@@ -101,6 +101,10 @@ query FetchPRContext($owner: String!, $repo: String!, $pr: Int!) {
   }
 }' | jq '.data.repository.pullRequest as $pr |
   ["codecov"] as $ci_bots |
+  # Use // [] defaults on every collection traversal so missing keys produce
+  # explicit empty arrays rather than triggering jq exit code 5 (which is
+  # silent at the agent layer — see R18 in the v2 brainstorm). Same defense
+  # for nullable user fields like .author.login on deleted accounts.
   {
     pr: {
       number: $pr.number,
@@ -109,27 +113,27 @@ query FetchPRContext($owner: String!, $repo: String!, $pr: Int!) {
       body: $pr.body,
       headRefName: $pr.headRefName,
       baseRefName: $pr.baseRefName,
-      author: $pr.author.login
+      author: ($pr.author.login // null)
     },
-    review_threads: [$pr.reviewThreads.edges[]
+    review_threads: [(($pr.reviewThreads.edges) // [])[]
       | { resolved: .node.isResolved,
           outdated: .node.isOutdated,
           path: .node.path,
           line: .node.line,
-          comments: [.node.comments.nodes[]
-            | { author: .author.login, body: .body, createdAt: .createdAt, url: .url }] }],
-    review_bodies: [$pr.reviews.nodes[]
+          comments: [((.node.comments.nodes) // [])[]
+            | { author: (.author.login // null), body: .body, createdAt: .createdAt, url: .url }] }],
+    review_bodies: [(($pr.reviews.nodes) // [])[]
       | select(.body != null and .body != "")
-      | select(.author.login as $l | $ci_bots | index($l) | not)
-      | { author: .author.login, body: .body, state: .state, submittedAt: .submittedAt }],
-    pr_comments: [$pr.comments.nodes[]
-      | select(.author.login != $pr.author.login)
-      | select(.author.login as $l | $ci_bots | index($l) | not)
+      | select((.author.login // "") as $l | $ci_bots | index($l) | not)
+      | { author: (.author.login // null), body: .body, state: .state, submittedAt: .submittedAt }],
+    pr_comments: [(($pr.comments.nodes) // [])[]
+      | select((.author.login // "") != ($pr.author.login // ""))
+      | select((.author.login // "") as $l | $ci_bots | index($l) | not)
       | select(.body | test("^\\s*$") | not)
-      | { author: .author.login, body: .body, createdAt: .createdAt }],
-    commits: [$pr.commits.nodes[]
+      | { author: (.author.login // null), body: .body, createdAt: .createdAt }],
+    commits: [(($pr.commits.nodes) // [])[]
       | { sha: .commit.oid,
           subject: .commit.messageHeadline,
           body: .commit.messageBody,
-          author: .commit.author.name }]
+          author: (.commit.author.name // null) }]
   }'
