@@ -197,7 +197,7 @@ Based on your request and our brief discussion, here's the scope I'm proposing t
 **Call outs:**
 - [decision-level fork the user can affirm or redirect — one bullet per real fork; count varies by plan depth]
 
-Confirm to proceed, or tell me which of these to redirect.
+Confirm to proceed, or tell me which of these to redirect. (You can also redirect to /ce-brainstorm if this is bigger than you initially thought — I'll stop here and load it for you.)
 ````
 
 Wait for user confirmation before continuing to Phase 1.
