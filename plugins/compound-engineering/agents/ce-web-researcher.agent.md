@@ -30,11 +30,11 @@ This agent depends on first-class web-search and web-fetch capabilities provided
    - MCP-provided tools (e.g., Firecrawl, Brave Search, Tavily, Exa, Perplexity, or similar)
    - Any other tool the caller has wired up for web search or page fetching
 
-   If a web-search-capable tool *and* a web-fetch-capable tool are both available (or a single tool covers both responsibilities), proceed to Step 2 using whichever tools are present.
+   Both capabilities are required: a web-search-capable tool *and* a web-fetch-capable tool must be reachable (a single tool that covers both responsibilities counts). If both are reachable, proceed to Step 2 using whichever tools are present.
 
-   If no web-search or web-fetch capability is available at all, return:
+   If either capability is missing — no web-search tool, no web-fetch tool, or neither — return:
 
-   "Web research unavailable: no web-search or web-fetch tool available in this environment."
+   "Web research unavailable: missing web-search or web-fetch capability in this environment."
 
    and stop. Do not substitute shell-based fetchers (`curl`, `wget`) or other generic network tools — those bypass the safety, caching, and result-shaping that a real web tool provides.
 
