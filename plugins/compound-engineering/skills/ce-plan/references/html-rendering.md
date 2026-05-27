@@ -324,6 +324,23 @@ across categories, a bar chart is the right shape; if it's component
 relationships, a topology diagram; if it's process flow across
 participants, a swim lane; etc.
 
+**Conceptual diagrams are not wireframes.** The wireframe affordance below
+is scoped to brainstorm requirements docs about *visual products* and is
+excluded for non-visual systems. That exclusion is about wireframes only —
+a brainstorm about a data model, schema, agent workflow, or migration is
+still free to use a conceptual diagram (a before/after field map, a
+source-of-truth fan-out, a state diagram). Don't let the wireframe
+exclusion suppress a conceptual diagram the content warrants.
+
+**Diagrams complement prose; they never replace it.** A diagram is an
+accelerant placed next to the prose it illustrates, not a substitute. The
+IDed prose stays complete and standalone — a reader who ignores every
+diagram still gets the full content in text, and a text-reading downstream
+agent (which does not parse SVG geometry) is never left with a relationship
+that exists only in the picture. This extends the prose-is-authoritative
+rule above: prose governs not only on disagreement but on completeness, so
+adding a diagram is not license to thin the prose it depicts.
+
 ### Layout legibility for hand-authored SVG
 
 The agent designs SVG coordinates without rendering — layouts that look
@@ -508,6 +525,9 @@ Before returning the artifact, scan it for common slips:
 - **`<details>`** inside repeating cards have no `open` attribute.
 - **Diagram labels** are legible — no arrow paths crossing text,
   halo width appropriate for font size.
+- **Diagrams complement prose, not replace it.** Every relationship a
+  diagram conveys is also present in the surrounding IDed prose; no
+  content lives only in an SVG.
 - **No JS framework runtimes** included. Small inline `<script>` for
   active-section TOC tracking or anchor-permalink behavior is the only
   acceptable JS.
