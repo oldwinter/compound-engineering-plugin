@@ -1,38 +1,38 @@
-name: Release Preview
+name: Release Preview（发布预览）
 
 on:
   workflow_dispatch:
     inputs:
       title:
-        description: "Conventional title to evaluate (defaults to the latest commit title on this ref)"
+        description: "要评估的 Conventional title（默认使用此 ref 上最新 commit title）"
         required: false
         type: string
       cli_bump:
-        description: "CLI bump override"
+        description: "CLI bump override（覆盖 CLI 版本 bump）"
         required: false
         type: choice
         options: [auto, patch, minor, major]
         default: auto
       compound_engineering_bump:
-        description: "compound-engineering bump override"
+        description: "compound-engineering bump override（覆盖 compound-engineering 版本 bump）"
         required: false
         type: choice
         options: [auto, patch, minor, major]
         default: auto
       coding_tutor_bump:
-        description: "coding-tutor bump override"
+        description: "coding-tutor bump override（覆盖 coding-tutor 版本 bump）"
         required: false
         type: choice
         options: [auto, patch, minor, major]
         default: auto
       marketplace_bump:
-        description: "marketplace bump override"
+        description: "marketplace bump override（覆盖 marketplace 版本 bump）"
         required: false
         type: choice
         options: [auto, patch, minor, major]
         default: auto
       cursor_marketplace_bump:
-        description: "cursor-marketplace bump override"
+        description: "cursor-marketplace bump override（覆盖 cursor-marketplace 版本 bump）"
         required: false
         type: choice
         options: [auto, patch, minor, major]
@@ -47,15 +47,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Bun
+      - name: 设置 Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Install dependencies
+      - name: 安装依赖
         run: bun install --frozen-lockfile
 
-      - name: Determine title and changed files
+      - name: 确定 title 和 changed files
         id: inputs
         shell: bash
         run: |
@@ -69,15 +69,15 @@ jobs:
           echo "title=$TITLE" >> "$GITHUB_OUTPUT"
           echo "files=$FILES" >> "$GITHUB_OUTPUT"
 
-      - name: Add preview note
+      - name: 添加 preview note
         run: |
-          echo "This preview currently evaluates the selected ref from its latest commit title and changed files." >> "$GITHUB_STEP_SUMMARY"
-          echo "It is side-effect free, but it does not yet reconstruct the full accumulated open release PR state." >> "$GITHUB_STEP_SUMMARY"
+          echo "此 preview 目前会根据 selected ref 的 latest commit title 和 changed files 进行评估。" >> "$GITHUB_STEP_SUMMARY"
+          echo "它没有 side effects，但尚不会重建完整 accumulated open release PR state。" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Validate release metadata
+      - name: 验证 release metadata
         run: bun run release:validate
 
-      - name: Preview release
+      - name: 预览 release
         shell: bash
         run: |
           TITLE='${{ steps.inputs.outputs.title }}'
@@ -96,6 +96,6 @@ jobs:
 
           bun run scripts/release/preview.ts "${args[@]}" | tee /tmp/release-preview.txt
 
-      - name: Publish preview summary
+      - name: 发布 preview summary
         shell: bash
         run: cat /tmp/release-preview.txt >> "$GITHUB_STEP_SUMMARY"

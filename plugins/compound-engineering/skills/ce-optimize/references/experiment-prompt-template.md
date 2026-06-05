@@ -1,10 +1,10 @@
-# Experiment Worker Prompt Template
+# Experiment Worker Prompt Template（Experiment Worker Prompt 模板）
 
-This template is used by the orchestrator to dispatch each experiment to a subagent or Codex. Variable substitution slots are filled at spawn time.
+此 template 由 orchestrator 用来将每个 experiment dispatch 给 subagent 或 Codex。Variable substitution slots 在 spawn time 填充。
 
 ---
 
-## Template
+## Template（模板）
 
 ```
 You are an optimization experiment worker.
@@ -64,26 +64,26 @@ Focus on implementing the hypothesis well. The orchestrator will measure and eva
 </instructions>
 ```
 
-## Variable Reference
+## Variable Reference（变量参考）
 
 | Variable | Source | Description |
 |----------|--------|-------------|
 | `{iteration}` | Experiment counter | Sequential experiment number |
 | `{spec_name}` | Spec file `name` field | Optimization target identifier |
-| `{hypothesis_description}` | Hypothesis backlog | What this experiment should try |
-| `{hypothesis_category}` | Hypothesis backlog | Category (signal-extraction, algorithm, etc.) |
-| `{current_best_metrics}` | Experiment log `best` section | Current best metric values (compact YAML or key: value pairs) |
-| `{baseline_metrics}` | Experiment log `baseline` section | Original baseline before any optimization |
-| `{scope_mutable}` | Spec `scope.mutable` | List of files/dirs the worker may modify |
-| `{scope_immutable}` | Spec `scope.immutable` | List of files/dirs the worker must not touch |
-| `{constraints}` | Spec `constraints` | Free-text constraints to follow |
-| `{approved_dependencies}` | Spec `dependencies.approved` | Dependencies approved for use |
-| `{recent_experiment_summaries}` | Rolling window (last 10) from experiment log | Compact summaries: hypothesis, outcome, learnings |
+| `{hypothesis_description}` | Hypothesis backlog | 此 experiment 应尝试什么 |
+| `{hypothesis_category}` | Hypothesis backlog | Category（signal-extraction、algorithm 等） |
+| `{current_best_metrics}` | Experiment log `best` section | 当前最佳 metric values（compact YAML 或 key: value pairs） |
+| `{baseline_metrics}` | Experiment log `baseline` section | 任何 optimization 前的 original baseline |
+| `{scope_mutable}` | Spec `scope.mutable` | Worker 可修改的 files/dirs list |
+| `{scope_immutable}` | Spec `scope.immutable` | Worker 不得触碰的 files/dirs list |
+| `{constraints}` | Spec `constraints` | 需要遵循的 free-text constraints |
+| `{approved_dependencies}` | Spec `dependencies.approved` | 已批准使用的 dependencies |
+| `{recent_experiment_summaries}` | Rolling window (last 10) from experiment log | Compact summaries：hypothesis、outcome、learnings |
 
-## Notes
+## Notes（说明）
 
-- This template works for both subagent and Codex dispatch. No platform-specific assumptions.
-- For Codex dispatch: write the filled template to a temp file and pipe via stdin (`cat /tmp/optimize-exp-XXXXX.txt | codex exec --skip-git-repo-check - 2>&1`).
-- For subagent dispatch: pass the filled template as the subagent prompt.
-- Keep `{recent_experiment_summaries}` concise -- 2-3 lines per experiment, last 10 only. Do not include the full experiment log.
-- The worker should NOT read the full experiment log or strategy digest. It receives only what the orchestrator provides.
+- 此 template 同时适用于 subagent 和 Codex dispatch。没有 platform-specific assumptions。
+- 对 Codex dispatch：将 filled template 写到 temp file，并通过 stdin pipe（`cat /tmp/optimize-exp-XXXXX.txt | codex exec --skip-git-repo-check - 2>&1`）。
+- 对 subagent dispatch：将 filled template 作为 subagent prompt 传入。
+- 保持 `{recent_experiment_summaries}` 简洁：每个 experiment 2-3 行，只取最近 10 个。不要包含完整 experiment log。
+- Worker 不应读取完整 experiment log 或 strategy digest。它只接收 orchestrator 提供的内容。

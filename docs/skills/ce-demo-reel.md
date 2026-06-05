@@ -1,189 +1,189 @@
 # `ce-demo-reel`
 
-> Capture a visual demo reel — GIF, terminal recording, screenshots — for PR descriptions. Real product usage, not test output.
+> 为 PR descriptions 捕获 visual demo reel：GIF、terminal recording、screenshots。真实 product usage，不是 test output。
 
-`ce-demo-reel` is the **evidence capture** skill. It detects the project type, recommends the right capture tier (browser reel / terminal recording / screenshot reel / static screenshots), records the actual feature in action, uploads to a public URL, and returns markdown ready for a PR description. **Evidence means using the product**, not running tests — "I ran npm test" is test evidence. Capture is running the actual CLI command, opening the web app, making the API call, or triggering the feature.
+`ce-demo-reel` 是 **evidence capture** skill。它会检测 project type，推荐合适 capture tier（browser reel / terminal recording / screenshot reel / static screenshots），记录真实 feature in action，上传到 public URL，并返回可直接放入 PR description 的 markdown。**Evidence 指使用 product**，不是运行 tests；"I ran npm test" 是 test evidence。Capture 是运行真实 CLI command、打开 web app、发出 API call，或触发 feature。
 
-It's most often invoked by `/ce-commit-push-pr` when a change has observable behavior, but also directly when you want to add a demo to a PR description after the fact.
+它最常由 `/ce-commit-push-pr` 在 change 有 observable behavior 时调用，也可在事后直接调用，把 demo 加到 PR description 中。
 
 ---
 
 ## TL;DR
 
-| Question | Answer |
+| Question（问题） | Answer（答案） |
 |----------|--------|
-| What does it do? | Detects project type, picks a capture tier, records the feature in action, uploads, returns markdown for PR inclusion |
-| When to use it | Shipping UI changes, CLI features, API behavior with runnable examples — anything where visual evidence helps |
-| What it produces | A public URL (or local path) and a `Tier`/`Description` ready for `ce-commit-push-pr` to splice into a PR body |
-| Tiers | Browser reel, terminal recording, screenshot reel, static screenshots, no evidence needed |
+| 它做什么？ | 检测 project type、选择 capture tier、记录 feature in action、上传，并返回可放入 PR 的 markdown |
+| 何时使用 | Shipping UI changes、CLI features、带 runnable examples 的 API behavior；任何 visual evidence 有帮助的场景 |
+| 产出什么 | Public URL（或 local path）以及可供 `ce-commit-push-pr` splice 进 PR body 的 `Tier`/`Description` |
+| Tiers | Browser reel、terminal recording、screenshot reel、static screenshots、no evidence needed |
 
 ---
 
-## The Problem
+## 问题
 
-PR descriptions without evidence are weaker for predictable reasons:
+没有 evidence 的 PR descriptions 会更弱，原因很可预测：
 
-- **Reviewers can't see what changed** — they have to clone, build, run, and reproduce just to verify a UI render
-- **Visual regressions are silent** — no recorded baseline means a future regression may go unnoticed for weeks
-- **Evidence gets faked under pressure** — when capturing the real flow is hard, agents substitute test output and label it "Demo"
-- **Capturing eats focus** — figuring out which tool to use, getting the right window size, finding a public host, generating the markdown — all distracts from shipping
-- **Secrets leak into recordings** — credentials in CLI output, URL bars, DevTools, env exports — the demo ships with the leak
-- **Local-only artifacts** — recordings on disk that never make it to the PR description, or break when the local file moves
+- **Reviewers 看不到 change**：他们必须 clone、build、run、reproduce，才能验证 UI render
+- **Visual regressions 沉默无声**：没有 recorded baseline，未来 regression 可能数周无人注意
+- **压力下 evidence 会被伪造**：当捕获真实 flow 太难时，agents 会用 test output 替代并标成 "Demo"
+- **Capturing 吃掉注意力**：选择工具、设置 window size、找 public host、生成 markdown，都会分散 shipping 精力
+- **Secrets 泄露进 recordings**：CLI output、URL bars、DevTools、env exports 中的 credentials，会随 demo 一起 ship
+- **Local-only artifacts**：录屏留在磁盘上，没有进入 PR description；或 local file 移动后断掉
 
-## The Solution
+## 方案
 
-`ce-demo-reel` runs as a structured capture flow with explicit fallbacks:
+`ce-demo-reel` 以 structured capture flow 运行，并带 explicit fallbacks：
 
-- **Project detection** picks the right tier automatically (browser reel for web apps, terminal recording for CLIs)
-- **Real product usage** — the skill exercises the feature first to verify it works, then captures
-- **Tier fallback chain** — if the chosen tier fails, the skill drops to the next available tier rather than failing the run
-- **Secret-safe by design** — recordings stay in the visible transcript only; secrets stay in env vars or out of frame; pre-upload scan catches leaks
-- **Test output is never labeled "Demo"** — that distinction is absolute
-- **Upload to public host** — returns a real public URL ready for `## Demo` embedding
-- **Skip-cleanly when irrelevant** — docs-only, markdown-only, internal refactors get an explicit "no evidence needed" rather than fake substitutes
+- **Project detection** 自动选择正确 tier（web apps 用 browser reel，CLIs 用 terminal recording）
+- **Real product usage**：skill 先 exercise feature 验证它工作，再 capture
+- **Tier fallback chain**：所选 tier 失败时，skill 会降级到下一个可用 tier，而不是让 run 失败
+- **Secret-safe by design**：recordings 只保留 visible transcript；secrets 留在 env vars 或画面外；pre-upload scan 捕捉 leaks
+- **Test output 永远不标成 "Demo"**：这一区分是绝对的
+- **Upload to public host**：返回可嵌入 `## Demo` 的真实 public URL
+- **Irrelevant 时 clean skip**：docs-only、markdown-only、internal refactors 得到明确的 "no evidence needed"，而不是 fake substitutes
 
 ---
 
-## What Makes It Novel
+## 它的新意
 
-### 1. Evidence means using the product — strict separation from test output
+### 1. Evidence 指使用 product：严格区分 test output
 
-The skill enforces an absolute distinction: **evidence is running the actual CLI command, opening the web app, making the API call, or triggering the feature.** Test output (`npm test`, `pytest`, etc.) is never labeled "Demo" or "Screenshots." If real product usage is impractical (requires API keys, cloud deploy, paid services, bot tokens), the skill says so explicitly and recommends a fallback rather than silently substituting test output.
+Skill 强制绝对区分：**evidence 是运行真实 CLI command、打开 web app、发出 API call 或触发 feature。** Test output（`npm test`、`pytest` 等）永远不会被标为 "Demo" 或 "Screenshots"。如果真实 product usage 不可行（需要 API keys、cloud deploy、paid services、bot tokens），skill 会明确说明并推荐 fallback，而不是静默用 test output 代替。
 
-### 2. Four tiers — picked by project type and change shape
+### 2. 四个 tiers：按 project type 和 change shape 选择
 
-| Tier | When |
+| Tier | When（何时使用） |
 |------|------|
-| **Browser reel** | Web apps with motion or interaction (forms, transitions, real-time updates) — agent-browser screenshots stitched into animated GIF |
-| **Terminal recording** | CLI tools with motion (typing flows, streaming output) — VHS recording to GIF |
-| **Screenshot reel** | CLI with discrete steps — styled terminal frames stitched into GIF |
-| **Static screenshots** | Fallback when other tools are unavailable; or naturally discrete states |
-| **No evidence needed** | Docs-only, config-only, CI-only, test-only, or pure internal refactors |
+| **Browser reel** | 有 motion 或 interaction 的 web apps（forms、transitions、real-time updates）：agent-browser screenshots stitched into animated GIF |
+| **Terminal recording** | 有 motion 的 CLI tools（typing flows、streaming output）：VHS recording to GIF |
+| **Screenshot reel** | 有 discrete steps 的 CLI：styled terminal frames stitched into GIF |
+| **Static screenshots** | 其他 tools 不可用时 fallback；或天然是 discrete states |
+| **No evidence needed** | Docs-only、config-only、CI-only、test-only 或 pure internal refactors |
 
-The recommendation factors in project type (web-app vs CLI), change classification (motion vs states), and tool availability (preflight check confirms what's installed). The user picks among the available tiers.
+Recommendation 会综合 project type（web-app vs CLI）、change classification（motion vs states）和 tool availability（preflight check 确认 installed）。用户在 available tiers 中选择。
 
-### 3. Stateless target discovery — branch-aware, not session-bound
+### 3. Stateless target discovery：branch-aware，不依赖 session
 
-The skill assumes it may be invoked in a fresh session after the work was already done. It doesn't rely on conversation history or assume the caller knows the right artifact. Target discovery uses: current branch name, open PR title and description, changed files and diff, recent commits, and a plan file only when obviously referenced. When invoked by another skill, the caller-provided target is treated as a hint, not proof — the skill re-runs target discovery and validation before capturing.
+Skill 假设它可能在 fresh session 中、work 已经完成后被调用。它不依赖 conversation history，也不假设 caller 知道正确 artifact。Target discovery 使用：current branch name、open PR title 和 description、changed files 和 diff、recent commits，以及只有在明显 referenced 时才使用的 plan file。当由其他 skill 调用时，caller-provided target 只作为 hint，不是 proof；capture 前，skill 会重新运行 target discovery 和 validation。
 
-### 4. Secret-safety by design — transcript hygiene, not blur-after-the-fact
+### 4. Secret-safety by design：transcript hygiene，而不是事后 blur
 
-The skill never records credentials. Secrets affect the environment, not the visible transcript:
+Skill 永远不记录 credentials。Secrets 影响 environment，不出现在 visible transcript：
 
-- Plan secrets out of frame — env vars set before recording, CLI invoked via env vars not flag values, demonstrations of authenticated states (not auth steps)
-- **No placeholder substitution inside recordings** — typing a fake `sk-xxxxx` produces a misleading artifact and may break the demo (`401 Unauthorized` because the fake env var overwrites the real one)
-- **Pre-upload scan** — looks for `sk-`, `ghp_`, `Bearer`, `Authorization:`, `?token=`, `api_key=`, long hex/base64 near credential-sounding labels. If any appear, discard and recapture. Never blur or crop.
+- 把 secrets 规划到画面外：recording 前设置 env vars，CLI 通过 env vars 调用而不是 flag values，展示 authenticated states 而不是 auth steps
+- **Recordings 内不要 placeholder substitution**：输入 fake `sk-xxxxx` 会生成 misleading artifact，也可能破坏 demo（fake env var 覆盖真实值导致 `401 Unauthorized`）
+- **Pre-upload scan**：查找 `sk-`、`ghp_`、`Bearer`、`Authorization:`、`?token=`、`api_key=`，以及 credential-sounding labels 附近的 long hex/base64。一旦出现，discard 并 recapture。绝不 blur 或 crop。
 
-### 5. Runtime fallback chain
+### 5. Runtime fallback chain（运行时 fallback 链）
 
-If the selected tier fails during execution (tool crashes, server unreachable, recording produces empty output), the skill falls back to the next available tier rather than failing the run:
+如果 selected tier 执行中失败（tool crashes、server unreachable、recording 产出 empty output），skill 会 fallback 到下一个 available tier，而不是让整个 run 失败：
 
-- Browser reel → static screenshots
-- Terminal recording → screenshot reel → static screenshots
-- Screenshot reel → static screenshots
-- Static screenshots → report failure to user
+- Browser reel -> static screenshots（静态截图）
+- Terminal recording -> screenshot reel -> static screenshots（静态截图）
+- Screenshot reel -> static screenshots（静态截图）
+- Static screenshots -> 向用户报告 failure
 
-### 6. Pre-flight tool detection
+### 6. Pre-flight tool detection（预检工具检测）
 
-Before capturing, the preflight script checks tool availability (`agent_browser`, `vhs`, `silicon`, `ffmpeg`, `ffprobe`) and outputs which tiers are usable. The skill prints install commands for missing tools (`brew install charmbracelet/tap/vhs`, `brew install silicon`) so the user can enable richer tiers if they want.
+Capture 前，preflight script 会检查 tool availability（`agent_browser`、`vhs`、`silicon`、`ffmpeg`、`ffprobe`），并输出哪些 tiers 可用。Skill 会打印 missing tools 的 install commands（`brew install charmbracelet/tap/vhs`、`brew install silicon`），用户可自行启用更 rich tiers。
 
-### 7. Per-run scratch directory in OS temp
+### 7. OS temp 中的 per-run scratch directory
 
-Each capture creates a per-run directory in OS temp (`mktemp -d -t demo-reel-XXXXXX`) for ephemeral artifacts. Recordings get uploaded to a public host then discarded — they don't pollute the repo tree. The user only sees the final URL.
+每次 capture 都会在 OS temp 中创建 per-run directory（`mktemp -d -t demo-reel-XXXXXX`）存放 ephemeral artifacts。Recordings 会上传到 public host 后丢弃，不污染 repo tree。用户只看到 final URL。
 
-### 8. Stable output contract for upstream callers
+### 8. 给 upstream callers 的 stable output contract
 
-The skill returns a structured envelope (`Tier`, `Description`, `URL`, `Path`) where exactly one of `URL` or `Path` carries a real value (the other is `"none"`). The caller — usually `/ce-commit-push-pr` — formats this into the PR description's `## Demo` or `## Screenshots` section. Static screenshots get the "Screenshots" label; all motion tiers get "Demo." Test output never gets either.
-
----
-
-## Quick Example
-
-You finish a notification settings page. You invoke `/ce-commit-push-pr`, which detects observable behavior and asks whether to capture evidence. You say yes. It loads `/ce-demo-reel`.
-
-The skill discovers the target from branch + PR diff: a settings page route with toggles. It exercises the feature (navigates to `/settings/notifications`, toggles a few options, verifies hot-reload works). Detects project type as `web-app` (Next.js). Classifies the change as `motion` (toggle state changes, micro-animations).
-
-Preflight finds `agent_browser` and `ffmpeg` available — recommends **browser reel**. You confirm. The skill captures a sequence of agent-browser screenshots through the toggle flow, stitches them into a GIF via ffmpeg, scans for secrets (none found), uploads to a public host, returns the URL.
-
-`/ce-commit-push-pr` splices `## Demo` with the GIF embed into the PR body. Total elapsed time: ~30 seconds.
+Skill 返回 structured envelope（`Tier`、`Description`、`URL`、`Path`），其中 `URL` 或 `Path` 恰好一个带真实值（另一个是 `"none"`）。Caller，通常是 `/ce-commit-push-pr`，会把它格式化进 PR description 的 `## Demo` 或 `## Screenshots` section。Static screenshots 使用 "Screenshots" label；所有 motion tiers 使用 "Demo"。Test output 永远不使用任一 label。
 
 ---
 
-## When to Reach For It
+## 快速示例
 
-Reach for `ce-demo-reel` when:
+你完成 notification settings page。调用 `/ce-commit-push-pr`，它检测到 observable behavior 并询问是否 capture evidence。你回答 yes。它加载 `/ce-demo-reel`。
 
-- A PR has observable behavior worth showing (UI render, CLI output, API call with runnable example)
-- A bug fix has a before/after worth demonstrating
-- The feature requires interaction or motion that prose doesn't capture
-- You're shipping a CLI feature where output formatting matters
+Skill 从 branch + PR diff 发现 target：一个带 toggles 的 settings page route。它 exercise feature（导航到 `/settings/notifications`，切换几个 options，验证 hot-reload works）。检测 project type 为 `web-app`（Next.js）。将 change 分类为 `motion`（toggle state changes、micro-animations）。
 
-Skip `ce-demo-reel` when:
+Preflight 发现 `agent_browser` 和 `ffmpeg` 可用，推荐 **browser reel**。你确认。Skill 通过 agent-browser 截取 toggle flow 的一系列 screenshots，用 ffmpeg 拼成 GIF，扫描 secrets（未发现），上传到 public host，并返回 URL。
 
-- The change is docs-only, markdown-only, CI-only, test-only, or pure internal refactor — pick "No evidence needed"
-- Real product usage requires resources you don't have (paid services, cloud deploy, bot tokens) — say so explicitly rather than fake it
-- The diff genuinely speaks for itself
+`/ce-commit-push-pr` 把带 GIF embed 的 `## Demo` splice 到 PR body。总耗时约 30 秒。
 
 ---
 
-## Use as Part of the Workflow
+## 何时使用
 
-`ce-demo-reel` is invoked by other skills when behavior is observable:
+在以下情况使用 `ce-demo-reel`：
 
-- **`/ce-commit-push-pr` Step 6** — calls this skill when the change has UI / CLI / API behavior and asks the user whether to capture
-- **`/ce-work` Phase 4.1** — Evidence Context — flags whether evidence is possible so `ce-commit-push-pr` can ask the right question
+- PR 有值得展示的 observable behavior（UI render、CLI output、带 runnable example 的 API call）
+- Bug fix 有值得展示的 before/after
+- Feature 需要 prose 无法捕捉的 interaction 或 motion
+- Shipping CLI feature 且 output formatting 很重要
 
-The skill returns `Tier`, `Description`, `URL`, `Path` — the caller decides how to format the result into the PR description.
+以下情况跳过 `ce-demo-reel`：
 
----
-
-## Use Standalone
-
-The skill is also invoked directly:
-
-- **After a PR is already open** — `/ce-demo-reel "the new settings page"` to add a demo to an existing PR
-- **For a specific behavior** — `/ce-demo-reel "CLI output of the migrate command"`
-- **Without a description** — `/ce-demo-reel` infers from branch/PR/diff context and asks if ambiguous
-
-When invoked outside `ce-commit-push-pr`, the user typically copies the returned markdown into the PR description manually, or uses `gh pr edit --body-file` separately.
+- Change 是 docs-only、markdown-only、CI-only、test-only 或 pure internal refactor：选择 "No evidence needed"
+- 真实 product usage 需要你没有的 resources（paid services、cloud deploy、bot tokens）：明确说明，而不是伪造
+- Diff 确实 self-explanatory
 
 ---
 
-## Reference
+## 作为 Workflow 的一部分使用
 
-| Argument | Effect |
+当 behavior observable 时，其他 skills 会调用 `ce-demo-reel`：
+
+- **`/ce-commit-push-pr` Step 6**：当 change 有 UI / CLI / API behavior 时调用此 skill，并询问用户是否 capture
+- **`/ce-work` Phase 4.1**：Evidence Context，标记 evidence 是否可行，让 `ce-commit-push-pr` 能问对问题
+
+Skill 返回 `Tier`、`Description`、`URL`、`Path`；caller 决定如何把 result 格式化进 PR description。
+
+---
+
+## 单独使用
+
+Skill 也可直接调用：
+
+- **PR 已经打开后**：`/ce-demo-reel "the new settings page"`，给 existing PR 添加 demo
+- **特定 behavior**：`/ce-demo-reel "CLI output of the migrate command"`
+- **无 description**：`/ce-demo-reel` 从 branch/PR/diff context infer，ambiguous 时询问
+
+当不通过 `ce-commit-push-pr` 调用时，用户通常手动把返回 markdown 复制到 PR description，或另外使用 `gh pr edit --body-file`。
+
+---
+
+## 参考
+
+| Argument（参数） | Effect（效果） |
 |----------|--------|
-| _(empty)_ | Infers target from branch/PR/diff context; asks if ambiguous |
-| `<description>` | e.g., "the new settings page", "CLI output of the migrate command" |
+| _(empty)_ | 从 branch/PR/diff context infer target；ambiguous 时询问 |
+| `<description>` | 例如 "the new settings page"、"CLI output of the migrate command" |
 
-Tier selection is offered as a blocking question once the recommendation is computed; the user picks among available tiers.
-
----
-
-## FAQ
-
-**Why isn't test output evidence?**
-Tests prove logic in isolation; they say nothing about whether the feature works for a user. A reviewer needs to know "what does this look like when used", not "do the unit tests pass" (CI shows that). The strict separation prevents agents from substituting easy test runs for harder real-product captures.
-
-**What if real evidence requires credentials I don't want to record?**
-Set the credential before the recording starts, outside the recorded region. Demonstrate the *authenticated result*, not the auth step. Never type `export API_KEY=fake` inside the recording — that overwrites your real env var and breaks the demo (`401 Unauthorized`). If you can't capture without showing the secret, say so and pick "No evidence needed" or recommend a fallback.
-
-**What if the chosen tier fails mid-capture?**
-The skill falls back to the next available tier rather than failing entirely. Browser reel → static screenshots. Terminal recording → screenshot reel → static screenshots. If even static screenshots fail, the skill reports the failure and lets you decide.
-
-**Where does the GIF or screenshot live?**
-Per-run artifacts go to OS temp (`/tmp/...`) and get uploaded to a public host. The local files are ephemeral. The URL goes into the PR description; the local copies are discarded.
-
-**What about `--full` page screenshots?**
-Static screenshot tier supports full-page captures via agent-browser's `screenshot --full` for tall pages. The skill picks the right capture mode based on what's being demonstrated.
-
-**Why doesn't it auto-blur secrets that slipped in?**
-Because partial blur is a known-bad mitigation — even cropped or blurred secrets can leak via metadata, frame edges, or visible patterns. The skill's discipline is: scan before upload, recapture if anything looks like a secret. Recapture is the only remediation.
+Tier selection 会在 recommendation 计算后作为 blocking question 提供；用户在 available tiers 中选择。
 
 ---
 
-## See Also
+## 常见问题
 
-- [`ce-commit-push-pr`](./ce-commit-push-pr.md) — primary caller; splices the captured evidence into PR descriptions
-- [`ce-work`](./ce-work.md) — flags evidence context at Phase 4.1 so the PR flow can ask the right question
-- [`ce-test-browser`](./ce-test-browser.md) — sibling skill for end-to-end browser testing (different goal: verify behavior, not capture)
+**为什么 test output 不是 evidence？**
+Tests 证明 isolated logic；它们不能说明 feature 对用户是否有效。Reviewer 需要知道 "what does this look like when used"，不是 "do the unit tests pass"（CI 会显示）。严格区分可防止 agents 用容易的 test runs 替代较难的 real-product captures。
+
+**如果真实 evidence 需要我不想录进去的 credentials 怎么办？**
+在 recording 开始前、recorded region 外设置 credential。展示 *authenticated result*，不是 auth step。不要在 recording 内输入 `export API_KEY=fake`；这会覆盖真实 env var 并破坏 demo（`401 Unauthorized`）。如果无法在不显示 secret 的情况下 capture，请说明并选择 "No evidence needed" 或推荐 fallback。
+
+**如果 chosen tier 在 capture 中途失败怎么办？**
+Skill 会 fallback 到下一个 available tier，而不是完全失败。Browser reel -> static screenshots。Terminal recording -> screenshot reel -> static screenshots。如果 static screenshots 也失败，skill 会报告 failure，并让你决定。
+
+**GIF 或 screenshot 存在哪里？**
+Per-run artifacts 存到 OS temp（`/tmp/...`）并上传到 public host。Local files 是 ephemeral。URL 放入 PR description；local copies 会丢弃。
+
+**`--full` page screenshots 怎么办？**
+Static screenshot tier 支持通过 agent-browser 的 `screenshot --full` 捕获 tall pages 的 full-page captures。Skill 会根据展示内容选择正确 capture mode。
+
+**为什么不自动 blur 漏进去的 secrets？**
+因为 partial blur 是已知不可靠 mitigation；即使 cropped 或 blurred secrets，也可能通过 metadata、frame edges 或 visible patterns 泄漏。Skill 的纪律是：upload 前 scan，如有任何像 secret 的内容就 recapture。Recapture 是唯一 remediation。
+
+---
+
+## 另请参阅
+
+- [`ce-commit-push-pr`](./ce-commit-push-pr.md) - primary caller；把 captured evidence splice 进 PR descriptions
+- [`ce-work`](./ce-work.md) - 在 Phase 4.1 标记 evidence context，让 PR flow 能问对问题
+- [`ce-test-browser`](./ce-test-browser.md) - sibling skill，用于 end-to-end browser testing（不同目标：verify behavior，而不是 capture）

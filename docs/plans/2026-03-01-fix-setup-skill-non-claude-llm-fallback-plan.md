@@ -1,44 +1,46 @@
 ---
-title: "fix: Setup skill fails silently on non-Claude LLMs due to AskUserQuestion dependency"
+title: "fix: Setup skill 因 AskUserQuestion 依赖在非 Claude LLM 上静默失败"
 type: fix
 status: active
 date: 2026-03-01
 ---
 
-## Enhancement Summary
+## 增强摘要
 
-**Deepened on:** 2026-03-01
-**Research agents used:** best-practices-researcher, architecture-strategist, code-simplicity-reviewer, scope-explorer
+**Deepened on（深化日期）：** 2026-03-01
+**Research agents used（使用的 research agents）：** best-practices-researcher, architecture-strategist, code-simplicity-reviewer, scope-explorer
 
-### Key Improvements
-1. Simplified preamble from 16 lines to 4 lines — drop platform name list and example blockquote (YAGNI)
-2. Expanded scope: `create-new-skill.md` also has `AskUserQuestion` and needs the same fix
-3. Clarified that `codex-agents.ts` change helps command/agent contexts only — does NOT reach skill execution (skills aren't converter-transformed)
-4. Added CLAUDE.md skill compliance policy as a third deliverable to prevent recurrence
-5. Separated two distinct failure modes: tool-not-found error vs silent auto-configuration
+### 关键改进
 
-### New Considerations Discovered
-- Only Pi converter transforms `AskUserQuestion` (incompletely); all others pass skill content through verbatim — the codex-agents.ts fix is independent of skill execution
-- `add-workflow.md` and `audit-skill.md` already explicitly prohibit `AskUserQuestion` — this undocumented policy should be formalized
-- Prose fallback is probabilistic (LLM compliance); converter-level transformation is the correct long-term architectural fix
-- The brainstorming skill avoids `AskUserQuestion` entirely and works cross-platform — that's the gold standard pattern
+1. 将 preamble 从 16 行简化到 4 行，移除 platform name list 和 example blockquote（YAGNI）
+2. 扩大 scope：`create-new-skill.md` 也使用 `AskUserQuestion`，需要同样 fix
+3. 澄清 `codex-agents.ts` 变更只帮助 command/agent contexts，**不会**触达 skill execution（skills 不经过 converter transform）
+4. 添加 CLAUDE.md skill compliance policy 作为第三个 deliverable，防止复发
+5. 分离两种不同 failure modes：tool-not-found error 与 silent auto-configuration
+
+### 新发现的考虑事项
+
+- 只有 Pi converter 会 transform `AskUserQuestion`（且不完整）；所有其他 converters 都原样透传 skill content，codex-agents.ts fix 与 skill execution 独立
+- `add-workflow.md` 和 `audit-skill.md` 已经明确禁止 `AskUserQuestion`，这条未记录 policy 应被正式化
+- Prose fallback 是概率性的（LLM compliance）；converter-level transformation 才是正确的长期架构 fix
+- brainstorming skill 完全避开 `AskUserQuestion`，并可跨平台工作，这是 gold standard pattern
 
 ---
 
-# fix: Setup Skill Cross-Platform Fallback for AskUserQuestion
+# fix: Setup Skill 的 AskUserQuestion 跨平台 Fallback
 
-## Overview
+## 概览
 
-The `setup` skill uses `AskUserQuestion` at 5 decision points. On non-Claude platforms (Codex, Gemini, OpenCode, Copilot, Kiro, etc.), this tool doesn't exist — the LLM reads the skill body but cannot call the tool, causing silent failure or unconsented auto-configuration. Fix by adding a minimal fallback instruction to the skill body, applying the same to `create-new-skill.md`, and adding a policy to the CLAUDE.md skill checklist to prevent recurrence.
+`setup` skill 在 5 个 decision points 使用 `AskUserQuestion`。在非 Claude platforms（Codex、Gemini、OpenCode、Copilot、Kiro 等）上，该 tool 不存在；LLM 会读取 skill body，但无法调用 tool，导致 silent failure 或未经同意的 auto-configuration。修复方式是在 skill body 中添加最小 fallback instruction，对 `create-new-skill.md` 应用相同变更，并向 CLAUDE.md skill checklist 添加 policy，防止复发。
 
-## Problem Statement
+## 问题陈述
 
-**Two distinct failure modes:**
+**两种不同 failure modes：**
 
-1. **Tool-not-found error** — LLM tries to call `AskUserQuestion` as a function; platform returns an error. Setup halts.
-2. **Silent skip** — LLM reads `AskUserQuestion` as prose, ignores the decision gate, auto-configures. User never consulted. This is worse — produces a `compound-engineering.local.md` the user never approved.
+1. **Tool-not-found error** — LLM 尝试将 `AskUserQuestion` 作为 function 调用；platform 返回 error。Setup 停止。
+2. **Silent skip** — LLM 将 `AskUserQuestion` 当作 prose 读取，忽略 decision gate，直接 auto-configures。用户从未被咨询。这更糟，会产生用户从未批准的 `compound-engineering.local.md`。
 
-`plugins/compound-engineering/skills/ce-setup/SKILL.md` has 5 `AskUserQuestion` blocks:
+`plugins/compound-engineering/skills/ce-setup/SKILL.md` 有 5 个 `AskUserQuestion` blocks：
 
 | Line | Decision Point |
 |------|----------------|
@@ -48,17 +50,17 @@ The `setup` skill uses `AskUserQuestion` at 5 decision points. On non-Claude pla
 | 85 | Focus areas (multiSelect) |
 | 104 | Review depth: Thorough / Fast / Comprehensive |
 
-`plugins/compound-engineering/skills/create-agent-skills/workflows/create-new-skill.md` lines 22 and 45 also use `AskUserQuestion`.
+`plugins/compound-engineering/skills/create-agent-skills/workflows/create-new-skill.md` lines 22 和 45 也使用 `AskUserQuestion`。
 
-Only the Pi converter transforms the reference (incompletely). All other converters (Codex, Gemini, Copilot, Kiro, Droid, Windsurf) pass skill content through verbatim — **skills are not converter-transformed**.
+只有 Pi converter 会 transform 该 reference（且不完整）。所有其他 converters（Codex、Gemini、Copilot、Kiro、Droid、Windsurf）都原样透传 skill content：**skills are not converter-transformed**。
 
-## Proposed Solution
+## 解决方案提议
 
-Three deliverables, each addressing a different layer:
+三个 deliverables，各自处理不同层级：
 
-### 1. Add 4-line "Interaction Method" preamble to `setup/SKILL.md`
+### 1. 向 `setup/SKILL.md` 添加 4 行 "Interaction Method" preamble
 
-Immediately after the `# Compound Engineering Setup` heading, insert:
+紧接 `# Compound Engineering Setup` heading 后插入：
 
 ```markdown
 ## Interaction Method
@@ -68,31 +70,33 @@ If `AskUserQuestion` is available, use it for all prompts below.
 If not, present each question as a numbered list and wait for a reply before proceeding to the next step. For multiSelect questions, accept comma-separated numbers (e.g. `1, 3`). Never skip or auto-configure.
 ```
 
-**Why 4 lines, not 16:** LLMs know what a numbered list is — no example blockquote needed. The branching condition is tool availability, not platform identity — no platform name list needed (YAGNI: new platforms will be added and lists go stale). State the "never skip" rule once here; don't repeat it in `codex-agents.ts`.
+**为什么是 4 行，而不是 16 行：** LLMs 知道 numbered list 是什么，不需要 example blockquote。分支条件是 tool availability，而不是 platform identity，因此不需要 platform name list（YAGNI：新 platforms 会增加，列表会过期）。在这里声明一次 "never skip" rule，不要在 `codex-agents.ts` 中重复。
 
-**Why this works:** The skill body IS read by the LLM on all platforms when `/ce-setup` is invoked. The agent follows prose instructions regardless of tool availability. This is the same pattern `brainstorming/SKILL.md` uses — it avoids `AskUserQuestion` entirely and uses inline numbered lists — the gold standard cross-platform approach.
+**为什么有效：** 在所有 platforms 上调用 `/ce-setup` 时，LLM 都会读取 skill body。agent 会遵循 prose instructions，不管 tool availability 如何。这与 `brainstorming/SKILL.md` 使用的 pattern 相同：它完全避开 `AskUserQuestion`，使用 inline numbered lists，是 gold standard cross-platform approach。
 
-### 2. Apply the same preamble to `create-new-skill.md`
+### 2. 对 `create-new-skill.md` 应用相同 preamble
 
-`plugins/compound-engineering/skills/create-agent-skills/workflows/create-new-skill.md` uses `AskUserQuestion` at lines 22 and 45. Apply an identical preamble at the top of that file.
+`plugins/compound-engineering/skills/create-agent-skills/workflows/create-new-skill.md` 在 lines 22 和 45 使用 `AskUserQuestion`。在该文件顶部应用相同 preamble。
 
-### 3. Strengthen `codex-agents.ts` AskUserQuestion mapping
+### 3. 强化 `codex-agents.ts` AskUserQuestion mapping
 
-This change does NOT fix skill execution (skills bypass the converter pipeline). It improves the AGENTS.md guidance for Codex command/agent contexts.
+该变更**不会**修复 skill execution（skills 会绕过 converter pipeline）。它改进 Codex command/agent contexts 的 AGENTS.md guidance。
 
-Replace (`src/utils/codex-agents.ts` line 21):
+替换（`src/utils/codex-agents.ts` line 21）：
+
 ```
 - AskUserQuestion/Question: ask the user in chat
 ```
 
-With:
+为：
+
 ```
 - AskUserQuestion/Question: present choices as a numbered list in chat and wait for a reply number. For multi-select (multiSelect: true), accept comma-separated numbers. Never skip or auto-configure — always wait for the user's response before proceeding.
 ```
 
-### 4. Add lint rule to CLAUDE.md skill compliance checklist
+### 4. 向 CLAUDE.md skill compliance checklist 添加 lint rule
 
-Add to the "Skill Compliance Checklist" in `plugins/compound-engineering/CLAUDE.md`:
+添加到 `plugins/compound-engineering/CLAUDE.md` 的 "Skill Compliance Checklist"：
 
 ```
 ### AskUserQuestion Usage
@@ -101,34 +105,34 @@ Add to the "Skill Compliance Checklist" in `plugins/compound-engineering/CLAUDE.
 - [ ] Prefer avoiding `AskUserQuestion` entirely (see brainstorming/SKILL.md pattern) for skills intended to run cross-platform
 ```
 
-## Technical Considerations
+## 技术考虑
 
-- `setup/SKILL.md` has `disable-model-invocation: true` — this controls session-startup context loading only, not skill-body execution at invocation time
-- The prose fallback is probabilistic (LLM compliance), not a build-time guarantee. The correct long-term architectural fix is converter-level transformation of skill content (a `transformSkillContent()` pass in each converter), but that is out of scope here
-- Commands with `AskUserQuestion` (`ce/brainstorm.md`, `ce/plan.md`, `test-browser.md`, etc.) have the same gap but are out of scope — explicitly noted as a future task
+- `setup/SKILL.md` 有 `disable-model-invocation: true`，它只控制 session-startup context loading，不控制 invocation time 的 skill-body execution
+- prose fallback 是概率性的（LLM compliance），不是 build-time guarantee。正确长期架构 fix 是 converter-level transformation of skill content（每个 converter 中的 `transformSkillContent()` pass），但这不在本次 scope 内
+- 使用 `AskUserQuestion` 的 Commands（`ce/brainstorm.md`、`ce/plan.md`、`test-browser.md` 等）存在同样 gap，但不在 scope 内，并明确记录为 future task
 
-## Acceptance Criteria
+## 验收标准
 
-- [ ] `setup/SKILL.md` has a 4-line "Interaction Method" preamble after the opening heading
-- [ ] `create-new-skill.md` has the same preamble
-- [ ] The skills still use `AskUserQuestion` as primary — no change to Claude Code behavior
-- [ ] `codex-agents.ts` AskUserQuestion line updated with structured guidance
-- [ ] `plugins/compound-engineering/CLAUDE.md` skill checklist includes AskUserQuestion policy
-- [ ] No regression: on Claude Code, setup works exactly as before
+- [ ] `setup/SKILL.md` 在 opening heading 后有 4 行 "Interaction Method" preamble
+- [ ] `create-new-skill.md` 有相同 preamble
+- [ ] skills 仍以 `AskUserQuestion` 为 primary，不改变 Claude Code behavior
+- [ ] `codex-agents.ts` AskUserQuestion 行已更新为 structured guidance
+- [ ] `plugins/compound-engineering/CLAUDE.md` skill checklist 包含 AskUserQuestion policy
+- [ ] No regression：在 Claude Code 上，setup 与之前完全一样工作
 
-## Files
+## 文件
 
-- `plugins/compound-engineering/skills/ce-setup/SKILL.md` — Add 4-line preamble after line 8
-- `plugins/compound-engineering/skills/create-agent-skills/workflows/create-new-skill.md` — Add same preamble at top
-- `src/utils/codex-agents.ts` — Strengthen AskUserQuestion mapping (line 21)
-- `plugins/compound-engineering/CLAUDE.md` — Add AskUserQuestion policy to skill compliance checklist
+- `plugins/compound-engineering/skills/ce-setup/SKILL.md` — 在 line 8 后添加 4 行 preamble
+- `plugins/compound-engineering/skills/create-agent-skills/workflows/create-new-skill.md` — 在顶部添加相同 preamble
+- `src/utils/codex-agents.ts` — 强化 AskUserQuestion mapping（line 21）
+- `plugins/compound-engineering/CLAUDE.md` — 向 skill compliance checklist 添加 AskUserQuestion policy
 
-## Future Work (Out of Scope)
+## Future Work（范围外）
 
-- Converter-level `transformSkillContent()` for all targets — build-time guarantee instead of prose fallback
-- Commands with `AskUserQuestion` (`ce/brainstorm.md`, `ce/plan.md`, `test-browser.md`) — same failure mode, separate fix
+- 面向所有 targets 的 converter-level `transformSkillContent()`，用 build-time guarantee 替代 prose fallback
+- 使用 `AskUserQuestion` 的 Commands（`ce/brainstorm.md`、`ce/plan.md`、`test-browser.md`）存在同样 failure mode，需要单独 fix
 
-## Sources & References
+## Sources & References（来源与参考）
 
 - Issue: [#204](https://github.com/EveryInc/compound-engineering-plugin/issues/204)
 - `plugins/compound-engineering/skills/ce-setup/SKILL.md`

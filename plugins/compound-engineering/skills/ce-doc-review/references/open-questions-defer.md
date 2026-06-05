@@ -1,33 +1,33 @@
-# Open Questions Deferral
+# Open Questions Deferral（开放问题延后）
 
-This reference defines the Defer action's in-doc append mechanic. When the user chooses Defer on a finding (from the walk-through or from the bulk-preview Append-to-Open-Questions path), an entry for that finding appends to a `## Deferred / Open Questions` section at the end of the document under review.
+本 reference 定义 Defer action 的 in-doc append 机制。当用户对某个 finding 选择 Defer（来自 walk-through，或来自 bulk-preview Append-to-Open-Questions path）时，会将该 finding 的 entry 追加到被 review 文档末尾的 `## Deferred / Open Questions` section。
 
-Interactive mode only. Invoked by `references/walkthrough.md` (per-finding Defer option) and `references/bulk-preview.md` (routing option C Proceed).
+仅 Interactive mode。由 `references/walkthrough.md`（per-finding Defer option）和 `references/bulk-preview.md`（routing option C Proceed）调用。
 
 ---
 
-## Append flow
+## Append flow（追加流程）
 
-### Step 1: Locate or create the Open Questions section
+### Step 1：Locate or create the Open Questions section（定位或创建 Open Questions section）
 
-Scan the document for an existing `## Deferred / Open Questions` heading (case-sensitive match on the full heading text). Behavior by location:
+扫描文档中是否已有 `## Deferred / Open Questions` heading（对完整 heading text 做 case-sensitive match）。按位置处理：
 
-- **Heading present at the end of the document (last `##`-level section):** append new content inside this section at the end.
-- **Heading present mid-document (not the last `##`-level section):** still append inside the existing heading at that location. Do not create a duplicate at the end — the user positioned the section deliberately.
-- **Heading absent:** create `## Deferred / Open Questions` at the end of the document. If the document has a trailing horizontal-rule separator (`---`) or a trailing footer (table, links section), insert the new section above it. If the document has only frontmatter and no body, create the section after the frontmatter block (not at byte 0).
+- **Heading 位于文档末尾（最后一个 `##`-level section）：** 在此 section 内末尾 append new content。
+- **Heading 位于文档中部（不是最后一个 `##`-level section）：** 仍在该位置已有 heading 内 append。不要在末尾创建 duplicate；这是用户刻意放置的 section。
+- **Heading 不存在：** 在文档末尾创建 `## Deferred / Open Questions`。如果文档有 trailing horizontal-rule separator（`---`）或 trailing footer（table、links section），将新 section 插在其上方。如果文档只有 frontmatter 而没有 body，在 frontmatter block 之后创建 section（不要在 byte 0）。
 
-### Step 2: Locate or create the timestamped subsection
+### Step 2：Locate or create the timestamped subsection（定位或创建带时间戳的 subsection）
 
-Within the Open Questions section, scan for a subsection heading matching the current review date: `### From YYYY-MM-DD review`. Behavior:
+在 Open Questions section 内，扫描是否有匹配当前 review date 的 subsection heading：`### From YYYY-MM-DD review`。行为：
 
-- **Subsection present:** append new entries to it. Multiple Defer actions within a single review session accumulate under the same subsection.
-- **Subsection absent:** create `### From YYYY-MM-DD review` as the last subsection within the Open Questions section. Insert one blank line before the heading for readability.
+- **Subsection 存在：** 向其中 append new entries。同一 review session 中的多个 Defer actions 累积在同一 subsection 下。
+- **Subsection 不存在：** 在 Open Questions section 内创建 `### From YYYY-MM-DD review` 作为最后一个 subsection。为可读性，在 heading 前插入一个空行。
 
-Date format: ISO 8601 calendar date (`YYYY-MM-DD`). If multiple reviews occur on the same document on the same day within the same session, they still share the same subsection. Multi-day same-document reviews get distinct subsections, which is the intended behavior.
+Date format：ISO 8601 calendar date（`YYYY-MM-DD`）。如果同一 session 内同一天对同一文档发生多次 reviews，它们仍共享同一 subsection。跨天 same-document reviews 会得到不同 subsections，这是预期行为。
 
-### Step 3: Format and append the entry
+### Step 3：Format and append the entry（格式化并追加 entry）
 
-Per deferred finding, append a bullet-point entry with the following fields. The visible content is a reader-friendly summary; an HTML comment on the entry persists the dedup-key fields so Step 4's compound-key check can run reliably across retries and same-day reruns without requiring the entry format itself to carry machine-oriented metadata:
+对每个 deferred finding，append 一个包含以下字段的 bullet-point entry。可见内容是 reader-friendly summary；entry 上的 HTML comment 持久化 dedup-key fields，让 Step 4 的 compound-key check 能在 retries 和 same-day reruns 中可靠运行，而不要求 entry format 本身携带 machine-oriented metadata：
 
 ```
 - **{title}** — {section} ({severity}, {reviewer}, confidence {confidence})
@@ -37,64 +37,64 @@ Per deferred finding, append a bullet-point entry with the following fields. The
   <!-- dedup-key: section="{normalized_section}" title="{normalized_title}" evidence="{evidence_fingerprint}" -->
 ```
 
-Fields come from the finding's schema:
+字段来自 finding 的 schema：
 
-- `{title}` — the finding's title field
-- `{section}` — the finding's section field, unmodified (human-readable)
+- `{title}` — finding 的 title field
+- `{section}` — finding 的 section field，保持原样（human-readable）
 - `{severity}` — P0 / P1 / P2 / P3
-- `{reviewer}` — the persona that produced the finding (after dedup, the persona with the highest confidence anchor; surface all co-flagging personas if multiple)
-- `{confidence}` — the integer anchor (`50`, `75`, or `100`), emitted without a decimal point or percent sign
-- `{why_it_matters}` — the full why_it_matters text, preserving the framing guidance from the subagent template
+- `{reviewer}` — 产出该 finding 的 persona（dedup 后为 confidence anchor 最高的 persona；若有多个 co-flagging personas，则全部 surface）
+- `{confidence}` — integer anchor（`50`、`75` 或 `100`），不带小数点或百分号
+- `{why_it_matters}` — 完整 why_it_matters 文本，保留 subagent template 中的 framing guidance
 
-HTML-comment fields (machine-readable, used by Step 4 dedup):
+HTML-comment fields（machine-readable，由 Step 4 dedup 使用）：
 
-- `{normalized_section}` — `normalize(section)` (lowercase, punctuation-stripped, whitespace-collapsed)
-- `{normalized_title}` — `normalize(title)` (same normalization)
-- `{evidence_fingerprint}` — first ~120 chars of the finding's first evidence quote, word-boundary-preserving, then sanitized for single-line HTML-comment embedding; empty string when the finding had no evidence. Sanitization (apply in order, before the 120-char slice so the resulting fingerprint stays under the budget):
-  1. Collapse any run of whitespace — including newlines, carriage returns, and tabs — to a single space.
-  2. Strip any occurrence of `-->` (HTML-comment terminator) and any stray `<!--` sequence; replace each with a single space. This prevents the evidence from closing the dedup-key comment prematurely or injecting a nested comment.
-  3. Replace the double-quote character with `\"` (quote escaping, as before).
-  4. Trim leading/trailing whitespace.
+- `{normalized_section}` — `normalize(section)`（lowercase、punctuation-stripped、whitespace-collapsed）
+- `{normalized_title}` — `normalize(title)`（同样 normalization）
+- `{evidence_fingerprint}` — finding 第一条 evidence quote 的前约 120 chars，保留 word-boundary，然后 sanitized 以便嵌入单行 HTML-comment；当 finding 没有 evidence 时为空字符串。Sanitization（按顺序应用，且在 120-char slice 前应用，让生成的 fingerprint 保持在预算内）：
+  1. 将任何连续 whitespace（包括 newlines、carriage returns 和 tabs）折叠为单个空格。
+  2. 移除任何 `-->`（HTML-comment terminator）以及任何散落的 `<!--` sequence；每个替换为单个空格。这可防止 evidence 提前关闭 dedup-key comment 或注入 nested comment。
+  3. 将双引号字符替换为 `\"`（quote escaping，与之前相同）。
+  4. Trim leading/trailing whitespace（去除首尾空白）。
 
-  The sanitized fingerprint MUST be a single line with no embedded `-->` so the dedup-key comment stays parseable by Step 4's compound-key reconstruction. When computing the fingerprint for a new finding, apply this sanitization; when reading back from an existing entry, treat the parsed `evidence="..."` value as already-sanitized and compare verbatim.
+  sanitized fingerprint 必须是单行，且没有嵌入的 `-->`，这样 dedup-key comment 才能被 Step 4 的 compound-key reconstruction 解析。为新 finding 计算 fingerprint 时，应用此 sanitization；从 existing entry 读回时，将解析出的 `evidence="..."` value 视为已 sanitized，并逐字比较。
 
-Do not include `suggested_fix` or the full `evidence` array in the appended entry. Those live in the review run artifact (when applicable) and do not belong in the document's Open Questions section — the entry is a concern summary for the reader returning later, not a full decision packet. The HTML-comment dedup-key line is the minimum machine-oriented metadata required for reliable idempotence and deliberately sits on a single line with simple `key="value"` shape so a retry can parse it without a markdown parser.
+不要在 appended entry 中包含 `suggested_fix` 或完整 `evidence` array。它们位于 review run artifact 中（如适用），不属于文档的 Open Questions section；entry 是给稍后返回的读者看的 concern summary，不是完整 decision packet。HTML-comment dedup-key line 是可靠 idempotence 所需的最小 machine-oriented metadata，并刻意保持为带简单 `key="value"` shape 的单行，这样 retry 无需 markdown parser 即可解析。
 
-### Step 4: Idempotence on compound-key collisions
+### Step 4：Idempotence on compound-key collisions（compound-key 冲突时保持幂等）
 
-If an entry with the same compound key already exists under the same `### From YYYY-MM-DD review` subsection, do not append a duplicate. This can happen when:
+如果同一 `### From YYYY-MM-DD review` subsection 下已存在相同 compound key 的 entry，不要 append duplicate。这可能发生在：
 
-- The same review session re-routes the same finding to Defer a second time (rare but possible via best-judgment-the-rest after a walk-through Defer)
-- The orchestrator retries after a partial failure
+- 同一 review session 将同一 finding 第二次 re-route 到 Defer（少见，但可能通过 walk-through Defer 后的 best-judgment-the-rest 发生）
+- orchestrator 在 partial failure 后 retry
 
-**Compound key for dedup:** `normalize(section) + normalize(title) + evidence_fingerprint`, reconstructed from each existing entry's `<!-- dedup-key: ... -->` HTML comment (see Step 3 entry format). For a new finding about to append, compute the same fields from the finding's schema data; for existing entries, parse them out of the HTML comment. Match on all three fields.
+**Compound key for dedup:** `normalize(section) + normalize(title) + evidence_fingerprint`，从每个 existing entry 的 `<!-- dedup-key: ... -->` HTML comment 重建（见 Step 3 entry format）。对于即将 append 的新 finding，从 finding 的 schema data 计算相同字段；对于 existing entries，从 HTML comment 中解析。三个字段全部匹配才算 match。
 
-- `normalize(section)` and `normalize(title)` use the same normalization as synthesis step 3.3 dedup (lowercase, strip punctuation, collapse whitespace)
-- `evidence_fingerprint` is the first ~120 characters of the finding's first evidence quote, sanitized per Step 3 (whitespace collapsed to single spaces, `-->` and stray `<!--` stripped, quotes escaped). The same slice is used in the decision primer — see `SKILL.md` under "Decision primer". When no evidence is available on the new finding, fall back to section+title alone. When an existing entry's HTML comment has `evidence=""`, treat the entry as evidence-less and also fall back to section+title for that comparison. If an existing entry's dedup-key comment is malformed (e.g., a newline or `-->` sequence split the comment across lines in a pre-sanitization entry), treat that entry under the legacy-fallback rule below rather than attempting a partial reconstruction.
+- `normalize(section)` 和 `normalize(title)` 使用与 synthesis step 3.3 dedup 相同的 normalization（lowercase、strip punctuation、collapse whitespace）
+- `evidence_fingerprint` 是 finding 第一条 evidence quote 的前约 120 个字符，并按 Step 3 sanitization（whitespace 折叠为单空格、移除 `-->` 和散落的 `<!--`、转义 quotes）。decision primer 使用同一 slice；见 `SKILL.md` 中的 "Decision primer"。当新 finding 没有 evidence 可用时，仅回退到 section+title。当 existing entry 的 HTML comment 有 `evidence=""` 时，将该 entry 视为 evidence-less，并在该比较中也回退到 section+title。如果 existing entry 的 dedup-key comment malformed（例如 pre-sanitization entry 中 newline 或 `-->` sequence 将 comment 拆成多行），按下方 legacy-fallback rule 处理该 entry，而不是尝试 partial reconstruction。
 
-Title-only dedup is not sufficient: two different findings in the same document (even in the same review date) can legitimately share a short title if their sections and evidence differ. Using only `{title}` would silently drop one of them — losing user-visible backlog context. The compound key mirrors the R29/R30 matching predicate (`section + title + evidence-substring overlap`) so cross-round and intra-round dedup behave consistently.
+Title-only dedup 不够：同一文档中的两个不同 findings（即使在同一 review date）如果 sections 和 evidence 不同，也可能合法共享一个短 title。只使用 `{title}` 会静默丢弃其中一个，造成 user-visible backlog context 丢失。compound key 镜像 R29/R30 matching predicate（`section + title + evidence-substring overlap`），让 cross-round 和 intra-round dedup 行为一致。
 
-**Legacy entries without dedup-key comments:** entries written before this format (if any survive in the wild) lack the HTML comment. When Step 4 encounters such an entry, fall back to title-only comparison for that entry — imperfect, but strictly better than duplicate-appending. This is a backwards-compat behavior for legacy data, not a sanctioned format.
+**Legacy entries without dedup-key comments:** 此格式之前写入的 entries（如果仍存在）没有 HTML comment。当 Step 4 遇到这种 entry 时，对该 entry 回退到 title-only comparison；不完美，但严格好于 duplicate-appending。这是 legacy data 的 backwards-compat behavior，不是 sanctioned format。
 
-On collision, record the no-op in the completion report's Coverage section so the user sees the duplicate was suppressed. Cross-subsection collisions (same compound key, different dates) are not deduplicated — each review is allowed to re-raise the same concern.
-
----
-
-## Concurrent edit safety
-
-Document edits happen via the platform's edit tool (Edit in Claude Code, or equivalent). Before every append, re-read the document from disk to reduce the window for user-in-editor concurrent-write collisions. If the document's mtime or content has changed unexpectedly between a prior read and the append attempt, abort the append and surface the situation via the failure path below. The user may be editing in their editor during the review session and simultaneous writes would corrupt the document.
-
-The orchestrator only holds the most recent read in memory, not a persistent lock — interactive review doesn't need lock coordination; it needs observation-before-write.
+发生 collision 时，在 completion report 的 Coverage section 记录 no-op，让用户看到 duplicate 被 suppressed。Cross-subsection collisions（相同 compound key，不同日期）不 deduplicate；每次 review 都允许重新 raise 同一 concern。
 
 ---
 
-## Failure path
+## Concurrent edit safety（并发编辑安全）
 
-When the append cannot complete — document is read-only on disk, path is invalid, the platform's edit tool returns an error, concurrent-edit collision detected, or any other write failure — surface the failure inline to the user via the platform's blocking question tool with the following sub-question:
+Document edits 通过平台 edit tool 发生（Claude Code 中的 Edit 或等价工具）。每次 append 前，都从 disk 重新读取文档，以缩小 user-in-editor concurrent-write collisions 的窗口。如果文档 mtime 或 content 在 prior read 和 append attempt 之间意外变化，中止 append，并通过下方 failure path 展示情况。用户可能在 review session 中用编辑器编辑文档，同时写入会破坏文档。
 
-**Stem:** `Couldn't append the finding to Open Questions. What should the agent do?`
+orchestrator 只在内存中持有最近一次 read，而不是 persistent lock；interactive review 不需要 lock coordination，它需要 observation-before-write。
 
-**Options (exactly three; fixed order):**
+---
+
+## Failure path（失败路径）
+
+当 append 无法完成时（document 在 disk 上 read-only、path invalid、平台 edit tool 返回 error、检测到 concurrent-edit collision，或任何其他 write failure），通过平台 blocking question tool 向用户 inline 展示 failure，并提出以下 sub-question：
+
+**Stem（问题主干）:** `Couldn't append the finding to Open Questions. What should the agent do?`
+
+**Options（恰好三个；固定顺序）：**
 
 ```
 A. Retry the append
@@ -102,27 +102,27 @@ B. Record the deferral in the completion report only (don't mutate the document)
 C. Convert this finding to Skip
 ```
 
-**Dispatch:**
+**Dispatch（分派）：**
 
-- **A Retry** — try the append again. On repeated failure, loop back to the same sub-question.
-- **B Record only** — skip the document mutation; record the Deferred action in the completion report with a note that the append failed. The finding does not end up in the document but the user sees in the report that they deferred it.
-- **C Convert to Skip** — record the finding as Skip with an explanatory reason ("append to Open Questions failed: <error>"). The finding is treated as no-action for the remainder of the session.
+- **A Retry** — 再次尝试 append。若重复失败，循环回同一个 sub-question。
+- **B Record only** — 跳过 document mutation；在 completion report 中记录 Deferred action，并注明 append failed。finding 不会进入文档，但用户会在 report 中看到他们 deferred 了它。
+- **C Convert to Skip** — 将 finding 记录为 Skip，并带解释性 reason（"append to Open Questions failed: <error>"）。该 finding 在 session 剩余时间被视为 no-action。
 
-Silent failure is not acceptable. If the user does not respond to the sub-question (session ends, terminal disconnects), default to option B so the in-memory decision state stays consistent even if the document wasn't written.
-
----
-
-## Upstream availability signal
-
-The walk-through and bulk-preview check append-availability before offering Defer as an option. When the document is known-unwritable (e.g., initial read shows it's on a read-only filesystem), the orchestrator caches an `append_available: false` signal at Phase 4 start and Defer is suppressed in the walk-through menu and in the routing question's option C. See `references/walkthrough.md` under "Adaptations" for the menu behavior and `references/bulk-preview.md` under "Edge cases" for the preview behavior.
-
-When append-availability is true at Phase 4 start but an individual append fails mid-flow, the failure path above handles the specific finding — this does not flip the session-level cached signal (other findings may still append successfully if the failure was transient).
+Silent failure 不可接受。如果用户没有回应 sub-question（session ends、terminal disconnects），默认选择 option B，这样即使文档未写入，in-memory decision state 也保持一致。
 
 ---
 
-## Example appended content
+## Upstream availability signal（上游可用性信号）
 
-Starting document state:
+walk-through 和 bulk-preview 在提供 Defer 作为选项前，会检查 append-availability。当文档已知 unwritable（例如 initial read 显示它位于 read-only filesystem 上），orchestrator 在 Phase 4 start 缓存 `append_available: false` signal，并在 walk-through menu 和 routing question 的 option C 中 suppress Defer。菜单行为见 `references/walkthrough.md` 的 "Adaptations"，preview 行为见 `references/bulk-preview.md` 的 "Edge cases"。
+
+当 Phase 4 start 时 append-availability 为 true，但某个 individual append 在 mid-flow 失败，上方 failure path 处理该 specific finding；这不会翻转 session-level cached signal（如果 failure 是 transient，其他 findings 仍可能 append 成功）。
+
+---
+
+## Example appended content（追加内容示例）
+
+Starting document state（起始文档状态）:
 
 ```markdown
 ## Risks
@@ -141,7 +141,7 @@ Starting document state:
 
 ```
 
-After appending two findings in a 2026-04-18 session:
+After appending two findings in a 2026-04-18 session（在 2026-04-18 session 中追加两个 findings 后）:
 
 ```markdown
 ## Risks

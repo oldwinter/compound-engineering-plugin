@@ -1,26 +1,26 @@
-# `autofix_class` rubric (personas)
+# `autofix_class` 评判标准（personas）
 
-`autofix_class` describes the **intrinsic shape** of follow-up work — it is signal, **not an apply gate or permission**. In `mode:agent` the caller interprets findings and owns apply; in default (interactive) mode the review applies safe fixes itself by judgment (SKILL.md Stage 5c). Either way the class informs *what to do first* and *what to flag* — it does not mechanically decide what gets applied.
+`autofix_class` 描述 follow-up work 的**内在形态**；它是信号，**不是 apply gate 或 permission**。在 `mode:agent` 中，caller 负责解释 findings 并拥有 apply 决策；在默认（interactive）模式中，review 会按 judgment 自行应用 safe fixes（SKILL.md Stage 5c）。无论哪种情况，该 class 都用于提示*先做什么*和*标记什么*，而不是机械决定什么会被应用。
 
 | `autofix_class` | Meaning |
 |-----------------|---------|
-| `gated_auto` | A concrete change is proposed in `suggested_fix`. Callers may apply after their own judgment. |
-| `manual` | Actionable work that needs design input or a decision before code changes. Include `suggested_fix` when you can propose a defensible default. |
-| `advisory` | Report-only — learnings, residual risk, rollout notes. |
+| `gated_auto` | 在 `suggested_fix` 中提出了具体 change。Callers 可以在自行判断后 apply。 |
+| `manual` | 需要 design input 或 decision 才能改代码的 actionable work。能提出可辩护默认方案时，包含 `suggested_fix`。 |
+| `advisory` | 仅报告：learnings、residual risk、rollout notes。 |
 
-## Persona guidance
+## Persona 指引
 
-- Prefer `gated_auto` when you can write a defensible `suggested_fix` for a localized change.
-- Use `manual` when the right fix depends on product intent, architecture, or cross-cutting refactors.
-- Use `advisory` when nothing breaks if left unfixed but the observation has value.
-- Do **not** emit `safe_auto` — callers decide what to apply; reviewers classify and propose.
+- 当可以为 localized change 写出可辩护的 `suggested_fix` 时，优先使用 `gated_auto`。
+- 当正确修复依赖 product intent、architecture 或 cross-cutting refactors 时，使用 `manual`。
+- 当不修也不会破坏任何东西、但观察结果有价值时，使用 `advisory`。
+- **不要**输出 `safe_auto`：callers 决定 apply 什么；reviewers 负责分类和提出方案。
 
-## Owner field
+## `owner` 字段
 
 | `owner` | Meaning |
 |---------|---------|
-| `downstream-resolver` | Caller or human should act after review. |
-| `human` | Judgment required before implementation. |
-| `release` | Operational / rollout follow-up. |
+| `downstream-resolver` | Caller 或 human 应在 review 后处理。 |
+| `human` | implementation 前需要 judgment。 |
+| `release` | Operational / rollout follow-up。 |
 
-Do not use `review-fixer`.
+不要使用 `review-fixer`。

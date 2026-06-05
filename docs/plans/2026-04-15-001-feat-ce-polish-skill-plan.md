@@ -1,139 +1,139 @@
 ---
-title: "feat: Add /ce:polish skill for human-in-the-loop refinement before merge"
+title: "feat: 添加用于 merge 前 human-in-the-loop refinement 的 /ce:polish skill"
 type: feat
 status: active
 date: 2026-04-15
 ---
 
-# feat: Add `/ce:polish` skill for human-in-the-loop refinement before merge
+# feat: 添加用于 merge 前 human-in-the-loop 打磨的 `/ce:polish` skill
 
-## Overview
+## 概览
 
-Add a new workflow skill at `plugins/compound-engineering/skills/ce-polish/SKILL.md` that implements the "polish phase" — a human-in-the-loop refinement step that runs AFTER `/ce:review` (tests + review green) and BEFORE merge. Polish is the second of two human-in-the-loop moments in an otherwise-automated flow; the first is `/ce:brainstorm` (WHAT to build). Polish answers: *does this feel right to a real user?*
+在 `plugins/compound-engineering/skills/ce-polish/SKILL.md` 添加一个新的 workflow skill，实现“polish phase”：在 `/ce:review`（tests + review green）之后、merge 之前运行的 human-in-the-loop refinement 步骤。Polish 是一个基本自动化流程中的第二个人类介入节点；第一个是 `/ce:brainstorm`（构建什么）。Polish 回答的问题是：*这对真实用户来说感觉对吗？*
 
-The skill accepts a PR number, URL, or branch name (blank → current branch), verifies that review has already completed successfully, merges latest `main` into the branch with the user's confirmation, starts a local dev server from a user-authored `.claude/launch.json` (with per-framework auto-detect as a fallback), opens the app in the host IDE's built-in browser when available (Claude Code desktop, Cursor, soon Codex) and falls back to printing the URL otherwise, generates an end-user-testable checklist from the diff and PR body, and dispatches polish sub-agents (design iterators, frontend race reviewers, simplicity reviewers) to fix issues the human flags. If the polish batch exceeds one "focus area" (more than one component, cross-cutting files, or cannot be tested as a single user flow), the skill refuses to batch-fix and emits a stacked-PR hand-off artifact.
+该 skill 接受 PR number、URL 或 branch name（空值 → 当前分支），验证 review 已成功完成，在用户确认后把最新 `main` merge 到该分支，从用户编写的 `.claude/launch.json` 启动本地 dev server（按 framework auto-detect 作为 fallback），可用时在宿主 IDE 的内置浏览器中打开应用（Claude Code desktop、Cursor，未来的 Codex），否则打印 URL；随后从 diff 和 PR body 生成面向终端用户可测试的 checklist，并 dispatch polish sub-agents（design iterators、frontend race reviewers、simplicity reviewers）修复人类标记的问题。如果 polish batch 超过一个“focus area”（多于一个 component、跨切面文件，或无法作为单一 user flow 测试），该 skill 会拒绝 batch-fix，并输出 stacked-PR hand-off artifact。
 
-Ship as `ce:polish-beta` first per the beta-skills framework; promote to stable after usage feedback.
+按 beta-skills framework 先以 `ce:polish-beta` 发布；收到使用反馈后再 promote 为 stable。
 
-## Problem Frame
+## 问题框架
 
-The compound-engineering plugin automates most of the development flow end-to-end (`/ce:ideate → /ce:brainstorm → /ce:plan → /ce:work → /ce:review`). Today there is no structured step between a green review and merge. Two gaps result:
+compound-engineering plugin 已经自动化了大部分端到端开发流程（`/ce:ideate → /ce:brainstorm → /ce:plan → /ce:work → /ce:review`）。目前在 review green 与 merge 之间没有结构化步骤，因此出现两个缺口：
 
-1. **Craft/UX is never experienced as an end user.** Review catches correctness, security, and structural issues. It does not catch "this animation is janky," "the empty state is ugly," or "this response feels slow." A human has to use the feature to notice those.
-2. **Polish work accidentally becomes scope creep.** When a human does sit down to polish, it's easy to keep adding to the same PR until it's too large to understand or review again — and the polish never ships cleanly.
+1. **Craft/UX 从未以终端用户视角被体验。** Review 会捕获 correctness、security 和结构问题，但不会捕获“这个动画卡顿”、“empty state 不好看”或“这个响应感觉慢”。这些必须由人真正使用功能才能发现。
+2. **Polish work 容易意外变成 scope creep。** 当人真正开始 polish 时，很容易不断往同一个 PR 里加东西，直到它大到难以理解或再次 review，最终 polish 也无法干净 ship。
 
-Polish needs its own shaped step: bounded, human-driven, but automation-assisted for the fixes themselves. It also needs an explicit size gate so polish tasks that outgrow the PR get split into stacked PRs rather than bloating the original.
+Polish 需要一个独立成形的步骤：有边界、由人驱动，但修复本身由自动化辅助。它还需要显式 size gate，让超出原 PR 的 polish tasks 被拆成 stacked PRs，而不是让原 PR 膨胀。
 
-The transcript that motivated this plan frames polish as "the second human-in-the-loop moment" — deliberately paired with brainstorm on either end of an automated middle.
+触发本计划的 transcript 将 polish 定义为“第二个人类介入节点”，有意与 brainstorm 分别放在自动化中段的两端。
 
-## Requirements Trace
+## 需求追踪
 
-From the feature description (10 deliverables):
+来自 feature description（10 个 deliverables）：
 
-- **R1.** Command lives as a skill at `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` with frontmatter `name`, `description`, `argument-hint`, `disable-model-invocation: true` — matching the canonical `ce:review` / `ce:work` / `ce:brainstorm` shape under the beta-first convention (promoted to `skills/ce-polish/` in a follow-up PR).
-- **R2.** Skill SKILL.md structured for progressive disclosure: body under ~500 lines, per-framework dev-server recipes and checklist/dispatch templates extracted to `references/`, deterministic classifiers in `scripts/`.
-- **R3.** `$ARGUMENTS` parses PR number, PR URL, branch name, or blank → current branch, plus named tokens that strip before the target is interpreted: `mode:headless` (machine envelope for LFG/pipelines) and `trust-fork:1` (explicit fork-PR trust override). Additional tokens (`mode:report-only`, `mode:autonomous`) are deferred to follow-up PRs so the surface stays honest about what's actually implemented.
-- **R4.** Dev-server lifecycle is config-driven with auto-detect fallback. Primary source is `.claude/launch.json` at the repo root (Claude Code's launch-config convention); when absent or incomplete, fall back to per-framework auto-detection (Rails / Next.js / Vite / Procfile / Overmind) and offer to write a minimal `launch.json` stub the user can confirm and save for future runs. Kill and restart surface the PID and log path so the user can reclaim control.
-- **R4b.** When running inside an IDE with an embedded browser (Claude Code desktop, Cursor, future Codex), open the polish URL in that browser; otherwise print the URL for the user to open manually. Detection is best-effort and non-blocking — failure to detect the IDE always falls through to printing the URL.
-- **R5.** Skill refuses to polish untested or unreviewed work, based on two signals: the latest `.context/compound-engineering/ce-review/<run-id>/` artifact's verdict, plus `gh pr checks` green.
-- **R6.** Test checklist is generated from the diff, PR body, and (if available) the plan referenced via `plan:<path>` — never by asking the human "what would you like to test?".
-- **R7.** Polish sub-agents are dispatched via fully qualified names (`compound-engineering:design:design-iterator`, `compound-engineering:review:julik-frontend-races-reviewer`, etc.). Dispatch is sequential below 5 items, parallel above — with the invariant that items touching the same file path never run concurrently.
-- **R8.** A "too big" detector operates on two tiers. Per-item: items exceeding file-count, cross-surface, or diff-line thresholds are refused and routed to a stacked-PR hand-off artifact. Per-batch: when the overall polish run shows the PR as a whole is too large (majority-oversized items, repeated `replan` actions from the user, or a preemptive diff-size probe before checklist generation), polish escalates to re-planning — writes a `replan-seed.md` pointing back to the originating brainstorm/plan and routes the user to `/ce:plan` or `/ce:brainstorm`. The size gate at both tiers is load-bearing, not decoration.
-- **R9.** `/ce:polish` slots between `/ce:review` and `/git-commit-push-pr` in the workflow. `/ce:work` Phase 3 offers polish as a next step after `/ce:review` completes. `mode:headless` variant exists so LFG and future pipelines can chain it.
-- **R10.** Feature branch for this work: `feat/ce-polish-command`. No release-owned versions bumped in the PR.
+- **R1.** Command 作为 skill 位于 `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md`，frontmatter 包含 `name`、`description`、`argument-hint`、`disable-model-invocation: true`，并在 beta-first convention 下匹配 canonical `ce:review` / `ce:work` / `ce:brainstorm` 形态（在 follow-up PR 中 promote 到 `skills/ce-polish/`）。
+- **R2.** Skill SKILL.md 按 progressive disclosure 组织：正文约 500 行以内，按 framework 的 dev-server recipes 与 checklist/dispatch templates 提取到 `references/`，deterministic classifiers 放入 `scripts/`。
+- **R3.** `$ARGUMENTS` 解析 PR number、PR URL、branch name，或空值 → 当前分支；同时支持在解释 target 前剥离的命名 tokens：`mode:headless`（给 LFG/pipelines 的 machine envelope）和 `trust-fork:1`（显式 fork-PR trust override）。其他 tokens（`mode:report-only`、`mode:autonomous`）推迟到 follow-up PR，让 surface 诚实反映实际实现内容。
+- **R4.** Dev-server lifecycle 由 config 驱动，并带 auto-detect fallback。主来源是 repo root 的 `.claude/launch.json`（Claude Code 的 launch-config convention）；缺失或不完整时，fallback 到按 framework auto-detection（Rails / Next.js / Vite / Procfile / Overmind），并提供写入最小 `launch.json` stub 的选项，供用户确认并保存以便未来运行。Kill 和 restart 会显示 PID 与 log path，让用户能重新取得控制。
+- **R4b.** 在带 embedded browser 的 IDE 内运行时（Claude Code desktop、Cursor、未来 Codex），在该浏览器中打开 polish URL；否则打印 URL 供用户手动打开。Detection 尽力而为且非阻塞；无法 detect IDE 时始终 fallback 到打印 URL。
+- **R5.** Skill 拒绝 polish 未测试或未 review 的工作，基于两个信号：最新 `.context/compound-engineering/ce-review/<run-id>/` artifact 的 verdict，以及 `gh pr checks` green。
+- **R6.** Test checklist 从 diff、PR body 以及（如果可用）通过 `plan:<path>` 引用的 plan 生成，绝不通过询问人类“你想测试什么？”来生成。
+- **R7.** Polish sub-agents 通过 fully qualified names dispatch（`compound-engineering:design:design-iterator`、`compound-engineering:review:julik-frontend-races-reviewer` 等）。少于 5 items 时 sequential dispatch，超过时 parallel dispatch，但不变量是触及同一路径的 items 永不并发运行。
+- **R8.** “too big” detector 分两层运行。Per-item：超过 file-count、cross-surface 或 diff-line thresholds 的 items 被拒绝并路由到 stacked-PR hand-off artifact。Per-batch：当整体 polish run 显示 PR 过大（多数 items oversized、用户反复触发 `replan` actions，或 checklist generation 前的预检查 diff-size probe）时，polish 升级到 re-planning：写入指回原始 brainstorm/plan 的 `replan-seed.md`，并把用户路由到 `/ce:plan` 或 `/ce:brainstorm`。两层 size gate 都是 load-bearing，不是装饰。
+- **R9.** `/ce:polish` 在 workflow 中位于 `/ce:review` 与 `/git-commit-push-pr` 之间。`/ce:work` Phase 3 在 `/ce:review` 完成后将 polish 作为下一步提供。`mode:headless` variant 存在，以便 LFG 和未来 pipelines 串联。
+- **R10.** 本工作的 feature branch：`feat/ce-polish-command`。PR 中不 bump release-owned versions。
 
-## Scope Boundaries
+## 范围边界
 
-**In scope:**
-- New beta skill `skills/ce-polish-beta/` (promoted to `skills/ce-polish/` in a follow-up PR per the beta-skills framework)
-- `.claude/launch.json` reader + auto-detect fallback + stub-writer; per-framework dev-server recipes (Rails, Next.js/Node, Vite, Procfile/Overmind) as the fallback path
-- IDE detection (Claude Code, Cursor, future Codex) for embedded-browser handoff; progressive enhancement, never a gate
-- Edit-file-then-ack human interaction loop via `.context/compound-engineering/ce-polish/<run-id>/checklist.md`
-- Two-tier size gate: per-item (stacked-PR seed) and per-batch (replan escalation back to `/ce:plan` or `/ce:brainstorm`)
-- Fork-PR trust boundary check at the entry gate (requires `trust-fork:1` token for cross-repository PRs)
-- Reuse of `resolve-base.sh` (duplicated into the new skill's `references/`, per the "no cross-directory references" rule)
-- Sub-agent orchestration of existing design and review agents — no new agents created in this PR
-- README.md component count update (author edit, not release-owned)
+**范围内：**
+- 新 beta skill `skills/ce-polish-beta/`（按 beta-skills framework 在 follow-up PR 中 promote 到 `skills/ce-polish/`）
+- `.claude/launch.json` reader + auto-detect fallback + stub-writer；按 framework 的 dev-server recipes（Rails、Next.js/Node、Vite、Procfile/Overmind）作为 fallback path
+- 用于 embedded-browser handoff 的 IDE detection（Claude Code、Cursor、未来 Codex）；这是 progressive enhancement，绝不是 gate
+- 通过 `.context/compound-engineering/ce-polish/<run-id>/checklist.md` 实现 edit-file-then-ack human interaction loop
+- 两层 size gate：per-item（stacked-PR seed）和 per-batch（replan escalation 回到 `/ce:plan` 或 `/ce:brainstorm`）
+- Entry gate 的 fork-PR trust boundary check（cross-repository PRs 需要 `trust-fork:1` token）
+- 复用 `resolve-base.sh`（按“no cross-directory references”规则复制到新 skill 的 `references/`）
+- 编排现有 design 和 review agents 的 sub-agent orchestration，本 PR 不创建新 agents
+- README.md component count update（作者编辑，不属于 release-owned）
 
-**Out of scope:**
-- Creating a new "copy/microcopy polish" sub-agent — out of scope; surfaced as a future consideration. Copy polish folds into the `design-iterator` loop for v1.
-- Modifying `/ce:work` or `/ce:review` to automatically chain into `/ce:polish`. The first release is manually invoked after `/ce:review`. Automatic chaining belongs in a follow-up PR once beta usage proves the shape.
-- Version bumps in `plugins/compound-engineering/.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`, or manual `CHANGELOG.md` entries — release-please automation owns these (per `plugins/compound-engineering/AGENTS.md`).
-- Adding a web UI / browser-extension annotation layer for polish note-taking. The transcript mentions annotating in the browser; in v1, notes are captured as plain prose input to the skill, which then dispatches fixes. Browser-side annotation is a follow-up.
+**范围外：**
+- 创建新的 “copy/microcopy polish” sub-agent，超出范围；作为未来考虑项提出。v1 中 copy polish 并入 `design-iterator` loop。
+- 修改 `/ce:work` 或 `/ce:review` 以自动 chain 到 `/ce:polish`。首个 release 在 `/ce:review` 后手动调用。待 beta usage 证明形态后，automatic chaining 属于 follow-up PR。
+- bump `plugins/compound-engineering/.claude-plugin/plugin.json` 或 `.claude-plugin/marketplace.json` 中的 version，或手写 `CHANGELOG.md` entries；这些由 release-please automation 拥有（按 `plugins/compound-engineering/AGENTS.md`）。
+- 为 polish note-taking 添加 web UI / browser-extension annotation layer。Transcript 提到在浏览器中 annotate；v1 中 notes 作为 plain prose input 捕获到 skill，再由 skill dispatch fixes。Browser-side annotation 是 follow-up。
 
-## Context & Research
+## 上下文与调研
 
-### Relevant Code and Patterns
+### 相关代码与模式
 
-- **Skill-as-slash-command pattern:** Since v2.39.0, former `/command-name` slash commands live under `plugins/compound-engineering/skills/<command-name>/SKILL.md` (see `plugins/compound-engineering/AGENTS.md`). No `commands/` directory exists. Polish follows this pattern.
-- **Argument parsing (token-based):** `plugins/compound-engineering/skills/ce-review/SKILL.md:19-33` defines the canonical `mode:*`, `base:*`, `plan:*` token-stripping pattern. Polish adopts it verbatim for future extensibility.
-- **Frontmatter for interactively-invocable workflow skills:** `plugins/compound-engineering/skills/ce-review/SKILL.md:1-5` and `plugins/compound-engineering/skills/ce-work/SKILL.md:1-5` — `name: ce:<verb>`, description with natural-language trigger phrases, `argument-hint`, no `disable-model-invocation` for stable workflow skills.
-- **Beta-first convention:** `plugins/compound-engineering/skills/ce-work-beta/` shows the beta pattern. Frontmatter: `name: ce:<verb>-beta`, description prefixed `[BETA]`, `disable-model-invocation: true`. Convention documented in `docs/solutions/skill-design/beta-skills-framework.md`.
-- **Branch / PR acquisition:** `plugins/compound-engineering/skills/ce-review/SKILL.md:184-267` — clean-worktree check via `git status --porcelain`, then `gh pr checkout <n>` for PRs, `git checkout <branch>` for branches, shared `resolve-base.sh` helper for base-branch resolution.
-- **Port detection cascade:** `plugins/compound-engineering/skills/test-browser/SKILL.md:97-143` — CLI flag → `AGENTS.md`/`CLAUDE.md` → `package.json` dev-script → `.env*` → default `3000`. Polish reuses this cascade as-is.
-- **Review artifact location and envelope:** `plugins/compound-engineering/skills/ce-review/SKILL.md:509-516` (headless envelope exposes `Artifact: .context/compound-engineering/ce-review/<run-id>/`) and `SKILL.md:675-680` (what's written). Polish reads this to gate entry.
-- **Scratch space convention:** `.context/compound-engineering/<workflow>/<run-id>/` with `RUN_ID=$(date +%Y%m%d-%H%M%S)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' ')`. Used by ce-review, ce-optimize, ce-plan-deepening.
-- **Sub-agent dispatch:** `plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md:135-164` is the canonical parallel-dispatch pattern. `plugins/compound-engineering/skills/ce-review/references/subagent-template.md` is the canonical sub-agent prompt shape. Fully qualified names mandatory; omit `mode` on tool calls to honor user permission settings.
-- **Polish-relevant existing agents:** `agents/design/design-iterator.md`, `agents/design/design-implementation-reviewer.md`, `agents/design/figma-design-sync.md`, `agents/review/code-simplicity-reviewer.md`, `agents/review/maintainability-reviewer.md`, `agents/review/julik-frontend-races-reviewer.md`. All referenced via fully qualified `compound-engineering:<category>:<name>`.
-- **Complexity / focus-area heuristic:** `plugins/compound-engineering/skills/ce-work/SKILL.md:36-42` (Trivial / Small / Large matrix) and `plugins/compound-engineering/skills/ce-work/references/shipping-workflow.md:25-30, 108-112` (Tier 1 single-concern criteria). Polish's "too big" detector extends these.
-- **Mode detection and headless envelope:** `plugins/compound-engineering/skills/ce-review/SKILL.md:36-72` — the mode table, the headless rules, and the terminal `Review complete` signal. Polish mirrors this shape with `Polish complete`.
+- **Skill-as-slash-command pattern：** 自 v2.39.0 起，原 `/command-name` slash commands 位于 `plugins/compound-engineering/skills/<command-name>/SKILL.md`（见 `plugins/compound-engineering/AGENTS.md`）。不存在 `commands/` 目录。Polish 遵循该模式。
+- **Argument parsing（token-based）：** `plugins/compound-engineering/skills/ce-review/SKILL.md:19-33` 定义 canonical `mode:*`、`base:*`、`plan:*` token-stripping pattern。Polish 为未来扩展原样采用。
+- **可交互调用 workflow skills 的 frontmatter：** `plugins/compound-engineering/skills/ce-review/SKILL.md:1-5` 和 `plugins/compound-engineering/skills/ce-work/SKILL.md:1-5`：`name: ce:<verb>`，description 包含 natural-language trigger phrases，`argument-hint`，stable workflow skills 不设置 `disable-model-invocation`。
+- **Beta-first convention：** `plugins/compound-engineering/skills/ce-work-beta/` 展示 beta pattern。Frontmatter：`name: ce:<verb>-beta`，description 前缀为 `[BETA]`，`disable-model-invocation: true`。Convention 记录在 `docs/solutions/skill-design/beta-skills-framework.md`。
+- **Branch / PR acquisition：** `plugins/compound-engineering/skills/ce-review/SKILL.md:184-267`：通过 `git status --porcelain` 做 clean-worktree check，然后 PR 使用 `gh pr checkout <n>`，branch 使用 `git checkout <branch>`，共享 `resolve-base.sh` helper 来解析 base branch。
+- **Port detection cascade：** `plugins/compound-engineering/skills/test-browser/SKILL.md:97-143`：CLI flag → `AGENTS.md`/`CLAUDE.md` → `package.json` dev-script → `.env*` → default `3000`。Polish 原样复用该 cascade。
+- **Review artifact location and envelope：** `plugins/compound-engineering/skills/ce-review/SKILL.md:509-516`（headless envelope 暴露 `Artifact: .context/compound-engineering/ce-review/<run-id>/`）以及 `SKILL.md:675-680`（写入内容）。Polish 读取该 artifact 作为 entry gate。
+- **Scratch space convention：** `.context/compound-engineering/<workflow>/<run-id>/`，使用 `RUN_ID=$(date +%Y%m%d-%H%M%S)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' ')`。ce-review、ce-optimize、ce-plan-deepening 已使用。
+- **Sub-agent dispatch：** `plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md:135-164` 是 canonical parallel-dispatch pattern。`plugins/compound-engineering/skills/ce-review/references/subagent-template.md` 是 canonical sub-agent prompt shape。Fully qualified names 是强制要求；tool calls 省略 `mode`，以尊重用户 permission settings。
+- **Polish 相关的 existing agents：** `agents/design/design-iterator.md`、`agents/design/design-implementation-reviewer.md`、`agents/design/figma-design-sync.md`、`agents/review/code-simplicity-reviewer.md`、`agents/review/maintainability-reviewer.md`、`agents/review/julik-frontend-races-reviewer.md`。全部通过 fully qualified `compound-engineering:<category>:<name>` 引用。
+- **Complexity / focus-area heuristic：** `plugins/compound-engineering/skills/ce-work/SKILL.md:36-42`（Trivial / Small / Large matrix）和 `plugins/compound-engineering/skills/ce-work/references/shipping-workflow.md:25-30, 108-112`（Tier 1 single-concern criteria）。Polish 的 "too big" detector 扩展这些规则。
+- **Mode detection and headless envelope：** `plugins/compound-engineering/skills/ce-review/SKILL.md:36-72`：mode table、headless rules，以及 terminal `Review complete` signal。Polish 用 `Polish complete` 镜像该形态。
 
-### Institutional Learnings
+### 机构经验
 
-- **`docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`** — Branch/PR-switching skills must be modeled as explicit state machines and re-probe at each transition. Polish re-reads `git branch --show-current`, server PID, and PR number after every checkout or kill. Never carries earlier values forward in prose.
-- **`docs/solutions/skill-design/compound-refresh-skill-improvements.md`** — Question-before-evidence is an anti-pattern. Polish generates the test checklist *before* asking the human what to test; the human edits the generated list rather than authoring it from scratch. All confirmations include concrete command/port/PID so the human can judge without a follow-up.
-- **`docs/solutions/skill-design/pass-paths-not-content-to-subagents.md`** — Orchestrator hands paths to sub-agents; sub-agents do their own reads. Polish passes the diff file list, the review artifact path, and the PR number — never inlined diff content.
-- **`docs/solutions/best-practices/codex-delegation-best-practices.md`** — ~5-7 unit crossover for parallel dispatch; "never split units that share files." Polish goes sequential below 5 items, parallel above, with the same-file collision guard.
-- **`docs/solutions/skill-design/script-first-skill-architecture.md`** — Deterministic classification (project-type, file-to-surface mapping, oversize detection) belongs in bundled scripts, not the model. 60-75% token reduction.
-- **`docs/solutions/workflow/todo-status-lifecycle.md`** — Status fields only have value when a downstream consumer branches on them. Polish's `status: {manageable | oversized}` per-item field is load-bearing — the dispatcher branches on it (`manageable` → fix, `oversized` → stacked-PR seed).
-- **`docs/solutions/developer-experience/branch-based-plugin-install-and-testing.md`** — Shared checkout can't serve two branches. If the user is already on a worktree for the target PR, attach; do not silently re-checkout the primary.
-- **`docs/solutions/skill-design/beta-skills-framework.md`** + `.../ce-work-beta-promotion-checklist.md` — New workflow skills ship first as `-beta` with `disable-model-invocation: true`. Promotion later requires updating every caller in the same PR.
+- **`docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`** — Branch/PR-switching skills 必须建模为 explicit state machines，并在每次 transition 后重新 probe。Polish 在每次 checkout 或 kill 后重新读取 `git branch --show-current`、server PID 和 PR number。绝不在 prose 中沿用旧值。
+- **`docs/solutions/skill-design/compound-refresh-skill-improvements.md`** — Question-before-evidence 是 anti-pattern。Polish 先生成 test checklist，再问 human 要测试什么；human 编辑 generated list，而不是从零编写。所有 confirmations 都包含具体 command/port/PID，让 human 无需追问即可判断。
+- **`docs/solutions/skill-design/pass-paths-not-content-to-subagents.md`** — Orchestrator 只把 paths 传给 sub-agents；sub-agents 自己读取内容。Polish 传递 diff file list、review artifact path 和 PR number，绝不 inline diff content。
+- **`docs/solutions/best-practices/codex-delegation-best-practices.md`** — 约 5-7 个 units 是 parallel dispatch 的 crossover；"never split units that share files." Polish 少于 5 items 时 sequential，超过时 parallel，并带 same-file collision guard。
+- **`docs/solutions/skill-design/script-first-skill-architecture.md`** — Deterministic classification（project-type、file-to-surface mapping、oversize detection）属于 bundled scripts，不属于 model。可减少 60-75% tokens。
+- **`docs/solutions/workflow/todo-status-lifecycle.md`** — Status fields 只有 downstream consumer 会基于它 branch 时才有价值。Polish 的 per-item `status: {manageable | oversized}` 是 load-bearing 字段，dispatcher 会基于它分支（`manageable` → fix，`oversized` → stacked-PR seed）。
+- **`docs/solutions/developer-experience/branch-based-plugin-install-and-testing.md`** — Shared checkout 不能同时服务两个 branches。如果用户已经在 target PR 的 worktree 上，就 attach；不要静默 re-checkout primary。
+- **`docs/solutions/skill-design/beta-skills-framework.md`** + `.../ce-work-beta-promotion-checklist.md` — 新 workflow skills 先以 `-beta` 和 `disable-model-invocation: true` 发布。后续 promotion 需要在同一个 PR 中更新每个 caller。
 
-### External References
+### 外部参考
 
-None required. Repo patterns and institutional learnings cover every decision; no external framework behavior is in dispute. (For cross-platform "kill process by port," `lsof -i :$PORT -t | xargs -r kill` is portable across macOS/Linux; documented inline in the dev-server reference file.)
+无需外部参考。Repo patterns 和 institutional learnings 已覆盖所有决策；不存在需要争议的外部 framework 行为。（对于 cross-platform “按 port kill process”，`lsof -i :$PORT -t | xargs -r kill` 在 macOS/Linux 上可移植；在 dev-server reference file 中内联记录。）
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **Ship as beta first (`skills/ce-polish-beta/`, `name: ce:polish-beta`).** Polish is a new human-in-the-loop workflow skill with multiple novel patterns (dev-server lifecycle, CI-check verification, checklist generation, stacked-PR hand-off). Per `beta-skills-framework.md`, new workflow skills ship beta first with `disable-model-invocation: true`. Promote to `ce:polish` in a follow-up PR once real usage validates the shape. *Rationale: every novel pattern listed below could miss on first design; beta contains blast radius and signals "this shape is not final yet."*
-- **Follow `ce:review`'s token-based argument parsing, not `ce:work`'s `<input_document>` wrapper.** Polish needs structured flags (`mode:*`, eventually `focus:*`, `skip-server-restart`) combined with a free-form target (PR/branch/blank). `ce:review`'s table-based token stripping is the right pattern. *Rationale: pattern already proven in the plugin's most-flag-rich skill.*
-- **Config-first dev-server, `.claude/launch.json` as primary source.** Polish reads `.claude/launch.json` at the repo root first. Schema: VS Code-compatible `version` + `configurations[]` array, each entry with `name`, `runtimeExecutable`, `runtimeArgs`, `port`, `cwd`, `env`. If multiple configurations exist, ask the user to pick. If no `launch.json` exists, fall back to per-framework auto-detect. If auto-detect succeeds, offer to write a minimal `launch.json` stub back to disk so future runs are deterministic. *Rationale: user-authored config is a cleaner trust boundary than auto-executing `bin/dev` from a checked-out branch, piggybacks on a standard Claude Code / VS Code / Cursor users are already adopting, and eliminates detection ambiguity on monorepos or unusual project layouts. Standard is not fully unified across IDEs yet — we lead with `.claude/launch.json` because it's the Claude Code native path; users on other IDEs can still author it.*
-- **Reuse `test-browser`'s port-detection cascade as the auto-detect fallback.** When `launch.json` is absent, cascade: CLI flag → `AGENTS.md`/`CLAUDE.md` → `package.json` dev-script → `.env*` → default `3000`. Do not invent a new cascade. *Rationale: consistency across the plugin, and the cascade already handles the long tail of project conventions when the user hasn't authored explicit config.*
-- **IDE-aware browser handoff.** After the server is reachable, probe for the host IDE via environment variables (`CLAUDE_CODE`, `CURSOR_TRACE_ID`, `TERM_PROGRAM=vscode`, future Codex signals). If running inside an IDE with an embedded browser, emit an open-in-browser instruction the IDE understands; otherwise print `http://localhost:<port>` in the interactive summary. Detection failure is silent — always fall through to printing the URL. *Rationale: polish is inherently iterative, and a built-in browser keeps the loop inside the editor. But IDE detection is a moving target across tools, so treat it as progressive enhancement, never a gate.*
-- **Kill-by-port uses `lsof -i :$PORT -t | xargs -r kill`, gated behind user confirmation.** Portable across macOS/Linux. The confirmation step is mandatory — the plugin's posture everywhere else is "ask the user to do environment setup" (see `test-browser` which tells the user to start the server manually rather than starting it itself). Polish breaks this posture only with explicit consent, and only for the kill step; the start step also asks before executing. *Rationale: destructive action on user's local processes; user consent is non-negotiable.*
-- **Start dev server via background task with PID + log-path reported.** Use the platform's `run_in_background` + Monitor equivalent (in Claude Code: `Bash(..., run_in_background=true)`), capture PID, and print the log tail file path so the user can `tail -f` it themselves. *Rationale: dev servers outlive the polish run; the user must be able to reclaim control.*
-- **Entry gate reads the latest `ce-review` artifact, not CI alone.** Polish looks at `.context/compound-engineering/ce-review/*/` sorted by mtime; requires verdict `Ready to merge` or `Ready with fixes`. *Additionally* runs `gh pr checks <pr> --json bucket,state` for CI green signal. If either gate fails, refuse with clear routing message ("run `/ce:review` first" or "wait for CI"). *Rationale: the review artifact is the canonical "review done" signal in the plugin; CI green is the canonical "tests passed" signal. Both are required.*
-- **Merge `main` back into the branch with user confirmation, not rebase.** `git fetch origin && git merge origin/<base>` after clean-worktree check. Merge, not rebase, because polish operates on a PR that may already have external review comments tied to commits — rebasing orphans those. *Rationale: preserve review-thread anchoring.*
-- **Test checklist generation happens in the model with a bundled prompt template; classification (file → surface, item → oversized) happens in scripts.** The checklist is a judgment artifact (what's worth experiencing as a user); classification is deterministic. Split accordingly per `script-first-skill-architecture.md`.
-- **Sub-agent selection via deterministic rules + diff signal.** Script inspects the diff and emits a proposed agent set: design agents if `.erb`/`.tsx`/`.vue`/`.svelte`/`.css`/`.scss` files changed; frontend-races reviewer if `stimulus`/`turbo`/`hotwire` or async JS patterns detected; simplicity/maintainability reviewer for all polish runs as a sanity pass. *Rationale: agents-as-personas pattern matches `ce:review`; the orchestrator doesn't guess.*
-- **Size gate is load-bearing.** Each checklist item carries `status: {manageable | oversized}`. The dispatcher branches: `manageable` → dispatch a fix sub-agent; `oversized` → refuse to fix, write a stacked-PR seed to `.context/compound-engineering/ce-polish/<run-id>/stacked-pr-<n>.md`, and emit guidance to the user with a proposed branch name. *Rationale: without branching consumption, size gates rot into decoration (per `todo-status-lifecycle.md`).*
-- **Worktree-aware checkout.** Before `gh pr checkout`, probe `git worktree list --porcelain` for the PR branch. If found, attach (cd into the worktree) rather than switching the user's primary checkout. *Rationale: silent branch switches on a running server + shared checkout are one of the more painful ways this could misbehave (per `branch-based-plugin-install-and-testing`).*
-- **`mode:headless` support from v1.** Emit structured completion envelope with `Polish complete` terminal signal, artifact path, and pending-stacked-PR list — mirroring `ce:review` headless. *Rationale: LFG and future pipelines need a machine-consumable completion shape; retrofitting later is harder than building it in.*
+- **先以 beta 发布（`skills/ce-polish-beta/`、`name: ce:polish-beta`）。** Polish 是新的 human-in-the-loop workflow skill，包含多个新模式（dev-server lifecycle、CI-check verification、checklist generation、stacked-PR hand-off）。按 `beta-skills-framework.md`，新的 workflow skills 先以 beta 形态发布，并设置 `disable-model-invocation: true`。真实使用验证形态后，再在 follow-up PR promote 到 `ce:polish`。*理由：下面列出的每个新模式都可能在首次设计时偏离实际；beta 控制 blast radius，并明确传达“这个形态尚未最终定型”。*
+- **遵循 `ce:review` 的 token-based argument parsing，而不是 `ce:work` 的 `<input_document>` wrapper。** Polish 需要把 structured flags（`mode:*`，未来可能有 `focus:*`、`skip-server-restart`）与 free-form target（PR/branch/blank）组合起来。`ce:review` 的 table-based token stripping 是合适模式。*理由：该模式已在 plugin 中 flag 最多的 skill 里验证过。*
+- **Config-first dev-server，`.claude/launch.json` 作为 primary source。** Polish 首先读取 repo root 的 `.claude/launch.json`。Schema：VS Code-compatible `version` + `configurations[]` array，每个 entry 包含 `name`、`runtimeExecutable`、`runtimeArgs`、`port`、`cwd`、`env`。如果存在多个 configurations，让用户选择。没有 `launch.json` 时 fallback 到 per-framework auto-detect。auto-detect 成功后，提供把最小 `launch.json` stub 写回磁盘的选项，使未来运行 deterministic。*理由：user-authored config 是比从 checked-out branch 自动执行 `bin/dev` 更干净的 trust boundary，也复用 Claude Code / VS Code / Cursor 用户已经在采用的标准，并消除 monorepos 或异常项目布局下的 detection ambiguity。该标准尚未在所有 IDE 间完全统一；这里优先使用 `.claude/launch.json`，因为它是 Claude Code native path；其他 IDE 用户仍可自行编写。*
+- **复用 `test-browser` 的 port-detection cascade 作为 auto-detect fallback。** 当 `launch.json` 缺失时，cascade 为：CLI flag → `AGENTS.md`/`CLAUDE.md` → `package.json` dev-script → `.env*` → default `3000`。不要发明新的 cascade。*理由：保持 plugin 内一致性；在用户尚未编写显式 config 时，该 cascade 已覆盖项目约定的长尾。*
+- **IDE-aware browser handoff。** Server reachable 后，通过 environment variables（`CLAUDE_CODE`、`CURSOR_TRACE_ID`、`TERM_PROGRAM=vscode`、未来 Codex signals）探测 host IDE。如果运行在带 embedded browser 的 IDE 中，emit 该 IDE 能理解的 open-in-browser instruction；否则在 interactive summary 中打印 `http://localhost:<port>`。Detection failure 保持 silent，始终 fall through 到打印 URL。*理由：polish 本质是 iterative，内置浏览器能让循环留在编辑器内。但 IDE detection 在不同工具中会变化，所以只能作为 progressive enhancement，不能成为 gate。*
+- **Kill-by-port 使用 `lsof -i :$PORT -t | xargs -r kill`，并由用户确认 gate。** 该命令在 macOS/Linux 上可移植。确认步骤是强制的：plugin 在其他地方的姿态是“让用户做 environment setup”（见 `test-browser`，它要求用户手动启动 server，而不是自己启动）。Polish 只在用户显式同意时打破该姿态，并且 kill step 和 start step 都在执行前询问。*理由：这是对用户本地 processes 的破坏性操作；用户 consent 不可协商。*
+- **通过 background task 启动 dev server，并报告 PID + log-path。** 使用平台的 `run_in_background` + Monitor 等价能力（Claude Code 中为 `Bash(..., run_in_background=true)`），捕获 PID，并打印 log tail file path，便于用户自行 `tail -f`。*理由：dev servers 会比 polish run 活得更久；用户必须能重新取得控制。*
+- **Entry gate 读取最新 `ce-review` artifact，而不是只看 CI。** Polish 按 mtime 排序查看 `.context/compound-engineering/ce-review/*/`，要求 verdict 为 `Ready to merge` 或 `Ready with fixes`。*此外* 运行 `gh pr checks <pr> --json bucket,state` 作为 CI green signal。如果任一 gate 失败，用明确 routing message 拒绝（“先运行 `/ce:review`”或“等待 CI”）。*理由：review artifact 是 plugin 中 canonical “review done” signal；CI green 是 canonical “tests passed” signal。两者都需要。*
+- **经用户确认后把 `main` merge 回 branch，而不是 rebase。** Clean-worktree check 后运行 `git fetch origin && git merge origin/<base>`。使用 merge 而不是 rebase，因为 polish 处理的 PR 可能已有绑定到 commits 的外部 review comments；rebase 会让这些 anchors 失效。*理由：保留 review-thread anchoring。*
+- **Test checklist generation 在模型中使用 bundled prompt template；classification（file → surface、item → oversized）在 scripts 中完成。** Checklist 是 judgment artifact（什么值得作为用户体验去测试）；classification 是 deterministic。按 `script-first-skill-architecture.md` 拆分。
+- **通过 deterministic rules + diff signal 选择 sub-agent。** Script 检查 diff 并输出 proposed agent set：如果 `.erb`/`.tsx`/`.vue`/`.svelte`/`.css`/`.scss` 文件变更，则使用 design agents；如果检测到 `stimulus`/`turbo`/`hotwire` 或 async JS patterns，则使用 frontend-races reviewer；所有 polish runs 都用 simplicity/maintainability reviewer 做 sanity pass。*理由：agents-as-personas pattern 与 `ce:review` 一致；orchestrator 不凭空猜测。*
+- **Size gate 是 load-bearing。** 每个 checklist item 携带 `status: {manageable | oversized}`。Dispatcher 分支：`manageable` → dispatch fix sub-agent；`oversized` → 拒绝修复，写入 stacked-PR seed 到 `.context/compound-engineering/ce-polish/<run-id>/stacked-pr-<n>.md`，并向用户输出 guidance 和 proposed branch name。*理由：如果没有 branching consumption，size gates 会退化成装饰（按 `todo-status-lifecycle.md`）。*
+- **Worktree-aware checkout。** 在 `gh pr checkout` 之前，通过 `git worktree list --porcelain` probe PR branch。如果找到，就 attach（cd 到该 worktree），而不是切换用户 primary checkout。*理由：在 running server + shared checkout 上 silent branch switch 会导致痛苦的误行为（见 `branch-based-plugin-install-and-testing`）。*
+- **v1 起支持 `mode:headless`。** Emit structured completion envelope，包含 `Polish complete` terminal signal、artifact path 和 pending-stacked-PR list，镜像 `ce:review` headless。*理由：LFG 和未来 pipelines 需要 machine-consumable completion shape；后补比一开始建进去更难。*
 
-## Open Questions
+## 开放问题
 
-### Resolved During Planning
+### 规划期间已解决
 
-- *Should polish ship as stable or beta first?* **Beta (`ce:polish-beta`).** Resolved via `beta-skills-framework.md` learning — multiple novel patterns warrant beta containment. Promotion follow-up PR will flip the name and update callers.
-- *Where does polish verify "review done"?* Latest `.context/compound-engineering/ce-review/<run-id>/` artifact verdict + `gh pr checks`. Both must pass.
-- *Does polish itself manage the dev server, or ask the user to?* Polish manages it (kill + restart) with user confirmation at each step. This is a deliberate posture break from `test-browser`, justified because polish is inherently a tight iterate-and-see loop where manual server juggling is the thing polish exists to eliminate.
-- *Rebase or merge when pulling latest main?* Merge. Rebasing would orphan existing PR review-thread anchors.
-- *What agents does polish dispatch?* Existing design and review agents (`design-iterator`, `design-implementation-reviewer`, `figma-design-sync`, `code-simplicity-reviewer`, `maintainability-reviewer`, `julik-frontend-races-reviewer`). No new agents in this PR.
-- *When sub-agents run in parallel, how are file-collision-prone items handled?* Items touching overlapping file paths always run sequentially regardless of total count. The dispatcher groups items by file-path intersection before deciding parallel vs sequential.
+- *polish 应该先 stable 还是 beta？* **Beta（`ce:polish-beta`）。** 依据 `beta-skills-framework.md` learning 解决；多个 novel patterns 值得先用 beta containment。Promotion follow-up PR 会切换名称并更新 callers。
+- *polish 在哪里验证 "review done"？* 最新 `.context/compound-engineering/ce-review/<run-id>/` artifact verdict + `gh pr checks`。二者都必须通过。
+- *polish 自己管理 dev server，还是让用户管理？* Polish 自己管理（kill + restart），每一步都要求用户确认。这是对 `test-browser` posture 的有意打破，理由是 polish 本质上是紧密 iterate-and-see loop，而手动 server juggling 正是 polish 要消除的摩擦。
+- *拉取最新 main 时 rebase 还是 merge？* Merge。Rebase 会让已有 PR review-thread anchors 失效。
+- *polish dispatch 哪些 agents？* 现有 design 和 review agents（`design-iterator`、`design-implementation-reviewer`、`figma-design-sync`、`code-simplicity-reviewer`、`maintainability-reviewer`、`julik-frontend-races-reviewer`）。本 PR 不新增 agents。
+- *sub-agents 并行运行时，容易发生 file collision 的 items 怎么处理？* 触及重叠 file paths 的 items 无论总数多少都始终 sequential。dispatcher 先按 file-path intersection 分组，再决定 parallel 或 sequential。
 
-### Deferred to Implementation
+### 推迟到实现阶段
 
-- *Exact file-count / line-count thresholds for "oversized."* The classifier script should start conservative (e.g., >5 distinct file paths, or >2 distinct surface categories, or >300 diff lines for a single polish item) and be tuned after first beta runs. Don't pretend the thresholds are precisely right at plan time.
-- *Exact format of the stacked-PR seed artifact.* Minimum: target branch name suggestion, description seed, file list, references to the review artifact. Detailed schema belongs in implementation once the downstream consumer (a future `/ce:stack-pr`?) is clearer.
-- *Which log-tail strategy on each platform.* Rails `bin/dev` writes to stdout; Next.js `npm run dev` to stdout; Procfile/Overmind to overmind socket. Specific tail capture belongs in per-framework `references/dev-server-*.md`.
-- *Whether `/ce:work` should auto-chain into `/ce:polish` after review completes.* Deferred to a follow-up PR. First release is manually invoked; chain integration after beta usage signals the shape is right.
-- *What happens if the user is in a git worktree but the PR is not checked out in any worktree.* Recommended behavior is "offer `git worktree add`" but the UX needs to be designed during implementation with an actual worktree scenario to trigger against.
+- *"oversized" 的精确 file-count / line-count thresholds。* classifier script 应从保守值开始（例如单个 polish item >5 个 distinct file paths、>2 个 distinct surface categories，或 >300 diff lines），并在 first beta runs 后调优。不要在 plan 阶段假装 thresholds 已经精确。
+- *stacked-PR seed artifact 的准确格式。* 最小内容：target branch name suggestion、description seed、file list、指向 review artifact 的 references。更详细 schema 应在 downstream consumer（未来的 `/ce:stack-pr`？）更清楚后实现。
+- *各平台使用哪种 log-tail strategy。* Rails `bin/dev` 写 stdout；Next.js `npm run dev` 写 stdout；Procfile/Overmind 写 overmind socket。具体 tail capture 放进对应 framework 的 `references/dev-server-*.md`。
+- *`/ce:work` 是否应在 review 完成后 auto-chain 到 `/ce:polish`。* 推迟到 follow-up PR。首个 release 由用户手动调用；等 beta usage 证明形态正确后再集成 chain。
+- *如果用户在 git worktree 中，但 PR 没有 checkout 到任何 worktree，会怎样？* 推荐行为是提供 `git worktree add`，但 UX 需要在实现时用真实 worktree 场景设计。
 
-## High-Level Technical Design
+## 高层技术设计
 
-> *This illustrates the intended approach and is directional guidance for review, not implementation specification. The implementing agent should treat it as context, not code to reproduce.*
+> *此处展示 intended approach，并为 review 提供方向性 guidance，不是 implementation specification。实现 agent 应把它视为 context，而不是要照抄的 code。*
 
-### State machine
+### 状态机
 
 ```mermaid
 flowchart TB
@@ -190,7 +190,7 @@ flowchart TB
     REPLAN3 --> END
 ```
 
-### Skill directory shape
+### Skill 目录形态
 
 ```
 skills/ce-polish-beta/
@@ -216,7 +216,7 @@ skills/ce-polish-beta/
 │   └── parse-checklist.sh                # edited checklist.md -> action JSON
 ```
 
-### Headless completion envelope (mirrors ce:review)
+### Headless completion envelope（镜像 ce:review）
 
 ```
 Polish complete (headless mode).
@@ -234,395 +234,395 @@ Artifact: .context/compound-engineering/ce-polish/<run-id>/
 Polish complete
 ```
 
-## Implementation Units
+## 实施单元
 
-- [ ] **Unit 1: Skill skeleton, frontmatter, and argument parsing**
+- [ ] **Unit 1：Skill skeleton、frontmatter 和 argument parsing**
 
-  **Goal:** Create `skills/ce-polish-beta/SKILL.md` with frontmatter, argument-parsing table, mode detection, and input-triage phase that lands at the entry gate without attempting any state changes.
+  **目标：** 创建 `skills/ce-polish-beta/SKILL.md`，包含 frontmatter、argument-parsing table、mode detection，以及只抵达 entry gate、但不尝试任何 state changes 的 input-triage phase。
 
-  **Requirements:** R1, R2, R3, R10
+  **需求：** R1, R2, R3, R10
 
-  **Dependencies:** None
+  **依赖：** 无
 
-  **Files:**
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md`
-  - Test: `tests/fixtures/sample-plugin/skills/ce-polish-beta/SKILL.md` (fixture for converter tests) and converter coverage in `tests/converter.test.ts`
+  **文件：**
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md`
+  - 测试： `tests/fixtures/sample-plugin/skills/ce-polish-beta/SKILL.md`（converter tests 的 fixture）以及 `tests/converter.test.ts` 中的 converter coverage
 
-  **Approach:**
-  - Frontmatter: `name: ce:polish-beta`, description starts `[BETA] ...`, `argument-hint: "[PR number, PR URL, branch name, or blank for current branch]"`, `disable-model-invocation: true`.
-  - Parse `$ARGUMENTS` via `ce:review`-style token table: `mode:headless`, `trust-fork:1`. Strip tokens, interpret remainder as PR number / URL / branch / blank. (`mode:report-only` and `mode:autonomous` are deferred — add in a follow-up PR once a downstream consumer needs them.)
-  - Conflicting mode token detection — stop and emit an envelope mirror of `ce:review` Stage 6.
-  - Phase 0 (Input Triage) only for this unit; later units extend with behavior.
+  **方法：**
+  - Frontmatter：`name: ce:polish-beta`，description 以 `[BETA] ...` 开头，`argument-hint: "[PR number, PR URL, branch name, or blank for current branch]"`，`disable-model-invocation: true`。
+  - 通过 `ce:review` 风格 token table 解析 `$ARGUMENTS`：`mode:headless`、`trust-fork:1`。剥离 tokens，将剩余内容解释为 PR number / URL / branch / blank。（`mode:report-only` 和 `mode:autonomous` deferred，等 downstream consumer 需要时在 follow-up PR 添加。）
+  - 检测 conflicting mode token；停止并 emit 一个镜像 `ce:review` Stage 6 的 envelope。
+  - 本 unit 只实现 Phase 0（Input Triage）；后续 units 扩展 behavior。
 
-  **Patterns to follow:**
-  - Frontmatter: `plugins/compound-engineering/skills/ce-review/SKILL.md:1-5`
-  - Argument table: `plugins/compound-engineering/skills/ce-review/SKILL.md:19-33`
-  - Beta skill posture: `plugins/compound-engineering/skills/ce-work-beta/SKILL.md` frontmatter
-  - Cross-platform tool-selection rules: `plugins/compound-engineering/AGENTS.md` section on tool selection
+  **遵循的模式：**
+  - Frontmatter 范例： `plugins/compound-engineering/skills/ce-review/SKILL.md:1-5`
+  - Argument table 范例： `plugins/compound-engineering/skills/ce-review/SKILL.md:19-33`
+  - Beta skill posture 范例： `plugins/compound-engineering/skills/ce-work-beta/SKILL.md` frontmatter
+  - Cross-platform tool-selection rules：`plugins/compound-engineering/AGENTS.md` 中的 tool selection section
 
-  **Test scenarios:**
-  - Happy path: `$ARGUMENTS="123"` → parsed as PR number 123, no mode flags.
-  - Happy path: `$ARGUMENTS=""` → parsed as "use current branch".
-  - Happy path: `$ARGUMENTS="mode:headless 123"` → headless mode, PR 123.
-  - Happy path: `$ARGUMENTS="https://github.com/foo/bar/pull/42"` → parsed as PR URL 42.
-  - Edge case: `$ARGUMENTS="feat/my-branch"` → parsed as branch name.
-  - Happy path: `$ARGUMENTS="trust-fork:1 123"` → trust-fork flag set, PR 123; fork-PR check in Unit 3 will honor it.
-  - Error path: `$ARGUMENTS="mode:headless mode:autonomous"` → unknown-mode-token envelope (only `mode:headless` is implemented in v1), no further dispatch.
-  - Integration: converter test confirms the skill is discovered and YAML frontmatter parses under `install --to opencode` and `install --to codex` without the colon-unquoting bug (see `plugin.compound-engineering/AGENTS.md` YAML rule).
+  **测试场景：**
+  - 正常路径：`$ARGUMENTS="123"` → 解析为 PR number 123，无 mode flags。
+  - 正常路径：`$ARGUMENTS=""` → 解析为“use current branch”。
+  - 正常路径：`$ARGUMENTS="mode:headless 123"` → headless mode，PR 123。
+  - 正常路径：`$ARGUMENTS="https://github.com/foo/bar/pull/42"` → 解析为 PR URL 42。
+  - 边界情况：`$ARGUMENTS="feat/my-branch"` → 解析为 branch name。
+  - 正常路径：`$ARGUMENTS="trust-fork:1 123"` → 设置 trust-fork flag，PR 123；Unit 3 的 fork-PR check 会 honor it。
+  - 错误路径：`$ARGUMENTS="mode:headless mode:autonomous"` → unknown-mode-token envelope（v1 只实现 `mode:headless`），不继续 dispatch。
+  - 集成：converter test 确认该 skill 可被 discovered，并且在 `install --to opencode` 和 `install --to codex` 下 YAML frontmatter 正常解析，没有 colon-unquoting bug（见 `plugin.compound-engineering/AGENTS.md` YAML rule）。
 
-  **Verification:** Invoking `/ce:polish-beta` with no arguments prints the parsed target and exits cleanly at end of Phase 0 without attempting checkout, server work, or sub-agent dispatch.
+  **验证：** 无参数调用 `/ce:polish-beta` 会打印 parsed target，并在 Phase 0 结束处 cleanly exit，不尝试 checkout、server work 或 sub-agent dispatch。
 
-- [ ] **Unit 2: Branch / PR acquisition with worktree awareness**
+- [ ] **Unit 2：带 worktree awareness 的 Branch / PR acquisition**
 
-  **Goal:** Check out the requested PR or branch safely. Probe for an existing worktree; attach rather than re-checkout when possible. Refuse with a clear message when the working tree is dirty.
+  **目标：** 安全 check out 请求的 PR 或 branch。探测 existing worktree；可行时 attach，而不是 re-checkout。working tree dirty 时以清晰 message 拒绝。
 
-  **Requirements:** R3, R4
+  **需求：** R3, R4
 
-  **Dependencies:** Unit 1
+  **依赖：** Unit 1
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (new phase)
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/resolve-base.sh` (copied from `plugins/compound-engineering/skills/ce-review/references/resolve-base.sh` verbatim)
-  - Test: extend `tests/converter.test.ts` to confirm the duplicated script is included in the skill's output tree on conversion.
+  **文件：**
+  - 修改： `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (new phase)
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/resolve-base.sh`（从 `plugins/compound-engineering/skills/ce-review/references/resolve-base.sh` verbatim copy）
+  - 测试：扩展 `tests/converter.test.ts`，确认 conversion 后 duplicated script 包含在 skill 的 output tree 中。
 
-  **Approach:**
-  - Clean-worktree probe via `git status --porcelain`. Non-empty → emit the same message `ce-review` uses; do not proceed.
-  - For PR number/URL: `gh pr view <n> --json url,headRefName,baseRefName,headRepositoryOwner,state,mergeable`, then `git worktree list --porcelain` and grep for the head branch. If present in a worktree, cd into that worktree's path and announce the attach. Otherwise `gh pr checkout <n>`.
-  - For branch name: same worktree probe, then `git checkout <branch>` if not in a worktree.
-  - For blank: use current branch, run `resolve-base.sh` to find the base.
-  - Re-read `git branch --show-current` after any checkout (state-machine discipline from `git-workflow-skills-need-explicit-state-machines`).
+  **方法：**
+  - 通过 `git status --porcelain` 做 clean-worktree probe。非空 → emit 与 `ce-review` 相同的 message；不继续。
+  - 对 PR number/URL：运行 `gh pr view <n> --json url,headRefName,baseRefName,headRepositoryOwner,state,mergeable`，然后运行 `git worktree list --porcelain` 并 grep head branch。如果已存在于某个 worktree，则 cd 到该 worktree path 并宣布 attach；否则运行 `gh pr checkout <n>`。
+  - 对 branch name：做相同 worktree probe；若不在 worktree 中，则 `git checkout <branch>`。
+  - 对 blank：使用 current branch，运行 `resolve-base.sh` 找 base。
+  - 任意 checkout 后重新读取 `git branch --show-current`（来自 `git-workflow-skills-need-explicit-state-machines` 的 state-machine discipline）。
 
-  **Patterns to follow:**
-  - Branch/PR acquisition block: `plugins/compound-engineering/skills/ce-review/SKILL.md:184-267`
-  - State-machine discipline: `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`
+  **遵循的模式：**
+  - Branch/PR acquisition block 范例：`plugins/compound-engineering/skills/ce-review/SKILL.md:184-267`
+- State-machine discipline（state-machine 纪律）：`docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`
 
-  **Test scenarios:**
-  - Happy path: clean worktree, PR number provided, PR not in any worktree → `gh pr checkout` executes, branch matches `headRefName`.
-  - Happy path: clean worktree, PR number provided, PR already in a worktree at `../polish-pr-123` → attach (print worktree path), no `gh pr checkout`.
-  - Edge case: dirty worktree → emit uncommitted-changes message, exit without checkout.
-  - Edge case: PR state is `MERGED` or `CLOSED` → emit "PR not open, nothing to polish" and exit.
-  - Error path: `gh pr view` fails because `gh` is not authenticated → surface the actual error to the user; do not swallow (per AGENTS.md "no error suppression" rule).
-  - Integration: running the skill on a PR branch already checked out via `gh pr checkout` earlier should re-confirm via `git branch --show-current` and proceed without re-checkout.
+  **测试场景：**
+  - 正常路径：clean worktree，提供 PR number，PR 不在任何 worktree 中 → 执行 `gh pr checkout`，branch 匹配 `headRefName`。
+  - 正常路径：clean worktree，提供 PR number，PR 已在 `../polish-pr-123` worktree 中 → attach（打印 worktree path），不运行 `gh pr checkout`。
+  - 边界情况：dirty worktree → emit uncommitted-changes message，exit without checkout。
+  - 边界情况：PR state 为 `MERGED` 或 `CLOSED` → emit "PR not open, nothing to polish" 并 exit。
+  - 错误路径：`gh pr view` 因 `gh` 未认证而失败 → 向用户 surface actual error；不要 swallow（按 AGENTS.md “no error suppression” rule）。
+  - 集成：在之前已通过 `gh pr checkout` checkout 的 PR branch 上运行 skill，应通过 `git branch --show-current` 重新确认并继续，不 re-checkout。
 
-  **Verification:** The skill never silently switches a user's primary checkout when a worktree for the PR exists, and never proceeds past Phase 1 with a dirty working tree.
+  **验证：** 当 PR 已有 worktree 时，skill 永不静默切换用户 primary checkout；working tree dirty 时永不越过 Phase 1。
 
-- [ ] **Unit 3: Entry gate — fork-PR trust check + review artifact + CI check + merge-main**
+- [ ] **Unit 3：Entry gate — fork-PR trust check、review artifact、CI check 与 merge-main**
 
-  **Goal:** Verify the work is actually ready (and safe) to polish before taking any further action. Refuse cleanly if the PR is from a fork without explicit trust, if review is not green, or if CI is failing. Offer to merge latest `main` in with user confirmation.
+  **目标：** 在采取任何进一步动作前，验证 work 确实 ready（且 safe）to polish。如果 PR 来自 fork 且没有 explicit trust、review 不是 green、或 CI failing，则 cleanly refuse。经用户确认后提供把 latest `main` merge 进来的选项。
 
-  **Requirements:** R5, R10
+  **需求：** R5, R10
 
-  **Dependencies:** Unit 2
+  **依赖：** Unit 2
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (new phase)
-  - Modify: `plugins/compound-engineering/skills/ce-review/SKILL.md` — single additive step in the finalize phase: write `metadata.json` alongside the existing synthesized-findings file containing `{branch, head_sha, created_at}`. No other ce-review behavior changes. This is the writer counterpart to polish's SHA-binding reader.
-  - Test: fixture under `tests/fixtures/sample-plugin/.context/compound-engineering/ce-review/20260415-120000-abcd/` with both a "ready to merge" and a "not ready" synthesized-findings file, each with a matching `metadata.json`, to exercise both gate outcomes and the SHA-binding paths. Also include one fixture artifact without `metadata.json` to exercise the pre-metadata.json fallback.
+  **文件：**
+  - 修改： `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (new phase)
+  - 修改： `plugins/compound-engineering/skills/ce-review/SKILL.md` — finalize phase 中添加单个 additive step：在现有 synthesized-findings file 旁写入 `metadata.json`，内容为 `{branch, head_sha, created_at}`。不改变其它 ce-review behavior。这是 polish SHA-binding reader 对应的 writer。
+  - 测试：在 `tests/fixtures/sample-plugin/.context/compound-engineering/ce-review/20260415-120000-abcd/` 下添加 fixture，包含一个 "ready to merge" 和一个 "not ready" synthesized-findings file，二者都带 matching `metadata.json`，用于覆盖两种 gate outcomes 和 SHA-binding paths。另加一个无 `metadata.json` 的 fixture artifact，用于覆盖 pre-metadata.json fallback。
 
-  **Approach:**
-  - **Fork-PR trust check (first, before anything else in this phase):** For PR-number and PR-URL targets, run `gh pr view <n> --json isCrossRepository,headRepositoryOwner,author`. If `isCrossRepository=true`, refuse unless `$ARGUMENTS` contains the explicit token `trust-fork:1`. Refusal message prints the PR author, head repo, and instructions to re-invoke with the trust-fork token. For branch-name and blank targets, skip this check (the user already has the code on disk; they are the trust boundary).
-  - **Branch + SHA binding (before reading the artifact's verdict):** Compute `current_branch = git branch --show-current` and `current_sha = git rev-parse HEAD`. The entry gate must verify that the ce-review artifact it is about to read was produced against **this branch** at **this SHA** or an ancestor SHA. Binding logic:
-    - Read `.context/compound-engineering/ce-review/*/metadata.json` sorted by mtime; pick the newest whose `branch` matches `current_branch`. If none match, emit "No review artifact found for branch `<current_branch>` — run `/ce:review` first." and exit.
-    - If the matching artifact's `head_sha` equals `current_sha`, bind succeeds.
-    - If `current_sha` is a descendant of the artifact's `head_sha` (test: `git merge-base --is-ancestor <artifact_head_sha> <current_sha>`), warn "review covers `<artifact_head_sha>`; you have N additional commits — re-run /ce:review to cover them" and, unless `$ARGUMENTS` contains `accept-stale-review:1`, refuse. Never silently accept a partial-coverage artifact.
-    - If `current_sha` is neither equal to nor a descendant of the artifact's `head_sha` (different branch lineage, force-push, or reset), refuse unconditionally with "review artifact is not an ancestor of HEAD; re-run /ce:review."
-    - `metadata.json` is a small additive file ce-review writes alongside its existing artifact (see Unchanged Invariants — ce-review gains one small additive field, no behavior change). If a pre-metadata.json artifact is the only match, fall back to the mtime-vs-HEAD-commit-time heuristic: if any commit on `current_branch` is newer than the artifact mtime, warn and require `accept-stale-review:1`. The fallback exists for backwards-compatibility during the rollout window and is documented as such — it is not the preferred path.
-  - Read the matching artifact. Parse verdict. Accept `Ready to merge` and `Ready with fixes`; reject `Not ready`.
-  - Run `gh pr checks <pr-or-branch> --json bucket,state --jq '.[] | select(.state != "SUCCESS" and .state != "SKIPPED")'`. Non-empty → "CI not green" and exit (headless mode emits structured failure envelope; interactive offers to wait-and-retry).
-  - Offer "Merge latest `main` into this branch?" via the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini) with a numbered-options fallback. On confirm: `git fetch origin && git merge origin/<base>` where `<base>` is from `resolve-base.sh`.
-  - Merge conflict → stop, do not attempt resolution; tell the user to resolve manually and re-invoke.
+  **方法：**
+  - **Fork-PR trust check（本 phase 第一件事）：** 对 PR-number 和 PR-URL targets，运行 `gh pr view <n> --json isCrossRepository,headRepositoryOwner,author`。如果 `isCrossRepository=true`，除非 `$ARGUMENTS` 包含显式 token `trust-fork:1`，否则拒绝。拒绝 message 打印 PR author、head repo，以及带 trust-fork token 重新调用的说明。对 branch-name 和 blank targets，跳过此 check（用户已经把 code 放在本地磁盘上，用户本身就是 trust boundary）。
+  - **Branch + SHA binding（读取 artifact verdict 前）：** 计算 `current_branch = git branch --show-current` 和 `current_sha = git rev-parse HEAD`。entry gate 必须验证即将读取的 ce-review artifact 是针对 **this branch** 的 **this SHA** 或 ancestor SHA 生成的。Binding logic：
+    - 按 mtime 排序读取 `.context/compound-engineering/ce-review/*/metadata.json`；选择最新且 `branch` 匹配 `current_branch` 的 artifact。如果没有匹配，emit "No review artifact found for branch `<current_branch>` — run `/ce:review` first." 并 exit。
+    - 如果 matching artifact 的 `head_sha` 等于 `current_sha`，bind 成功。
+    - 如果 `current_sha` 是 artifact `head_sha` 的 descendant（测试：`git merge-base --is-ancestor <artifact_head_sha> <current_sha>`），warn "review covers `<artifact_head_sha>`; you have N additional commits — re-run /ce:review to cover them"；除非 `$ARGUMENTS` 包含 `accept-stale-review:1`，否则拒绝。永不静默接受 partial-coverage artifact。
+    - 如果 `current_sha` 既不相等，也不是 artifact `head_sha` 的 descendant（不同 branch lineage、force-push 或 reset），无条件拒绝并提示 "review artifact is not an ancestor of HEAD; re-run /ce:review."
+    - `metadata.json` 是 ce-review 随现有 artifact 写入的小型 additive file（见 Unchanged Invariants：ce-review 增加一个小 additive field，不改变 behavior）。如果唯一匹配的是 pre-metadata.json artifact，则 fallback 到 mtime-vs-HEAD-commit-time heuristic：如果 `current_branch` 上任何 commit 比 artifact mtime 更新，就 warn 并要求 `accept-stale-review:1`。fallback 仅用于 rollout 窗口内的 backwards-compatibility，并记录为 fallback；它不是 preferred path。
+  - 读取 matching artifact，解析 verdict。接受 `Ready to merge` 和 `Ready with fixes`；拒绝 `Not ready`。
+  - 运行 `gh pr checks <pr-or-branch> --json bucket,state --jq '.[] | select(.state != "SUCCESS" and .state != "SKIPPED")'`。非空 → "CI not green" 并 exit（headless mode emit structured failure envelope；interactive 提供 wait-and-retry）。
+  - 通过 platform blocking question tool（Claude Code 的 `AskUserQuestion`、Codex 的 `request_user_input`、Gemini 的 `ask_user`）提供 "Merge latest `main` into this branch?"，并带 numbered-options fallback。确认后：`git fetch origin && git merge origin/<base>`，其中 `<base>` 来自 `resolve-base.sh`。
+  - Merge conflict → stop，不尝试 resolution；告知用户手动 resolve 并重新 invoke。
 
-  **Patterns to follow:**
-  - Artifact reading: `plugins/compound-engineering/skills/ce-review/SKILL.md:509-516, 675-680`
-  - Question-tool pattern: `plugins/compound-engineering/AGENTS.md` Cross-Platform User Interaction rules
-  - State-machine: re-read branch after merge.
+  **遵循的模式：**
+  - Artifact reading 范例：`plugins/compound-engineering/skills/ce-review/SKILL.md:509-516, 675-680`
+- Question-tool pattern（question-tool 模式）：`plugins/compound-engineering/AGENTS.md` Cross-Platform User Interaction rules
+  - State-machine：merge 后重新读取 branch。
 
-  **Test scenarios:**
-  - Happy path (fork + trust): PR is from a fork, `trust-fork:1` token present → fork check passes, proceed to review-artifact gate.
-  - Error path (fork without trust): PR is from a fork, no `trust-fork:1` token → refusal message prints PR author + head repo, exits before any server command runs.
-  - Happy path (same-repo): PR is from the same repo (`isCrossRepository=false`) → fork check is a no-op, proceed.
-  - Happy path (SHA binding exact match): artifact's `metadata.json` has `branch: feat/x`, `head_sha: abc123`; current branch `feat/x`, current SHA `abc123` → bind succeeds, proceed to verdict parse.
-  - Happy path (SHA binding ancestor-with-warning-accepted): artifact at `abc123`, current SHA `def456` is a descendant of `abc123`, `accept-stale-review:1` token present → warn "2 commits newer than review," proceed.
-  - Error path (SHA binding ancestor-without-accept): same scenario, no `accept-stale-review:1` → refuse with "re-run /ce:review to cover N additional commits."
-  - Error path (SHA binding diverged): artifact at `abc123`, current SHA `zzz999` on a different lineage (force-push or different branch) → refuse unconditionally.
-  - Error path (branch mismatch): artifact's metadata shows `branch: feat/a`, current branch is `feat/b` → refuse with "no review artifact found for branch `feat/b`."
-  - Happy path (pre-metadata.json fallback): artifact has no `metadata.json` (produced by an older ce-review), artifact mtime is newer than the HEAD commit time → warn but proceed.
-  - Edge case (pre-metadata.json fallback, stale): artifact has no `metadata.json`, HEAD commit is newer than artifact mtime → require `accept-stale-review:1` or refuse.
-  - Happy path: latest artifact says "Ready to merge", `gh pr checks` all `SUCCESS`, user confirms merge → merges cleanly and proceeds.
-  - Happy path: user skips merge-main → proceeds without merging.
-  - Edge case: no review artifact on disk → refuse with routing message.
-  - Edge case: latest review artifact is older than the latest commit on the branch → warn "review may be stale; re-run /ce:review" (don't hard-refuse — the user may have made only polish-intent commits, but flag it).
-  - Error path: `gh pr checks` shows a failing job → refuse with the job name in the error message.
-  - Error path: `git merge origin/<base>` produces a conflict → surface conflict file list, exit without attempting resolution.
-  - Integration: gate messages flow through headless envelope correctly when `mode:headless` is set.
+  **测试场景：**
+  - 正常路径（fork + trust）：PR 来自 fork，存在 `trust-fork:1` token → fork check pass，继续到 review-artifact gate。
+  - 错误路径（fork without trust）：PR 来自 fork，无 `trust-fork:1` token → refusal message 打印 PR author + head repo，并在任何 server command 运行前 exit。
+  - 正常路径（same-repo）：PR 来自同 repo（`isCrossRepository=false`）→ fork check no-op，继续。
+  - 正常路径（SHA binding exact match）：artifact 的 `metadata.json` 有 `branch: feat/x`、`head_sha: abc123`；current branch `feat/x`，current SHA `abc123` → bind 成功，继续 verdict parse。
+  - 正常路径（SHA binding ancestor-with-warning-accepted）：artifact at `abc123`，current SHA `def456` 是 `abc123` 的 descendant，存在 `accept-stale-review:1` token → warn "2 commits newer than review," 并继续。
+  - 错误路径（SHA binding ancestor-without-accept）：相同场景但无 `accept-stale-review:1` → refuse，并提示 "re-run /ce:review to cover N additional commits."
+  - 错误路径（SHA binding diverged）：artifact at `abc123`，current SHA `zzz999` 位于不同 lineage（force-push 或不同 branch）→ 无条件拒绝。
+  - 错误路径（branch mismatch）：artifact metadata 显示 `branch: feat/a`，current branch 是 `feat/b` → 拒绝并提示 "no review artifact found for branch `feat/b`."
+  - 正常路径（pre-metadata.json fallback）：artifact 没有 `metadata.json`（由旧 ce-review 生成），artifact mtime 比 HEAD commit time 更新 → warn 但继续。
+  - 边界情况（pre-metadata.json fallback, stale）：artifact 没有 `metadata.json`，HEAD commit 比 artifact mtime 更新 → 要求 `accept-stale-review:1`，否则拒绝。
+  - 正常路径：latest artifact 为 "Ready to merge"，`gh pr checks` 全部 `SUCCESS`，用户确认 merge → clean merge 并继续。
+  - 正常路径：用户跳过 merge-main → 不 merge 并继续。
+  - 边界情况：磁盘上没有 review artifact → 以 routing message 拒绝。
+  - 边界情况：latest review artifact 早于 branch 上 latest commit → warn "review may be stale; re-run /ce:review"（不 hard-refuse；用户可能只做了 polish-intent commits，但需要标记）。
+  - 错误路径：`gh pr checks` 显示 failing job → 用 job name 拒绝。
+  - 错误路径：`git merge origin/<base>` 产生 conflict → surface conflict file list，exit without attempting resolution。
+  - 集成：设置 `mode:headless` 时，gate messages 正确流入 headless envelope。
 
-  **Verification:** Running `/ce:polish-beta` on a branch with no review artifact, or with failing CI, exits before touching the dev server or generating any checklist.
+  **验证：** 在没有 review artifact 或 CI failing 的 branch 上运行 `/ce:polish-beta`，会在 touching dev server 或 generating checklist 之前 exit。
 
-- [ ] **Unit 4: Dev-server lifecycle (launch.json-first, auto-detect fallback, IDE browser handoff)**
+- [ ] **Unit 4：Dev-server lifecycle（dev-server 生命周期：launch.json-first、auto-detect fallback、IDE browser handoff）**
 
-  **Goal:** Resolve the dev-server start command from `.claude/launch.json` when present; fall back to per-framework auto-detect when absent and offer to write a `launch.json` stub; optionally kill any existing listener on the target port; start the server in the background; detect the host IDE and open the polish URL in its embedded browser when available, otherwise print the URL.
+  **目标：** 当 `.claude/launch.json` 存在时，从中解析 dev-server start command；缺失时 fallback 到 per-framework auto-detect，并提供写入 `launch.json` stub 的选项；可选 kill target port 上的 existing listener；后台启动 server；detect host IDE，并在可用时用其 embedded browser 打开 polish URL，否则打印 URL。
 
-  **Requirements:** R4, R4b
+  **需求：** R4, R4b
 
-  **Dependencies:** Unit 3
+  **依赖：** Unit 3
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (new phase)
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/scripts/detect-project-type.sh`
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/scripts/read-launch-json.sh` — parses `.claude/launch.json`, emits selected configuration as JSON on stdout, or `__NO_LAUNCH_JSON__` / `__INVALID_LAUNCH_JSON__` sentinel on failure
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/launch-json-schema.md` — documents the schema polish reads, the stub template written on fallback, and worked examples for Rails / Next / Vite / Procfile
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/ide-detection.md` — env-var probe table (`CLAUDE_CODE`, `CURSOR_TRACE_ID`, `TERM_PROGRAM`, future Codex signals) and browser-open command per IDE
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-detection.md`
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-rails.md`
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-next.md`
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-vite.md`
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-procfile.md`
-  - Test: `tests/skills/ce-polish-beta-dev-server.test.ts` — unit tests for `read-launch-json.sh` (valid single-config, valid multi-config, missing file, invalid JSON) and `detect-project-type.sh` (signature tree per framework plus `unknown`).
+  **文件：**
+  - 修改： `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (new phase)
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/scripts/detect-project-type.sh`
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/scripts/read-launch-json.sh` — 解析 `.claude/launch.json`，在 stdout 输出 selected configuration JSON；失败时输出 `__NO_LAUNCH_JSON__` / `__INVALID_LAUNCH_JSON__` sentinel
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/launch-json-schema.md` — 记录 polish 读取的 schema、fallback 时写入的 stub template，以及 Rails / Next / Vite / Procfile 的 worked examples
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/ide-detection.md` — env-var probe table（`CLAUDE_CODE`、`CURSOR_TRACE_ID`、`TERM_PROGRAM`、future Codex signals）和各 IDE 的 browser-open command
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-detection.md`
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-rails.md`
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-next.md`
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-vite.md`
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-procfile.md`
+  - 测试： `tests/skills/ce-polish-beta-dev-server.test.ts` — 覆盖 `read-launch-json.sh`（valid single-config、valid multi-config、missing file、invalid JSON）和 `detect-project-type.sh`（每个 framework 的 signature tree，以及 `unknown`）。
 
-  **Approach:**
-  - **Step 1 — Resolve the start command, config-first:**
-    - Run `read-launch-json.sh` at the repo root. If it returns a valid configuration object, use it: `runtimeExecutable` + `runtimeArgs` + `port` + `cwd` + `env`. If multiple configurations are defined, ask the user to pick via the platform's blocking question tool.
-    - If it returns `__NO_LAUNCH_JSON__`, fall through to Step 2 (auto-detect).
-    - If it returns `__INVALID_LAUNCH_JSON__`, stop with a clear parse-error message pointing at the file — do not silently fall back; a broken config should be fixed, not worked around.
-  - **Step 2 — Auto-detect fallback when launch.json is absent:**
-    - Script `detect-project-type.sh` inspects signature files: `bin/dev` and `Gemfile` → `rails`; `next.config.js`/`next.config.mjs` → `next`; `vite.config.*` → `vite`; `Procfile` / `Procfile.dev` → `procfile`; otherwise `unknown`.
-    - Port detection: reuse the `test-browser` cascade verbatim (CLI flag → `AGENTS.md`/`CLAUDE.md` → `package.json` dev-script → `.env*` → default `3000`). Duplicate the relevant prose into `references/dev-server-detection.md` (no cross-skill references).
-    - For multi-signature (monorepo-ish): ask the user to disambiguate. For `unknown`: ask the user for the start command explicitly; do not guess.
-  - **Step 3 — Offer to persist launch.json stub (fallback path only):**
-    - Once auto-detect (or user prompt) has produced a working command + port, ask the user: "Save this as `.claude/launch.json` for future runs?" via the platform's blocking question tool. On confirm: render `references/launch-json-schema.md` stub template with the resolved values and write to the repo root. On decline: proceed without writing; future runs will auto-detect again.
-  - **Step 4 — Kill any existing listener on the target port (with consent):**
-    - Ask: "Kill existing listener on port `<port>` (PID `<pid>`, command `<name>`)?" with `AskUserQuestion` / numbered-options fallback. On confirm: `lsof -i :$PORT -t | xargs -r kill`; re-probe after 1s; if still listening, `kill -9` with a second confirmation.
-  - **Step 5 — Start server in the background:**
-    - Start via the platform's background-command primitive (`Bash(..., run_in_background=true)` in Claude Code; equivalent elsewhere). For platforms without a background primitive (Codex currently), fall back to asking the user to start the server in another terminal and paste back PID + port.
-    - Redirect stdout+stderr to `.context/compound-engineering/ce-polish/<run-id>/server.log`.
-    - Probe reachability: `curl -sfI http://localhost:<port>` for up to 30s. Print PID, log path.
-  - **Step 6 — Host IDE detection and browser handoff:**
-    - Load `references/ide-detection.md`. Probe env vars in order: `CLAUDE_CODE` (Claude Code desktop), `CURSOR_TRACE_ID` (Cursor), future Codex signal, `TERM_PROGRAM=vscode` (plain VS Code). On a positive match, emit the IDE's open-in-browser instruction for `http://localhost:<port>`. On no match, print the URL in the interactive summary. Detection failure is never fatal.
+  **方法：**
+  - **Step 1 — 解析 start command，config-first：**
+    - 在 repo root 运行 `read-launch-json.sh`。如果返回 valid configuration object，就使用它：`runtimeExecutable` + `runtimeArgs` + `port` + `cwd` + `env`。如果定义了 multiple configurations，通过 platform blocking question tool 让用户选择。
+    - 如果返回 `__NO_LAUNCH_JSON__`，fall through 到 Step 2（auto-detect）。
+    - 如果返回 `__INVALID_LAUNCH_JSON__`，带指向该文件的 clear parse-error message 停止；不要 silently fall back，broken config 应被修复，而不是绕过。
+  - **Step 2 — launch.json 缺失时 auto-detect fallback:**
+    - Script `detect-project-type.sh` 检查 signature files：`bin/dev` 和 `Gemfile` → `rails`；`next.config.js`/`next.config.mjs` → `next`；`vite.config.*` → `vite`；`Procfile` / `Procfile.dev` → `procfile`；否则 `unknown`。
+    - Port detection：原样复用 `test-browser` cascade（CLI flag → `AGENTS.md`/`CLAUDE.md` → `package.json` dev-script → `.env*` → default `3000`）。将相关 prose 复制进 `references/dev-server-detection.md`（no cross-skill references）。
+    - 对 multi-signature（monorepo-ish）：询问用户 disambiguate。对 `unknown`：明确询问用户 start command；不要 guess。
+  - **Step 3 — 提供持久化 launch.json stub（仅 fallback path）：**
+    - auto-detect（或用户 prompt）产生 working command + port 后，通过 platform blocking question tool 询问用户："Save this as `.claude/launch.json` for future runs?"。确认后：用 resolved values 渲染 `references/launch-json-schema.md` stub template，并写到 repo root。拒绝后：不写入并继续；未来 runs 会再次 auto-detect。
+  - **Step 4 — 带 consent kill target port 上的 existing listener：**
+    - 使用 `AskUserQuestion` / numbered-options fallback 询问："Kill existing listener on port `<port>` (PID `<pid>`, command `<name>`)?"。确认后：`lsof -i :$PORT -t | xargs -r kill`；1s 后 re-probe；如果仍在 listening，第二次确认后 `kill -9`。
+  - **Step 5 — 后台启动 server：**
+    - 通过平台 background-command primitive 启动（Claude Code 中是 `Bash(..., run_in_background=true)`；其他平台等价）。对没有 background primitive 的平台（当前 Codex），fallback 为让用户在另一个 terminal 中启动 server 并 paste back PID + port。
+    - 将 stdout+stderr redirect 到 `.context/compound-engineering/ce-polish/<run-id>/server.log`。
+    - Reachability probe：最多 30s 运行 `curl -sfI http://localhost:<port>`。打印 PID 和 log path。
+  - **Step 6 — Host IDE detection 和 browser handoff：**
+    - 加载 `references/ide-detection.md`。按顺序 probe env vars：`CLAUDE_CODE`（Claude Code desktop）、`CURSOR_TRACE_ID`（Cursor）、future Codex signal、`TERM_PROGRAM=vscode`（plain VS Code）。positive match 时，emit IDE 对 `http://localhost:<port>` 的 open-in-browser instruction。无 match 时，在 interactive summary 中打印 URL。Detection failure 永不 fatal。
 
-  **Patterns to follow:**
-  - Port cascade: `plugins/compound-engineering/skills/test-browser/SKILL.md:97-143`
-  - Script-first architecture: `docs/solutions/skill-design/script-first-skill-architecture.md`
-  - Pre-resolution sentinel pattern (for `read-launch-json.sh`): `plugins/compound-engineering/AGENTS.md` pre-resolution exception rule
-  - No error suppression / no shell chaining in SKILL.md bodies (per `plugins/compound-engineering/AGENTS.md`)
+  **遵循的模式：**
+  - Port cascade 范例：`plugins/compound-engineering/skills/test-browser/SKILL.md:97-143`
+- Script-first architecture（script-first 架构）：`docs/solutions/skill-design/script-first-skill-architecture.md`
+  - Pre-resolution sentinel pattern（用于 `read-launch-json.sh`）： `plugins/compound-engineering/AGENTS.md` pre-resolution exception rule
+  - No error suppression / no shell chaining in SKILL.md bodies（按 `plugins/compound-engineering/AGENTS.md`）
 
-  **Test scenarios:**
-  - Happy path (launch.json, single config): `.claude/launch.json` with one Rails configuration → `read-launch-json.sh` returns it, skill uses it verbatim, auto-detect not invoked.
-  - Happy path (launch.json, multi-config): `.claude/launch.json` with `web` + `worker` configurations → skill prompts user to pick before proceeding.
-  - Happy path (no launch.json, Rails auto-detect): fixture with `bin/dev` + `Gemfile`, no `.claude/launch.json` → auto-detect returns `rails`, skill offers to write stub.
-  - Happy path (stub accepted): auto-detect succeeds, user says yes to "save launch.json?" → file written at `.claude/launch.json` with correct schema, subsequent run uses it without re-prompting.
-  - Happy path (Next.js auto-detect): fixture with `next.config.mjs`, no launch.json → `next` detected.
-  - Happy path (Procfile/Overmind auto-detect): fixture with `Procfile.dev`, no launch.json → `procfile`.
-  - Happy path (IDE detect — Claude Code): `CLAUDE_CODE` env var set → browser-open instruction emitted.
-  - Happy path (IDE detect — Cursor): `CURSOR_TRACE_ID` env var set → Cursor browser-open instruction emitted.
-  - Happy path (IDE detect — terminal): no IDE env vars set → URL printed, no browser-open attempt.
-  - Edge case (invalid launch.json): `.claude/launch.json` exists but is malformed JSON → skill stops with parse-error pointing at file, does not fall back silently.
-  - Edge case (multi-signature auto-detect): `bin/dev` + `next.config.mjs` (monorepo-ish) → skill asks the user to disambiguate.
-  - Edge case (unknown auto-detect): no signatures, no launch.json → skill prompts user for start command.
-  - Error path: port in use, user declines to kill → skill exits cleanly with "cannot continue without dev server."
-  - Error path: kill succeeds but server fails to start within 30s → exit with the log tail printed.
-  - Error path (no background primitive): Codex or other platform without background-command support → skill asks user to start the server manually and paste PID + port.
-  - Integration: server PID/log path propagated into the run artifact so the user can tail logs after the polish run ends; `launch.json` written during a first run is consumed by the next run without re-prompting.
+  **测试场景：**
+  - 正常路径（launch.json, single config）：`.claude/launch.json` 带一个 Rails configuration → `read-launch-json.sh` 返回它，skill 原样使用，不 invoke auto-detect。
+  - 正常路径（launch.json, multi-config）：`.claude/launch.json` 带 `web` + `worker` configurations → skill 在继续前 prompt 用户选择。
+  - 正常路径（no launch.json, Rails auto-detect）：fixture 有 `bin/dev` + `Gemfile`，无 `.claude/launch.json` → auto-detect 返回 `rails`，skill 提供写 stub。
+  - 正常路径（stub accepted）：auto-detect 成功，用户对 "save launch.json?" 说 yes → 在 `.claude/launch.json` 写入正确 schema，后续 run 无需 re-prompt 即使用它。
+  - 正常路径（Next.js auto-detect）：fixture 有 `next.config.mjs`，无 launch.json → detect 到 `next`。
+  - 正常路径（Procfile/Overmind auto-detect）：fixture 有 `Procfile.dev`，无 launch.json → detect 到 `procfile`。
+  - 正常路径（IDE detect — Claude Code）：设置 `CLAUDE_CODE` env var → emit browser-open instruction。
+  - 正常路径（IDE detect — Cursor）：设置 `CURSOR_TRACE_ID` env var → emit Cursor browser-open instruction。
+  - 正常路径（IDE detect — terminal）：无 IDE env vars → 打印 URL，不尝试 browser-open。
+  - 边界情况（invalid launch.json）：`.claude/launch.json` 存在但 JSON malformed → skill 停止并用 parse-error 指向文件，不 silently fall back。
+  - 边界情况（multi-signature auto-detect）：`bin/dev` + `next.config.mjs`（monorepo-ish）→ skill 询问用户 disambiguate。
+  - 边界情况（unknown auto-detect）：无 signatures、无 launch.json → skill prompt 用户提供 start command。
+  - 错误路径：port in use，用户拒绝 kill → skill cleanly exit，并提示 "cannot continue without dev server."
+  - 错误路径：kill 成功但 server 30s 内未启动 → 打印 log tail 后 exit。
+  - 错误路径（no background primitive）：Codex 或其他无 background-command support 的平台 → skill 要求用户手动启动 server 并 paste PID + port。
+  - 集成：server PID/log path 传播进 run artifact，让用户在 polish run 结束后可以 tail logs；first run 写入的 `launch.json` 会被 next run 使用，不 re-prompt。
 
-  **Verification:** `launch.json` is the first source checked; auto-detect runs only when it is missing; a user who accepts the stub offer gets a durable config that makes subsequent runs deterministic. For each supported project type, the skill starts a reachable dev server on the correct port and reports PID + log path. When running inside Claude Code / Cursor, the polish URL opens in the embedded browser; elsewhere the URL is printed.
+  **验证：** `launch.json` 是第一个被检查的 source；只有缺失时才运行 auto-detect；接受 stub offer 的用户会得到 durable config，使后续 runs deterministic。对每个 supported project type，skill 会在正确 port 启动 reachable dev server，并报告 PID + log path。在 Claude Code / Cursor 中运行时，polish URL 会在 embedded browser 中打开；其他环境打印 URL。
 
-- [ ] **Unit 5: Checklist generation, size gate, and sub-agent dispatch**
+- [ ] **Unit 5：Checklist generation、size gate 和 sub-agent dispatch**
 
-  **Goal:** Generate an end-user-testable checklist from the diff + PR body + (optional) plan, classify each item as `manageable` or `oversized`, route `oversized` items to stacked-PR seed files, dispatch polish sub-agents for `manageable` items with file-collision-safe grouping.
+  **目标：** 从 diff + PR body +（可选）plan 生成 end-user-testable checklist，将每个 item 分类为 `manageable` 或 `oversized`，把 `oversized` items 路由到 stacked-PR seed files，并对 `manageable` items 以 file-collision-safe grouping dispatch polish sub-agents。
 
-  **Requirements:** R6, R7, R8
+  **需求：** R6, R7, R8
 
-  **Dependencies:** Unit 4
+  **依赖：** Unit 4
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (new phase — the core of polish)
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/scripts/extract-surfaces.sh`
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/scripts/classify-oversized.sh`
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/scripts/parse-checklist.sh` — parses the edited `checklist.md`, emits JSON array of `{id, action, files, surface, status, notes}`; surfaces parse errors with line numbers on stderr
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/checklist-template.md` — markdown scaffold with per-item schema, field descriptions, and allowed-action list
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/subagent-dispatch-matrix.md`
-  - Create: `plugins/compound-engineering/skills/ce-polish-beta/references/stacked-pr-seed-template.md`
-  - Test: `tests/skills/ce-polish-beta-size-gate.test.ts` — unit tests on `classify-oversized.sh` (manageable + oversized fixture items), on `parse-checklist.sh` (well-formed + malformed files + unknown actions), and on dispatcher branching by action.
+  **文件：**
+  - 修改： `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (new phase — the core of polish)
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/scripts/extract-surfaces.sh`
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/scripts/classify-oversized.sh`
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/scripts/parse-checklist.sh` — 解析 edited `checklist.md`，输出 `{id, action, files, surface, status, notes}` 的 JSON array；在 stderr 中带 line numbers 报告 parse errors
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/checklist-template.md` — markdown scaffold，包含 per-item schema、field descriptions 和 allowed-action list
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/subagent-dispatch-matrix.md`
+  - 新增： `plugins/compound-engineering/skills/ce-polish-beta/references/stacked-pr-seed-template.md`
+  - 测试： `tests/skills/ce-polish-beta-size-gate.test.ts` — 覆盖 `classify-oversized.sh`（manageable + oversized fixture items）、`parse-checklist.sh`（well-formed + malformed files + unknown actions），以及 dispatcher 按 action branching。
 
-  **Approach:**
-  - `extract-surfaces.sh` reads `git diff --name-only <base>...HEAD` and emits JSON mapping each file to one of `{view, controller, model, api, config, asset, test, other}` based on path heuristics (matches `app/views/`, `app/controllers/`, etc. for Rails; `pages/`/`app/` for Next; `src/components/` for Vite).
-  - Model synthesizes the checklist using `references/checklist-template.md` as a scaffold: diff + PR body + plan → list of per-item markdown sections. Each item is a top-level `## Item N — <title>` block with YAML-ish fields: `action:` (default `keep`), `files:`, `surface:`, `status:` (from `classify-oversized.sh`), `notes:` (block scalar). The template explains the allowed `action` values and documents that editing `action` is the only input channel.
-  - `classify-oversized.sh` reads each checklist item's file-path list and returns `status: manageable` or `status: oversized` based on:
-    - >5 distinct file paths, OR
-    - >2 distinct surface categories, OR
-    - >300 lines of diff spanned (sum of `git diff --numstat <base>...HEAD` for the item's files).
-  - Thresholds are explicitly conservative starting points; revisit after beta runs.
-  - For each `oversized` item: write `.context/compound-engineering/ce-polish/<run-id>/stacked-pr-<n>.md` using `references/stacked-pr-seed-template.md`. In the checklist file, oversized items are included but marked `status: oversized` and `action: stacked` (immutable — user editing `action` on an oversized item is rejected on re-read with a pointer to the stacked seed).
-  - **Human interaction loop (edit-file-then-ack):**
-    1. Polish writes `.context/compound-engineering/ce-polish/<run-id>/checklist.md` with all items in their default state (`action: keep` except oversized which are pinned `action: stacked`).
-    2. Polish announces the file path, a short summary of item count and stacked count, the dev-server URL (and whether it was opened in the IDE browser), and exits to the user prompt with one instruction: *"Test the app, edit `action:` on each item to `keep` / `skip` / `fix` / `note`, add prose under `notes:` as needed, then reply `ready` to dispatch or `done` to finish."*
-    3. User edits the file in their editor of choice (the IDE that's open anyway). They may also **add new `## Item N — ...` sections** for anything the generated checklist missed — polish re-runs size classification on added items during the next parse.
-    4. On user reply `ready`: `parse-checklist.sh` reads the file. Unknown action values, malformed YAML-ish fields, or edits to pinned `status: oversized / action: stacked` items produce a structured error — polish prints the error with line number and asks the user to fix the file, does not dispatch.
-    5. On a clean parse, polish dispatches per-action:
-       - `keep` → record in `dispatch-log.json`, no sub-agent
-       - `skip` → record in `dispatch-log.json`, no sub-agent
-       - `fix` → dispatch sub-agent using the item's `notes:` block as the fix directive (per the dispatch matrix rules below)
-       - `note` → record in `dispatch-log.json`, no sub-agent
-       - `stacked` → already handled at classification; never dispatched
-       - `replan` → escalate: this item is bigger than polish can handle. Polish writes `.context/compound-engineering/ce-polish/<run-id>/replan-seed.md` capturing the item's `notes:`, file list, and originating brainstorm/plan path (from `plan:<path>` argument if provided, else `docs/plans/` most recent match). The run halts with a routing message recommending `/ce:plan <path>` to revise the plan or `/ce:brainstorm` to rethink scope.
-  - **Escalation thresholds (batch-level replan):** in addition to the per-item `replan` action, polish auto-suggests (does not auto-execute) batch-level replan when any of these fire:
-    - More than half the generated items are classified `oversized` (the PR as a whole is too large, not just individual items)
-    - More than 3 items are marked `replan` by the user in a single round
-    - The initial diff against base exceeds >30 files or >1000 lines before checklist generation — polish preempts the loop entirely and emits the escalation message before writing `checklist.md`, so the user does not do exploratory testing on a scope that should not have reached polish
-    When any threshold fires, polish writes `replan-seed.md`, pauses the loop, and asks the user via the platform's blocking question tool: (a) continue polishing the subset that is manageable, (b) halt and re-plan via `/ce:plan`, (c) halt and rethink via `/ce:brainstorm`. The user's answer is durable — polish records it in the artifact so later runs do not re-prompt.
-    6. After dispatch, polish rewrites `checklist.md` in place: each previously-`fix` item now shows `result: {fixed | failed}`, a one-line summary, and (for fixed items) a link to the commit SHA or pending diff. All other items retain their prior state. Polish announces the updated file and awaits the next reply.
-    7. On user reply `done`: polish stops the loop, proceeds to Unit 6 (envelope + artifact write).
-    8. On user reply `cancel`: polish stops without dispatching remaining actions, records the partial state in the artifact, proceeds to Unit 6.
-  - Dispatch rules (from `references/subagent-dispatch-matrix.md`):
+  **方法：**
+  - `extract-surfaces.sh` 读取 `git diff --name-only <base>...HEAD`，并基于 path heuristics 输出 JSON，将每个 file 映射到 `{view, controller, model, api, config, asset, test, other}` 之一（Rails 匹配 `app/views/`、`app/controllers/` 等；Next 匹配 `pages/`/`app/`；Vite 匹配 `src/components/`）。
+  - Model 使用 `references/checklist-template.md` 作为 scaffold 合成 checklist：diff + PR body + plan → per-item markdown sections list。每个 item 是顶层 `## Item N — <title>` block，带 YAML-ish fields：`action:`（默认 `keep`）、`files:`、`surface:`、`status:`（来自 `classify-oversized.sh`）、`notes:`（block scalar）。template 解释允许的 `action` values，并说明编辑 `action` 是唯一 input channel。
+  - `classify-oversized.sh` 读取每个 checklist item 的 file-path list，并基于以下条件返回 `status: manageable` 或 `status: oversized`：
+    - >5 distinct file paths，或
+    - >2 distinct surface categories，或
+    - >300 lines of diff spanned（该 item files 的 `git diff --numstat <base>...HEAD` 总和）。
+  - Thresholds 明确是 conservative starting points；在 beta runs 后 revisit。
+  - 对每个 `oversized` item：使用 `references/stacked-pr-seed-template.md` 写入 `.context/compound-engineering/ce-polish/<run-id>/stacked-pr-<n>.md`。在 checklist file 中，oversized items 会被包含，但标记为 `status: oversized` 和 `action: stacked`（immutable；用户若编辑 oversized item 的 `action`，下次 re-read 时会被拒绝，并指向 stacked seed）。
+	  - **Human interaction loop（人工交互循环，edit-file-then-ack）：**
+    1. Polish 写入 `.context/compound-engineering/ce-polish/<run-id>/checklist.md`，所有 items 处于默认状态（`action: keep`，oversized 除外，它们 pinned 为 `action: stacked`）。
+    2. Polish 宣布 file path、item count 和 stacked count 的短摘要、dev-server URL（以及是否已在 IDE browser 中打开），然后返回用户 prompt，只给一条 instruction：*"Test the app, edit `action:` on each item to `keep` / `skip` / `fix` / `note`, add prose under `notes:` as needed, then reply `ready` to dispatch or `done` to finish."*
+    3. 用户在自己选择的 editor 中编辑该文件（通常就是已打开的 IDE）。用户也可以为 generated checklist 漏掉的内容 **添加新的 `## Item N — ...` sections**；polish 会在下一次 parse 时对 added items 重新运行 size classification。
+    4. 用户回复 `ready` 时：`parse-checklist.sh` 读取文件。Unknown action values、malformed YAML-ish fields，或对 pinned `status: oversized / action: stacked` items 的 edits 会产生 structured error；polish 打印带 line number 的 error，要求用户修复文件，不 dispatch。
+    5. clean parse 后，polish 按 action dispatch：
+       - `keep` → 记录到 `dispatch-log.json`，不使用 sub-agent
+       - `skip` → 记录到 `dispatch-log.json`，不使用 sub-agent
+       - `fix` → 使用该 item 的 `notes:` block 作为 fix directive dispatch sub-agent（按下方 dispatch matrix rules）
+       - `note` → 记录到 `dispatch-log.json`，不使用 sub-agent
+       - `stacked` → 已在 classification 阶段处理，绝不 dispatch
+       - `replan` → escalate：该 item 超出 polish 能处理的范围。Polish 写入 `.context/compound-engineering/ce-polish/<run-id>/replan-seed.md`，捕获该 item 的 `notes:`、file list，以及 originating brainstorm/plan path（若提供 `plan:<path>` argument 则使用它，否则使用 `docs/plans/` 最近匹配）。run 以 routing message halt，建议通过 `/ce:plan <path>` revise plan 或通过 `/ce:brainstorm` rethink scope。
+  - **Escalation thresholds（batch-level replan）：** 除 per-item `replan` action 外，当以下任一条件触发时，polish auto-suggests（不 auto-execute）batch-level replan：
+    - 超过一半 generated items 被分类为 `oversized`（PR 整体过大，而不只是 individual items）
+    - 用户在单轮中将超过 3 个 items 标记为 `replan`
+    - checklist generation 前，initial diff against base 超过 >30 files 或 >1000 lines；polish 会完全 preempt loop，在写 `checklist.md` 前 emit escalation message，避免用户在本不该进入 polish 的 scope 上做 exploratory testing
+    任何 threshold 触发时，polish 写入 `replan-seed.md`，暂停 loop，并通过 platform blocking question tool 询问用户：(a) continue polishing manageable subset，(b) halt and re-plan via `/ce:plan`，(c) halt and rethink via `/ce:brainstorm`。用户答案是 durable 的；polish 将其记录在 artifact 中，后续 runs 不再 re-prompt。
+    6. dispatch 后，polish in place 重写 `checklist.md`：每个之前为 `fix` 的 item 现在显示 `result: {fixed | failed}`、一行 summary，以及（对 fixed items）commit SHA 或 pending diff 的链接。其他 items 保留 prior state。Polish 宣布 updated file 并等待下一次 reply。
+    7. 用户回复 `done` 时：polish 停止 loop，进入 Unit 6（envelope + artifact write）。
+    8. 用户回复 `cancel` 时：polish 停止，不 dispatch remaining actions，在 artifact 中记录 partial state，然后进入 Unit 6。
+	  - Dispatch rules（dispatch 规则，来自 `references/subagent-dispatch-matrix.md`）：
     - `asset`/`view` files → `compound-engineering:design:design-iterator`
-    - If a Figma link is in the PR body → also `compound-engineering:design:design-implementation-reviewer`
+    - 如果 PR body 中有 Figma link → 也运行 `compound-engineering:design:design-implementation-reviewer`
     - Async JS / `stimulus_*` / `turbo_*` files → `compound-engineering:review:julik-frontend-races-reviewer`
-    - Every polish run → `compound-engineering:review:code-simplicity-reviewer` + `compound-engineering:review:maintainability-reviewer` as a sanity pass on dispatched items (not a blanket run — only over touched files).
-  - Group `fix`-action items by file-path intersection. Items sharing any file run sequentially in a single agent invocation; disjoint items may run in parallel.
-  - Parallelize only when the number of disjoint `fix` groups is >=5 (crossover rule from `codex-delegation-best-practices`). Below 5, run sequentially — overhead isn't worth it.
-  - **Headless mode behavior:** `mode:headless` cannot use the edit-file-then-ack loop (no human to edit the file). In headless mode, polish generates `checklist.md`, emits the structured envelope with item list and stacked seeds, and exits with `Polish complete` — it does NOT wait for user edits or dispatch fixes. A downstream caller can re-invoke interactively to complete the loop. Document this in Unit 6.
+    - 每次 polish run → 对 dispatched items 运行 `compound-engineering:review:code-simplicity-reviewer` + `compound-engineering:review:maintainability-reviewer` 作为 sanity pass（不是 blanket run，只覆盖 touched files）。
+  - 按 file-path intersection 对 `fix`-action items 分组。共享任意 file 的 items 在单个 agent invocation 中 sequentially run；disjoint items 可以 parallel run。
+  - 仅当 disjoint `fix` groups 数量 >=5 时 parallelize（来自 `codex-delegation-best-practices` 的 crossover rule）。低于 5 时 sequential run，overhead 不值得。
+  - **Headless mode behavior（headless mode 行为）：** `mode:headless` 不能使用 edit-file-then-ack loop（没有人编辑文件）。headless mode 下，polish 生成 `checklist.md`，emit 带 item list 和 stacked seeds 的 structured envelope，并以 `Polish complete` exit；它不会等待 user edits，也不会 dispatch fixes。downstream caller 可重新 interactively invoke 来完成 loop。Unit 6 中记录此行为。
 
-  **Patterns to follow:**
-  - Parallel dispatch: `plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md:135-164`
-  - Sub-agent template: `plugins/compound-engineering/skills/ce-review/references/subagent-template.md`
-  - Fully qualified agent names: `plugins/compound-engineering/AGENTS.md`
-  - Pass paths not content: `docs/solutions/skill-design/pass-paths-not-content-to-subagents.md`
-  - Load-bearing status fields: `docs/solutions/workflow/todo-status-lifecycle.md`
+  **遵循的模式：**
+  - Parallel dispatch 范例：`plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md:135-164`
+	  - Sub-agent template（sub-agent 模板）：`plugins/compound-engineering/skills/ce-review/references/subagent-template.md`
+	  - Fully qualified agent names（完全限定 agent 名称）：`plugins/compound-engineering/AGENTS.md`
+  - Pass paths not content（传路径而非内容）：`docs/solutions/skill-design/pass-paths-not-content-to-subagents.md`
+  - Load-bearing status fields（关键 status fields）：`docs/solutions/workflow/todo-status-lifecycle.md`
 
-  **Test scenarios:**
-  - Happy path (manageable): 3 items, 4 total files across 2 surfaces → all `manageable`, user marks 2 `fix` + 1 `keep`, dispatch sequential (below 5-group crossover).
-  - Happy path (oversized): 1 item touching 8 files across 4 surfaces → `oversized`, stacked-PR seed written, item pinned in checklist.md, user cannot change its action.
-  - Happy path (parallel): 6 disjoint items all marked `fix` → parallel dispatch.
-  - Happy path (edit-ack round-trip): polish writes checklist.md, user changes 2 items to `fix`, replies `ready`, polish dispatches, rewrites checklist.md with results, user replies `done` → clean exit.
-  - Edge case (file collision): 5 items with 2 sharing a file, all `fix` → first 4 run parallel, those 2 serialize into one sub-agent.
-  - Edge case (human-added item oversized): human adds a free-form `## Item N` section that spans many files → size gate re-runs on next parse, item becomes `oversized`, pinned; polish warns.
-  - Edge case (replan action on one item): user marks 1 item `replan` → polish writes replan-seed.md, halts, routes to `/ce:plan`, does not dispatch remaining `fix` items from the same round.
-  - Edge case (batch-level preemptive replan): diff touches 45 files / 1500 lines → polish preempts before checklist generation, writes replan-seed.md, asks continue-subset / halt-for-replan / halt-for-brainstorm.
-  - Edge case (majority-oversized): 5 of 8 generated items classified `oversized` → polish writes replan-seed.md and prompts user for continue-subset / halt.
-  - Edge case (3+ replan actions in one round): user marks 4 items `replan` in one round → polish escalates even though no preemptive signal fired.
-  - Error path (malformed checklist): user introduces an unknown `action:` value or breaks the item header format → parse-checklist.sh reports line number, polish asks user to fix file, does not dispatch.
-  - Error path (editing pinned oversized item): user changes a `status: oversized` item's action to `fix` → parse rejects the edit with pointer to the stacked-PR seed file.
-  - Error path (sub-agent fails): sub-agent fails to produce a fix → recorded as `result: failed` in updated checklist.md, dispatch-log.json captures full error, polish does not retry automatically.
-  - Error path (diff empty): polish invoked with no changes vs base → refuse with "nothing to polish."
-  - Error path (cancel mid-loop): user replies `cancel` after round 1 with fixes in flight → polish stops dispatch, records partial state, proceeds to envelope with partial summary.
-  - Headless: `mode:headless` generates checklist.md, emits envelope with item list + stacked seeds + replan flag if any, exits with `Polish complete` — never waits for user ack, never dispatches.
-  - Integration: checklist + dispatch + artifact writing round-trips through the run artifact; later `/ce:polish` runs on the same PR can see prior run's output.
+  **测试场景：**
+  - 正常路径（manageable）：3 items，跨 2 surfaces 共 4 files → 全部 `manageable`，用户标记 2 个 `fix` + 1 个 `keep`，sequential dispatch（低于 5-group crossover）。
+  - 正常路径（oversized）：1 个 item 触及 8 files、4 surfaces → `oversized`，写入 stacked-PR seed，item pinned in checklist.md，用户不能修改其 action。
+  - 正常路径（parallel）：6 个 disjoint items 全部标记 `fix` → parallel dispatch。
+  - 正常路径（edit-ack round-trip）：polish 写 checklist.md，用户将 2 个 items 改为 `fix`，回复 `ready`，polish dispatch，带 results 重写 checklist.md，用户回复 `done` → clean exit。
+  - 边界情况（file collision）：5 items 中 2 个共享一个 file，全部 `fix` → 前 4 个 parallel run，两个共享 file 的 item serialize 到一个 sub-agent。
+  - 边界情况（human-added item oversized）：人类添加一个跨 many files 的 free-form `## Item N` section → size gate 在下一次 parse 重新运行，item 变为 `oversized` 并 pinned；polish warn。
+  - 边界情况（one item replan action）：用户标记 1 个 item 为 `replan` → polish 写 replan-seed.md，halt，route 到 `/ce:plan`，不 dispatch 同一轮 remaining `fix` items。
+  - 边界情况（batch-level preemptive replan）：diff 触及 45 files / 1500 lines → polish 在 checklist generation 前 preempt，写 replan-seed.md，并询问 continue-subset / halt-for-replan / halt-for-brainstorm。
+  - 边界情况（majority-oversized）：8 个 generated items 中 5 个被分类为 `oversized` → polish 写 replan-seed.md 并 prompt 用户 continue-subset / halt。
+  - 边界情况（单轮 3+ replan actions）：用户在一轮中标记 4 个 items 为 `replan` → 即使没有 preemptive signal，也 escalation。
+  - 错误路径（malformed checklist）：用户引入 unknown `action:` value 或破坏 item header format → parse-checklist.sh 报告 line number，polish 要求用户修复文件，不 dispatch。
+  - 错误路径（editing pinned oversized item）：用户把 `status: oversized` item 的 action 改为 `fix` → parse 拒绝该 edit，并指向 stacked-PR seed file。
+  - 错误路径（sub-agent fails）：sub-agent 未能产生 fix → 在 updated checklist.md 中记录为 `result: failed`，dispatch-log.json 捕获 full error，polish 不自动 retry。
+  - 错误路径（diff empty）：polish invoked with no changes vs base → 以 "nothing to polish." 拒绝。
+  - 错误路径（cancel mid-loop）：用户在 round 1、fixes in flight 后回复 `cancel` → polish 停止 dispatch，记录 partial state，进入带 partial summary 的 envelope。
+  - Headless：`mode:headless` 生成 checklist.md，emit 带 item list + stacked seeds + replan flag（如有）的 envelope，并以 `Polish complete` exit；永不等待 user ack，永不 dispatch。
+  - 集成：checklist + dispatch + artifact writing 通过 run artifact round-trip；后续同一 PR 的 `/ce:polish` runs 可看到 prior run output。
 
-  **Verification:** For a PR with 4 polish items (1 oversized, 3 manageable sharing one file), the skill writes 1 stacked-PR seed, pins the oversized item in `checklist.md`, the user edits two of the three manageable items to `fix`, polish dispatches them via a single sequential sub-agent invocation (file collision), rewrites `checklist.md` with results, and the user replies `done` — producing a summary record with `fixed: 2`, `kept: 1`, `stacked: 1`, `replanned: 0`. For a PR diff of 50 files touching 5 surfaces, polish preempts before checklist generation and routes the user to `/ce:plan`.
+  **验证：** 对一个含 4 个 polish items（1 oversized，3 manageable 且共享一个 file）的 PR，skill 会写入 1 个 stacked-PR seed，在 `checklist.md` 中 pin oversized item；用户将三个 manageable items 中的两个改为 `fix`；polish 通过单个 sequential sub-agent invocation dispatch 它们（file collision），带 results 重写 `checklist.md`；用户回复 `done` 后，生成 summary record：`fixed: 2`、`kept: 1`、`stacked: 1`、`replanned: 0`。对一个触及 50 files 和 5 surfaces 的 PR diff，polish 在 checklist generation 前 preempt，并将用户 route 到 `/ce:plan`。
 
-- [ ] **Unit 6: Headless envelope, run artifact, and workflow stitching**
+- [ ] **Unit 6：Headless envelope、run artifact 和 workflow stitching**
 
-  **Goal:** Emit structured completion envelopes (interactive + headless), write the canonical run artifact, and document where `/ce:polish` slots in the overall workflow.
+  **目标：** Emit structured completion envelopes（interactive + headless），写入 canonical run artifact，并记录 `/ce:polish` 在 overall workflow 中的位置。
 
-  **Requirements:** R9
+  **需求：** R9
 
-  **Dependencies:** Unit 5
+  **依赖：** Unit 5
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (final phase + workflow-integration prose)
-  - Modify: `plugins/compound-engineering/README.md` — add `ce:polish-beta` to the Skills table; update skill count (note: this is a substantive doc update, not a release-owned count change — it reflects a genuine new file, not a release version bump).
-  - Test: `tests/skills/ce-polish-beta-envelope.test.ts` — snapshot tests for both interactive and headless completion output.
+  **文件：**
+  - 修改： `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (final phase + workflow-integration prose)
+  - 修改： `plugins/compound-engineering/README.md` — 将 `ce:polish-beta` 添加到 Skills table；更新 skill count（注意：这是 substantive doc update，不是 release-owned count change；它反映真实新增 file，不是 release version bump）。
+  - 测试： `tests/skills/ce-polish-beta-envelope.test.ts` — 对 interactive 和 headless completion output 做 snapshot tests。
 
-  **Approach:**
-  - Write per-run artifact at `.context/compound-engineering/ce-polish/<run-id>/` with: `checklist.md` (evolves in place across rounds), `dispatch-log.json` (agent assignments + outcomes + classifier decisions for threshold tuning), `stacked-pr-<n>.md` files, `replan-seed.md` (present only when escalation fired), `server.log` (from Unit 4), `summary.md`.
-  - Interactive mode: print a human-readable summary and, if any stacked-PR seeds exist, offer to create them via `gh pr create` in a new branch — or stop and let the user run `/git-commit-push-pr` themselves.
-  - Headless mode: emit the envelope shape from the High-Level Technical Design section, terminal signal `Polish complete`.
-  - Skill prose includes a "Where this fits" section linking to `/ce:review` upstream and `/git-commit-push-pr` downstream. Uses semantic wording ("load the `git-commit-push-pr` skill") per the cross-platform reference rules.
+  **方法：**
+  - 在 `.context/compound-engineering/ce-polish/<run-id>/` 写入 per-run artifact，包含：`checklist.md`（跨 rounds in place 演进）、`dispatch-log.json`（agent assignments + outcomes + classifier decisions，供 threshold tuning）、`stacked-pr-<n>.md` files、`replan-seed.md`（仅 escalation fired 时存在）、`server.log`（来自 Unit 4）、`summary.md`。
+  - Interactive mode：打印 human-readable summary；如果存在 stacked-PR seeds，提供在新 branch 中通过 `gh pr create` 创建它们的选项，或停止并让用户自己运行 `/git-commit-push-pr`。
+  - Headless mode：emit High-Level Technical Design section 中的 envelope shape，terminal signal 为 `Polish complete`。
+  - Skill prose 包含 “Where this fits” section，链接 upstream `/ce:review` 和 downstream `/git-commit-push-pr`。按 cross-platform reference rules 使用 semantic wording（"load the `git-commit-push-pr` skill"）。
 
-  **Patterns to follow:**
-  - Headless envelope: `plugins/compound-engineering/skills/ce-review/SKILL.md:509-516`
-  - Run artifact shape: `plugins/compound-engineering/skills/ce-review/SKILL.md:675-680`
-  - Cross-platform reference wording: `plugins/compound-engineering/AGENTS.md` Cross-Platform Reference Rules
+  **遵循的模式：**
+  - Headless envelope 范例：`plugins/compound-engineering/skills/ce-review/SKILL.md:509-516`
+  - Run artifact shape 范例：`plugins/compound-engineering/skills/ce-review/SKILL.md:675-680`
+  - Cross-platform reference wording（跨平台引用措辞）：`plugins/compound-engineering/AGENTS.md` Cross-Platform Reference Rules
 
-  **Test scenarios:**
-  - Happy path (interactive): successful polish run ending with 2 fixes and 1 stacked → summary prints correctly, user prompted about stacked PR creation.
-  - Happy path (headless): same scenario in `mode:headless` → envelope matches the documented shape byte-for-byte, `Polish complete` is the last line.
-  - Edge case (0 items fixed): skill exits cleanly, envelope reports `Checklist items: 0 fixed`.
-  - Edge case (only oversized items): skill reports all items stacked, no fixes dispatched, server still started.
-  - Integration: `bun run release:validate` after this unit still passes (no release-owned file changes).
-  - Integration: README skill table includes `ce:polish-beta` with the correct description; `bun test` converter tests pass.
+  **测试场景：**
+  - 正常路径（interactive）：successful polish run 以 2 fixes 和 1 stacked 结束 → summary 正确打印，用户被 prompt 关于 stacked PR creation。
+  - 正常路径（headless）：同一场景在 `mode:headless` 下 → envelope byte-for-byte 匹配 documented shape，`Polish complete` 是最后一行。
+  - 边界情况（0 items fixed）：skill cleanly exit，envelope 报告 `Checklist items: 0 fixed`。
+  - 边界情况（only oversized items）：skill 报告 all items stacked，无 fixes dispatched，server 仍已启动。
+  - 集成：本 unit 后 `bun run release:validate` 仍通过（无 release-owned file changes）。
+  - 集成：README skill table 包含 `ce:polish-beta` 及正确 description；`bun test` converter tests 通过。
 
-  **Verification:** A consumer of `mode:headless` (e.g., a future LFG chain) can parse the envelope, detect `Polish complete`, and read the artifact path reliably. `README.md` reflects the new skill. `bun run release:validate` passes without release-owned version changes.
+  **验证：** `mode:headless` consumer（例如 future LFG chain）可以 parse envelope、detect `Polish complete`，并可靠读取 artifact path。`README.md` 反映新 skill。`bun run release:validate` 在没有 release-owned version changes 的情况下通过。
 
-## System-Wide Impact
+## 系统级影响
 
-- **Interaction graph:** `/ce:polish-beta` invokes six existing agents (design-iterator, design-implementation-reviewer, figma-design-sync, code-simplicity-reviewer, maintainability-reviewer, julik-frontend-races-reviewer) via sub-agent dispatch. It reads from `/ce:review`'s run-artifact directory and writes to its own. It does not modify any existing skill's behavior; integration with `/ce:work` (auto-chain) is deliberately deferred.
-- **Error propagation:** Gate failures (no review artifact, failing CI, dirty worktree, merge conflict, no dev server) all exit cleanly at the phase boundary with an actionable message. No silent skipping. Sub-agent failures are recorded in the artifact and surfaced to the user; polish never proceeds as if a failed fix succeeded.
-- **State lifecycle risks:** The dev server outlives the polish run. PID + log path must be in the artifact and the final summary. Otherwise the user has no clean way to reclaim or kill the server after the session ends. Worktree state must be re-probed after every checkout (state-machine discipline).
-- **API surface parity:** `mode:headless` envelope shape mirrors `ce:review` so downstream consumers can parse both with the same logic. Future `/ce:polish` (stable) promotion must preserve the envelope exactly.
-- **Integration coverage:** Unit tests alone will not cover the cross-layer behavior of "review artifact + CI check + merge-main + server lifecycle + sub-agent dispatch" as a single flow. Beta usage on a real PR is the integration test for v1.
-- **Unchanged invariants:**
-  - `/ce:review`'s synthesis, finding taxonomy, and headless envelope are unchanged.
-  - `/ce:work`'s shipping workflow is unchanged.
-  - `/git-commit-push-pr` is unchanged.
-  - No existing agents are modified.
-  - No release-owned files (`.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, root `CHANGELOG.md`) are touched.
-- **Additive change to `/ce:review` artifact shape:** `/ce:review` gains a small, additive `metadata.json` file per run artifact containing `{branch, head_sha, created_at}`. This is required by Unit 3's SHA-binding entry gate so polish can refuse stale review artifacts. The change is purely additive — existing artifact consumers are unaffected, the written files otherwise keep their current shape, and a fallback path handles pre-metadata.json artifacts via mtime comparison against the HEAD commit time. The `/ce:review` skill edit is scoped to a single write step in its finalize phase and does not alter finding synthesis or envelope output.
+- **交互图：** `/ce:polish-beta` 通过 sub-agent dispatch 调用六个 existing agents（design-iterator、design-implementation-reviewer、figma-design-sync、code-simplicity-reviewer、maintainability-reviewer、julik-frontend-races-reviewer）。它读取 `/ce:review` run-artifact directory，并写入自己的 artifact。它不修改任何 existing skill behavior；与 `/ce:work` 的 integration（auto-chain）刻意 deferred。
+- **错误传播：** Gate failures（无 review artifact、failing CI、dirty worktree、merge conflict、no dev server）都在 phase boundary cleanly exit，并带 actionable message。无 silent skipping。Sub-agent failures 记录在 artifact 中并 surface 给用户；polish 永不假装 failed fix 已 succeeded。
+- **状态生命周期风险：** dev server 会比 polish run 活得更久。PID + log path 必须写入 artifact 和 final summary。否则 session 结束后用户没有 clean way reclaim 或 kill server。每次 checkout 后必须 re-probe worktree state（state-machine discipline）。
+- **API surface parity：** `mode:headless` envelope shape 镜像 `ce:review`，使 downstream consumers 可用相同 logic parse 二者。未来 `/ce:polish`（stable）promotion 必须精确保留该 envelope。
+- **集成覆盖：** 仅靠 unit tests 无法覆盖 “review artifact + CI check + merge-main + server lifecycle + sub-agent dispatch” 作为单一 flow 的 cross-layer behavior。真实 PR 上的 beta usage 是 v1 的 integration test。
+- **不变不变量：**
+  - `/ce:review` 的 synthesis、finding taxonomy 和 headless envelope 不变。
+  - `/ce:work` 的 shipping workflow 不变。
+  - `/git-commit-push-pr` 不变。
+  - 不修改 existing agents。
+  - 不 touch release-owned files（`.claude-plugin/plugin.json`、`.claude-plugin/marketplace.json`、root `CHANGELOG.md`）。
+- **对 `/ce:review` artifact shape 的 additive change：** `/ce:review` 为每个 run artifact 增加一个小的 additive `metadata.json` file，包含 `{branch, head_sha, created_at}`。Unit 3 的 SHA-binding entry gate 需要它，以便 polish 能拒绝 stale review artifacts。该 change 是纯 additive；existing artifact consumers 不受影响，已写文件其余 shape 保持当前形态，并通过 mtime 与 HEAD commit time 比较的 fallback path 处理 pre-metadata.json artifacts。`/ce:review` skill edit 限定为 finalize phase 中的单个 write step，不改变 finding synthesis 或 envelope output。
 
-## Risks & Dependencies
+## 风险与依赖
 
-| Risk | Mitigation |
+| 风险 | 缓解措施 |
 |------|------------|
-| Dev-server lifecycle is novel ground; the per-framework recipes will miss edge cases (monorepos, custom scripts, non-standard ports). | Lead with user-authored `.claude/launch.json` — sidesteps detection entirely for users who opt in. Auto-detect remains as fallback. Ship as beta (`ce:polish-beta`) with `disable-model-invocation: true`. `unknown` project type always falls back to asking the user for the start command. Revisit thresholds and recipes after first beta runs. |
-| `.claude/launch.json` is not a fully standardized format across Claude Code / Cursor / VS Code / Codex. Leading with it may surprise users on other IDEs who expect `.vscode/launch.json` or `tasks.json`. | Document the schema polish reads in `references/launch-json-schema.md` with worked examples. On absence, auto-detect still covers most cases. Revisit after beta if a clear cross-IDE standard emerges — the config format can be swapped without touching the rest of the skill. |
-| IDE detection (Claude Code / Cursor / future Codex) is a moving target; env-var signals shift between releases. | Treat IDE detection as progressive enhancement. Detection failure never blocks — always falls through to printing the URL. Encode the env-var table in `references/ide-detection.md` so updates are a single-file change. |
-| A fork PR's checked-out `.claude/launch.json` is attacker-controlled; auto-executing its `runtimeExecutable` + `runtimeArgs` inside the maintainer's shell is arbitrary code execution. | Entry gate probes `gh pr view --json isCrossRepository,headRepositoryOwner`. For fork PRs, refuse by default and require an explicit `trust-fork:1` argument token plus printing the PR author + repo before any server command runs. Document this in Unit 3's entry gate alongside the review-artifact and CI check. |
-| `lsof` kill on a port may terminate a server the user cares about (not the expected dev server). | Always confirm the kill with the user by printing the PID and process name before asking. Never kill without consent. Never use `kill -9` without a second confirmation after a graceful kill fails. |
-| `git merge origin/<base>` may conflict, leaving the branch in a half-merged state. | Exit cleanly on conflict with the conflict file list; do not attempt resolution. User resolves manually and re-invokes. |
-| Silent primary-checkout switches during an active `bin/dev` / `npm run dev` can serve the wrong branch's assets. | Worktree probe before `gh pr checkout`: if PR is already checked out in a worktree, attach. Dev server is always killed+restarted after any checkout before the checklist is presented. |
-| The "oversized" classifier thresholds (>5 files, >2 surfaces, >300 diff lines for per-item; >30 files / >1000 lines for batch preempt) are guesses. Over-triggering creates friction; under-triggering defeats the guard. | Thresholds configurable via the classifier script. Ship conservative defaults; document as "revisit after beta runs." The size gate is load-bearing in the dispatcher, so incorrect thresholds produce visible friction the user will report. The run artifact must record every classifier decision (item file count, surface count, diff-line count, classification result, user override if any) so thresholds can be tuned empirically. |
-| Polish escalates to re-planning (writing `replan-seed.md` and routing to `/ce:plan` or `/ce:brainstorm`) but cannot itself invoke those skills. A user who dismisses the escalation and continues anyway produces work the stacked-PR path cannot safely absorb. | Replan escalation is presented via the platform's blocking question tool with a durable recorded answer. `continue subset` is explicitly offered so the user can proceed on the part that fits polish while acknowledging the replan-seed. The seed file persists and the summary flags it so a later reviewer sees that the user consciously deferred a replan. |
-| Sub-agents running in parallel may collide on file writes. | Dispatcher groups items by file-path intersection; colliding items serialize. No item is ever dispatched to two agents simultaneously. |
-| The skill assumes `.context/compound-engineering/ce-review/` exists. On a fresh clone or a new branch where `/ce:review` has never run, the gate will fail with "no review artifact." | Gate's refusal message explicitly routes the user to `/ce:review` first. No silent fallback. |
-| `gh pr checks` may not return results for a brand-new PR where CI hasn't started yet. | Interactive mode: offer to wait-and-retry with a 30s interval; user can cancel. Headless mode: treat as non-green and emit failure envelope. |
-| Promotion from beta to stable requires updating every orchestration caller in the same PR; missing one leaves stale references. | Implementation Unit 6 catalogs the integration points (`README.md`, future `/ce:work` auto-chain, potential LFG integration). Promotion PR follows the `ce-work-beta-promotion-checklist` precedent. |
-| The human-in-the-loop step pauses automation indefinitely in headless mode if the caller doesn't expect it. | `mode:headless` never prompts interactively; if human judgment is required (oversized items, ambiguous project type, kill confirmation), headless fails fast with a structured "human input required" envelope and does not hang. |
+| Dev-server lifecycle 是新领域；per-framework recipes 可能漏掉 edge cases（monorepos、custom scripts、non-standard ports）。 | 优先使用 user-authored `.claude/launch.json`，为 opt-in 用户完全绕过 detection。Auto-detect 保留为 fallback。以 beta（`ce:polish-beta`）和 `disable-model-invocation: true` 发布。`unknown` project type 始终 fallback 为询问用户 start command。首次 beta runs 后 revisit thresholds 和 recipes。 |
+| `.claude/launch.json` 在 Claude Code / Cursor / VS Code / Codex 之间并非完全标准化 format。把它放在首位可能让期待 `.vscode/launch.json` 或 `tasks.json` 的其他 IDE 用户意外。 | 在 `references/launch-json-schema.md` 中记录 polish 读取的 schema，并提供 worked examples。缺失时，auto-detect 仍覆盖多数 cases。如果 beta 后出现清晰 cross-IDE standard，再 revisit；config format 可替换而不触碰 skill 其余部分。 |
+| IDE detection（Claude Code / Cursor / future Codex）是 moving target；env-var signals 会随 release 变化。 | 将 IDE detection 视为 progressive enhancement。Detection failure 永不 block，始终 fall through 到打印 URL。把 env-var table 编码在 `references/ide-detection.md` 中，使更新成为 single-file change。 |
+| fork PR checkout 后的 `.claude/launch.json` 由 attacker 控制；在 maintainer shell 中 auto-executing 其 `runtimeExecutable` + `runtimeArgs` 等同 arbitrary code execution。 | Entry gate probe `gh pr view --json isCrossRepository,headRepositoryOwner`。对 fork PRs 默认拒绝，要求显式 `trust-fork:1` argument token，并在任何 server command 运行前打印 PR author + repo。与 review-artifact 和 CI check 一起记录在 Unit 3 entry gate。 |
+| 对 port 执行 `lsof` kill 可能终止用户关心的 server（不是预期 dev server）。 | 询问前始终打印 PID 和 process name，让用户确认 kill。没有 consent 永不 kill。graceful kill 失败后，没有 second confirmation 永不使用 `kill -9`。 |
+| `git merge origin/<base>` 可能 conflict，使 branch 处于 half-merged state。 | conflict 时 clean exit，并带 conflict file list；不尝试 resolution。用户手动 resolve 后重新 invoke。 |
+| active `bin/dev` / `npm run dev` 期间 silent primary-checkout switches 可能 serve wrong branch assets。 | `gh pr checkout` 前 worktree probe：若 PR 已 checkout 在 worktree 中，则 attach。每次 checkout 后，在 checklist 呈现前 dev server 总是 killed+restarted。 |
+| “oversized” classifier thresholds（per-item >5 files、>2 surfaces、>300 diff lines；batch preempt >30 files / >1000 lines）是初始估计。过度触发会造成 friction，触发不足会削弱 guard。 | Thresholds 通过 classifier script 可配置。先 ship conservative defaults，并记录 “revisit after beta runs”。size gate 在 dispatcher 中 load-bearing，因此错误 thresholds 会产生用户可报告的 visible friction。run artifact 必须记录每个 classifier decision（item file count、surface count、diff-line count、classification result、user override 如有），以便 empirical tuning。 |
+| Polish escalation 到 re-planning（写 `replan-seed.md` 并 route 到 `/ce:plan` 或 `/ce:brainstorm`），但自身不能 invoke 那些 skills。用户如果 dismiss escalation 并继续，会产生 stacked-PR path 无法 safely absorb 的 work。 | Replan escalation 通过 platform blocking question tool 呈现，并记录 durable answer。显式提供 `continue subset`，让用户在承认 replan-seed 的情况下继续处理适合 polish 的部分。seed file 持久存在，summary 标记它，使后续 reviewer 看见用户 consciously deferred a replan。 |
+| 并行运行的 sub-agents 可能在 file writes 上 collide。 | Dispatcher 按 file-path intersection 对 items 分组；colliding items serialize。任何 item 永不同时 dispatch 给两个 agents。 |
+| skill 假定 `.context/compound-engineering/ce-review/` 存在。fresh clone 或从未运行 `/ce:review` 的新 branch 上，gate 会因 “no review artifact” fail。 | Gate refusal message 明确 route 用户先运行 `/ce:review`。无 silent fallback。 |
+| 对刚创建且 CI 未启动的新 PR，`gh pr checks` 可能不返回 results。 | Interactive mode：提供 30s 间隔的 wait-and-retry；用户可 cancel。Headless mode：视为 non-green，并 emit failure envelope。 |
+| 从 beta promotion 到 stable 需要在同一 PR 更新每个 orchestration caller；遗漏一个会留下 stale references。 | Implementation Unit 6 catalog integration points（`README.md`、未来 `/ce:work` auto-chain、潜在 LFG integration）。Promotion PR 遵循 `ce-work-beta-promotion-checklist` precedent。 |
+| human-in-the-loop step 在 headless mode 中如果 caller 没预期，可能无限暂停 automation。 | `mode:headless` 永不 interactively prompt；如果需要 human judgment（oversized items、ambiguous project type、kill confirmation），headless fast fail，并带 structured "human input required" envelope，不 hang。 |
 
-## Security Considerations
+## 安全考虑
 
-`/ce:polish-beta` runs attacker-influenced code (the checked-out branch's dev server, `launch.json`, and diff) inside the maintainer's shell and on a local network port. The individual guardrails are distributed across Units 3-5; this section consolidates the threat model so the boundaries stay explicit as the skill evolves.
+`/ce:polish-beta` 会在 maintainer shell 中、local network port 上运行 attacker-influenced code（checked-out branch 的 dev server、`launch.json` 和 diff）。各项 guardrails 分布在 Units 3-5；本 section 汇总 threat model，使 skill 演进时 boundaries 保持明确。
 
-| Concern | Trust boundary | Control | Unit |
+| 关注点 | 信任边界 | 控制措施 | Unit |
 |---------|---------------|---------|------|
-| Fork-PR `launch.json` is attacker-authored — its `runtimeExecutable` + `runtimeArgs` run in the maintainer's shell. | Cross-repo PR code is untrusted by default. | Entry gate probes `gh pr view --json isCrossRepository,headRepositoryOwner`. Fork PRs refuse unconditionally unless `trust-fork:1` is passed; the PR author + source repo are printed before any server command runs. Headless mode never auto-trusts a fork. | Unit 3 |
-| `launch.json` from a same-repo branch can still be malicious if the branch was written by a compromised contributor. | User-authored config on a trusted repo is the trust boundary. The user who invokes `/ce:polish-beta` must trust their own repo's branches. | Document the trust model in `references/launch-json-schema.md`. No separate guard — this matches the trust model of any IDE that executes `.vscode/launch.json`. | Unit 4 |
-| Killing a process bound to the project's dev-server port may terminate an unrelated server the user cares about. | User explicit consent required per kill. | Print PID + process name, ask via the platform's blocking question tool; never kill without confirmation; never use `kill -9` without a second confirmation after graceful kill fails; headless mode refuses to kill unless `allow-port-kill:1` is passed. | Unit 4 |
-| Dev server bound to `0.0.0.0` exposes attacker-influenced code to the network. | Dev server should be localhost-only. | All framework recipes and the `launch.json` schema document default to `localhost`/`127.0.0.1` host binding. Reject a configured host of `0.0.0.0` unless the user explicitly overrides. | Unit 4 |
-| Reusing a stale `/ce:review` artifact across branches (e.g., the user ran review on branch A, then checked out branch B and invoked polish) would gate polish on the wrong verdict. | Review artifact is trusted only for the exact SHA it was computed against (and descendants the user acknowledges). | SHA-binding check: `metadata.json` must match current branch and SHA, or be an ancestor with `accept-stale-review:1`, else refuse. Pre-metadata.json fallback uses mtime-vs-commit-time with the same accept-token. | Unit 3 |
-| Artifact files written to `.context/compound-engineering/ce-polish/<run-id>/` may be read by other skills or committed by accident. | Artifacts are local-only, never committed. | `.context/` is already gitignored at repo root; polish never writes outside it. Run IDs are per-run so concurrent invocations cannot interleave. | Unit 6 |
-| Sub-agent dispatch passes user-supplied `notes:` text as fix directives. Malicious notes could attempt prompt injection against the sub-agent. | The user authoring `notes:` is the same user who invoked polish; notes are not an external input. | No separate guard — same trust level as any user-typed directive to the agent. Document that `notes:` is interpreted as a directive in `references/checklist-template.md`. | Unit 5 |
+| Fork-PR `launch.json` 由 attacker 编写，其 `runtimeExecutable` + `runtimeArgs` 会在 maintainer shell 中运行。 | Cross-repo PR code 默认不受信任。 | Entry gate probe `gh pr view --json isCrossRepository,headRepositoryOwner`。Fork PRs 除非传入 `trust-fork:1`，否则无条件拒绝；任何 server command 运行前都会打印 PR author + source repo。Headless mode 从不 auto-trust fork。 | Unit 3 |
+| 如果 same-repo branch 由受损 contributor 编写，其中的 `launch.json` 仍可能恶意。 | Trusted repo 中的 user-authored config 是 trust boundary。调用 `/ce:polish-beta` 的用户必须信任自己 repo 的 branches。 | 在 `references/launch-json-schema.md` 中记录 trust model。不增加单独 guard；这与任何执行 `.vscode/launch.json` 的 IDE 的 trust model 一致。 | Unit 4 |
+| Kill 绑定到项目 dev-server port 的 process，可能终止用户关心的无关 server。 | 每次 kill 都需要用户显式 consent。 | 打印 PID + process name，并通过平台 blocking question tool 询问；没有确认绝不 kill；graceful kill 失败后，未二次确认绝不使用 `kill -9`；headless mode 除非传入 `allow-port-kill:1`，否则拒绝 kill。 | Unit 4 |
+| Dev server 绑定到 `0.0.0.0` 会把 attacker-influenced code 暴露到网络。 | Dev server 应只监听 localhost。 | 所有 framework recipes 和 `launch.json` schema document 默认使用 `localhost`/`127.0.0.1` host binding。除非用户显式 override，否则拒绝配置为 `0.0.0.0` 的 host。 | Unit 4 |
+| 跨 branches 复用 stale `/ce:review` artifact（例如用户在 branch A 跑 review，然后 checkout branch B 并调用 polish）会让 polish 基于错误 verdict gate。 | Review artifact 只对它计算时的 exact SHA（以及用户确认的 descendants）可信。 | SHA-binding check：`metadata.json` 必须匹配 current branch 和 SHA，或在传入 `accept-stale-review:1` 时作为 ancestor 接受，否则拒绝。Pre-metadata.json fallback 使用 mtime-vs-commit-time，并沿用相同 accept-token。 | Unit 3 |
+| 写入 `.context/compound-engineering/ce-polish/<run-id>/` 的 artifact files 可能被其他 skills 读取，或被意外 commit。 | Artifacts 仅限本地，绝不提交。 | `.context/` 已在 repo root gitignored；polish 从不写出该目录。Run IDs 按 run 生成，因此并发 invocations 不会交织。 | Unit 6 |
+| Sub-agent dispatch 会把用户提供的 `notes:` text 作为 fix directives。恶意 notes 可能尝试对 sub-agent 做 prompt injection。 | 编写 `notes:` 的用户就是调用 polish 的用户；notes 不是外部输入。 | 不增加单独 guard；它与用户直接给 agent 输入 directive 的 trust level 相同。在 `references/checklist-template.md` 中记录 `notes:` 会被解释为 directive。 | Unit 5 |
 
-The table is the full surface area: there are no other untrusted inputs into polish beyond (a) fork-PR contents, (b) same-repo branch contents, (c) the port-binding process table, (d) the review artifact on disk, and (e) user-typed notes.
+该表是完整 surface area：除 (a) fork-PR contents、(b) same-repo branch contents、(c) port-binding process table、(d) 磁盘上的 review artifact，以及 (e) user-typed notes 外，没有其他 untrusted inputs 进入 polish。
 
-## Documentation / Operational Notes
+## 文档与运维说明
 
-- `README.md` skill table gains one row for `ce:polish-beta`. Count update is a substantive doc edit, not a release-owned version bump.
-- No `CHANGELOG.md` entry in this PR; release-please composes it from the conventional commit (`feat(ce-polish): add /ce:polish-beta skill for human-in-the-loop refinement`).
-- Feature branch name: `feat/ce-polish-command`.
-- After the beta PR merges, monitor usage feedback for ~2 weeks of active use before opening a promotion PR. Promotion criteria: no P0/P1 issues in beta usage, `unknown` fall-back rate <20% of runs, stacked-PR-seed path exercised at least once.
-- Beta-to-stable promotion PR checklist lives in `docs/solutions/skill-design/ce-work-beta-promotion-checklist.md` — apply it by analogy.
+- `README.md` skill table 为 `ce:polish-beta` 增加一行。Count update 是 substantive doc edit，不是 release-owned version bump。
+- 本 PR 不需要 `CHANGELOG.md` entry；release-please 会从 conventional commit（`feat(ce-polish): add /ce:polish-beta skill for human-in-the-loop refinement`）生成。
+- Feature branch name：`feat/ce-polish-command`。
+- beta PR merge 后，在约 2 周 active use 中监控 usage feedback，再打开 promotion PR。Promotion criteria：beta usage 中无 P0/P1 issues，`unknown` fall-back rate <20% runs，stacked-PR-seed path 至少 exercised 一次。
+- Beta-to-stable promotion PR checklist 位于 `docs/solutions/skill-design/ce-work-beta-promotion-checklist.md`，按类比应用。
 
-## Sources & References
+## 来源与参考
 
-- Motivating transcript: user-provided polish-phase description (attached to `/modify-plugin` invocation, this planning run).
-- Research agents consulted this planning run:
-  - `compound-engineering:research:repo-research-analyst` — patterns, architecture, directory layout, frontmatter conventions, existing agent inventory.
-  - `compound-engineering:research:learnings-researcher` — institutional findings across `docs/solutions/`.
-- Related code (all repo-relative):
-  - `plugins/compound-engineering/skills/ce-review/SKILL.md` (argument table, branch/PR acquisition, headless envelope)
-  - `plugins/compound-engineering/skills/ce-work/SKILL.md` (complexity matrix, phase structure)
-  - `plugins/compound-engineering/skills/ce-brainstorm/SKILL.md` (interactive posture baseline)
-  - `plugins/compound-engineering/skills/test-browser/SKILL.md` (port detection cascade, framework-agnostic probing)
-  - `plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md` (parallel sub-agent dispatch pattern)
-  - `plugins/compound-engineering/skills/ce-work-beta/SKILL.md` (beta posture)
-  - `plugins/compound-engineering/skills/ce-review/references/resolve-base.sh` (base-branch resolver — duplicated, not referenced)
-  - `plugins/compound-engineering/skills/ce-review/references/subagent-template.md` (sub-agent prompt shape)
+- Motivating transcript：user-provided polish-phase description（附在本 planning run 的 `/modify-plugin` invocation 上）。
+- 本 planning run 咨询的 research agents：
+  - `compound-engineering:research:repo-research-analyst`：patterns、architecture、directory layout、frontmatter conventions、existing agent inventory。
+  - `compound-engineering:research:learnings-researcher`：`docs/solutions/` 中的 institutional findings。
+- 相关代码（全部为 repo-relative）：
+  - `plugins/compound-engineering/skills/ce-review/SKILL.md`（argument table、branch/PR acquisition、headless envelope）
+  - `plugins/compound-engineering/skills/ce-work/SKILL.md`（complexity matrix、phase structure）
+  - `plugins/compound-engineering/skills/ce-brainstorm/SKILL.md`（interactive posture baseline）
+  - `plugins/compound-engineering/skills/test-browser/SKILL.md`（port detection cascade、framework-agnostic probing）
+  - `plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md`（parallel sub-agent dispatch pattern）
+  - `plugins/compound-engineering/skills/ce-work-beta/SKILL.md`（beta posture）
+  - `plugins/compound-engineering/skills/ce-review/references/resolve-base.sh`（base-branch resolver：duplicated, not referenced）
+  - `plugins/compound-engineering/skills/ce-review/references/subagent-template.md`（sub-agent prompt shape）
   - `plugins/compound-engineering/agents/design/ce-design-iterator.agent.md`
   - `plugins/compound-engineering/agents/design/ce-design-implementation-reviewer.agent.md`
   - `plugins/compound-engineering/agents/design/ce-figma-design-sync.agent.md`
   - `plugins/compound-engineering/agents/review/ce-code-simplicity-reviewer.agent.md`
   - `plugins/compound-engineering/agents/review/ce-maintainability-reviewer.agent.md`
   - `plugins/compound-engineering/agents/review/ce-julik-frontend-races-reviewer.agent.md`
-- Institutional learnings:
+- 组织内 learnings：
   - `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`
   - `docs/solutions/skill-design/compound-refresh-skill-improvements.md`
   - `docs/solutions/skill-design/research-agent-pipeline-separation.md`
@@ -634,6 +634,6 @@ The table is the full surface area: there are no other untrusted inputs into pol
   - `docs/solutions/skill-design/script-first-skill-architecture.md`
   - `docs/solutions/skill-design/beta-skills-framework.md`
   - `docs/solutions/skill-design/ce-work-beta-promotion-checklist.md`
-- Project AGENTS.md rules applied throughout:
-  - `AGENTS.md` (repo root) — branching, commit conventions, release versioning, file reference rules
-  - `plugins/compound-engineering/AGENTS.md` — skill compliance checklist, cross-platform rules, reference file inclusion, tool selection
+- 全程应用的 Project AGENTS.md rules：
+  - `AGENTS.md`（repo root）— branching、commit conventions、release versioning、file reference rules
+  - `plugins/compound-engineering/AGENTS.md` — skill compliance checklist、cross-platform rules、reference file inclusion、tool selection

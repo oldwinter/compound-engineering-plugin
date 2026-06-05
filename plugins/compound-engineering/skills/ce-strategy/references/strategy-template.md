@@ -1,19 +1,19 @@
-# Strategy Template
+# Strategy Template（策略模板）
 
-Loaded by `SKILL.md` after the interview is complete. Fill it in using the captured answers and write to `STRATEGY.md`.
+Interview 完成后由 `SKILL.md` 加载。使用 captured answers 填写，并写入 `STRATEGY.md`。
 
-## Rules for filling in
+## 填写规则
 
-- Use the user's own language where possible. Do not paraphrase into generic PM-speak.
-- Each section stays compact. The whole doc should read in under 5 minutes.
-- Section order is locked. Do not add new top-level sections.
-- Optional sections: delete entirely if unused. Do not leave empty headers.
-- Set `last_updated` in the YAML frontmatter to today's ISO date (YYYY-MM-DD). Do not duplicate the date in prose.
-- Set `name` in the frontmatter to the product or initiative name (the same value used in the H1 title).
+- 尽可能使用用户自己的语言。不要改写成 generic PM-speak。
+- 每个 section 保持 compact。整篇 doc 应能在 5 分钟内读完。
+- Section order 已锁定。不要添加新的 top-level sections。
+- Optional sections：未使用时完整删除。不要留下 empty headers。
+- 将 YAML frontmatter 中的 `last_updated` 设置为今天的 ISO date（YYYY-MM-DD）。不要在 prose 中重复 date。
+- 将 frontmatter 中的 `name` 设置为 product 或 initiative name（与 H1 title 使用同一值）。
 
-## Template
+## Template（模板）
 
-The block below is the literal file to write (minus this line and the fences). Replace every `{{placeholder}}` with the captured answer. Delete any optional section whose placeholder wasn't answered.
+下面的 block 是要写入的 literal file（不包括本行和 fences）。用 captured answer 替换每个 `{{placeholder}}`。删除所有 placeholder 未被回答的 optional section。
 
 ~~~markdown
 ---
@@ -76,14 +76,14 @@ _Why it serves the approach:_ {{one line}}
 <!-- Optional. Delete the section if unused. -->
 ~~~
 
-## Post-write checklist
+## Post-write checklist（写入后检查清单）
 
-Before confirming the write, scan the draft for:
+确认写入前，扫描 draft：
 
-- [ ] Frontmatter present at the top with `name` and `last_updated` keys.
-- [ ] `last_updated` carries today's date in ISO format (YYYY-MM-DD).
-- [ ] No section has more than 4 sentences except Tracks (where each track has its own short block).
-- [ ] No placeholders remain (`{{...}}`).
-- [ ] Optional sections with no content have been deleted, not left empty.
-- [ ] Metric count is between 3 and 5. Track count is between 2 and 4.
-- [ ] Target problem and Our approach are connected - one clearly responds to the other.
+- [ ] Frontmatter 位于顶部，并包含 `name` 和 `last_updated` keys。
+- [ ] `last_updated` 使用今天的 ISO format date（YYYY-MM-DD）。
+- [ ] 除 Tracks 外，没有 section 超过 4 句话（Tracks 中每个 track 有自己的 short block）。
+- [ ] 没有剩余 placeholders（`{{...}}`）。
+- [ ] 没有内容的 optional sections 已删除，而不是留空。
+- [ ] Metric count 在 3 到 5 之间。Track count 在 2 到 4 之间。
+- [ ] Target problem 和 Our approach 相互连接：后者清楚回应前者。

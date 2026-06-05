@@ -1,306 +1,306 @@
 ---
 name: ce-code-review
-description: "Structured code review using tiered persona agents, confidence-gated findings, and a merge/dedup pipeline. In interactive mode it applies safe, verified fixes and commits them when the working tree is clean (it never pushes); in mode:agent it reports only and the caller applies. Use when reviewing code changes before creating a PR."
-argument-hint: "[mode:agent] [blank to review current branch, or provide PR link]"
+description: "使用 tiered persona agents、confidence-gated findings 和 merge/dedup pipeline 进行 structured code review。Interactive mode 中，它会 apply safe、verified fixes，并在 working tree clean 时 commit（绝不 push）；mode:agent 中只 report，由 caller apply。创建 PR 前 review code changes 时使用。"
+argument-hint: "[mode:agent] [留空则 review current branch，或提供 PR link]"
 ---
 
-# Code Review
+# 代码审查
 
-Reviews code changes using dynamically selected reviewer personas. Spawns parallel sub-agents that return structured JSON, then merges and deduplicates findings into a single report.
+使用 dynamically selected reviewer personas review code changes。Spawn parallel sub-agents 返回 structured JSON，然后将 findings merge 和 deduplicate 成 single report。
 
-## When to Use
+## 使用时机
 
-- Before creating a PR
-- After completing a task during iterative implementation
-- When feedback is needed on any code changes
-- Can be invoked standalone
-- Can run inside larger workflows; use `mode:agent` when the caller needs JSON instead of markdown tables
+- 创建 PR 前
+- Iterative implementation 期间完成 task 后
+- 任何 code changes 需要 feedback 时
+- 可 standalone invocation
+- 可在 larger workflows 内运行；当 caller 需要 JSON 而非 markdown tables 时，使用 `mode:agent`
 
-## Argument Parsing
+## 参数解析
 
-Parse `$ARGUMENTS` for optional tokens. Strip each recognized token before interpreting the remainder as a PR number, GitHub URL, or branch name.
+解析 `$ARGUMENTS` 中的 optional tokens。在将剩余内容解释为 PR number、GitHub URL 或 branch name 前，先移除每个 recognized token。
 
-| Token | Example | Effect |
+| Token | Example（示例） | Effect（效果） |
 |-------|---------|--------|
-| `mode:agent` | `mode:agent` | **Report-only**: return **JSON** instead of markdown tables and skip the Stage 5c apply (the caller applies). Does not change reviewer selection, merge logic, or scope rules (see Output format) |
-| `mode:headless` | `mode:headless` | **Deprecated alias** for `mode:agent` |
-| `mode:report-only` | `mode:report-only` | **Deprecated — ignored.** Former no-artifacts mode; default behavior is review-only without checkout |
-| `base:<sha-or-ref>` | `base:abc1234` or `base:origin/main` | Diff base on the **current checkout** (explicit; skips auto base detection) |
-| `plan:<path>` | `plan:docs/plans/2026-03-25-001-feat-foo-plan.md` | Plan file for requirements verification (explicit) |
+| `mode:agent` | `mode:agent` | **Report-only**：返回 **JSON** 而不是 markdown tables，并跳过 Stage 5c apply（由 caller apply）。不改变 reviewer selection、merge logic 或 scope rules（见 Output format） |
+| `mode:headless` | `mode:headless` | `mode:agent` 的 **Deprecated alias** |
+| `mode:report-only` | `mode:report-only` | **Deprecated：ignored。** 旧 no-artifacts mode；default behavior 是不 checkout 的 review-only |
+| `base:<sha-or-ref>` | `base:abc1234` or `base:origin/main` | **Current checkout** 上的 diff base（explicit；跳过 auto base detection） |
+| `plan:<path>` | `plan:docs/plans/2026-03-25-001-feat-foo-plan.md` | Requirements verification 用的 plan file（explicit） |
 
-**Mode alias:** `mode:headless` normalizes to `mode:agent`. `mode:agent` + `mode:headless` is not a conflict.
+**Mode alias：** `mode:headless` normalize 为 `mode:agent`。`mode:agent` + `mode:headless` 不是 conflict。
 
-**Conflicting arguments:** Stop without dispatching reviewers when:
-- Multiple incompatible scope selectors appear together (e.g. `base:` **and** a PR number/branch target — `base:` means "review the current checkout against this base")
-- Multiple distinct `mode:` tokens other than the `mode:agent`/`mode:headless` alias pair
+**Conflicting arguments：** 以下情况 stop，不 dispatch reviewers：
+- 多个 incompatible scope selectors 同时出现（例如 `base:` **以及** PR number/branch target：`base:` 表示 "review the current checkout against this base"）
+- 除 `mode:agent`/`mode:headless` alias pair 外，出现多个 distinct `mode:` tokens
 
-Deprecated `mode:autofix` is **not** a conflict — ignore the token and proceed with the normal flow (see below).
+Deprecated `mode:autofix` **不是** conflict：ignore token 并按 normal flow 继续（见下方）。
 
-Emit a one-line failure reason. In `mode:agent`, return JSON: `{"status":"failed","reason":"..."}`.
+Emit one-line failure reason。在 `mode:agent` 中返回 JSON：`{"status":"failed","reason":"..."}`。
 
-## Operating principles
+## 运行原则
 
-Same pipeline for default and `mode:agent`:
+Default 和 `mode:agent` 使用相同 pipeline：
 
-- **Apply locally; never push.** Never push, open PRs, or file tickets in any mode — push is the outward step the user owns. In **default (interactive)** mode the review applies safe, verified fixes and commits them when the pre-review tree was clean (Stage 5c owns the full rule). In **`mode:agent`** it never mutates the tree — it reports and the caller applies.
-- **No blocking prompts.** Never use `AskUserQuestion`, `request_user_input`, `ask_user`, or other blocking question tools. Infer intent, plan, and scope from explicit tokens, git state, PR metadata, and conversation. Note uncertainty in Coverage or the verdict — do not stop to ask.
-- **Explicit mutations only.** Never run `gh pr checkout`, `git checkout`, `git switch`, or similar branch-switch commands. Passing a PR number, URL, or branch name selects **review scope**, not permission to mutate the working tree. To review local uncommitted work on a feature branch, check out that branch yourself (or stay on it) and pass `base:` or no target.
-- **Smart defaults.** Untracked files: review tracked changes only and list excluded paths in Coverage. Plan: use `plan:` when passed; otherwise discover conservatively from PR body or branch keywords. Weak advisory P2/P3 from testing/maintainability alone: demote to `testing_gaps` / `residual_risks` per Stage 5.
+- **本地 apply，绝不 push。** 任何 mode 都绝不 push、open PRs 或 file tickets：push 是用户拥有的 outward step。在 **default (interactive)** mode 中，review 会 apply safe、verified fixes，并在 pre-review tree clean 时 commit（完整规则由 Stage 5c 拥有）。在 **`mode:agent`** 中，它绝不 mutate tree：只 report，由 caller apply。
+- **不使用 blocking prompts。** 绝不使用 `AskUserQuestion`、`request_user_input`、`ask_user` 或其它 blocking question tools。根据 explicit tokens、git state、PR metadata 和 conversation 推断 intent、plan 和 scope。在 Coverage 或 verdict 中记录 uncertainty：不要停下来问。
+- **只做显式 mutations。** 绝不运行 `gh pr checkout`、`git checkout`、`git switch` 或类似 branch-switch commands。传入 PR number、URL 或 branch name 只选择 **review scope**，不授权 mutate working tree。要 review feature branch 上的 local uncommitted work，请自己 checkout 该 branch（或保持在该 branch），并传 `base:` 或不传 target。
+- **Smart defaults。** Untracked files：只 review tracked changes，并在 Coverage 中列出 excluded paths。Plan：传入 `plan:` 时使用；否则从 PR body 或 branch keywords conservative discovery。仅来自 testing/maintainability 的 weak advisory P2/P3：按 Stage 5 demote 到 `testing_gaps` / `residual_risks`。
 
-## Output format
+## 输出格式
 
-| Invocation | Deliverable |
+| Invocation（调用方式） | Deliverable（交付物） |
 |------------|-------------|
-| **Default** | Markdown report (pipe-delimited finding tables) + Actionable Findings summary |
-| **`mode:agent`** | One JSON object (see ### JSON output format below) + the same `/tmp/.../ce-code-review/<run-id>/` artifacts |
+| **Default** | Markdown report（pipe-delimited finding tables）+ Actionable Findings summary |
+| **`mode:agent`** | One JSON object（见下方 ### JSON output format）+ 相同 `/tmp/.../ce-code-review/<run-id>/` artifacts |
 
-`mode:agent` is **report-only**: it skips the Stage 5c apply (the caller applies) and serializes findings as JSON instead of markdown. It does not change reviewer selection, merge logic, or scope rules — the JSON is the deterministic contract for programmatic and cross-harness callers (Codex, Gemini, etc.). The default markdown is the human view; keep it ASCII-safe (pipe tables, `->` not middot `·`, no box-drawing) so it degrades gracefully across terminals.
+`mode:agent` 是 **report-only**：它跳过 Stage 5c apply（由 caller apply），并将 findings 序列化为 JSON 而不是 markdown。它不改变 reviewer selection、merge logic 或 scope rules：JSON 是 programmatic 和 cross-harness callers（Codex、Gemini 等）的 deterministic contract。Default markdown 是 human view；保持 ASCII-safe（pipe tables、`->` 而不是 middot `·`，不使用 box-drawing），让它在不同 terminals 中优雅降级。
 
-## Quick Review Short-Circuit
+## Quick Review 短路
 
-If `$ARGUMENTS` indicates the user wants a quick, fast, or light code review — and **`mode:agent` is not active** — do not dispatch the multi-agent flow.
+如果 `$ARGUMENTS` 表明用户想要 quick、fast 或 light code review，且 **`mode:agent` 未 active**，不要 dispatch multi-agent flow。
 
-**Announce the chosen path** before any other work (Quick review vs Multi-agent review). Skip this announcement when `mode:agent` is active.
+在任何其它 work 前 **announce chosen path**（Quick review vs Multi-agent review）。当 `mode:agent` active 时跳过此 announcement。
 
-Sequence:
+流程：
 
-1. **Run the harness's built-in code review.** Forward any review target after stripping tokens. Then stop — do not dispatch the multi-agent pipeline.
-2. **Exemption:** If no built-in review exists, continue into the full multi-agent review.
-3. **`mode:agent` bypasses this short-circuit** — always run the full multi-agent review and return JSON.
+1. **运行 harness built-in code review。** 移除 tokens 后 forward 任何 review target。然后 stop：不要 dispatch multi-agent pipeline。
+2. **Exemption：** 如果没有 built-in review，继续进入 full multi-agent review。
+3. **`mode:agent` 绕过此 short-circuit**：始终运行 full multi-agent review 并返回 JSON。
 
-**Deprecated:** `mode:autofix` is no longer supported — there is no apply *mode*. If passed, ignore the token and proceed with the normal flow (default applies safe fixes via Stage 5c; `mode:agent` reports and the caller applies).
+**Deprecated：** `mode:autofix` 不再支持：不存在 apply *mode*。如果传入，ignore token 并按 normal flow 继续（default 通过 Stage 5c apply safe fixes；`mode:agent` report，由 caller apply）。
 
-## Severity Scale
+## 严重级别
 
-All reviewers use P0-P3:
+所有 reviewers 使用 P0-P3：
 
-| Level | Meaning | Action |
+| Level | Meaning（含义） | Action（动作） |
 |-------|---------|--------|
-| **P0** | Critical breakage, exploitable vulnerability, data loss/corruption | Must fix before merge |
-| **P1** | High-impact defect likely hit in normal usage, breaking contract | Should fix |
-| **P2** | Moderate issue with meaningful downside (edge case, perf regression, maintainability trap) | Fix if straightforward |
-| **P3** | Low-impact, narrow scope, minor improvement | User's discretion |
+| **P0** | Critical breakage、exploitable vulnerability、data loss/corruption | merge 前必须修复 |
+| **P1** | Normal usage 中 likely hit 的 high-impact defect、breaking contract | 应修复 |
+| **P2** | 有 meaningful downside 的 moderate issue（edge case、perf regression、maintainability trap） | straightforward 时修复 |
+| **P3** | Low-impact、narrow scope、minor improvement | 由用户决定 |
 
-## Action Routing
+## Action Routing（动作路由）
 
-Severity answers **urgency**. `autofix_class` and `owner` are **signal** describing follow-up shape for callers — **not apply permission or an apply gate.** The apply decision is judgment (Stage 5c), not a function of `autofix_class`: default mode applies; in `mode:agent` this skill does not mutate the checkout — the caller applies. See `references/action-class-rubric.md` for persona guidance.
+Severity 回答的是 **urgency**。`autofix_class` 和 `owner` 是描述 caller follow-up shape 的 **signal**：**不是 apply permission 或 apply gate。** Apply decision 是 judgment（Stage 5c），不是 `autofix_class` 的函数：default mode 会 apply；在 `mode:agent` 中此 skill 不 mutate checkout，由 caller apply。Persona guidance 见 `references/action-class-rubric.md`。
 
-| `autofix_class` | Default owner | Meaning |
+| `autofix_class` | Default owner（默认 owner） | Meaning（含义） |
 |-----------------|---------------|---------|
-| `gated_auto` | `downstream-resolver` or `human` | Concrete `suggested_fix` proposed; caller applies after judgment |
-| `manual` | `downstream-resolver` or `human` | Actionable work needing design input or handoff |
-| `advisory` | `human` or `release` | Report-only — learnings, rollout notes, residual risk |
+| `gated_auto` | `downstream-resolver` or `human` | 提出 concrete `suggested_fix`；caller judgment 后 apply |
+| `manual` | `downstream-resolver` or `human` | 需要 design input 或 handoff 的 actionable work |
+| `advisory` | `human` or `release` | Report-only：learnings、rollout notes、residual risk |
 
-Routing rules:
+Routing rules（路由规则）：
 
-- **Synthesis owns the final route.** Persona-provided routing metadata is input, not the last word.
-- **Choose the more conservative route on disagreement.** A merged finding may move from `gated_auto` to `manual`, but never widen without stronger evidence.
-- **Reject `safe_auto` and `review-fixer` if present** — drop the finding or remap to `gated_auto` / `downstream-resolver` during synthesis.
-- **`requires_verification: true` means any caller-applied fix needs targeted tests or follow-up validation.**
+- **Synthesis 拥有 final route。** Persona-provided routing metadata 是 input，不是最后结论。
+- **Disagreement 时选择更 conservative route。** Merged finding 可从 `gated_auto` 移到 `manual`，但没有 stronger evidence 时绝不 widen。
+- **如果出现 `safe_auto` 和 `review-fixer`，reject 它们**：在 synthesis 期间 drop finding，或 remap 到 `gated_auto` / `downstream-resolver`。
+- **`requires_verification: true` 表示任何 caller-applied fix 需要 targeted tests 或 follow-up validation。**
 
-## Reviewers
+## Reviewers（审查者）
 
-14 reviewer personas in layered conditionals, plus CE agents. Quick roster with one-line triggers below; the persona catalog included at the bottom has the full per-persona selection criteria and spawn gates.
+14 个 reviewer personas 使用 layered conditionals，外加 CE agents。下方是带 one-line triggers 的 quick roster；底部 persona catalog 包含完整 per-persona selection criteria 和 spawn gates。
 
-**Always-on (every review):** `ce-correctness-reviewer`, `ce-testing-reviewer`, `ce-maintainability-reviewer`, `ce-project-standards-reviewer`, plus CE agents `ce-agent-native-reviewer` and `ce-learnings-researcher`.
+**Always-on（每次 review）：** `ce-correctness-reviewer`、`ce-testing-reviewer`、`ce-maintainability-reviewer`、`ce-project-standards-reviewer`，以及 CE agents `ce-agent-native-reviewer` 和 `ce-learnings-researcher`。
 
-**Cross-cutting conditional (per diff):**
+**Cross-cutting conditional（per diff，跨领域条件）：**
 
-- `ce-security-reviewer` — auth, public endpoints, user input, permissions
-- `ce-performance-reviewer` — DB queries, data transforms, caching, async
-- `ce-api-contract-reviewer` — routes, serializers, type signatures, versioning
-- `ce-data-migration-reviewer` — migration files / schema dumps / backfills (see spawn gate in Stage 3)
-- `ce-reliability-reviewer` — error handling, retries, timeouts, background jobs
-- `ce-adversarial-reviewer` — >=50 changed code lines, or auth / payments / data mutations / external APIs
-- `ce-previous-comments-reviewer` — PR with existing review comments (PR-only, comment-gated)
+- `ce-security-reviewer` — auth、public endpoints、user input、permissions
+- `ce-performance-reviewer` — DB queries、data transforms、caching、async
+- `ce-api-contract-reviewer` — routes、serializers、type signatures、versioning
+- `ce-data-migration-reviewer` — migration files / schema dumps / backfills（见 Stage 3 的 spawn gate）
+- `ce-reliability-reviewer` — error handling、retries、timeouts、background jobs
+- `ce-adversarial-reviewer` — >=50 changed code lines，或 auth / payments / data mutations / external APIs
+- `ce-previous-comments-reviewer` — 带 existing review comments 的 PR（PR-only，comment-gated）
 
-**Stack-specific conditional (per diff):** `ce-julik-frontend-races-reviewer` (Stimulus/Turbo, DOM events, async UI) and `ce-swift-ios-reviewer` (Swift/SwiftUI/UIKit, entitlements, Core Data, `.pbxproj`).
+**Stack-specific conditional（per diff）：** `ce-julik-frontend-races-reviewer`（Stimulus/Turbo、DOM events、async UI）和 `ce-swift-ios-reviewer`（Swift/SwiftUI/UIKit、entitlements、Core Data、`.pbxproj`）。
 
-**CE conditional (migration-specific):** `ce-deployment-verification-agent` — deployment checklist + rollback when the migration gate applies and the change is risky.
+**CE conditional（migration-specific）：** `ce-deployment-verification-agent`：migration gate 适用且 change risky 时，提供 deployment checklist + rollback。
 
-## Review Scope
+## 审查范围
 
-Every review spawns all 4 always-on personas plus the 2 CE always-on agents, then adds whichever cross-cutting and stack-specific conditionals fit the diff. The model naturally right-sizes: a small config change triggers 0 conditionals = 6 reviewers. A Rails auth feature might trigger security + reliability + adversarial = 9 reviewers.
+每次 review 都 spawn 所有 4 个 always-on personas 和 2 个 CE always-on agents，然后添加任何符合 diff 的 cross-cutting 和 stack-specific conditionals。Model 会自然 right-size：small config change 触发 0 个 conditionals = 6 reviewers。Rails auth feature 可能触发 security + reliability + adversarial = 9 reviewers。
 
-## Protected Artifacts
+## 受保护 Artifacts
 
-The following paths are compound-engineering pipeline artifacts and must never be flagged for deletion, removal, or gitignore by any reviewer:
+以下 paths 是 compound-engineering pipeline artifacts，任何 reviewer 都绝不能将它们 flagged for deletion、removal 或 gitignore：
 
-- `docs/brainstorms/*` -- requirements documents created by ce-brainstorm
-- `docs/plans/*.md` -- plan files created by ce-plan (decision artifacts; execution progress is derived from git, not stored in plan bodies)
-- `docs/solutions/*.md` -- solution documents created during the pipeline
+- `docs/brainstorms/*`：ce-brainstorm 创建的 requirements documents
+- `docs/plans/*.md`：ce-plan 创建的 plan files（decision artifacts；execution progress 从 git 派生，不存储在 plan bodies 中）
+- `docs/solutions/*.md`：pipeline 期间创建的 solution documents
 
-If a reviewer flags any file in these directories for cleanup or removal, discard that finding during synthesis.
+如果 reviewer 将这些 directories 中任何 file flagged for cleanup 或 removal，在 synthesis 期间 discard 该 finding。
 
-## How to Run
+## 运行方式
 
-### Stage 1: Determine scope
+### Stage 1：确定 scope
 
-Compute the diff range, file list, and diff. Minimize permission prompts by combining into as few commands as possible.
+计算 diff range、file list 和 diff。通过合并为尽可能少的 commands 来最小化 permission prompts。
 
-**If `base:` argument is provided (fast path):**
+**如果提供 `base:` argument（fast path）：**
 
-The caller already knows the diff base. Skip all base-branch detection, remote resolution, and merge-base computation. Use the provided value directly:
+Caller 已知 diff base。跳过所有 base-branch detection、remote resolution 和 merge-base computation。直接使用提供的值：
 
 ```
 BASE_ARG="{base_arg}"
 BASE=$(git merge-base HEAD "$BASE_ARG" 2>/dev/null) || BASE="$BASE_ARG"
 ```
 
-Then produce the same output as the other paths:
+然后生成与其它 paths 相同的 output：
 
 ```
 echo "BASE:$BASE" && echo "FILES:" && git diff --name-only $BASE && echo "DIFF:" && git diff -U10 $BASE && echo "UNTRACKED:" && git ls-files --others --exclude-standard
 ```
 
-This path works with any ref — a SHA, `origin/main`, a branch name. Callers reviewing the current checkout should pass explicit `base:` when auto-detection is unnecessary. **Do not combine `base:` with a PR number or branch target.** If both are present, stop with an error: "Cannot use `base:` with a PR number or branch target — `base:` implies the current checkout is already the correct branch. Pass `base:` alone, or pass the target alone and let scope detection resolve the base."
+此 path 适用于任何 ref：SHA、`origin/main`、branch name。Reviewing current checkout 的 callers 在不需要 auto-detection 时应传 explicit `base:`。**不要将 `base:` 与 PR number 或 branch target 组合。** 如果二者都存在，stop 并报错："Cannot use `base:` with a PR number or branch target — `base:` implies the current checkout is already the correct branch. Pass `base:` alone, or pass the target alone and let scope detection resolve the base."
 
-**If a PR number or GitHub URL is provided as an argument:**
+**如果 argument 提供了 PR number 或 GitHub URL：**
 
-Do **not** check out the PR branch. Scope comes from GitHub read APIs plus optional local alignment when HEAD already matches the PR head branch.
+**不要** checkout PR branch。Scope 来自 GitHub read APIs，以及当 HEAD 已匹配 PR head branch 时的 optional local alignment。
 
-**Skip-condition pre-check.** Before scope detection, run a PR-state probe:
+**Skip-condition pre-check。** Scope detection 前，运行 PR-state probe：
 
 ```
 gh pr view <number-or-url> --json state,title,body,files
 ```
 
-Apply skip rules in order:
+按顺序应用 skip rules：
 
-- `state` is `CLOSED` or `MERGED` -> stop with reason `PR is closed/merged; not reviewing.`
-- **Trivial-PR judgment**: spawn a lightweight sub-agent (use `model: haiku` in Claude Code; gpt-5.4-nano or equivalent in Codex) with the PR title, body, and changed file paths. The agent's task: "Is this an automated or trivial PR that does not warrant a code review? Consider: dependency lock-file or manifest-only bumps, automated release commits, chore version increments with no substantive code changes. When in doubt, answer no — false negatives (skipped reviews that should have run) are more costly than false positives (unnecessary reviews)." If the judgment returns yes: stop with reason `PR appears to be a trivial automated PR; not reviewing. Run without a PR argument to review the current branch, or pass base:<ref> if review is intended.`
+- `state` 为 `CLOSED` 或 `MERGED` -> stop，reason 为 `PR is closed/merged; not reviewing.`
+- **Trivial-PR judgment**：使用 PR title、body 和 changed file paths spawn lightweight sub-agent（Claude Code 中使用 `model: haiku`；Codex 中使用 gpt-5.4-nano 或 equivalent）。Agent task："Is this an automated or trivial PR that does not warrant a code review? Consider: dependency lock-file or manifest-only bumps, automated release commits, chore version increments with no substantive code changes. When in doubt, answer no — false negatives (skipped reviews that should have run) are more costly than false positives (unnecessary reviews)." 如果 judgment 返回 yes：stop，reason 为 `PR appears to be a trivial automated PR; not reviewing. Run without a PR argument to review the current branch, or pass base:<ref> if review is intended.`
 
-When any skip rule fires, stop without dispatching reviewers. **Default mode:** emit the reason as plain text. **`mode:agent`:** emit JSON only — `{"status":"skipped","reason":"<same message>"}` — so programmatic callers can parse the outcome. **Standalone**, **`base:`**, and **branch-remote** paths are unaffected. **Draft PRs are reviewed normally.**
+任何 skip rule 触发时，stop，不 dispatch reviewers。**Default mode：** 以 plain text emit reason。**`mode:agent`：** 只 emit JSON：`{"status":"skipped","reason":"<same message>"}`，让 programmatic callers 可 parse outcome。**Standalone**、**`base:`** 和 **branch-remote** paths 不受影响。**Draft PRs 正常 review。**
 
-If no skip rule fires, fetch PR metadata **without checkout**:
+如果没有 skip rule 触发，**不 checkout**，fetch PR metadata：
 
 ```
 gh pr view <number-or-url> --json title,body,baseRefName,headRefName,headRefOid,isCrossRepository,url,files,reviews,comments --jq '{title, body, baseRefName, headRefName, headRefOid, isCrossRepository, url, files: [.files[].path], hasPriorComments: ((.reviews | map(select(.state != "APPROVED" or .body != "")) | length) > 0 or (.comments | length) > 0)}'
 ```
 
-Set `BASE:` to `pr:<number-or-url>` (logical marker — not a git SHA). Set `UNTRACKED:` from `git ls-files --others --exclude-standard` on the **current** checkout (usually empty during PR-remote review).
+将 `BASE:` 设为 `pr:<number-or-url>`（logical marker，不是 git SHA）。从 **current** checkout 上的 `git ls-files --others --exclude-standard` 设置 `UNTRACKED:`（PR-remote review 期间通常为空）。
 
-**PR scope mode.** Classify as **`local-aligned`** only when **all** of these hold; otherwise use **`pr-remote`**. A matching branch name alone is not enough — a fork PR or a stale local branch can share a name with the PR head while pointing at unrelated code, and trusting the name would diff and inspect the wrong tree.
+**PR scope mode。** 只有以下条件 **全部** 成立时，classify as **`local-aligned`**；否则使用 **`pr-remote`**。仅 matching branch name 不够：fork PR 或 stale local branch 可能与 PR head 同名，但指向 unrelated code；信任名称会 diff 并 inspect wrong tree。
 
-1. `git rev-parse --abbrev-ref HEAD` equals `headRefName`.
-2. The PR is **not** cross-repository (`isCrossRepository` is false).
-3. The PR head commit is contained in the local checkout: `git merge-base --is-ancestor <headRefOid> HEAD` exits 0. This confirms the working tree actually carries the PR head (allowing unpushed local fixes layered on top) rather than an unrelated same-named branch.
+1. `git rev-parse --abbrev-ref HEAD` 等于 `headRefName`。
+2. PR **不是** cross-repository（`isCrossRepository` 为 false）。
+3. PR head commit 包含在 local checkout 中：`git merge-base --is-ancestor <headRefOid> HEAD` exit 0。这确认 working tree 实际包含 PR head（允许其上叠加 unpushed local fixes），而不是 unrelated same-named branch。
 
-- **`local-aligned`** — all three checks pass. Local Read/Grep/git blame against workspace files are valid for PR changed paths.
-- **`pr-remote`** — any check fails. The working tree is **not** the PR head; workspace file contents for changed paths may be stale or unrelated.
+- **`local-aligned`**：三个 checks 全部 pass。对 workspace files 进行 local Read/Grep/git blame，对 PR changed paths 是 valid 的。
+- **`pr-remote`**：任一 check fails。Working tree **不是** PR head；changed paths 的 workspace file contents 可能 stale 或 unrelated。
 
-**Diff by scope mode** (do not mix remote and local diffs — contradictory hunks cause false positives):
+**按 scope mode 取 diff**（不要混合 remote 和 local diffs：contradictory hunks 会导致 false positives）：
 
-- **`local-aligned`:** Resolve `<resolved-base-ref>` from `baseRefName` (fetch if needed). Compute `BASE=$(git merge-base HEAD <resolved-base-ref>)`, then set `FILES:` from `git diff --name-only $BASE` and `DIFF:` from `git diff -U10 $BASE` (includes committed, staged, and unstaged changes on the PR branch). Do **not** call `gh pr diff` or append remote hunks — when unpushed fixes exist, the local tree is canonical. Note in Coverage: `scope: local-aligned (PR; local tree diff)`.
-- **`pr-remote`:** Set `FILES:` from the PR `files` array. Set `DIFF:` from `gh pr diff <number-or-url> --color=never`. If `gh pr diff` fails, stop with an actionable error — do not fall back to checkout.
+- **`local-aligned`：** 从 `baseRefName` resolve `<resolved-base-ref>`（需要时 fetch）。计算 `BASE=$(git merge-base HEAD <resolved-base-ref>)`，然后从 `git diff --name-only $BASE` 设置 `FILES:`，从 `git diff -U10 $BASE` 设置 `DIFF:`（包含 PR branch 上 committed、staged 和 unstaged changes）。**不要** 调用 `gh pr diff` 或 append remote hunks：当存在 unpushed fixes 时，local tree 是 canonical。在 Coverage 中注明：`scope: local-aligned (PR; local tree diff)`。
+- **`pr-remote`：** 从 PR `files` array 设置 `FILES:`。从 `gh pr diff <number-or-url> --color=never` 设置 `DIFF:`。如果 `gh pr diff` fails，stop 并给出 actionable error：不要 fall back 到 checkout。
 
-When **`pr-remote`**, before Stage 4:
+当 **`pr-remote`** 时，在 Stage 4 前：
 
-1. Best-effort fetch PR head without checkout: `git fetch --no-tags origin <headRefName>:refs/review/pr-<number>-head` (substitute PR number from metadata).
-2. When fetch succeeds, set `PR_HEAD_REF=refs/review/pr-<number>-head` for reviewers and validators. When fetch fails, omit `PR_HEAD_REF` and note in Coverage — reviewers must rely on diff hunks only.
-3. Best-effort fetch the PR base without checkout: `git fetch --no-tags origin <baseRefName>`. When it succeeds, resolve a concrete ref with `git rev-parse FETCH_HEAD` and set `PR_BASE_REF` to that SHA — a **real git base ref** reviewers and validators use for file-level git diffs (e.g. `ce-data-migration-reviewer` runs `git diff <PR_BASE_REF> -- db/schema.rb`/`structure.sql`). The `pr:<number-or-url>` logical marker in `BASE:` stays the scope marker; `PR_BASE_REF` is the diffable base. When the fetch fails, omit `PR_BASE_REF` and note in Coverage — schema-drift and other git-diff checks fall back to diff hunks only and must **not** assume `main`.
-4. Include `<pr-scope-mode>pr-remote</pr-scope-mode>` and, when set, `<pr-head-ref>...</pr-head-ref>` and `<pr-base-ref>...</pr-base-ref>` in the Stage 4 review context bundle.
+1. Best-effort fetch PR head，不 checkout：`git fetch --no-tags origin <headRefName>:refs/review/pr-<number>-head`（从 metadata 替换 PR number）。
+2. Fetch 成功时，为 reviewers 和 validators 设置 `PR_HEAD_REF=refs/review/pr-<number>-head`。Fetch 失败时，省略 `PR_HEAD_REF` 并在 Coverage 中 note：reviewers 必须只依赖 diff hunks。
+3. Best-effort fetch PR base，不 checkout：`git fetch --no-tags origin <baseRefName>`。成功时，用 `git rev-parse FETCH_HEAD` resolve concrete ref，并将 `PR_BASE_REF` 设为该 SHA：这是 reviewers 和 validators 用于 file-level git diffs 的 **real git base ref**（例如 `ce-data-migration-reviewer` 运行 `git diff <PR_BASE_REF> -- db/schema.rb`/`structure.sql`）。`BASE:` 中的 `pr:<number-or-url>` logical marker 保持为 scope marker；`PR_BASE_REF` 是 diffable base。Fetch 失败时，省略 `PR_BASE_REF` 并在 Coverage 中 note：schema-drift 和其它 git-diff checks 只 fallback 到 diff hunks，且 **不得** assume `main`。
+4. 在 Stage 4 review context bundle 中包含 `<pr-scope-mode>pr-remote</pr-scope-mode>`，以及设置时的 `<pr-head-ref>...</pr-head-ref>` 和 `<pr-base-ref>...</pr-base-ref>`。
 
-Reviewers and Stage 5b validators in **`pr-remote`** mode must **not** Read/Grep workspace paths for files in `FILES:`. Inspect via `git show <PR_HEAD_REF>:<path>` when `PR_HEAD_REF` is set, otherwise use only the provided diff hunks. **`local-aligned`** uses normal workspace inspection.
+**`pr-remote`** mode 中的 reviewers 和 Stage 5b validators **不得** Read/Grep `FILES:` 中 files 的 workspace paths。当 `PR_HEAD_REF` 已设置时，通过 `git show <PR_HEAD_REF>:<path>` inspect；否则只使用 provided diff hunks。**`local-aligned`** 使用 normal workspace inspection。
 
-**If a branch name is provided as an argument:**
+**如果 argument 提供了 branch name：**
 
-Substitute the provided branch name as `<branch>`. Do **not** check out `<branch>`.
+将提供的 branch name 代入为 `<branch>`。**不要** checkout `<branch>`。
 
-If `git rev-parse --abbrev-ref HEAD` equals `<branch>`, use the **standalone (current branch)** path below — same tree, explicit branch name; do not use remote-only diff.
+如果 `git rev-parse --abbrev-ref HEAD` 等于 `<branch>`，使用下方 **standalone (current branch)** path：same tree、explicit branch name；不要使用 remote-only diff。
 
-Otherwise diff the remote/local ref **without checkout**:
+否则 **不 checkout**，diff remote/local ref：
 
-1. Try `gh pr view <branch> --json baseRefName,url,headRefName` — if a PR exists, prefer the **PR number/URL path** above (same remote diff rules).
-2. Else resolve `<branch>` as `origin/<branch>` or `<branch>` after `git fetch --no-tags origin <branch>` when needed.
-3. Resolve default base branch (same logic as standalone). Compute `BASE=$(git merge-base <base-ref> <branch-ref>)` and `git diff -U10 $BASE <branch-ref>`.
-4. If `<branch-ref>` cannot be resolved locally, stop: "Cannot diff branch `<branch>` without checkout. Check out that branch, pass its open PR URL/number, or review the current branch with `base:`."
+1. 尝试 `gh pr view <branch> --json baseRefName,url,headRefName`：如果 PR exists，prefer 上方 **PR number/URL path**（same remote diff rules）。
+2. 否则，需要时 `git fetch --no-tags origin <branch>`，然后将 `<branch>` resolve 为 `origin/<branch>` 或 `<branch>`。
+3. Resolve default base branch（与 standalone 相同逻辑）。计算 `BASE=$(git merge-base <base-ref> <branch-ref>)` 和 `git diff -U10 $BASE <branch-ref>`。
+4. 如果 `<branch-ref>` 无法 locally resolve，stop："Cannot diff branch `<branch>` without checkout. Check out that branch, pass its open PR URL/number, or review the current branch with `base:`."
 
-On success for remote branch diff, set **branch-remote scope**. The working tree is **not** `<branch>`. Include `<pr-scope-mode>branch-remote</pr-scope-mode>` and `<branch-head-ref><branch-ref></branch-head-ref>` in the Stage 4 review context bundle. Reviewers and Stage 5b validators must **not** Read/Grep workspace paths for files in `FILES:`. Inspect via `git show <branch-ref>:<path>` or diff hunks only.
+Remote branch diff 成功时，设置 **branch-remote scope**。Working tree **不是** `<branch>`。在 Stage 4 review context bundle 中包含 `<pr-scope-mode>branch-remote</pr-scope-mode>` 和 `<branch-head-ref><branch-ref></branch-head-ref>`。Reviewers 和 Stage 5b validators **不得** Read/Grep `FILES:` 中 files 的 workspace paths。只能通过 `git show <branch-ref>:<path>` 或 diff hunks inspect。
 
-Produce:
+生成：
 
 ```
 echo "BASE:$BASE" && echo "FILES:" && git diff --name-only $BASE <branch-ref> && echo "DIFF:" && git diff -U10 $BASE <branch-ref> && echo "UNTRACKED:" && git ls-files --others --exclude-standard
 ```
 
-**If no argument (standalone on current branch):**
+**如果无 argument（standalone on current branch）：**
 
-Apply the same base-detection logic as branch mode above, using the current branch (i.e., `gh pr view --json baseRefName,url` with no argument defaults to the current branch).
+使用 current branch 应用与上方 branch mode 相同的 base-detection logic（即不带 argument 的 `gh pr view --json baseRefName,url` default 到 current branch）。
 
-If no base can be resolved, **stop**. Do not fall back to `git diff HEAD` — a standalone review without the base would only show uncommitted changes and silently miss all committed work on the branch.
+如果无法 resolve base，**stop**。不要 fall back 到 `git diff HEAD`：没有 base 的 standalone review 只会显示 uncommitted changes，并 silent miss branch 上所有 committed work。
 
-On success, produce the diff:
+成功时，生成 diff：
 
 ```
 echo "BASE:$BASE" && echo "FILES:" && git diff --name-only $BASE && echo "DIFF:" && git diff -U10 $BASE && echo "UNTRACKED:" && git ls-files --others --exclude-standard
 ```
 
-Using `git diff $BASE` (without `..HEAD`) diffs the merge-base against the working tree, which includes committed, staged, and unstaged changes together.
+使用 `git diff $BASE`（不带 `..HEAD`）会将 merge-base 与 working tree diff，包含 committed、staged 和 unstaged changes。
 
-**Untracked file handling:** Always inspect `UNTRACKED:`. Untracked paths are out of scope unless staged. When non-empty, list excluded files in Coverage and continue on tracked changes only — never stop or prompt.
+**Untracked file handling：** 始终 inspect `UNTRACKED:`。Untracked paths 除非 staged，否则 out of scope。非空时，在 Coverage 中列出 excluded files，并只继续 tracked changes：绝不 stop 或 prompt。
 
-### Stage 2: Intent discovery
+### Stage 2：Intent discovery（意图发现）
 
-Understand what the change is trying to accomplish. The source of intent depends on which Stage 1 path was taken:
+理解 change 试图完成什么。Intent source 取决于采用了哪个 Stage 1 path：
 
-**PR/URL mode:** Use the PR title, body, and linked issues from `gh pr view` metadata. Supplement with commit messages from the PR if the body is sparse.
+**PR/URL mode：** 使用 `gh pr view` metadata 中的 PR title、body 和 linked issues。如果 body sparse，用 PR commit messages 补充。
 
-**Branch mode:** Run `git log --oneline ${BASE}..<branch-ref>` using the resolved merge-base and resolved branch ref from Stage 1. Use `<branch-ref>` (the resolved `origin/<branch>` or fetched ref), not the raw `<branch>` argument — a remote-only branch has no matching local ref, so the raw name would fail or read a stale same-named local branch.
+**Branch mode：** 使用 Stage 1 中 resolved merge-base 和 resolved branch ref 运行 `git log --oneline ${BASE}..<branch-ref>`。使用 `<branch-ref>`（resolved `origin/<branch>` 或 fetched ref），不要使用 raw `<branch>` argument：remote-only branch 没有 matching local ref，因此 raw name 会失败或读取 stale same-named local branch。
 
-**Standalone (current branch):** Run:
+**Standalone（current branch）：** 运行：
 
 ```
 echo "BRANCH:" && git rev-parse --abbrev-ref HEAD && echo "COMMITS:" && git log --oneline ${BASE}..HEAD
 ```
 
-Combined with conversation context (plan section summary, PR description), write a 2-3 line intent summary:
+结合 conversation context（plan section summary、PR description），写 2-3 行 intent summary：
 
 ```
 Intent: Simplify tax calculation by replacing the multi-tier rate lookup
 with a flat-rate computation. Must not regress edge cases in tax-exempt handling.
 ```
 
-Pass this to every reviewer in their spawn prompt. Intent shapes *how hard each reviewer looks*, not which reviewers are selected.
+将此传给每个 reviewer 的 spawn prompt。Intent 决定 *每个 reviewer 看得多仔细*，不决定选择哪些 reviewers。
 
-**When intent is ambiguous:** Infer from branch name, commits, PR title/body, diff, `plan:`, and conversation. Write the best-effort intent summary and note uncertainty in Coverage — never block on a clarifying question.
+**当 intent ambiguous 时：** 从 branch name、commits、PR title/body、diff、`plan:` 和 conversation 推断。写 best-effort intent summary，并在 Coverage 中 note uncertainty：绝不因 clarifying question 而 block。
 
-### Stage 2b: Plan discovery (requirements verification)
+### Stage 2b：Plan discovery（requirements verification，需求验证）
 
-Locate the plan document so Stage 6 can verify requirements completeness. Check these sources in priority order — stop at the first hit:
+定位 plan document，让 Stage 6 能 verify requirements completeness。按 priority order 检查这些 sources：命中第一个就停止：
 
-1. **`plan:` argument.** If the caller passed a plan path, use it directly. Read the file to confirm it exists.
-2. **PR body.** If PR metadata was fetched in Stage 1, scan the body for paths matching `docs/plans/*.md`. If exactly one match is found and the file exists, use it as `plan_source: explicit`. If multiple plan paths appear, treat as ambiguous — demote to `plan_source: inferred` for the most recent match that exists on disk, or skip if none exist or none clearly relate to the PR title/intent. Always verify the selected file exists before using it — stale or copied plan links in PR descriptions are common.
-3. **Auto-discover.** Extract 2-3 keywords from the branch name (e.g., `feat/onboarding-skill` -> `onboarding`, `skill`). Glob `docs/plans/*` and filter filenames containing those keywords. If exactly one match, use it. If multiple matches or the match looks ambiguous (e.g., generic keywords like `review`, `fix`, `update` that could hit many plans), **skip auto-discovery** — a wrong plan is worse than no plan. If zero matches, skip.
+1. **`plan:` argument。** 如果 caller 传入 plan path，直接使用它。读取 file 以确认其存在。
+2. **PR body。** 如果 Stage 1 fetch 了 PR metadata，扫描 body 中匹配 `docs/plans/*.md` 的 paths。如果恰好找到一个 match 且 file 存在，将其作为 `plan_source: explicit`。如果出现多个 plan paths，将其视为 ambiguous：对 disk 上存在的最新 match demote 为 `plan_source: inferred`，或在不存在/没有 clearly relate to PR title/intent 时跳过。使用前始终 verify selected file exists：PR descriptions 中 stale 或 copied plan links 很常见。
+3. **Auto-discover。** 从 branch name 提取 2-3 个 keywords（例如 `feat/onboarding-skill` -> `onboarding`、`skill`）。Glob `docs/plans/*`，并 filter 包含这些 keywords 的 filenames。如果恰好一个 match，使用它。如果多个 matches 或 match 看起来 ambiguous（例如 `review`、`fix`、`update` 这类 generic keywords 可能命中很多 plans），**跳过 auto-discovery**：wrong plan 比 no plan 更糟。如果 zero matches，跳过。
 
-**Confidence tagging:** Record how the plan was found:
-- `plan:` argument -> `plan_source: explicit` (high confidence)
-- Single unambiguous PR body match -> `plan_source: explicit` (high confidence)
-- Multiple/ambiguous PR body matches -> `plan_source: inferred` (lower confidence)
-- Auto-discover with single unambiguous match -> `plan_source: inferred` (lower confidence)
+**Confidence tagging：** 记录 plan 是如何找到的：
+- `plan:` argument -> `plan_source: explicit`（high confidence）
+- 单个 unambiguous PR body match -> `plan_source: explicit`（high confidence）
+- 多个或 ambiguous PR body matches -> `plan_source: inferred`（lower confidence）
+- Auto-discover 找到单个 unambiguous match -> `plan_source: inferred`（lower confidence）
 
-If a plan is found, read its **Requirements** section — `## Requirements` in current plans, `## Requirements Trace` in legacy ones — and the R-IDs (R1, R2, etc.) listed there, plus **Implementation Units** (current numeric subsections such as `### U1.`, `### U2.`, or `### Unit 1:` under `## Implementation Units`; legacy bullet or checkbox unit entries under that section also count). Store the extracted requirements list and `plan_source` for Stage 6. Do not block the review if no plan is found — requirements verification is additive, not required.
+如果找到 plan，读取其 **Requirements** section：current plans 中是 `## Requirements`，legacy ones 中是 `## Requirements Trace`；以及其中列出的 R-IDs（R1、R2 等），再读取 **Implementation Units**（`## Implementation Units` 下当前 numeric subsections，如 `### U1.`、`### U2.` 或 `### Unit 1:`；该 section 下 legacy bullet 或 checkbox unit entries 也算）。为 Stage 6 存储 extracted requirements list 和 `plan_source`。如果没有找到 plan，不要 block review：requirements verification 是 additive，不是 required。
 
-### Stage 3: Select reviewers
+### Stage 3：选择 reviewers
 
-Read the diff and file list from Stage 1. The 4 always-on personas and 2 CE always-on agents are automatic. For each cross-cutting and stack-specific conditional persona in the persona catalog included below, decide whether the diff warrants it. This is agent judgment, not keyword matching.
+读取 Stage 1 的 diff 和 file list。4 个 always-on personas 和 2 个 CE always-on agents 自动启用。对下方 persona catalog 中每个 cross-cutting 和 stack-specific conditional persona，判断 diff 是否 warrant 它。这是 agent judgment，不是 keyword matching。
 
-**File-type awareness for conditional selection:** Instruction-prose files (Markdown skill definitions, JSON schemas, config files) are product code but do not benefit from runtime-focused reviewers. The adversarial reviewer's techniques (race conditions, cascade failures, abuse cases) target executable code behavior. For diffs that only change instruction-prose files, skip adversarial unless the prose describes auth, payment, or data-mutation behavior. Count only executable code lines toward line-count thresholds.
+**Conditional selection 的 file-type awareness：** Instruction-prose files（Markdown skill definitions、JSON schemas、config files）是 product code，但 runtime-focused reviewers 对它们收益不大。Adversarial reviewer 的 techniques（race conditions、cascade failures、abuse cases）面向 executable code behavior。只修改 instruction-prose files 的 diffs，除非 prose 描述 auth、payment 或 data-mutation behavior，否则跳过 adversarial。Line-count thresholds 只统计 executable code lines。
 
-**`previous-comments` is PR-only AND comment-gated.** Only select this persona when both conditions hold:
+**`previous-comments` 仅 PR-only 且 comment-gated。** 只有两个条件都成立时才选择此 persona：
 
-1. Stage 1 gathered PR metadata (PR number or URL was provided as an argument, or `gh pr view` returned metadata for the current branch).
-2. `hasPriorComments` from Stage 1 is true (the PR has at least one review submission or issue comment).
+1. Stage 1 收集了 PR metadata（argument 提供了 PR number 或 URL，或 `gh pr view` 为 current branch 返回了 metadata）。
+2. Stage 1 的 `hasPriorComments` 为 true（PR 至少有一个 review submission 或 issue comment）。
 
-Skip it for standalone branch reviews with no associated PR, and skip it for PRs with no prior feedback yet -- there is nothing for the persona to verify, and a spawned subagent that returns empty findings still costs the full subagent startup overhead (persona spec, diff, schema, plus its own gh calls).
+对没有 associated PR 的 standalone branch reviews 跳过它；对还没有 prior feedback 的 PRs 也跳过：没有内容可让 persona verify，而且即使 spawned subagent 返回 empty findings，仍要付出完整 subagent startup overhead（persona spec、diff、schema，加上自己的 gh calls）。
 
-Stack-specific personas are additive when runtime behavior warrants them. A Hotwire UI change may warrant `julik-frontend-races`; a TypeScript API diff may warrant `api-contract` and `reliability`.
+当 runtime behavior warrant 时，stack-specific personas 是 additive。Hotwire UI change 可能 warrant `julik-frontend-races`；TypeScript API diff 可能 warrant `api-contract` 和 `reliability`。
 
-**`data-migration` spawn gate.** Select `ce-data-migration-reviewer` only when the diff includes at least one migration or schema artifact: `db/migrate/*`, `db/schema.rb`, `db/structure.sql`, Alembic/Flyway/Liquibase migration paths, or explicit backfill/data-transform scripts (rake tasks, one-off data migration classes). **Do not spawn** for model-only changes, query-only refactors, serializers/controllers that reference columns without a migration or schema dump in the diff, or migration tests alone.
+**`data-migration` spawn gate。** 只有 diff 至少包含一个 migration 或 schema artifact 时才选择 `ce-data-migration-reviewer`：`db/migrate/*`、`db/schema.rb`、`db/structure.sql`、Alembic/Flyway/Liquibase migration paths，或 explicit backfill/data-transform scripts（rake tasks、one-off data migration classes）。对 model-only changes、query-only refactors、serializers/controllers 中引用 columns 但 diff 中无 migration 或 schema dump、或仅 migration tests 的情况，**不要 spawn**。
 
-For `ce-deployment-verification-agent`, use the same migration-artifact gate when the change is risky (destructive DDL, backfills, NOT NULL without default, column renames/drops).
+对 `ce-deployment-verification-agent`，当 change risky（destructive DDL、backfills、NOT NULL without default、column renames/drops）时，使用相同 migration-artifact gate。
 
-Announce the team before spawning:
+Spawning 前 announce team：
 
 ```
 Review team:
@@ -316,64 +316,64 @@ Review team:
 - ce-deployment-verification-agent -- destructive migration with backfill
 ```
 
-This is progress reporting, not a blocking confirmation.
+这是 progress reporting，不是 blocking confirmation。
 
-### Stage 3b: Discover project standards paths
+### Stage 3b：发现 project standards paths（项目标准路径）
 
-Before spawning sub-agents, find the file paths (not contents) of all relevant standards files for the `project-standards` persona. Use the native file-search/glob tool to locate:
+Spawning sub-agents 前，为 `project-standards` persona 查找所有 relevant standards files 的 file paths（不是 contents）。使用 native file-search/glob tool 定位：
 
-1. Use the native file-search tool (e.g., Glob in Claude Code) to find all `**/CLAUDE.md` and `**/AGENTS.md` in the repo.
-2. Filter to those whose directory is an ancestor of at least one changed file. A standards file governs all files below it (e.g., `plugins/compound-engineering/AGENTS.md` applies to everything under `plugins/compound-engineering/`).
+1. 使用 native file-search tool（例如 Claude Code 中的 Glob）查找 repo 中所有 `**/CLAUDE.md` 和 `**/AGENTS.md`。
+2. Filter 目录是至少一个 changed file ancestor 的 files。Standards file governs 其下所有 files（例如 `plugins/compound-engineering/AGENTS.md` 适用于 `plugins/compound-engineering/` 下所有内容）。
 
-Pass the resulting path list to the `project-standards` persona inside a `<standards-paths>` block in its review context (see Stage 4). The persona reads the files itself, targeting only the sections relevant to the changed file types. This keeps the orchestrator's work cheap (path discovery only) and avoids bloating the subagent prompt with content the reviewer may not fully need.
+将 resulting path list 作为 review context 中 `<standards-paths>` block 传给 `project-standards` persona（见 Stage 4）。Persona 自行读取 files，并只针对 changed file types relevant 的 sections。这让 orchestrator work 保持 cheap（只做 path discovery），也避免用 reviewer 可能不完全需要的 content 膨胀 subagent prompt。
 
-### Stage 4: Spawn sub-agents
+### Stage 4：Spawn sub-agents（派发 sub-agents）
 
-#### Model tiering
+#### Model tiering（模型分层）
 
-Three reviewers inherit the session model with no override: `ce-correctness-reviewer`, `ce-security-reviewer`, and `ce-adversarial-reviewer`. These perform the highest-stakes analysis — logic bugs, security vulnerabilities, adversarial failure scenarios — and should run at whatever capability level the user has configured. If the user is on Opus, these get Opus.
+三个 reviewers 继承 session model 且不 override：`ce-correctness-reviewer`、`ce-security-reviewer` 和 `ce-adversarial-reviewer`。它们执行 highest-stakes analysis：logic bugs、security vulnerabilities、adversarial failure scenarios，应以用户配置的 capability level 运行。如果用户在用 Opus，它们也使用 Opus。
 
-All other persona sub-agents and CE agents use the platform's mid-tier model to reduce cost and latency. See the Spawning subsection below for the exact dispatch-time override.
+所有其它 persona sub-agents 和 CE agents 使用平台 mid-tier model，以降低 cost 和 latency。具体 dispatch-time override 见下方 Spawning subsection。
 
-The orchestrator (this skill) also inherits the session model; it handles intent discovery, reviewer selection, finding merge/dedup, and synthesis.
+Orchestrator（此 skill）也继承 session model；它处理 intent discovery、reviewer selection、finding merge/dedup 和 synthesis。
 
-#### Run ID
+#### Run ID（运行 ID）
 
-Generate a unique run identifier before dispatching any agents. This ID scopes all agent artifact files and the post-review run artifact to the same directory.
+Dispatching any agents 前，生成 unique run identifier。此 ID 将所有 agent artifact files 和 post-review run artifact scope 到同一 directory。
 
 ```bash
 RUN_ID=$(date +%Y%m%d-%H%M%S)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' ')
 mkdir -p "/tmp/compound-engineering/ce-code-review/$RUN_ID"
 ```
 
-Pass `{run_id}` to every persona sub-agent so they can write their full analysis to `/tmp/compound-engineering/ce-code-review/{run_id}/{reviewer_name}.json`.
+将 `{run_id}` 传给每个 persona sub-agent，让它们可将 full analysis 写入 `/tmp/compound-engineering/ce-code-review/{run_id}/{reviewer_name}.json`。
 
-**Large shared context — pass paths, not contents.** The diff and file list go to every reviewer and validator. When inlining them into each subagent prompt would be wasteful (many files / a big diff), write them once into the run dir (e.g. `full.diff`, `files.txt`) and pass those **paths** in the diff / changed-files slots instead of inline content — the subagent and validator templates instruct the child to Read a staged path. Inline a small diff directly.
+**Large shared context：传 paths，不传 contents。** Diff 和 file list 会传给每个 reviewer 和 validator。当把它们 inline 到每个 subagent prompt 会造成浪费（many files / big diff）时，将它们一次性写入 run dir（例如 `full.diff`、`files.txt`），然后在 diff / changed-files slots 中传这些 **paths**，而不是 inline content：subagent 和 validator templates 会指示 child Read staged path。Small diff 直接 inline。
 
-#### Spawning
+#### Spawning（派发）
 
-Omit the `mode` parameter when dispatching sub-agents so the user's configured permission settings apply. Do not pass `mode: "auto"`.
+Dispatching sub-agents 时省略 `mode` 参数，让用户配置的 permission settings 生效。不要传 `mode: "auto"`。
 
-**Model override at dispatch time.** Pass the platform's mid-tier model on every dispatch except `ce-correctness-reviewer`, `ce-security-reviewer`, and `ce-adversarial-reviewer`, which inherit the session model (per the Model tiering subsection above). In Claude Code, add `model: "sonnet"` to the `Agent` tool call. In Codex, pass the equivalent mid-tier on `spawn_agent` (e.g., `gpt-5.4-mini` as of April 2026). In Pi, pass the equivalent on `subagent` via the `pi-subagents` extension. On platforms where the dispatch primitive has no model-override parameter or the available model names are unknown, omit the override — a working review on the parent model beats a broken dispatch on an unrecognized name. Check this on every Agent / `spawn_agent` / `subagent` call in the parallel dispatch; omitting it on Opus sessions silently 3-4x's the cost of a review.
+**Dispatch time 的 model override。** 除 `ce-correctness-reviewer`、`ce-security-reviewer` 和 `ce-adversarial-reviewer` 外，每次 dispatch 都传平台 mid-tier model；这三者按上方 Model tiering subsection 继承 session model。Claude Code 中，在 `Agent` tool call 加 `model: "sonnet"`。Codex 中，在 `spawn_agent` 上传 equivalent mid-tier（例如 2026 年 4 月时的 `gpt-5.4-mini`）。Pi 中，通过 `pi-subagents` extension 在 `subagent` 上传 equivalent。如果平台 dispatch primitive 没有 model-override parameter，或 available model names 未知，省略 override：使用 parent model 的 working review 胜过 unrecognized name 导致 broken dispatch。Parallel dispatch 中每个 Agent / `spawn_agent` / `subagent` call 都要检查这一点；Opus sessions 中省略它会 silently 让 review cost 变成 3-4 倍。
 
-**Bounded parallel dispatch.** Respect the current harness's active-subagent limit. Queue selected reviewers, dispatch only as many as the harness accepts, and fill freed slots as reviewers complete. Treat active-agent/thread/concurrency-limit spawn errors as backpressure, not reviewer failure: leave the reviewer queued and retry after a slot frees. Record a reviewer as failed only after a successful dispatch times out/fails, or when dispatch fails for a non-capacity reason.
+**Bounded parallel dispatch。** 尊重 current harness 的 active-subagent limit。Queue selected reviewers，只 dispatch harness 接受的数量，并在 reviewers 完成时填充 freed slots。将 active-agent/thread/concurrency-limit spawn errors 视为 backpressure，而不是 reviewer failure：保留 reviewer queued，并在 slot frees 后 retry。只有 successful dispatch 后 timeout/fails，或 dispatch 因 non-capacity reason 失败时，才 record reviewer as failed。
 
-Spawn each selected persona reviewer using the subagent template included below. Each persona sub-agent receives:
+使用下方 included subagent template spawn 每个 selected persona reviewer。每个 persona sub-agent receives：
 
-1. Their persona file content (identity, failure modes, calibration, suppress conditions)
-2. Shared diff-scope rules from the diff-scope reference included below
-3. The JSON output contract from the findings schema included below
-4. PR metadata: title, body, and URL when reviewing a PR (empty string otherwise). Passed in a `<pr-context>` block so reviewers can verify code against stated intent
-5. Review context: intent summary, file list, diff, scope mode (`local-aligned` | `pr-remote` | `branch-remote`), and remote head ref (`PR_HEAD_REF` or `<branch-head-ref>`) when set
-6. Run ID and reviewer name for the artifact file path
-7. **For `project-standards` only:** the standards file path list from Stage 3b, wrapped in a `<standards-paths>` block appended to the review context
-8. **For `data-migration` only:** the resolved review base ref from Stage 1 (`BASE:` marker), wrapped in `<review-base>` inside the review context so schema drift checks never assume `main`
+1. 它们的 persona file content（identity、failure modes、calibration、suppress conditions）
+2. 下方 diff-scope reference 中的 shared diff-scope rules
+3. 下方 findings schema 中的 JSON output contract
+4. PR metadata：reviewing PR 时的 title、body 和 URL（否则为空 string）。放在 `<pr-context>` block 中，让 reviewers 可根据 stated intent verify code
+5. Review context：intent summary、file list、diff、scope mode（`local-aligned` | `pr-remote` | `branch-remote`），以及设置时的 remote head ref（`PR_HEAD_REF` 或 `<branch-head-ref>`）
+6. Artifact file path 用的 Run ID 和 reviewer name
+7. **仅 `project-standards`：** Stage 3b 的 standards file path list，包裹在 append 到 review context 的 `<standards-paths>` block 中
+8. **仅 `data-migration`：** Stage 1 的 resolved review base ref（`BASE:` marker），包裹在 review context 内的 `<review-base>` 中，让 schema drift checks 绝不 assume `main`
 
-Persona sub-agents are **read-only** with respect to the project: they review and return structured JSON. They do not edit project files or propose refactors. The one permitted write is saving their full analysis to the run-artifact path specified in the output contract (under `/tmp/compound-engineering/ce-code-review/<run-id>/`).
+Persona sub-agents 对 project 是 **read-only**：它们 review 并返回 structured JSON。它们不 edit project files，也不 propose refactors。唯一 permitted write 是将 full analysis 保存到 output contract 指定的 run-artifact path（`/tmp/compound-engineering/ce-code-review/<run-id>/` 下）。
 
-Read-only here means **non-mutating**, not "no shell access." Reviewer sub-agents may use non-mutating inspection commands when needed to gather evidence or verify scope, including read-oriented `git` / `gh` usage such as `git diff`, `git show`, `git blame`, `git log`, and `gh pr view`. In **`pr-remote`** or **`branch-remote`** scope (see Stage 1), inspect changed files via `git show <remote-head-ref>:<path>` or diff hunks — do not Read/Grep workspace paths for files in scope. They must not edit project files, change branches, commit, push, create PRs, or otherwise mutate the checkout or repository state.
+这里的 read-only 表示 **non-mutating**，不是 "no shell access."。Reviewer sub-agents 可在需要 gather evidence 或 verify scope 时使用 non-mutating inspection commands，包括 read-oriented `git` / `gh` usage，如 `git diff`、`git show`、`git blame`、`git log` 和 `gh pr view`。在 **`pr-remote`** 或 **`branch-remote`** scope 中（见 Stage 1），通过 `git show <remote-head-ref>:<path>` 或 diff hunks inspect changed files：不要 Read/Grep scope 内 files 的 workspace paths。它们不得 edit project files、change branches、commit、push、create PRs，或以其它方式 mutate checkout 或 repository state。
 
-Each persona sub-agent writes full JSON (all schema fields) to `/tmp/compound-engineering/ce-code-review/{run_id}/{reviewer_name}.json` and returns compact JSON with merge-tier fields only:
+每个 persona sub-agent 将 full JSON（all schema fields）写入 `/tmp/compound-engineering/ce-code-review/{run_id}/{reviewer_name}.json`，并只返回带 merge-tier fields 的 compact JSON：
 
 ```json
 {
@@ -397,156 +397,156 @@ Each persona sub-agent writes full JSON (all schema fields) to `/tmp/compound-en
 }
 ```
 
-The artifact file **must** carry the detail-tier fields (`why_it_matters`, `evidence`); the compact *return* omits them, but writing the compact shape to the artifact (a common reviewer slip) silently strips the detail Coverage and the keyed detail lines depend on. However review context is delivered — inlined, or staged to disk for a large diff — each reviewer still receives the full subagent-template output contract; staging context never licenses a thinner one. `suggested_fix` is optional in both tiers -- included in compact returns when present so callers can apply fixes after review. If the file write fails, the compact return still provides everything the merge needs.
+Artifact file **必须** 携带 detail-tier fields（`why_it_matters`、`evidence`）；compact *return* 会省略它们，但把 compact shape 写入 artifact（常见 reviewer slip）会 silently strip detail，而 Coverage 和 keyed detail lines 依赖这些字段。无论 review context 是 inlined，还是因 large diff staged to disk，每个 reviewer 仍收到完整 subagent-template output contract；staging context 从不授权更薄的 contract。`suggested_fix` 在两种 tiers 中都是 optional：present 时包含在 compact returns 中，方便 callers 在 review 后 apply fixes。如果 file write fails，compact return 仍提供 merge 所需的一切。
 
-**CE always-on agents** (ce-agent-native-reviewer, ce-learnings-researcher) are dispatched as standard Agent calls through the same bounded parallel scheduler as the persona agents. Give them the same review context bundle the personas receive: entry mode, any PR metadata gathered in Stage 1, intent summary, review base branch name when known, `BASE:` marker, file list, diff, and `UNTRACKED:` scope notes. Do not invoke them with a generic "review this" prompt. Their output is unstructured and synthesized separately in Stage 6.
+**CE always-on agents**（ce-agent-native-reviewer、ce-learnings-researcher）通过与 persona agents 相同的 bounded parallel scheduler 作为 standard Agent calls dispatch。给它们与 personas 相同的 review context bundle：entry mode、Stage 1 收集的任何 PR metadata、intent summary、已知时的 review base branch name、`BASE:` marker、file list、diff 和 `UNTRACKED:` scope notes。不要用 generic "review this" prompt 调用它们。它们的 output 是 unstructured，并在 Stage 6 单独 synthesized。
 
-**CE conditional agents** (`ce-deployment-verification-agent` only) are dispatched as standard Agent calls through the same bounded parallel scheduler when the migration-artifact gate applies. Pass the same review context bundle plus the applicability reason (for example, which migration files triggered the agent). Their output is unstructured and must be preserved for Stage 6 synthesis just like the CE always-on agents. Schema drift is handled by the `data-migration` persona as structured findings — not here.
+**CE conditional agents**（仅 `ce-deployment-verification-agent`）在 migration-artifact gate 适用时，通过相同 bounded parallel scheduler 作为 standard Agent calls dispatch。传入相同 review context bundle，加上 applicability reason（例如哪些 migration files 触发了 agent）。它们的 output 是 unstructured，必须像 CE always-on agents 一样为 Stage 6 synthesis 保留。Schema drift 由 `data-migration` persona 作为 structured findings 处理：不是这里。
 
-### Stage 5: Merge findings
+### Stage 5：合并 findings
 
-Convert multiple reviewer compact JSON returns into one deduplicated, confidence-gated finding set. The compact returns contain merge-tier fields (title, severity, file, line, confidence, autofix_class, owner, requires_verification, pre_existing) plus the optional suggested_fix. Detail-tier fields (why_it_matters, evidence) are on disk in the per-agent artifact files and are not loaded at this stage.
+将多个 reviewer compact JSON returns 转换成一个 deduplicated、confidence-gated finding set。Compact returns 包含 merge-tier fields（title、severity、file、line、confidence、autofix_class、owner、requires_verification、pre_existing），以及 optional suggested_fix。Detail-tier fields（why_it_matters、evidence）位于 disk 上的 per-agent artifact files，此 stage 不加载。
 
-`confidence` is one of 5 discrete anchors (`0`, `25`, `50`, `75`, `100`) with behavioral definitions in the findings schema. Synthesis treats anchors as integers; do not coerce to floats.
+`confidence` 是 5 个 discrete anchors（`0`、`25`、`50`、`75`、`100`）之一，behavioral definitions 位于 findings schema。Synthesis 将 anchors 视为 integers；不要 coerce to floats。
 
-1. **Validate.** Check each compact return for required top-level and per-finding fields, plus value constraints. Drop malformed returns or findings. Record the drop count.
-   - **Top-level required:** reviewer (string), findings (array), residual_risks (array), testing_gaps (array). Drop the entire return if any are missing or wrong type.
-   - **Per-finding required:** title, severity, file, line, confidence, autofix_class, owner, requires_verification, pre_existing
-   - **Value constraints:**
-     - severity: P0 | P1 | P2 | P3
-     - autofix_class: gated_auto | manual | advisory
-     - owner: downstream-resolver | human | release
-     - confidence: integer in {0, 25, 50, 75, 100}
-     - line: positive integer
-     - pre_existing, requires_verification: boolean
-   - Do not validate against the full schema here -- the full schema (including why_it_matters and evidence) applies to the artifact files on disk, not the compact returns.
-2. **Deduplicate.** Compute fingerprint: `normalize(file) + line_bucket(line, +/-3) + normalize(title)`. When fingerprints match, merge: keep highest severity, keep highest anchor, note which reviewers flagged it. Dedup runs over the full validated set (including anchor 50) so cross-reviewer promotion in step 3 can lift matching anchor-50 findings into the actionable tier.
-3. **Cross-reviewer agreement.** When 2+ independent reviewers flag the same issue (same fingerprint), promote the merged finding by one anchor step: `50 -> 75`, `75 -> 100`, `100 -> 100`. Note the agreement in the Reviewer column of the output (e.g., "security, correctness").
-4. **Separate pre-existing.** Pull out findings with `pre_existing: true` into a separate list.
-5. **Resolve disagreements.** When reviewers flag the same code region but disagree on severity, autofix_class, or owner, annotate the Reviewer column with the disagreement (e.g., "security (P0), correctness (P1) -- kept P0").
-6. **Normalize routing.** For each merged finding, set the final `autofix_class`, `owner`, and `requires_verification`. If reviewers disagree, keep the more conservative route. Remap any legacy `safe_auto` or `review-fixer` to `gated_auto` / `downstream-resolver`.
-6b. **Mode-aware demotion of weak general-quality findings.** Some persona output is real signal but does not warrant primary-findings attention. Reroute it to the existing soft buckets so the primary findings table stays focused on actionable issues.
+1. **Validate.** 检查每个 compact return 的 required top-level 和 per-finding fields，以及 value constraints。Drop malformed returns 或 findings。Record drop count。
+   - **Top-level required：** reviewer（string）、findings（array）、residual_risks（array）、testing_gaps（array）。任何缺失或 type 错误时，drop entire return。
+   - **每个 finding 必需：** title、severity、file、line、confidence、autofix_class、owner、requires_verification、pre_existing
+   - **Value constraints（值约束）：**
+     - severity：P0 | P1 | P2 | P3（严重级别枚举）
+     - autofix_class：gated_auto | manual | advisory（修复路由枚举）
+     - owner：downstream-resolver | human | release（负责人枚举）
+     - confidence：integer in {0, 25, 50, 75, 100}（整数锚点）
+     - line：positive integer（正整数）
+     - pre_existing、requires_verification：boolean
+   - 此处不要 validate against full schema：full schema（包括 why_it_matters 和 evidence）适用于 disk 上的 artifact files，不适用于 compact returns。
+2. **Deduplicate.** 计算 fingerprint：`normalize(file) + line_bucket(line, +/-3) + normalize(title)`。Fingerprints match 时 merge：保留 highest severity、highest anchor，并记录哪些 reviewers flagged it。Dedup 覆盖 full validated set（包括 anchor 50），让 step 3 的 cross-reviewer promotion 可将 matching anchor-50 findings 提升到 actionable tier。
+3. **Cross-reviewer agreement.** 当 2+ independent reviewers flag same issue（same fingerprint）时，将 merged finding promote one anchor step：`50 -> 75`、`75 -> 100`、`100 -> 100`。在 output 的 Reviewer column 中 note agreement（例如 "security, correctness"）。
+4. **Separate pre-existing.** 将 `pre_existing: true` 的 findings pull out 到 separate list。
+5. **Resolve disagreements.** 当 reviewers flag same code region 但在 severity、autofix_class 或 owner 上 disagree 时，在 Reviewer column 中 annotate disagreement（例如 "security (P0), correctness (P1) -- kept P0"）。
+6. **Normalize routing.** 对每个 merged finding，设置 final `autofix_class`、`owner` 和 `requires_verification`。如果 reviewers disagree，保留 more conservative route。将任何 legacy `safe_auto` 或 `review-fixer` remap 为 `gated_auto` / `downstream-resolver`。
+6b. **Mode-aware demotion of weak general-quality findings.** 某些 persona output 是 real signal，但不 warrant primary-findings attention。将其 reroute 到 existing soft buckets，让 primary findings table 聚焦 actionable issues。
 
-A finding qualifies for demotion when **all** of these hold:
-   - Severity is P2 or P3 (P0 and P1 always stay in primary findings)
-   - `autofix_class` is `advisory` (concrete-fix findings stay in primary)
-   - **All** contributing reviewers are `testing` or `maintainability` — if any other persona also flagged this finding, cross-reviewer corroboration is present and the finding stays in primary findings regardless of its severity or advisory status (expand the weak-signal list later only with evidence)
+Finding 只有在以下条件 **全部** 成立时才 qualifies for demotion：
+   - Severity 是 P2 或 P3（P0 和 P1 始终保留在 primary findings）
+   - `autofix_class` 是 `advisory`（concrete-fix findings 保留在 primary）
+   - **所有** contributing reviewers 都是 `testing` 或 `maintainability`：如果任何其它 persona 也 flagged 此 finding，则存在 cross-reviewer corroboration，该 finding 无论 severity 或 advisory status 如何都保留在 primary findings（以后只有基于 evidence 才扩展 weak-signal list）
 
-When a finding qualifies:
-   - Move demoted findings out of the primary set. If the contributing reviewer is `testing`, append `<file:line> -- <title>` to `testing_gaps`. If `maintainability`, append to `residual_risks`. Use title-only lines (compact return omits `why_it_matters`). Record the demotion count for Coverage.
+当 finding qualifies：
+   - 将 demoted findings 移出 primary set。如果 contributing reviewer 是 `testing`，向 `testing_gaps` append `<file:line> -- <title>`。如果是 `maintainability`，append 到 `residual_risks`。使用 title-only lines（compact return 省略 `why_it_matters`）。为 Coverage record demotion count。
 
-7. **Confidence gate.** After dedup, promotion, and demotion have shaped the primary set, suppress remaining findings below anchor 75. Exception: P0 findings at anchor 50+ survive the gate -- critical-but-uncertain issues must not be silently dropped. Record the suppressed count by anchor (so Coverage can report "N findings suppressed at anchor 50, M at anchor 25"). The gate runs late deliberately: anchor-50 findings need a chance to be promoted by step 3 (cross-reviewer corroboration) or rerouted by step 6b (mode-aware demotion to soft buckets) before any drop decision.
-8. **Partition the work.** Build two sets:
-   - actionable queue: `gated_auto` or `manual` findings whose owner is `downstream-resolver` (hand off to caller)
-   - report-only queue: `advisory` findings plus anything owned by `human` or `release`
-9. **Sort and number.** Order by severity (P0 first) -> anchor (descending) -> file path -> line number, then assign monotonically increasing `#` values across the full primary finding set in that sorted order. Do not restart numbering inside each severity table or autofix/routing bucket. If later sections repeat a finding (for example Actionable Findings), reuse the same stable `#` so users and downstream workflows can reference findings by `#` across the report and caller handoff.
-10. **Collect coverage data.** Union residual_risks and testing_gaps across reviewers.
-11. **Preserve CE agent artifacts.** Keep the learnings, agent-native, and deployment-verification outputs alongside the merged finding set. Do not drop unstructured agent output just because it does not match the persona JSON schema. Schema drift from `data-migration` is already in the merged finding set.
+7. **Confidence gate.** Dedup、promotion 和 demotion 塑造 primary set 后，suppress anchor 75 以下的 remaining findings。Exception：anchor 50+ 的 P0 findings survive the gate：critical-but-uncertain issues 不得 silent drop。按 anchor record suppressed count（让 Coverage 可 report "N findings suppressed at anchor 50, M at anchor 25"）。Gate 故意 late run：anchor-50 findings 需要机会在 any drop decision 前被 step 3 promote（cross-reviewer corroboration）或被 step 6b rerouted（mode-aware demotion to soft buckets）。
+8. **Partition the work.** 构建两个 sets：
+   - actionable queue：owner 为 `downstream-resolver` 的 `gated_auto` 或 `manual` findings（hand off to caller）
+   - report-only queue：`advisory` findings，加上任何 owned by `human` 或 `release` 的内容
+9. **Sort and number.** 按 severity（P0 first）-> anchor（descending）-> file path -> line number 排序，然后在 full primary finding set 中按该 sorted order 分配 monotonically increasing `#` values。不要在每个 severity table 或 autofix/routing bucket 内 restart numbering。如果 later sections repeat finding（例如 Actionable Findings），reuse same stable `#`，让 users 和 downstream workflows 可在 report 和 caller handoff 中通过 `#` reference findings。
+10. **Collect coverage data.** Union reviewers 的 residual_risks 和 testing_gaps。
+11. **Preserve CE agent artifacts.** 将 learnings、agent-native 和 deployment-verification outputs 与 merged finding set 一起保留。不要因为 unstructured agent output 不匹配 persona JSON schema 就 drop。来自 `data-migration` 的 schema drift 已在 merged finding set 中。
 
-### Stage 5b: Validation pass (optional quality gate)
+### Stage 5b：Validation pass（可选 quality gate，质量门）
 
-Independent verification gate. Spawn one validator sub-agent per surviving finding using `references/validator-template.md`. Findings the validator rejects are dropped; confirmed findings flow through unchanged.
+Independent verification gate。使用 `references/validator-template.md`，为每个 surviving finding spawn 一个 validator sub-agent。Validator reject 的 findings 会被 dropped；confirmed findings 原样 flow through。
 
-**When this stage runs:** After Stage 5 whenever at least one finding survives — skip only when zero survive. When more than 15 survive, do **not** skip the stage; validate per the budget cap in step 2. The default method is the per-finding validator wave (steps below); a surviving **P2/P3 finding at anchor 100** may instead be validated by direct first-party verification (see below). Same rule for default and `mode:agent`.
+**此 stage 何时运行：** Stage 5 后只要至少一个 finding survives 就运行；只有 zero survive 时才跳过。超过 15 个 survives 时，**不要** 跳过此 stage；按 step 2 中的 budget cap validate。Default method 是 per-finding validator wave（下方 steps）；surviving **P2/P3 finding at anchor 100** 可改用 direct first-party verification（见下方）。Default 和 `mode:agent` 使用相同规则。
 
-**Steps:**
+**步骤：**
 
-1. **Select findings to validate.** All survivors of Stage 5.
-2. **Apply dispatch budget cap.** If the selected set exceeds 15 findings, validate the highest-severity 15 (P0 first, then P1, then P2, then P3, breaking ties by anchor descending), dropping only from the P2/P3 tail. **Never drop a P0 or P1 from validation** — if P0/P1 findings alone exceed 15, raise the cap to include all of them. Record the over-budget count (the dropped P2/P3 tail) for the Coverage section.
-3. **Spawn validators with bounded parallelism.** One sub-agent per finding, dispatched independently using the validator template and the same bounded scheduler from Stage 4. Each validator receives:
-   - The finding's title, severity, file, line, suggested_fix, original reviewer name, and confidence anchor
-   - `why_it_matters` when available — loaded from the per-agent artifact file at `/tmp/compound-engineering/ce-code-review/{run_id}/{reviewer_name}.json`; omit when the file is absent or the artifact write failed. The validator proceeds without it, using the diff and cited code directly.
-   - The full diff
-   - The scope mode and remote head ref, mirroring the Stage 4 reviewer bundle: inject `<pr-scope-mode>local-aligned | pr-remote | branch-remote</pr-scope-mode>` and, when set, `<pr-head-ref>...</pr-head-ref>` or `<branch-head-ref>...</branch-head-ref>`. The validator template defaults to local-aligned workspace inspection when these are absent, so omitting them in `pr-remote`/`branch-remote` makes validators verify findings against the stale working tree — dropping valid findings or confirming false ones on the wrong tree.
-   - Inspection access scoped by mode: in `local-aligned`, Read/Grep/git blame the cited code, callers, guards, framework defaults, and history; in `pr-remote`/`branch-remote`, inspect via `git show <remote-head-ref>:<path>` or the provided diff hunks only — do not Read/Grep workspace paths for files in scope.
-4. **Collect verdicts.** Each validator returns `{ "validated": true | false, "reason": "<one sentence>" }`.
-   - `validated: true` -> finding survives unchanged into Stage 6
-   - `validated: false` -> finding is dropped; record the validator's reason in Coverage
-   - Validator **infrastructure** failure (timeout, dispatch error, malformed JSON — not a `validated:false` verdict): for **P2/P3**, drop the finding with reason "validator failed" (conservative bias). For **P0/P1**, do **not** drop on infra failure — keep the finding and mark its validation **degraded** (note in Coverage). A transient validator failure must never silently remove a critical/high finding; a genuine `validated:false` rejection above still drops at any severity.
-5. **Use mid-tier model for validators.** Same model class (sonnet) the persona reviewers use. Validators are read-only — same constraints as persona reviewers. They may use non-mutating inspection commands (Read, Grep, Glob, git blame, gh).
-6. **Record metrics for Coverage.** Total dispatched, validated true count, validated false count (with reasons), infra failures (and any P0/P1 kept-on-failure as degraded), and over-budget drops.
+1. **Select findings to validate（选择待验证 findings）。** Stage 5 的所有 survivors。
+2. **Apply dispatch budget cap（应用 dispatch 预算上限）。** 如果 selected set 超过 15 findings，validate highest-severity 15（P0 first，然后 P1、P2、P3，ties 按 anchor descending 打破），只从 P2/P3 tail drop。**绝不要从 validation 中 drop P0 或 P1**：如果仅 P0/P1 findings 就超过 15，raise cap 以包含它们全部。为 Coverage section record over-budget count（dropped P2/P3 tail）。
+3. **Spawn validators with bounded parallelism（以有界并行启动 validators）。** 每个 finding 一个 sub-agent，使用 validator template 和 Stage 4 的 same bounded scheduler 独立 dispatch。每个 validator receives：
+   - Finding 的 title、severity、file、line、suggested_fix、original reviewer name 和 confidence anchor
+   - 可用时的 `why_it_matters`：从 `/tmp/compound-engineering/ce-code-review/{run_id}/{reviewer_name}.json` 的 per-agent artifact file 加载；file absent 或 artifact write failed 时省略。Validator 没有它也继续，直接使用 diff 和 cited code。
+   - Full diff（完整 diff）
+   - Scope mode 和 remote head ref，mirror Stage 4 reviewer bundle：注入 `<pr-scope-mode>local-aligned | pr-remote | branch-remote</pr-scope-mode>`，以及设置时的 `<pr-head-ref>...</pr-head-ref>` 或 `<branch-head-ref>...</branch-head-ref>`。这些 absent 时 validator template default 到 local-aligned workspace inspection，因此在 `pr-remote`/`branch-remote` 中省略它们会让 validators 对 stale working tree verify findings：drop valid findings 或在 wrong tree 上 confirm false ones。
+   - 按 mode scoped 的 inspection access：在 `local-aligned` 中，Read/Grep/git blame cited code、callers、guards、framework defaults 和 history；在 `pr-remote`/`branch-remote` 中，只通过 `git show <remote-head-ref>:<path>` 或 provided diff hunks inspect：不要 Read/Grep scope 内 files 的 workspace paths。
+4. **Collect verdicts（收集判定）。** 每个 validator 返回 `{ "validated": true | false, "reason": "<one sentence>" }`。
+   - `validated: true` -> finding 不变，survive into Stage 6
+   - `validated: false` -> finding dropped；在 Coverage 中 record validator reason
+   - Validator **infrastructure** failure（timeout、dispatch error、malformed JSON：不是 `validated:false` verdict）：对 **P2/P3**，以 "validator failed" 为 reason drop finding（conservative bias）。对 **P0/P1**，infra failure 时 **不要** drop：keep finding 并将 validation 标为 **degraded**（在 Coverage 中 note）。Transient validator failure 绝不能 silently remove critical/high finding；上方 genuine `validated:false` rejection 仍会在任何 severity drop。
+5. **Use mid-tier model for validators（validators 使用中档模型）。** 与 persona reviewers 使用相同 model class（sonnet）。Validators read-only，constraints 与 persona reviewers 相同。它们可使用 non-mutating inspection commands（Read、Grep、Glob、git blame、gh）。
+6. **Record metrics for Coverage（记录 Coverage 指标）。** Total dispatched、validated true count、validated false count（带 reasons）、infra failures（以及任何 P0/P1 kept-on-failure as degraded）、over-budget drops。
 
-**Orchestrator direct verification.** When a finding hinges on a fact the orchestrator can check cheaply and authoritatively — a pinned dependency's source, a wiring/config fact in this repo, a build tag — verify it directly with single-purpose native tools (Read/Grep/Glob, one git command at a time), never chained or error-suppressed shell. Fold confirmed facts into synthesis. Whether it can *replace* the independent validator turns on a single distinction: the orchestrator is **not** an independent second opinion (it synthesized these findings), so direct verification catches a wrong **fact** but not the orchestrator's own **bias**. Independence adds nothing to a mechanically-checkable fact and everything to a judgment call:
+**Orchestrator direct verification.** 当 finding 依赖 orchestrator 可 cheaply 且 authoritatively 检查的 fact：pinned dependency source、repo 中 wiring/config fact、build tag，直接用 single-purpose native tools（Read/Grep/Glob、一次一个 git command）verify，绝不使用 chained 或 error-suppressed shell。将 confirmed facts fold into synthesis。它是否可 *replace* independent validator 取决于一个 distinction：orchestrator **不是** independent second opinion（它 synthesized 这些 findings），因此 direct verification 能捕获 wrong **fact**，但不能捕获 orchestrator 自身 **bias**。Independence 对 mechanically-checkable fact 没有增益，但对 judgment call 至关重要：
 
-- **P0/P1, any anchor:** the per-finding validator wave is **required**; direct verification only *complements* it, never replaces it.
-- **P2/P3 at anchor 100** (verifiable from code alone — compile/type error, definitive logic bug, quotable standards violation, no interpretation): direct verification **may stand in for** the wave; note the method in Coverage.
-- **P2/P3 at anchor 75** (judgment call — "will affect users," not airtight): the independent wave is **required** — this is exactly where a fresh second opinion filters false positives, and the orchestrator cannot supply that for its own findings.
+- **P0/P1, any anchor：** per-finding validator wave **required**；direct verification 只 *complements* 它，绝不 replace 它。
+- **P2/P3 at anchor 100**（仅从 code 即可 verify：compile/type error、definitive logic bug、quotable standards violation、无 interpretation）：direct verification **may stand in for** wave；在 Coverage 中 note method。
+- **P2/P3 at anchor 75**（judgment call："will affect users"，不是 airtight）：independent wave **required**：这里正是 fresh second opinion 过滤 false positives 的地方，orchestrator 无法为自己的 findings 提供这一点。
 
-**Why per-finding bounded dispatch (not batched):** Independence is the point. A single batched validator looking at all findings together pattern-matches across them and recreates the persona-bias problem. Per-finding dispatch preserves fresh context while the scheduler respects harness limits.
+**为什么 per-finding bounded dispatch（而不是 batched）：** Independence 才是重点。单个 batched validator 同时看所有 findings，会在它们之间 pattern-match，并重建 persona-bias problem。Per-finding dispatch 保留 fresh context，同时 scheduler 尊重 harness limits。
 
-### Stage 5c: Act on findings (default mode only)
+### Stage 5c：Act on findings（仅 default mode，处理 findings）
 
-**Skip entirely in `mode:agent`** — that mode is a machine handoff and the caller owns apply. In default (interactive) mode the review is the top-level agent, so it applies the fixes it is confident in before presenting the report.
+**在 `mode:agent` 中完全跳过**：该 mode 是 machine handoff，由 caller owns apply。Default（interactive）mode 中，review 是 top-level agent，因此在 presenting report 前 apply 它有信心的 fixes。
 
-**Act policy (bias to act).** Default to applying every finding that is a clear improvement and a reversible edit, regardless of severity. The work is a tracked, visible diff that can be reverted — so leaving a clean fix unapplied "to be safe" is the failure mode, not the safe choice. Decide by judgment, not a safety checklist:
+**Act policy（bias to act）。** 默认 apply 每个 clear improvement 且 reversible edit 的 finding，不论 severity。Work 是 tracked、visible diff，可 reverted，因此为了 "to be safe" 而留下 clean fix unapplied 才是 failure mode，不是 safe choice。用 judgment 决定，而不是 safety checklist：
 
-- **Apply** clear improvements — the common case (test hardening, dead-code removal, a localized fix with a concrete `suggested_fix`).
-- **Push back** — do not apply — when the reviewer is wrong; keep the finding and state the disagreement with reasoning.
-- **Skip with judgment** taste calls and conflicting suggestions, but surface what was skipped and why. Never silently drop.
+- **Apply** clear improvements：常见情况（test hardening、dead-code removal、带 concrete `suggested_fix` 的 localized fix）。
+- **Push back**：当 reviewer wrong 时，不 apply；保留 finding 并用 reasoning state disagreement。
+- **Skip with judgment** taste calls 和 conflicting suggestions，但 surface skipped 内容和原因。绝不 silently drop。
 
-Severity, confidence, and cross-reviewer agreement tell you what to do first and what to flag loudly — they do not gate the decision. There is no deny-list: downside is controlled after the fact (revert + visible diff + the commit checkpoint), not by a precondition.
+Severity、confidence 和 cross-reviewer agreement 告诉你先做什么、什么要 loudly flag：它们不 gate decision。没有 deny-list：downside 通过事后控制（revert + visible diff + commit checkpoint），不是通过 precondition。
 
-**Scope invariant.** Apply only when the working tree *is* what was reviewed — `local-aligned` or standalone. In `pr-remote` / `branch-remote` the working tree is not the reviewed head; do not apply — report instead.
+**Scope invariant.** 只有 working tree *就是* reviewed 内容时才 apply：`local-aligned` 或 standalone。在 `pr-remote` / `branch-remote` 中，working tree 不是 reviewed head；不要 apply：只 report。
 
-**Verify, then keep.** After applying, run the affected tests and lint (targeted by default; broaden when fixes span files). If they fail, revert that fix and report it as a finding instead — an unverified fix is not finished. Never leave the tree red.
+**Verify, then keep.** Applying 后运行 affected tests 和 lint（default targeted；当 fixes 跨 files 时 broaden）。如果它们 fail，revert 该 fix 并改为 report as finding：unverified fix 不算 finished。绝不留下 red tree。
 
-**Commit when the pre-review tree was clean.** Before applying, note whether the working tree already had uncommitted changes (`git status --porcelain`). The permanence gate is the **push**, not the commit — a local commit is private and reversible (`git reset --soft HEAD~1`).
+**Pre-review tree clean 时 commit。** Applying 前，note working tree 是否已有 uncommitted changes（`git status --porcelain`）。Permanence gate 是 **push**，不是 commit：local commit 是 private 且 reversible（`git reset --soft HEAD~1`）。
 
-- **Clean before the review:** after applying and verifying, commit the fixes as one isolated, review-labeled fix commit — `fix(review): <summary>`, or the repo's nearest convention if `review` isn't an allowed scope. Labeled and reversible, returning the tree to a known state.
-- **Dirty before the review:** apply but do **not** commit — the fixes interleave with the user's in-flight work and ride along with the commit they were already going to make. The Applied section lists what changed.
-- **Never push, open a PR, or file tickets** — that's the outward-facing step the user owns.
+- **Review 前 clean：** applying and verifying 后，将 fixes 作为一个 isolated、review-labeled fix commit 提交：`fix(review): <summary>`，如果 `review` 不是 allowed scope，则使用 repo 最近的 convention。Labeled 且 reversible，让 tree 回到 known state。
+- **Review 前 dirty：** apply 但 **不** commit：fixes 会与用户 in-flight work interleave，并随他们本来要做的 commit 一起走。Applied section 列出 changed 内容。
+- **绝不 push、open PR 或 file tickets**：这是用户拥有的 outward-facing step。
 
-**Surface green-but-unverifiable edits.** When an applied fix touches auth/authz, a public or cross-service contract/schema, or concurrency/ordering, a passing test does not prove safety — flag it prominently in the Applied section so the diff reviewer's attention goes there.
+**Surface green-but-unverifiable edits.** 当 applied fix 触及 auth/authz、public 或 cross-service contract/schema、或 concurrency/ordering 时，passing test 不证明 safety：在 Applied section 中 prominently flag，让 diff reviewer 注意。
 
-### Stage 6: Synthesize and present
+### Stage 6：综合并呈现
 
-Assemble the final report. **Default:** pipe-delimited markdown tables for findings (mandatory — see review output template). **`mode:agent`:** skip markdown and emit JSON (see ### JSON output format). Other sections (Actionable Findings, Learnings, Coverage, etc.) use bullets and `---` before the verdict in markdown mode only.
+Assemble final report。**Default：** findings 使用 pipe-delimited markdown tables（mandatory：见 review output template）。**`mode:agent`：** 跳过 markdown 并 emit JSON（见 ### JSON output format）。其它 sections（Actionable Findings、Learnings、Coverage 等）仅在 markdown mode 中使用 bullets，并在 verdict 前使用 `---`。
 
-**Before writing the report, load `references/review-output-template.md` and mirror it** — that file is the canonical skeleton (full per-section structure). The block below is the always-loaded fallback so the shape survives a long session even if the template was not reloaded.
+**Writing report 前，加载 `references/review-output-template.md` 并 mirror it**：该 file 是 canonical skeleton（完整 per-section structure）。下方 block 是 always-loaded fallback，确保即使 template 未重新加载，shape 也能跨 long session 保留。
 
-**Findings table shape (default mode — load-bearing, do not improvise).** Every finding is a row in a pipe-delimited table grouped by severity, with a **terse** `Issue` cell; depth goes in a keyed detail line under the table. Copy this shape; do not invent a layout:
+**Findings table shape（default mode：load-bearing，不要 improvise）。** 每个 finding 是按 severity 分组的 pipe-delimited table 中的一行，带 **terse** `Issue` cell；深度内容放在 table 下的 keyed detail line。复制此 shape；不要 invent layout：
 
 | # | File | Issue | Reviewer | Confidence |
 |---|------|-------|----------|------------|
 | 1 | `path/to/file.go:42` | One terse line — the scannable index | correctness | 100 |
 
-- **#1** — full explanation here (why it matters + concrete fix direction), as a keyed detail line under the table.
+- **#1** — full explanation here（why it matters + concrete fix direction），作为 table 下的 keyed detail line。
 
-Per-severity tables are **5 columns** — `Route` is not shown here (it appears only in the Actionable Findings table and the JSON). Keep the `Issue` cell to **one short clause** (roughly 12 words or fewer, no second sentence, no because/so/which explanation) — it is the scannable index, not the explanation. The moment a cell wants a comma-plus-clause or a reason, move that depth into the **keyed detail line** (`- **#N** — …`) instead of packing it in — usually for P0/P1; P2/P3 are typically terse-only.
+Per-severity tables 是 **5 columns**：这里不显示 `Route`（它只出现在 Actionable Findings table 和 JSON 中）。将 `Issue` cell 保持为 **one short clause**（大约 12 words 或更少；无 second sentence；无 because/so/which explanation）：它是 scannable index，不是 explanation。当 cell 想要 comma-plus-clause 或 reason 时，把 depth 移到 **keyed detail line**（`- **#N** — …`），不要塞进 cell：通常用于 P0/P1；P2/P3 通常 terse-only。
 
-**Never produce these shapes (instant fail — applies to *every* tabular section, the Applied table included, not just the severity findings; if you catch one mid-draft, re-render before delivering):**
-- Any row — a finding **or** an Applied entry — rendered as `Field:`-prefixed blocks (`#:` / `Sev:` / `File:` / `Issue:` / `Fix:` / `Route:` lines) — depth goes in the keyed detail line, never a field block
-- Per-row separators made of horizontal rules or box-drawing characters (`────`, `———`)
-- A table replaced by a plain bulleted/numbered list (the keyed `- **#N** —` detail line under a table is a supplement, not a replacement — that is expected)
-- Unicode separators or arrows in cells (middot `·`); use ASCII `->`
-- **Inconsistent treatment across severities or sections** (e.g. P1 as blocks while P2/P3 are tables, or the Applied table as field-blocks while findings are tables) — every table uses the same pipe-delimited shape
+**绝不要产出这些 shapes（instant fail：适用于 *every* tabular section，包括 Applied table，不只是 severity findings；如果 mid-draft 发现，delivery 前 re-render）：**
+- 任何 row：finding **或** Applied entry，被渲染为 `Field:`-prefixed blocks（`#:` / `Sev:` / `File:` / `Issue:` / `Fix:` / `Route:` lines）：depth 放在 keyed detail line，绝不放 field block
+- 使用 horizontal rules 或 box-drawing characters（`────`、`———`）作为 per-row separators
+- 用 plain bulleted/numbered list 替代表格（table 下的 keyed `- **#N** —` detail line 是 supplement，不是 replacement：这是 expected）
+- Cells 中出现 Unicode separators 或 arrows（middot `·`）；使用 ASCII `->`
+- **Severities 或 sections 之间 inconsistent treatment**（例如 P1 用 blocks，而 P2/P3 用 tables；或 Applied table 用 field-blocks 而 findings 用 tables）：每个 table 使用相同 pipe-delimited shape
 
-1. **Header.** Scope, intent, mode, reviewer team with per-conditional justifications.
-2. **Applied (default mode only).** When Stage 5c applied fixes, list them first — before the findings tables — in an Applied section (see review output template) as a pipe table `| # | File | Fix | Reviewer |` — **never** `Field:`-blocks or `────` separators, same rules as the findings tables — then a one-line validation outcome (e.g. "pin tests 4 -> 6; suite 94 pass, lint clean") and commit status (committed on a clean tree as `fix(review): …` or the repo's nearest convention, or left uncommitted for the user on a dirty one). Flag green-but-unverifiable edits (auth/contract/concurrency) prominently. Omit this section in `mode:agent` and when nothing was applied. Applied findings appear here, not in the severity tables.
-3. **Findings.** Pipe-delimited tables grouped by severity (`### P0 -- Critical`, `### P1 -- High`, `### P2 -- Moderate`, `### P3 -- Low`), using the shape above — the **same** shape for every severity. Omit empty severity levels. Finding numbers come from the stable assignment in Stage 5 -- never re-derive them per severity table.
-4. **Requirements Completeness.** Include only when a plan was found in Stage 2b. For each requirement (R1, R2, etc.) and implementation unit in the plan, report whether corresponding work appears in the diff. Use a simple checklist: met / not addressed / partially addressed. Routing depends on `plan_source`:
-   - **`explicit`** (caller-provided or PR body): Flag unaddressed requirements or implementation units as P1 findings with `autofix_class: manual`, `owner: downstream-resolver`. These enter the actionable queue.
-   - **`inferred`** (auto-discovered): Flag unaddressed requirements or implementation units as P3 findings with `autofix_class: advisory`, `owner: human`. These stay in the report only — no autonomous follow-up. An inferred plan match is a hint, not a contract.
-   Omit this section entirely when no plan was found — do not mention the absence of a plan.
-5. **Actionable Findings.** Include when the actionable queue is non-empty — findings the caller should address (`gated_auto` / `manual` with `downstream-resolver`), plus anything Stage 5c chose not to apply. In default mode, findings already applied appear in the Applied section, not here.
-6. **Pre-existing.** Separate section, does not count toward verdict.
-7. **Learnings & Past Solutions.** Surface ce-learnings-researcher results: if past solutions are relevant, flag them as "Known Pattern" with links to docs/solutions/ files.
-8. **Agent-Native Gaps.** Surface ce-agent-native-reviewer results. Omit section if no gaps found.
-9. **Deployment Notes.** If ce-deployment-verification-agent ran, surface the key Go/No-Go items: blocking pre-deploy checks, the most important verification queries, rollback caveats, and monitoring focus areas. Keep the checklist actionable rather than dropping it into Coverage. Schema drift appears in the findings tables as `data-migration` P1 rows — do not add a separate Schema Drift section.
-10. **Coverage.** Applied count (when Stage 5c ran), suppressed count by anchor (e.g., "N findings suppressed at anchor 50, M at anchor 25"), mode-aware demotion count, validator drop count and reasons (when Stage 5b ran), any P0/P1 with degraded validation (kept on validator infra failure), validator over-budget drops (when the 15-cap fired), residual risks, testing gaps, failed/timed-out reviewers, and inferred-intent uncertainty when applicable.
-11. **Verdict.** Ready to merge / Ready with fixes / Not ready. Fix order if applicable. When an `explicit` plan has unaddressed requirements or implementation units, the verdict must reflect it — a PR that's code-clean but missing planned requirements is "Not ready" unless the omission is intentional. When an `inferred` plan has unaddressed requirements or implementation units, note it in the verdict reasoning but do not block on it alone.
+1. **Header.** Scope、intent、mode、reviewer team 及 per-conditional justifications。
+2. **Applied（default mode only）。** 当 Stage 5c applied fixes 时，先列出它们：在 findings tables 前的 Applied section（见 review output template）中，以 pipe table `| # | File | Fix | Reviewer |` 呈现：**绝不** 使用 `Field:`-blocks 或 `────` separators，规则与 findings tables 相同；然后给一行 validation outcome（例如 "pin tests 4 -> 6; suite 94 pass, lint clean"）和 commit status（clean tree 上 committed as `fix(review): …` 或 repo 最近 convention；dirty tree 上 left uncommitted for the user）。Prominently flag green-but-unverifiable edits（auth/contract/concurrency）。在 `mode:agent` 和没有 applied 内容时省略此 section。Applied findings 出现在这里，不出现在 severity tables 中。
+3. **Findings.** 按 severity 分组的 pipe-delimited tables（`### P0 -- Critical`、`### P1 -- High`、`### P2 -- Moderate`、`### P3 -- Low`），使用上方 shape：每个 severity 使用 **same** shape。Omit empty severity levels。Finding numbers 来自 Stage 5 stable assignment：绝不按 severity table 重新 derive。
+4. **Requirements Completeness.** 仅当 Stage 2b 找到 plan 时包含。对 plan 中每个 requirement（R1、R2 等）和 implementation unit，report diff 中是否出现 corresponding work。使用 simple checklist：met / not addressed / partially addressed。Routing 取决于 `plan_source`：
+   - **`explicit`**（caller-provided 或 PR body）：将 unaddressed requirements 或 implementation units flag 为 P1 findings，`autofix_class: manual`、`owner: downstream-resolver`。这些进入 actionable queue。
+   - **`inferred`**（auto-discovered）：将 unaddressed requirements 或 implementation units flag 为 P3 findings，`autofix_class: advisory`、`owner: human`。这些只留在 report 中：无 autonomous follow-up。Inferred plan match 是 hint，不是 contract。
+   未找到 plan 时，完全省略此 section：不要提及 absence of plan。
+5. **Actionable Findings.** 当 actionable queue 非空时包含：caller 应 address 的 findings（`gated_auto` / `manual` 且 `downstream-resolver`），加上 Stage 5c 选择不 apply 的任何内容。Default mode 中，已 applied findings 出现在 Applied section，不在这里。
+6. **Pre-existing.** Separate section，不计入 verdict。
+7. **Learnings & Past Solutions.** Surface ce-learnings-researcher results：如果 past solutions relevant，将其 flag 为 "Known Pattern"，并附 docs/solutions/ files links。
+8. **Agent-Native Gaps.** Surface ce-agent-native-reviewer results。无 gaps 时 omit section。
+9. **Deployment Notes.** 如果 ce-deployment-verification-agent 运行，surface key Go/No-Go items：blocking pre-deploy checks、最重要 verification queries、rollback caveats 和 monitoring focus areas。保持 checklist actionable，不要 drop 到 Coverage。Schema drift 以 `data-migration` P1 rows 出现在 findings tables：不要添加 separate Schema Drift section。
+10. **Coverage.** Applied count（当 Stage 5c 运行）、按 anchor suppressed count（例如 "N findings suppressed at anchor 50, M at anchor 25"）、mode-aware demotion count、validator drop count 和 reasons（当 Stage 5b 运行）、任何 degraded validation 的 P0/P1（kept on validator infra failure）、validator over-budget drops（15-cap 触发时）、residual risks、testing gaps、failed/timed-out reviewers，以及适用时的 inferred-intent uncertainty。
+11. **Verdict.** Ready to merge / Ready with fixes / Not ready。适用时提供 fix order。当 `explicit` plan 有 unaddressed requirements 或 implementation units，verdict 必须反映：code-clean 但 missing planned requirements 的 PR 是 "Not ready"，除非 omission intentional。当 `inferred` plan 有 unaddressed requirements 或 implementation units，在 verdict reasoning 中 note，但不要仅因此 block。
 
-Do not include time estimates.
+不要包含 time estimates。
 
-**Format verification (default only — last gate before delivering).** Before delivering, scan **every table — the Applied table and each severity findings table** — for the forbidden shapes: `Field:`-prefixed blocks (`#:` / `File:` / `Fix:` / `Issue:`), box-drawing or horizontal-rule separators (`────`), middot `·`, or a list replacing a table. **The Applied table is the most common offender — check it explicitly.** If any table hit one of these, STOP and re-render it as the same pipe-delimited shape before delivering. (The keyed `- **#N** —` detail line under a table is expected — not a failure.) Skip only when `mode:agent` is active.
+**Format verification（default only：delivery 前最后 gate）。** Delivery 前，scan **every table：Applied table 和每个 severity findings table**，查找 forbidden shapes：`Field:`-prefixed blocks（`#:` / `File:` / `Fix:` / `Issue:`）、box-drawing 或 horizontal-rule separators（`────`）、middot `·`，或用 list 替代表格。**Applied table 是最常见 offender：明确检查它。** 如果任何 table 命中，STOP，并在 delivering 前 re-render 为相同 pipe-delimited shape。（Table 下 keyed `- **#N** —` detail line 是 expected，不是 failure。）仅当 `mode:agent` active 时跳过。
 
-### JSON output format (`mode:agent` only)
+### JSON output format（仅 `mode:agent`）
 
-Emit **one raw JSON object** as the primary response — a single bare JSON value, **no markdown code fence**. A leading ```` ```json ```` fence makes the response start with backticks and breaks naive `JSON.parse` consumers, so never wrap it. Also write `review.json` under `/tmp/compound-engineering/ce-code-review/<run-id>/` with the same payload.
+Emit **one raw JSON object** 作为 primary response：single bare JSON value，**no markdown code fence**。开头的 ```` ```json ```` fence 会让 response 以 backticks 开始，并 break naive `JSON.parse` consumers，因此绝不要 wrap。也用相同 payload 写入 `/tmp/compound-engineering/ce-code-review/<run-id>/` 下的 `review.json`。
 
-`mode:agent` does not apply fixes — the caller does — so there is no `applied_fixes` field; the handoff is `actionable_findings`. Applied work surfaces only in the default-mode markdown Applied section (Stage 5c/6).
+`mode:agent` 不 apply fixes：由 caller 执行。因此没有 `applied_fixes` field；handoff 是 `actionable_findings`。Applied work 只在 default-mode markdown Applied section（Stage 5c/6）中出现。
 
-Minimum shape:
+Minimum shape（最小结构）：
 
 ```json
 {
@@ -577,63 +577,63 @@ Minimum shape:
 }
 ```
 
-Each object in `findings` uses the merged finding fields: `#`, `title`, `severity`, `file`, `line`, `confidence`, `autofix_class`, `owner`, `requires_verification`, `pre_existing`, `suggested_fix`, `why_it_matters`, `evidence`, `reviewers`.
+`findings` 中每个 object 使用 merged finding fields：`#`、`title`、`severity`、`file`、`line`、`confidence`、`autofix_class`、`owner`、`requires_verification`、`pre_existing`、`suggested_fix`、`why_it_matters`、`evidence`、`reviewers`。
 
-`actionable_findings` lists the `gated_auto` / `manual` + `downstream-resolver` subset with the same fields plus stable `#`.
+`actionable_findings` 列出 `gated_auto` / `manual` + `downstream-resolver` subset，使用相同 fields 并包含 stable `#`。
 
-On failure before review completes, set `"status": "failed"` and `"reason": "<one sentence>"`. When all reviewers fail, use `"status": "degraded"` with a reason. When a PR skip rule fires (closed/merged/trivial), use `"status": "skipped"` with the skip reason. Do not emit markdown tables when `mode:agent` is active.
+Review completes 前 failure 时，设置 `"status": "failed"` 和 `"reason": "<one sentence>"`。当所有 reviewers fail，使用 `"status": "degraded"` 并附 reason。当 PR skip rule fires（closed/merged/trivial），使用 `"status": "skipped"` 和 skip reason。`mode:agent` active 时不要 emit markdown tables。
 
-## Quality Gates
+## 质量门禁
 
-Before delivering the review, verify:
+Delivering review 前，verify：
 
-1. **Every finding is actionable.** Re-read each finding. If it says "consider", "might want to", or "could be improved" without a concrete fix, rewrite it with a specific action. Vague findings waste engineering time.
-2. **No false positives from skimming.** For each finding, verify the surrounding code was actually read. Check that the "bug" isn't handled elsewhere in the same function, that the "unused import" isn't used in a type annotation, that the "missing null check" isn't guarded by the caller.
-3. **Severity is calibrated.** A style nit is never P0. A SQL injection is never P3. Re-check every severity assignment.
-4. **Line numbers are accurate.** Verify each cited line number against the file content. A finding pointing to the wrong line is worse than no finding.
-5. **Protected artifacts are respected.** Discard any findings that recommend deleting or gitignoring files in `docs/brainstorms/`, `docs/plans/`, or `docs/solutions/`.
-6. **Findings don't duplicate linter output.** Don't flag things the project's linter/formatter would catch (missing semicolons, wrong indentation). Focus on semantic issues.
+1. **Every finding is actionable。** Re-read 每个 finding。如果它写 "consider"、"might want to" 或 "could be improved"，但没有 concrete fix，用 specific action rewrite。Vague findings 浪费 engineering time。
+2. **No false positives from skimming。** 对每个 finding，verify surrounding code 确实已读取。检查 "bug" 是否已在同一 function 中 elsewhere handled，"unused import" 是否用于 type annotation，"missing null check" 是否由 caller guarded。
+3. **Severity is calibrated。** Style nit 绝不是 P0。SQL injection 绝不是 P3。重新检查每个 severity assignment。
+4. **Line numbers are accurate。** 根据 file content verify 每个 cited line number。指向 wrong line 的 finding 比没有 finding 更糟。
+5. **Protected artifacts are respected。** Discard 任何建议 deleting 或 gitignoring `docs/brainstorms/`、`docs/plans/` 或 `docs/solutions/` 中 files 的 findings。
+6. **Findings don't duplicate linter output。** 不要 flag 项目 linter/formatter 会捕获的内容（missing semicolons、wrong indentation）。聚焦 semantic issues。
 
-## Language-Aware Conditionals
+## 语言感知条件
 
-Stack-specific reviewers fire only when the diff touches runtime behavior they specialize in (async UI races, iOS/Swift lifecycle) — never mechanically from file extensions alone; the trigger is meaningful changed behavior in that stack's runtime domain. Structural quality (complexity deletion, 1k-line regressions, type-boundary leaks) lives in the always-on `ce-maintainability-reviewer`; do not spawn extra reviewers for language conventions, philosophy, or "strict bar" passes.
+Stack-specific reviewers 只有当 diff 触及它们 specialize 的 runtime behavior（async UI races、iOS/Swift lifecycle）时才 fire：绝不只因 file extensions mechanically 触发；trigger 是该 stack runtime domain 中 meaningful changed behavior。Structural quality（complexity deletion、1k-line regressions、type-boundary leaks）属于 always-on `ce-maintainability-reviewer`；不要为 language conventions、philosophy 或 "strict bar" passes spawn extra reviewers。
 
-## After Review
+## Review 后
 
-After Stage 6, stop. Never push, open PRs, or file tickets from this skill. In default (interactive) mode, Stage 5c has already applied and (on a clean pre-review tree) committed the safe fixes; in `mode:agent` the review mutates nothing — the caller (for example `ce-work`) and the user apply fixes, file tickets, or accept residual risk using the report and artifact.
+Stage 6 后 stop。绝不要从此 skill push、open PRs 或 file tickets。Default（interactive）mode 中，Stage 5c 已经 applied，并且在 clean pre-review tree 上 committed safe fixes；在 `mode:agent` 中 review 不 mutate anything：caller（例如 `ce-work`）和用户使用 report 与 artifact apply fixes、file tickets 或 accept residual risk。
 
-### Emit actionable findings summary (default mode only)
+### Emit actionable findings summary（仅 default mode）
 
-After Stage 6 **in default mode**, emit a compact **Actionable Findings** summary for callers:
+Stage 6 后，**default mode** 中 emit compact **Actionable Findings** summary 给 callers：
 
-- List each actionable finding (`gated_auto` or `manual` with `downstream-resolver`) with stable `#`, severity, file:line, title, `autofix_class`, whether `suggested_fix` is present, and `confidence`.
-- Include the run-artifact path when one was written: `/tmp/compound-engineering/ce-code-review/<run-id>/`
-- When the actionable queue is empty, state `Actionable findings: none.` explicitly.
+- 列出每个 actionable finding（`gated_auto` 或 `manual` 且 `downstream-resolver`），包含 stable `#`、severity、file:line、title、`autofix_class`、是否有 `suggested_fix`，以及 `confidence`。
+- 如果写入 run-artifact path，包含它：`/tmp/compound-engineering/ce-code-review/<run-id>/`
+- Actionable queue 为空时，明确说明 `Actionable findings: none.`。
 
-In `mode:agent` do **not** emit this markdown summary — the actionable findings are carried solely by the `actionable_findings` field of the JSON object. Emit nothing after the JSON object, so the response stays a single parseable JSON value.
+在 `mode:agent` 中 **不要** emit 此 markdown summary：actionable findings 仅由 JSON object 的 `actionable_findings` field 承载。JSON object 后不要 emit 任何内容，让 response 保持 single parseable JSON value。
 
-Do not run post-review triage (no per-finding walk-through, bulk ticket filing, or routing questions). The report and summary are the complete handoff.
+不要运行 post-review triage（无 per-finding walk-through、bulk ticket filing 或 routing questions）。Report 和 summary 是完整 handoff。
 
-### Mode-specific completion
+### Mode-specific completion（按 mode 完成）
 
 | Mode | After Stage 6 + actionable summary |
 |------|-----------------------------------|
-| **Default** | Markdown tables + Actionable Findings summary. |
-| **`mode:agent`** | JSON object + `review.json` in run artifact dir. |
+| **Default** | Markdown tables + Actionable Findings summary。 |
+| **`mode:agent`** | JSON object + run artifact dir 中的 `review.json`。 |
 
-Do not offer push/PR/create-branch next steps from this skill.
+不要从此 skill offer push/PR/create-branch next steps。
 
-#### Run artifacts
+#### Run artifacts（运行产物）
 
-Always write run artifacts under `/tmp/compound-engineering/ce-code-review/<run-id>/`:
+始终将 run artifacts 写入 `/tmp/compound-engineering/ce-code-review/<run-id>/`：
 
-- synthesized findings
-- actionable findings list
-- advisory outputs
-- per-agent `{reviewer_name}.json` from Stage 4
-- `report.md` — the rendered markdown report exactly as presented to the user (default mode only), so format and numbering stay auditable after the run
+- synthesized findings（综合后的 findings）
+- actionable findings list（可执行 findings 列表）
+- advisory outputs（建议性输出）
+- Stage 4 的 per-agent `{reviewer_name}.json`
+- `report.md`：完全按呈现给用户的 rendered markdown report（仅 default mode），让 format 和 numbering 在 run 后仍 auditable
 
-`metadata.json` minimum fields:
+`metadata.json` minimum fields：
 
 ```json
 {
@@ -645,34 +645,34 @@ Always write run artifacts under `/tmp/compound-engineering/ce-code-review/<run-
 }
 ```
 
-Capture `branch` and `head_sha` at dispatch time (no in-skill fixes will land afterward).
+在 dispatch time capture `branch` 和 `head_sha`（之后不会 land in-skill fixes）。
 
-## Fallback
+## Fallback（降级路径）
 
-If the platform doesn't support parallel sub-agents, run reviewers sequentially. If the platform supports sub-agents but caps active concurrency, use the bounded queueing rules in Stage 4 rather than treating cap-related spawn failures as reviewer failures. Everything else (stages, output format, merge pipeline) stays the same.
+如果平台不支持 parallel sub-agents，sequentially 运行 reviewers。如果平台支持 sub-agents 但限制 active concurrency，使用 Stage 4 的 bounded queueing rules，而不是将 cap-related spawn failures 视为 reviewer failures。其它内容（stages、output format、merge pipeline）保持不变。
 
 ---
 
-## Included References
+## Included References（内联参考）
 
-The files below are inlined at load time. The review output template is **not** inlined — Stage 6 loads it on demand (`references/review-output-template.md`).
+下方 files 在 load time inlined。Review output template **不** inline：Stage 6 按需加载它（`references/review-output-template.md`）。
 
-### Persona Catalog
+### Persona Catalog（persona 目录）
 
 @./references/persona-catalog.md
 
-### Subagent Template
+### Subagent Template（subagent 模板）
 
 @./references/subagent-template.md
 
-### Diff Scope Rules
+### Diff Scope Rules（diff scope 规则）
 
 @./references/diff-scope.md
 
-### Action class rubric
+### Action class rubric（action class rubric）
 
 @./references/action-class-rubric.md
 
-### Findings Schema
+### Findings Schema（findings schema）
 
 @./references/findings-schema.json

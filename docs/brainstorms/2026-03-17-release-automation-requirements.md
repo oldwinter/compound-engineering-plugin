@@ -3,87 +3,87 @@ date: 2026-03-17
 topic: release-automation
 ---
 
-# Release Automation and Changelog Ownership
+# Release Automation 与 Changelog Ownership
 
-## Problem Frame
+## 问题框架
 
-The repository currently has one automated release flow for the npm CLI, but the broader release story is split across CI, manual maintainer workflows, stale docs, and multiple version surfaces. That makes it hard to batch releases intentionally, hard for multiple maintainers to share release responsibility, and easy for changelogs, plugin manifests, and derived metadata like component counts to drift out of sync. The goal is to move to a release model that supports intentional batching, independent component versioning, centralized history, and CI-owned release authority without forcing version bumps for untouched plugins.
+repository 当前只有一个面向 npm CLI 的 automated release flow，但更大的 release story 分散在 CI、manual maintainer workflows、stale docs 和多个 version surfaces 之间。这让 intentional batching 变难，让多个 maintainers 共享 release responsibility 变难，也让 changelogs、plugin manifests 和 component counts 等 derived metadata 很容易 drift out of sync。目标是迁移到支持 intentional batching、independent component versioning、centralized history 和 CI-owned release authority 的 release model，同时不强迫 untouched plugins bump version。
 
-## Requirements
+## 需求
 
-- R1. The release process must be manually triggered; merging to `main` must not automatically publish a release.
-- R2. The release system must support batching: releasable merges may accumulate on `main` until maintainers decide to cut a release.
-- R3. The release system must maintain a single release PR for the whole repo that stays open until merged and automatically accumulates additional releasable changes merged to `main`.
-- R4. The release system must support independent version bumps for these components: `cli`, `compound-engineering`, `coding-tutor`, and `marketplace`.
-- R5. The release system must not bump untouched plugins or unrelated components.
-- R6. The release system must preserve one centralized root `CHANGELOG.md` as the canonical changelog for the repository.
-- R7. The root changelog must record releases as top-level entries per component version, rather than requiring separate changelog files per plugin.
-- R8. Existing root changelog history must be preserved during the migration; the new release model must not discard or rewrite historical entries in a way that loses continuity.
-- R9. `plugins/compound-engineering/CHANGELOG.md` must no longer be treated as the canonical changelog after the migration.
-- R10. The release process must replace the current `release-docs` workflow; `release-docs` must no longer act as a release authority or required release step.
-- R11. Narrow scripts must replace `release-docs` responsibilities, including metadata synchronization, count calculation, docs generation where still needed, and validation.
-- R12. Release automation must be the sole authority for version bumps, changelog writes, and computed metadata updates such as counts of agents, skills, commands, or similar release-owned descriptions.
-- R13. The release flow must support a dry-run mode that summarizes what would happen without publishing, tagging, or committing release changes.
-- R14. Dry run output must clearly summarize which components would release, the proposed version bumps, the changelog entries that would be added, and any blocking validation failures.
-- R15. Marketplace version bumps must happen only for marketplace-level changes, such as marketplace metadata changes or adding/removing plugins from the catalog.
-- R16. Updating a plugin version alone must not require a marketplace version bump.
-- R17. Plugin-only content changes must be releasable without requiring a CLI version bump when the CLI code itself has not changed.
-- R18. The release model must remain compatible with the current install behavior where `bunx @every-env/compound-plugin install ...` runs the npm CLI but fetches named plugin content from the GitHub repository at runtime.
-- R19. The release process must be triggerable by a maintainer or an AI agent through CI without requiring a local maintainer-only skill.
-- R20. The resulting model must scale to future plugins without requiring the repo to special-case `compound-engineering` forever.
-- R21. The release model must continue to rely on conventional release intent signals (`feat`, `fix`, breaking changes, etc.), but component scopes in commit or PR titles must remain optional rather than required.
-- R22. Release automation must infer component ownership primarily from changed files, not from commit or PR title scopes alone.
-- R23. The repo should enforce parseable conventional PR or merge titles strongly enough for release tooling to classify change type, while avoiding mandatory component scoping on every change.
-- R24. The manual CI-driven release workflow must support explicit bump overrides for exceptional cases, at least `patch`, `minor`, and `major`, without requiring maintainers to create fake or empty commits purely to coerce a release.
-- R25. Bump overrides must be expressible per component rather than only as a repo-wide override.
-- R26. Dry run output must clearly show both the inferred bump and any applied manual override for each affected component.
+- R1. release process 必须手动触发；merge 到 `main` 不得自动 publish release。
+- R2. release system 必须支持 batching：releasable merges 可在 `main` 上累积，直到 maintainers 决定 cut a release。
+- R3. release system 必须维护整个 repo 的 single release PR；该 PR 保持 open 直到 merged，并自动累积之后 merge 到 `main` 的 releasable changes。
+- R4. release system 必须支持这些 components 的 independent version bumps：`cli`、`compound-engineering`、`coding-tutor` 和 `marketplace`。
+- R5. release system 不得 bump untouched plugins 或 unrelated components。
+- R6. release system 必须保留一个 centralized root `CHANGELOG.md` 作为 repository canonical changelog。
+- R7. root changelog 必须按 component version 记录 top-level entries，而不是要求每个 plugin 有 separate changelog files。
+- R8. migration 期间必须保留 existing root changelog history；new release model 不得以丢失 continuity 的方式 discard 或 rewrite historical entries。
+- R9. migration 后，`plugins/compound-engineering/CHANGELOG.md` 不再被视为 canonical changelog。
+- R10. release process 必须替换当前 `release-docs` workflow；`release-docs` 不再作为 release authority 或 required release step。
+- R11. narrow scripts 必须替换 `release-docs` responsibilities，包括 metadata synchronization、count calculation、仍需要时的 docs generation，以及 validation。
+- R12. Release automation 必须是 version bumps、changelog writes 和 computed metadata updates（例如 agents、skills、commands 或类似 release-owned descriptions 数量）的 sole authority。
+- R13. release flow 必须支持 dry-run mode，summarize 将会发生什么，但不 publish、tag 或 commit release changes。
+- R14. Dry run output 必须清楚 summarize 哪些 components 会 release、proposed version bumps、将新增的 changelog entries，以及任何 blocking validation failures。
+- R15. Marketplace version bumps 只应发生在 marketplace-level changes 上，例如 marketplace metadata changes 或 catalog 中添加/移除 plugins。
+- R16. 仅更新 plugin version 不应要求 marketplace version bump。
+- R17. 当 CLI code 本身未变时，Plugin-only content changes 应可 release，而不需要 CLI version bump。
+- R18. release model 必须兼容当前 install behavior：`bunx @every-env/compound-plugin install ...` 运行 npm CLI，但 runtime 从 GitHub repository fetch named plugin content。
+- R19. release process 必须能由 maintainer 或 AI agent 通过 CI 触发，不要求 local maintainer-only skill。
+- R20. resulting model 必须能扩展到 future plugins，而不需要 repo 永久 special-case `compound-engineering`。
+- R21. release model 必须继续依赖 conventional release intent signals（`feat`、`fix`、breaking changes 等），但 commit 或 PR titles 中的 component scopes 应保持 optional，而非 required。
+- R22. Release automation 必须主要从 changed files 推断 component ownership，而不是只依赖 commit 或 PR title scopes。
+- R23. repo 应强约束 parseable conventional PR 或 merge titles，足以让 release tooling classify change type，同时避免每个 change 都强制 component scoping。
+- R24. manual CI-driven release workflow 必须支持 exceptional cases 的 explicit bump overrides，至少 `patch`、`minor` 和 `major`，不要求 maintainers 仅为 coerce release 创建 fake 或 empty commits。
+- R25. Bump overrides 必须能按 component 表达，而不是只有 repo-wide override。
+- R26. Dry run output 必须清楚展示每个 affected component 的 inferred bump 和 any applied manual override。
 
-## Success Criteria
+## 成功标准
 
-- Maintainers can let multiple PRs merge to `main` without immediately cutting a release.
-- At any point, maintainers can inspect a release PR or dry run and understand what would ship next.
-- A change to `coding-tutor` does not force a version bump to `compound-engineering`.
-- A plugin version bump does not force a marketplace version bump unless marketplace-level files changed.
-- Release-owned metadata and counts stay in sync without relying on a local slash command.
-- The root changelog remains readable and continuous before and after the migration.
+- Maintainers 可以让多个 PRs merge 到 `main`，而不立即 cut release。
+- 任意时刻，maintainers 可以 inspect release PR 或 dry run，理解下一次会 ship 什么。
+- 对 `coding-tutor` 的 change 不会强迫 `compound-engineering` version bump。
+- plugin version bump 不会强迫 marketplace version bump，除非 marketplace-level files changed。
+- release-owned metadata 和 counts 保持同步，不依赖 local slash command。
+- root changelog 在 migration 前后保持 readable 和 continuous。
 
-## Scope Boundaries
+## 范围边界
 
-- This work does not require changing how Claude Code itself consumes plugin and marketplace versions.
-- This work does not require solving end-user auto-update discovery for non-Claude harnesses in v1.
-- This work does not require adding dedicated per-plugin changelog files as the canonical history model.
-- This work does not require immediate future automation of release timing; manual release remains the default.
+- 此工作不要求改变 Claude Code 自身消费 plugin 和 marketplace versions 的方式。
+- 此工作不要求在 v1 解决 non-Claude harnesses 的 end-user auto-update discovery。
+- 此工作不要求添加 dedicated per-plugin changelog files 作为 canonical history model。
+- 此工作不要求立即自动化 release timing；manual release 保持 default。
 
-## Key Decisions
+## 关键决策
 
-- **Use `release-please` rather than a single release-line flow**: The repo now has multiple independently versioned components, and the release PR model matches the need to batch merges on `main` until a release is intentionally cut.
-- **One release PR for the whole repo**: Centralized release visibility matters more than separate PRs per component, and a single release PR can still carry multiple component bumps.
-- **Manual release timing**: The release process should prepare and accumulate the next release automatically, but the decision to cut that release should remain explicit.
-- **Root changelog stays canonical**: Centralized history is more important than per-plugin changelog isolation for the current repo shape.
-- **Top-level changelog entries per component version**: This preserves one changelog file while keeping independent component version history readable.
-- **Retire `release-docs`**: Its responsibilities are too broad, stale, and conflated. Release logic, docs logic, and metadata synchronization should be separated.
-- **Scripts for narrow responsibilities**: Explicit scripts are easier to validate, automate, and reuse from CI than a local repo-maintenance skill.
-- **Marketplace version is catalog-scoped**: Plugin version bumps alone should not imply a marketplace release.
-- **Conventional type required, component scope optional**: Release intent should still come from conventional commit semantics, but requiring `(compound-engineering)` on most repo changes would add unnecessary wording overhead. Component detection should remain file-driven.
-- **Manual bump override is an explicit escape hatch**: Automatic bump inference remains the default, but maintainers should be able to override a component's release level in CI for exceptional cases without awkward synthetic commits.
+- **Use `release-please` rather than a single release-line flow**：repo 现在有多个 independently versioned components，而 release PR model 匹配在 `main` 上 batch merges、直到 intentional cut release 的需求。
+- **One release PR for the whole repo**：centralized release visibility 比每个 component 一个 separate PR 更重要；single release PR 仍可承载多个 component bumps。
+- **Manual release timing**：release process 应自动 prepare 和 accumulate next release，但 cut release 的决定应保持 explicit。
+- **Root changelog stays canonical**：对当前 repo shape 来说，centralized history 比 per-plugin changelog isolation 更重要。
+- **Top-level changelog entries per component version**：这保留一个 changelog file，同时让 independent component version history 保持 readable。
+- **Retire `release-docs`**：它的 responsibilities 过宽、stale 且 conflated。Release logic、docs logic 和 metadata synchronization 应分离。
+- **Scripts for narrow responsibilities**：Explicit scripts 比 local repo-maintenance skill 更容易 validate、automate 并从 CI 复用。
+- **Marketplace version is catalog-scoped**：Plugin version bumps alone 不应 imply marketplace release。
+- **Conventional type required, component scope optional**：Release intent 仍应来自 conventional commit semantics，但要求大多数 repo changes 写 `(compound-engineering)` 会增加不必要 wording overhead。Component detection 应保持 file-driven。
+- **Manual bump override is an explicit escape hatch**：Automatic bump inference 保持 default，但 maintainers 应能在 CI 中 override component release level，用于 exceptional cases，而不需要尴尬的 synthetic commits。
 
-## Dependencies / Assumptions
+## 依赖与假设
 
-- The current install flow for named plugins continues to fetch plugin content from GitHub at runtime, so plugin content releases can remain independent from CLI releases unless CLI behavior also changes.
-- Claude Code already respects marketplace and plugin versions, so those version surfaces remain meaningful release signals.
+- 当前 named plugins install flow 继续在 runtime 从 GitHub fetch plugin content，因此 plugin content releases 可独立于 CLI releases，除非 CLI behavior 也改变。
+- Claude Code 已经尊重 marketplace 和 plugin versions，因此这些 version surfaces 仍是有意义的 release signals。
 
-## Outstanding Questions
+## 待决问题
 
-### Deferred to Planning
+### 延后到 Planning
 
-- [Affects R3][Technical] Should the release PR be updated automatically on every push to `main`, or via a manually triggered maintenance workflow that refreshes the release PR state on demand?
-- [Affects R7][Technical] What exact root changelog format best balances readability and automation for multiple component-version entries in one file?
-- [Affects R11][Technical] Which responsibilities should become distinct scripts versus steps embedded directly in the CI workflow?
-- [Affects R12][Technical] Which release-owned metadata fields should be computed automatically versus validated and left untouched when no count change is needed?
-- [Affects R9][Technical] Should `plugins/compound-engineering/CHANGELOG.md` be deleted, frozen, or replaced with a short pointer note after the migration?
-- [Affects R21][Technical] Should conventional-format enforcement happen on PR titles, squash-merge titles, commits, or some combination of them?
-- [Affects R24][Technical] Should manual bump overrides be implemented as workflow inputs that shape the generated release PR directly, or as an internal generated release-control commit on the release branch only?
+- [Affects R3][Technical] release PR 应在每次 push 到 `main` 时自动 update，还是通过 manually triggered maintenance workflow 按需 refresh release PR state？
+- [Affects R7][Technical] 什么 exact root changelog format 最能在一个 file 中平衡多个 component-version entries 的 readability 和 automation？
+- [Affects R11][Technical] 哪些 responsibilities 应变成 distinct scripts，哪些可直接嵌在 CI workflow steps 中？
+- [Affects R12][Technical] 哪些 release-owned metadata fields 应自动 computed，哪些应 validation 后在无 count change 时保持 untouched？
+- [Affects R9][Technical] migration 后，`plugins/compound-engineering/CHANGELOG.md` 应 delete、freeze，还是替换成 short pointer note？
+- [Affects R21][Technical] conventional-format enforcement 应发生在 PR titles、squash-merge titles、commits，还是组合？
+- [Affects R24][Technical] manual bump overrides 应实现为直接影响 generated release PR 的 workflow inputs，还是仅在 release branch 上生成 internal release-control commit？
 
-## Next Steps
+## 下一步
 
-→ `/ce:plan` for structured implementation planning
+→ `/ce:plan` 进行 structured implementation planning

@@ -1,21 +1,21 @@
-# Astro dev-server recipe (auto-detect fallback)
+# Astro dev-server recipe（dev-server 配方，auto-detect fallback）
 
-Loaded when `detect-project-type.sh` returns `astro` and there is no `.claude/launch.json` to consult.
+当 `detect-project-type.sh` 返回 `astro`，且没有 `.claude/launch.json` 可查询时加载。
 
-## Signature
+## Signature（识别特征）
 
-- `astro.config.js`, `astro.config.mjs`, or `astro.config.ts` exists
-- `package.json` contains an `astro` dependency
+- 存在 `astro.config.js`、`astro.config.mjs` 或 `astro.config.ts`
+- `package.json` 包含 `astro` dependency
 
-## Start command
+## Start command（启动命令）
 
-Standard:
+Standard（标准）:
 
 ```bash
 npm run dev
 ```
 
-The `dev` script in `package.json` typically wraps `astro dev`. Also valid (read `package.json` scripts to confirm which the project uses):
+`package.json` 中的 `dev` script 通常包装 `astro dev`。也有效（读取 `package.json` scripts，确认项目使用哪一个）：
 
 ```bash
 pnpm dev
@@ -23,17 +23,17 @@ yarn dev
 bun run dev
 ```
 
-Prefer the package manager indicated by the lockfile:
+优先使用 lockfile 指示的 package manager：
 - `pnpm-lock.yaml` -> `pnpm dev`
 - `yarn.lock` -> `yarn dev`
 - `bun.lock` / `bun.lockb` -> `bun run dev`
 - `package-lock.json` or none -> `npm run dev`
 
-## Port
+## Port（端口）
 
-Default: `4321`. Astro respects `--port <port>` and the `server.port` field in `astro.config.*`. Overrides follow the cascade in `references/dev-server-detection.md`.
+Default（默认）：`4321`。Astro respects `--port <port>` 和 `astro.config.*` 中的 `server.port` 字段。Overrides 遵循 `references/dev-server-detection.md` 中的 cascade。
 
-## Stub generation
+## Stub generation（stub 生成）
 
 ```json
 {
@@ -49,10 +49,10 @@ Default: `4321`. Astro respects `--port <port>` and the `server.port` field in `
 }
 ```
 
-Substitute the resolved package manager (`npm` / `pnpm` / `yarn` / `bun`) and port.
+替换为 resolved package manager（`npm` / `pnpm` / `yarn` / `bun`）和 port。
 
-## Common gotchas
+## Common gotchas（常见坑）
 
-- **SSR vs SSG:** `astro dev` runs identically for both output modes; the difference only matters at build time. Polish does not need to distinguish between them.
-- **Astro config takes precedence over Vite config:** Astro uses Vite under the hood but ships its own config file. The `astro` type takes precedence over `vite` when both `astro.config.*` and `vite.config.*` exist. This is rare -- Astro projects do not usually have a separate Vite config file.
-- **Dev toolbar (Astro 4+):** Astro 4+ includes a dev toolbar that adds overlay UI in the browser. It does not affect port binding or URL routing -- polish can ignore it.
+- **SSR vs SSG：** `astro dev` 对两种 output modes 的运行方式相同；差异只在 build time 重要。Polish 不需要区分它们。
+- **Astro config 优先于 Vite config：** Astro 底层使用 Vite，但有自己的 config file。当 `astro.config.*` 和 `vite.config.*` 同时存在时，`astro` type 优先于 `vite`。这很少见；Astro projects 通常没有单独的 Vite config file。
+- **Dev toolbar（Astro 4+）：** Astro 4+ 包含 dev toolbar，会在 browser 中添加 overlay UI。它不影响 port binding 或 URL routing；polish 可以忽略它。

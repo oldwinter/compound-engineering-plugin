@@ -1,175 +1,175 @@
-# Iterative Optimization Loop Skill — Requirements Brainstorm
+# Iterative Optimization Loop Skill - 需求 Brainstorm
 
-## Problem Statement
+## 问题陈述
 
-CE has strong knowledge-compounding (learn from past work) and multi-agent review (quality gates), but no skill for **metric-driven iterative optimization** — the pattern where you define a measurable goal, build measurement scaffolding, then run an automated loop that tries many approaches, measures each, keeps improvements, and converges toward the best solution.
+CE 已有强大的 knowledge-compounding（从过往工作学习）和 multi-agent review（quality gates），但还没有用于 **metric-driven iterative optimization** 的 skill：先定义可衡量目标，构建 measurement scaffolding，然后运行自动化 loop，尝试多种 approaches，逐个测量，保留改进，并逐步收敛到最佳方案。
 
-### Motivating Example
+### 动机示例
 
-A project builds issue/PR clusters for a large open-source repo. Currently only ~20% of issues/PRs land in clusters with >1 item. The suspected achievable target is ~95%. Getting there requires testing many hypotheses:
+某项目为大型 open-source repo 构建 issue/PR clusters。目前只有约 20% 的 issues/PRs 落入包含 >1 item 的 clusters。推测可达到的目标约为 95%。要达到该目标，需要测试许多 hypotheses：
 
-- Extracting signal (unique user-entered text) from noise (PR/issue template boilerplate that makes all vectors too similar)
-- Using issue-to-PR links as a new clustering signal
-- Adjusting similarity thresholds
-- Trying different embedding models or chunking strategies
-- Combining multiple signals (text similarity + link graph + label overlap + author patterns)
-- Pre-filtering or normalizing template sections before embedding
+- 从 noise（让所有 vectors 过于相似的 PR/issue template boilerplate）中提取 signal（用户输入的独特文本）
+- 使用 issue-to-PR links 作为新的 clustering signal
+- 调整 similarity thresholds
+- 尝试不同 embedding models 或 chunking strategies
+- 组合多个 signals（text similarity + link graph + label overlap + author patterns）
+- 在 embedding 前预过滤或标准化 template sections
 
-No single hypothesis will get from 20% to 95%. It requires systematic experimentation — trying dozens or hundreds of variations, measuring each, and building on successes.
+没有单一 hypothesis 能从 20% 直接到 95%。这需要 systematic experimentation：尝试数十甚至数百个 variations，逐个衡量，并基于成功结果继续推进。
 
-## Landscape Analysis
+## 格局分析
 
-### Karpathy's AutoResearch (March 2026, 21k+ stars)
+### Karpathy 的 AutoResearch（2026-03，21k+ stars）
 
-The simplest and most influential model. Core design:
+最简单且影响最大的 model。核心设计：
 
-- **One mutable file** (`train.py`) — the agent edits only this
-- **One immutable evaluator** (`prepare.py`) — the agent cannot touch measurement
-- **One instruction file** (`program.md`) — defines objectives, constraints, stopping criteria
-- **One metric** (`val_bpb`) — scalar, lower is better
-- **Linear keep/revert loop**: modify -> commit -> run -> measure -> if improved keep, else `git reset`
-- **History**: `results.tsv` accumulates all experiment results; git log preserves successful commits
-- **Result**: 700 experiments in 2 days, 20 discovered optimizations, ~12 experiments/hour
+- **一个 mutable file**（`train.py`）：agent 只编辑这个文件
+- **一个 immutable evaluator**（`prepare.py`）：agent 不能碰 measurement
+- **一个 instruction file**（`program.md`）：定义 objectives、constraints、stopping criteria
+- **一个 metric**（`val_bpb`）：scalar，越低越好
+- **Linear keep/revert loop**：modify -> commit -> run -> measure -> 如果改进则 keep，否则 `git reset`
+- **History**：`results.tsv` 累积所有 experiment results；git log 保留成功 commits
+- **Result**：2 天内 700 个 experiments，发现 20 个 optimizations，约 12 experiments/hour
 
-**Strengths**: Dead simple. Git-native history. Easy to understand and debug.
-**Weaknesses**: Linear — can't explore multiple directions simultaneously. Single scalar metric. No backtracking to earlier promising states.
+**优势**：极其简单。Git-native history。易理解和 debug。
+**弱点**：Linear，无法同时探索多个方向。单一 scalar metric。无法 backtrack 到早期 promising states。
 
-### AIDE / WecoAI
+### AIDE / WecoAI（相关案例）
 
-- **Tree search** in solution space — each script is a node, LLM patches spawn children
-- Can backtrack to any previous node and explore alternatives
-- 4x more Kaggle medals than linear agents on MLE-Bench
-- More complex but better at escaping local optima
+- 在 solution space 中做 **tree search**：每个 script 是一个 node，LLM patches 产生 children
+- 可以 backtrack 到任何 previous node 并探索 alternatives
+- 在 MLE-Bench 上获得的 Kaggle medals 是 linear agents 的 4 倍
+- 更复杂，但更擅长跳出 local optima
 
-### Sakana AI Scientist v2
+### Sakana AI Scientist v2（相关案例）
 
-- **Agentic tree search** with parallel experiment execution
-- VLM feedback for analyzing figures
-- Full paper generation with automated peer review
-- Overkill for code optimization but shows the value of tree-structured exploration
+- 带 parallel experiment execution 的 **agentic tree search**
+- 使用 VLM feedback 分析 figures
+- 完整 paper generation，包含 automated peer review
+- 对 code optimization 来说过重，但展示了 tree-structured exploration 的价值
 
-### DSPy (Stanford)
+### DSPy（Stanford，相关案例）
 
-- Automated prompt/weight optimization for LLM programs
-- Bayesian optimization (MIPROv2), iterative feedback (GEPA), coordinate ascent (COPRO)
-- Shows that different optimization strategies suit different problem shapes
+- 面向 LLM programs 的 automated prompt/weight optimization
+- Bayesian optimization（MIPROv2）、iterative feedback（GEPA）、coordinate ascent（COPRO）
+- 表明不同 optimization strategies 适合不同 problem shapes
 
-### Existing Claude Code AutoResearch Forks
+### 现有 Claude Code AutoResearch Forks
 
-- `uditgoenka/autoresearch` — packages the pattern as a Claude Code skill
-- `autoexp` — generalized for any project with a quantifiable metric
-- Multiple teams report 50-80% improvements over 30-70 iterations overnight
+- `uditgoenka/autoresearch`：将该 pattern 打包为 Claude Code skill
+- `autoexp`：泛化到任何带 quantifiable metric 的项目
+- 多个团队报告 overnight 运行 30-70 iterations 后获得 50-80% improvements
 
-## Key Design Decisions
+## 关键设计决策
 
-### 1. Linear vs. Tree Search
+### 1. Linear vs. Tree Search（线性与树搜索）
 
-| Approach | Pros | Cons |
+| Approach | 优点 | 缺点 |
 |---|---|---|
-| Linear (autoresearch) | Simple, easy to understand, git-native | Can't explore multiple directions, stuck in local optima |
-| Tree search (AIDE) | Can backtrack, explore alternatives | More complex state management, harder to review |
-| Hybrid: linear with manual branch points | Best of both — simple default, user chooses when to fork | Requires user interaction to fork |
+| Linear (autoresearch) | 简单、易理解、git-native | 无法探索多个方向，容易卡在 local optima |
+| Tree search (AIDE) | 可 backtrack 并探索 alternatives | state management 更复杂，更难 review |
+| Hybrid: linear with manual branch points | 兼具两者优点：默认简单，用户决定何时 fork | 需要用户交互来 fork |
 
-**Recommendation**: Start with linear keep/revert (Karpathy model) as the default. Add optional "branch point" support where the user can snapshot the current best and start a new exploration direction. Each direction is its own branch. This keeps the core loop simple while allowing multi-direction exploration when needed.
+**Recommendation**：默认从 linear keep/revert（Karpathy model）开始。添加可选 “branch point” support，让用户 snapshot current best 并开启新的 exploration direction。每个 direction 是自己的 branch。这样 core loop 保持简单，同时在需要时允许 multi-direction exploration。
 
-### 2. What Gets Measured — The Three-Tier Metric Architecture
+### 2. 测量什么：三层 metric 架构
 
-AutoResearch uses a single scalar metric (val_bpb). That works when you have an objective function with clear ground truth. Most real-world optimization problems don't — especially when the quality of the output requires human judgment.
+AutoResearch 使用单一 scalar metric（val_bpb）。当你拥有带清晰 ground truth 的 objective function 时，这很有效。但大多数 real-world optimization problems 并非如此，尤其是 output quality 需要 human judgment 时。
 
-**Key insight**: Hard scalar metrics are often the wrong optimization target. For clustering, "bigger clusters" isn't inherently better. "Fewer singletons" isn't inherently better. A solution with 35% singletons where every cluster is coherent beats a solution with 5% singletons where clusters are garbage. Hard metrics catch *degenerate* solutions; *quality* requires judgment.
+**Key insight**：Hard scalar metrics 往往不是正确 optimization target。对 clustering 而言，“bigger clusters”本身并不更好，“fewer singletons”本身也不更好。一个有 35% singletons、但每个 cluster 都 coherent 的方案，胜过一个只有 5% singletons、但 clusters 都是垃圾的方案。Hard metrics 捕获 *degenerate* solutions；*quality* 需要 judgment。
 
-**Three tiers**:
+**三层结构**：
 
-1. **Degenerate-case gates** (hard, cheap, fully automated):
-   - Catch obviously broken solutions before expensive evaluation
-   - Examples: "all items in 1 cluster" (degenerate merge), "all singletons" (degenerate split), "runtime > 10 minutes" (performance regression)
-   - These are fast boolean checks: pass/fail. If any gate fails, the experiment is immediately reverted without running the expensive judge
-   - Think of these as "sanity checks" not "optimization targets"
+1. **Degenerate-case gates（退化场景 gates）**（hard、cheap、fully automated）：
+   - 在昂贵 evaluation 前捕获明显 broken solutions
+   - 示例：“all items in 1 cluster”（degenerate merge）、“all singletons”（degenerate split）、“runtime > 10 minutes”（performance regression）
+   - 这些是快速 boolean checks：pass/fail。任何 gate 失败时，experiment 立即 reverted，不运行昂贵 judge
+   - 把它们当作 “sanity checks”，而不是 “optimization targets”
 
-2. **LLM-as-judge quality score** (the actual optimization target):
-   - For problems where quality requires judgment, this IS the primary metric
-   - Cost-controlled via stratified sampling (not exhaustive)
-   - Produces a scalar score the loop can optimize against
-   - Can include multiple dimensions (coherence, granularity, completeness)
-   - See detailed design below
+2. **LLM-as-judge quality score**（实际 optimization target）：
+   - 对 quality 需要 judgment 的问题，这就是 primary metric
+   - 通过 stratified sampling 控制成本（不是 exhaustive）
+   - 产生 loop 可优化的 scalar score
+   - 可包含多个 dimensions（coherence、granularity、completeness）
+   - 详见下方 detailed design
 
-3. **Diagnostics** (logged for understanding, not gated on):
-   - Distribution stats, counts, histograms
-   - Useful for understanding WHY a judge score changed
-   - Examples: median cluster size, singleton %, largest cluster size, cluster count
-   - Logged in the experiment record but never used for keep/revert decisions
+3. **Diagnostics**（用于理解而记录，不作为 gate）：
+   - Distribution stats、counts、histograms（分布统计、计数、直方图）
+   - 用于理解 judge score 为什么变化
+   - 示例：median cluster size、singleton %、largest cluster size、cluster count
+   - 记录在 experiment record 中，但绝不用于 keep/revert decisions
 
-**When to use which configuration**:
+**何时使用哪种配置**：
 
-| Problem Type | Degenerate Gates | Primary Metric | Example |
+| Problem Type | Degenerate Gates | Primary Metric | 示例 |
 |---|---|---|---|
 | Objective function exists | Yes | Hard metric (scalar) | Build time, test pass rate, API latency |
 | Quality requires judgment | Yes | LLM-as-judge score | Clustering quality, search relevance, content generation |
 | Hybrid | Yes | Hard metric + LLM-judge as guard rail | Latency (optimize) + response quality (must not drop) |
 
-**Recommendation**: Support all three tiers. The user declares whether the primary optimization target is a hard metric or an LLM-judge score. Degenerate gates always run first (cheap). Judge runs only on experiments that pass gates.
+**Recommendation**：支持全部 three tiers。用户声明 primary optimization target 是 hard metric 还是 LLM-judge score。Degenerate gates 总是先运行（cheap）。Judge 只在通过 gates 的 experiments 上运行。
 
-### 3. What the Agent Can Edit
+### 3. Agent 可以编辑什么
 
-AutoResearch constrains the agent to one file. This is elegant but too restrictive for most software projects.
+AutoResearch 将 agent 限制在一个文件内。这很优雅，但对大多数 software projects 过于受限。
 
-**Recommendation**: Define an explicit allowlist of mutable files/directories and an explicit denylist (measurement harness, test fixtures, evaluation data). The agent operates within the allowlist. The measurement harness is immutable — the agent cannot game the metric by changing how it's measured.
+**Recommendation**：定义显式 mutable files/directories allowlist，以及显式 denylist（measurement harness、test fixtures、evaluation data）。agent 只在 allowlist 内操作。measurement harness 是 immutable，agent 不能通过改变 measurement 方式来 game the metric。
 
-### 4. Measurement Scaffolding First
+### 4. 先构建 Measurement Scaffolding
 
-This is critical and distinguishes this from "just run the code in a loop":
+这是关键点，也让它区别于“just run the code in a loop”：
 
-1. **Define the measurement spec** before any optimization begins
-2. **Build and validate the measurement harness** — ensure it produces reliable, reproducible results
-3. **Establish baseline** — run the harness on the current code to get starting metrics
-4. Only then begin the optimization loop
+1. 在任何 optimization 开始前，**定义 measurement spec**
+2. **构建并验证 measurement harness**：确保它产生 reliable、reproducible results
+3. **建立 baseline**：在当前代码上运行 harness，得到 starting metrics
+4. 然后才开始 optimization loop
 
-**Recommendation**: Make this a hard phase gate. The skill refuses to enter the optimization loop until the measurement harness passes a validation check (runs successfully, produces expected metric types, baseline is recorded).
+**Recommendation**：把它设为 hard phase gate。直到 measurement harness 通过 validation check（成功运行、产生预期 metric types、baseline 已记录），skill 都拒绝进入 optimization loop。
 
-### 5. History and Memory
+### 5. History and Memory（历史与记忆）
 
-What gets remembered across iterations:
+跨 iterations 需要记住的内容：
 
-- **Results log**: Every experiment's metrics, hypothesis, and outcome (kept/reverted)
-- **Git history**: Successful experiments are commits; branches are preserved
-- **Hypothesis log**: What was tried, why, what was learned — prevents re-trying failed approaches
-- **Strategy evolution**: As the agent learns what works, it should adapt its exploration strategy
+- **Results log**：每个 experiment 的 metrics、hypothesis 和 outcome（kept/reverted）
+- **Git history**：成功 experiments 是 commits；branches 会保留
+- **Hypothesis log**：尝试了什么、为什么、学到了什么，避免重复尝试失败 approaches
+- **Strategy evolution**：随着 agent 学会什么有效，应调整 exploration strategy
 
-**Recommendation**: A structured experiment log (YAML or JSON) that captures: iteration number, hypothesis, changes made, metrics before/after, outcome (kept/reverted/error), and learnings. The agent reads this before proposing the next hypothesis. Git branches are preserved for all kept experiments.
+**Recommendation**：使用 structured experiment log（YAML 或 JSON）捕获 iteration number、hypothesis、changes made、metrics before/after、outcome（kept/reverted/error）和 learnings。agent 在提出下一个 hypothesis 前读取它。所有 kept experiments 都保留 git branches。
 
-### 6. How Long It Runs
+### 6. 运行多久
 
-- AutoResearch runs "indefinitely until manually stopped"
-- Real-world needs: time budgets, iteration budgets, metric targets, or "until no improvement for N iterations"
+- AutoResearch 会 “indefinitely until manually stopped”
+- Real-world needs：time budgets、iteration budgets、metric targets，或 “until no improvement for N iterations”
 
-**Recommendation**: Support multiple stopping criteria (any can trigger stop):
-- Target metric reached
-- Max iterations
-- Max wall-clock time
-- No improvement for N consecutive iterations
-- Manual stop (user interrupts)
+**Recommendation**：支持多个 stopping criteria（任意一个都可触发 stop）：
+- 达到 target metric
+- 达到 max iterations
+- 达到 max wall-clock time
+- 连续 N 次 iterations 无改进
+- Manual stop（用户中断）
 
-### 7. Parallelism
+### 7. Parallelism（并行）
 
-AutoResearch is single-threaded. AIDE and AI Scientist run parallel experiments. For CE:
+AutoResearch 是 single-threaded。AIDE 和 AI Scientist 会运行 parallel experiments。对 CE 而言：
 
-- **Phase 1 (v1)**: Single-threaded linear loop. Simple, debuggable, works with git worktrees.
-- **Phase 2 (future)**: Parallel experiments using multiple worktrees or Codex sandboxes. Each experiment is independent.
+- **Phase 1（v1）**：single-threaded linear loop。简单、可 debug，适配 git worktrees。
+- **Phase 2（future）**：使用多个 worktrees 或 Codex sandboxes 的 parallel experiments。每个 experiment 都独立。
 
-**Recommendation**: Start single-threaded. Design the experiment log and branching model to support parallelism later.
+**Recommendation**：先 single-threaded 启动。设计 experiment log 和 branching model 时支持未来 parallelism。
 
-### 8. Integration with Existing CE Skills
+### 8. 与现有 CE Skills 集成
 
-The optimization loop should compose with existing CE capabilities:
+optimization loop 应与现有 CE capabilities 组合：
 
-- **`/ce:ideate`** or **`/ce:brainstorm`** to generate initial hypothesis space
-- **Learnings researcher** to check if similar optimization was done before
-- **`/ce:compound`** to capture the winning strategy as institutional knowledge after the loop completes
-- **`/ce:review`** optionally on the final winning diff before it's merged
+- **`/ce:ideate`** 或 **`/ce:brainstorm`** 用于生成 initial hypothesis space
+- **Learnings researcher** 用于检查是否曾做过类似 optimization
+- **`/ce:compound`** 用于在 loop 完成后把 winning strategy 捕获为 institutional knowledge
+- **`/ce:review`** 可选，用于在 merge 前 review final winning diff
 
-## Proposed Skill: `/ce-optimize`
+## 提议 Skill：`/ce-optimize`
 
-### Workflow Phases
+### Workflow Phases（工作流阶段）
 
 ```
 Phase 0: Setup
@@ -240,11 +240,11 @@ Phase 4: Wrap-Up
   '-- Report to user
 ```
 
-### Optimization Spec File Format
+### Optimization Spec File Format（Optimization Spec 文件格式）
 
-See "Updated Spec File Format" in the Resolved Design Decisions section below for the full spec with parallel execution and stability config.
+包含 parallel execution 和 stability config 的完整 spec 见下方 Resolved Design Decisions section 中的 “Updated Spec File Format”。
 
-### Experiment Log Format
+### Experiment Log Format（Experiment Log 格式）
 
 ```yaml
 # .context/compound-engineering/optimize/experiment-log.yaml
@@ -376,52 +376,52 @@ best:
   total_judge_cost_usd: 1.60   # running total across all experiments
 ```
 
-## Hypothesis Generation Strategies
+## Hypothesis 生成策略
 
-For the clustering example, here's the kind of hypothesis space the agent should explore:
+对 clustering example，agent 应探索的 hypothesis space 大致如下：
 
-### Signal Extraction
-- Remove PR/issue template boilerplate before embedding
-- Extract only user-authored text (strip auto-generated sections)
-- Weight title more heavily than body
-- Use code snippets / file paths mentioned as signals
-- Extract error messages and stack traces as high-signal features
+### Signal Extraction（信号提取）
+- 在 embedding 前移除 PR/issue template boilerplate
+- 只提取用户创作文本（剥离 auto-generated sections）
+- 提高 title 相对 body 的权重
+- 将提到的 code snippets / file paths 用作 signals
+- 提取 error messages 和 stack traces 作为 high-signal features
 
-### Graph-Based Signals
-- Issue-to-PR links (issues referencing same PR are related)
-- Cross-references between issues (`#123` mentions)
-- Author patterns (same author filing similar issues)
-- Label co-occurrence
-- Milestone/project board grouping
+### Graph-Based Signals（基于图的信号）
+- Issue-to-PR links（引用同一 PR 的 issues 相关）
+- issues 之间的 cross-references（`#123` mentions）
+- Author patterns（同一 author 提交相似 issues）
+- Label co-occurrence（标签共现）
+- Milestone/project board grouping（milestone/project board 分组）
 
-### Embedding & Similarity
-- Try different embedding models (different size/quality tradeoffs)
-- Chunk long issues before embedding vs. truncate vs. summarize
-- Weighted combination of multiple similarity signals
-- Asymmetric similarity (issue-to-PR vs. issue-to-issue)
+### Embedding 与 Similarity
+- 尝试不同 embedding models（不同 size/quality tradeoffs）
+- 在 embedding 前对 long issues 做 chunk，而不是 truncate 或 summarize
+- 对多个 similarity signals 做 weighted combination
+- Asymmetric similarity（非对称相似度：issue-to-PR vs. issue-to-issue）
 
-### Clustering Algorithm
-- Adjust similarity thresholds (per-signal or combined)
-- Try hierarchical clustering vs. graph-based community detection
-- Two-pass: coarse clusters then split/merge refinement
-- Minimum cluster size constraints
-- Handle outlier issues that genuinely don't cluster
+### Clustering Algorithm（聚类算法）
+- 调整 similarity thresholds（per-signal 或 combined）
+- 尝试 hierarchical clustering vs. graph-based community detection
+- Two-pass：先 coarse clusters，再做 split/merge refinement
+- Minimum cluster size constraints（最小 cluster size 约束）
+- 处理确实不应进入 cluster 的 outlier issues
 
-### Pre-processing
-- Normalize markdown formatting
-- Deduplicate near-identical issues before clustering
-- Language detection and translation for multilingual repos
-- Time-decay weighting (recent issues weighted more)
+### Pre-processing（预处理）
+- 标准化 markdown formatting
+- 在 clustering 前对 near-identical issues 去重
+- 为 multilingual repos 做 language detection 和 translation
+- Time-decay weighting（recent issues 权重更高）
 
-## Resolved Design Decisions
+## 已解决的设计决策
 
-### D1: Measurement Harness Ownership -> DECIDED: Agent builds, user validates
+### D1：Measurement Harness Ownership -> DECIDED：Agent 构建，user 验证
 
-The agent builds the measurement harness in Phase 1 and evaluates it against the current implementation. If the user provides an existing harness, the agent documents how to use it (or reviews existing docs), runs it once, and confirms the baseline measurement is accurate. Either way, the user reviews and approves before the loop starts. This is a hard gate.
+agent 在 Phase 1 构建 measurement harness，并用当前 implementation 评估它。如果用户提供现有 harness，agent 会记录如何使用它（或 review 现有 docs），运行一次，并确认 baseline measurement 准确。不论哪种方式，用户都要在 loop 开始前 review 并 approve。这是 hard gate。
 
-### D2: Flaky Metrics -> DECIDED: User-configurable, default stable
+### D2：Flaky Metrics -> DECIDED：User-configurable，默认 stable
 
-The spec supports a `stability` block:
+spec 支持 `stability` block：
 
 ```yaml
 measurement:
@@ -434,30 +434,30 @@ measurement:
     # noise_threshold: 0.02 # improvement must exceed this to count
 ```
 
-When `mode: repeat`, the harness runs `repeat_count` times. The `aggregation` function reduces results to a single value per metric. The `noise_threshold` prevents accepting improvements within the noise floor. Default is `stable` — run once, trust it.
+当 `mode: repeat` 时，harness 运行 `repeat_count` 次。`aggregation` function 将 results reduce 为每个 metric 的单一值。`noise_threshold` 防止接受 noise floor 内的 improvements。默认是 `stable`：运行一次并信任结果。
 
-### D3: New Dependencies -> DECIDED: Pre-approve expected, defer surprises
+### D3：New Dependencies -> DECIDED：预先批准 expected dependencies，defer surprises
 
-During Phase 2 (Hypothesis Generation), the agent outlines expected new dependencies across all planned variations and gets bulk approval up front. If an experiment during the loop discovers it needs an unapproved dependency, the agent:
-1. Sets that hypothesis aside (marks it `deferred_needs_approval` in the experiment log)
-2. Continues with other hypotheses that don't need new deps
-3. At the end of the loop (or at a user check-in), presents the deferred hypotheses and their dep requirements for batch approval
-4. If approved, those hypotheses enter the next iteration batch
+在 Phase 2（Hypothesis Generation）期间，agent 会梳理所有 planned variations 中预期的新 dependencies，并预先获得 bulk approval。如果 loop 中某个 experiment 发现需要未批准 dependency，agent 会：
+1. 将该 hypothesis 放到一边（在 experiment log 中标记为 `deferred_needs_approval`）
+2. 继续处理不需要新 deps 的其他 hypotheses
+3. 在 loop 结束时（或 user check-in 时）展示 deferred hypotheses 及其 dep requirements，供 batch approval
+4. 如果获批，这些 hypotheses 进入下一轮 iteration batch
 
-This prevents blocking the pipeline on interactive approval during long unattended runs.
+这可以避免在长时间 unattended runs 中因 interactive approval 阻塞 pipeline。
 
-### D4: LLM-as-Judge -> DECIDED: Include in v1 (cost-controlled via sampling)
+### D4：LLM-as-Judge -> DECIDED：纳入 v1（通过 sampling 控制成本）
 
-LLM-as-judge is essential for problems where quality requires judgment — it's often the *actual* optimization target, not a nice-to-have. Hard metrics catch degenerate cases but can't tell you whether clusters are coherent or search results are relevant.
+对于 quality 需要 judgment 的问题，LLM-as-judge 是 essential，它往往是 *actual* optimization target，而不是 nice-to-have。Hard metrics 可以捕获 degenerate cases，但无法告诉你 clusters 是否 coherent，或 search results 是否 relevant。
 
-**Cost control via stratified sampling**:
-- Don't judge every output item — sample a representative set
-- Stratified sampling ensures coverage of edge cases (small clusters, large clusters, singletons)
-- Default: ~30 samples per evaluation (configurable)
-- At ~$0.01-0.03 per judgment call, 30 samples = ~$0.30-0.90 per experiment
-- Over 100 experiments = $30-90 total — manageable
+**通过 stratified sampling 控制成本**：
+- 不 judge 每个 output item，而是 sample 一组 representative set
+- Stratified sampling 确保覆盖 edge cases（small clusters、large clusters、singletons）
+- 默认每次 evaluation 约 30 samples（可配置）
+- 如果每次 judgment call 约 $0.01-0.03，30 samples = 每个 experiment 约 $0.30-0.90
+- 100 个 experiments 总计 $30-90，仍可管理
 
-**Sampling strategy**:
+**Sampling strategy（采样策略）**：
 ```yaml
 judge:
   sample_size: 30
@@ -472,7 +472,7 @@ judge:
   singleton_sample: 10
 ```
 
-**Rubric-based scoring** (user-defined, per problem):
+**Rubric-based scoring（由用户按 problem 定义）**：
 ```yaml
 judge:
   rubric: |
@@ -493,112 +493,112 @@ judge:
     output_format: "json"          # {"score": 4, "distinct_topics": 1, "remove_items": []}
 ```
 
-**Judge execution order**:
-1. Run degenerate-case gates (fast, free) -- reject obviously broken solutions
-2. Run hard metrics (fast, free) -- collect diagnostics
-3. Only if gates pass: run LLM-as-judge on sampled outputs (slow, costs money)
-4. Keep/revert decision uses judge score as primary metric
+**Judge execution order（Judge 执行顺序）**：
+1. 运行 degenerate-case gates（fast、free），拒绝 obviously broken solutions
+2. 运行 hard metrics（fast、free），收集 diagnostics
+3. 只有 gates 通过时，才对 sampled outputs 运行 LLM-as-judge（慢、花钱）
+4. keep/revert decision 使用 judge score 作为 primary metric
 
-**Judge consistency**:
-- Use the same sample indices across experiments when possible (same random seed)
-- This reduces noise from sample variance — you're comparing the same clusters across runs
-- When the output structure changes (different number of clusters), re-sample but log the seed change
+**Judge consistency（一致性）**：
+- 尽可能跨 experiments 使用相同 sample indices（相同 random seed）
+- 这会降低 sample variance 带来的 noise，因为你在跨 runs 比较同一批 clusters
+- 当 output structure 变化时（cluster 数量不同），重新 sample，但记录 seed change
 
-**Judge model selection**:
-- Default: Haiku (fast, cheap, good enough for rubric-based scoring)
-- Option: Sonnet for nuanced judgment (2-3x cost)
-- The judge prompt is part of the immutable measurement harness — the agent cannot modify it
+**Judge model selection（模型选择）**：
+- 默认：Haiku（fast、cheap，足够做 rubric-based scoring）
+- 可选：Sonnet，用于 nuanced judgment（成本 2-3 倍）
+- judge prompt 是 immutable measurement harness 的一部分，agent 不能修改
 
-**Singleton evaluation** (the non-obvious case):
-- Low singleton % isn't automatically good. High singleton % isn't automatically bad.
-- Sample singletons and ask the judge: "Given these other clusters, should this item be in one of them? Which one? Or is it genuinely unique?"
-- This catches false-negative clustering (items that should cluster but don't) AND validates true singletons
+**Singleton evaluation（容易被忽略的场景）**：
+- Low singleton % 不自动代表好。High singleton % 也不自动代表坏。
+- sample singletons 并询问 judge：“Given these other clusters, should this item be in one of them? Which one? Or is it genuinely unique?”
+- 这既能捕获 false-negative clustering（本应 cluster 但未 cluster 的 items），也能验证 true singletons
 
-### D5: Codex Support -> DECIDED: Include from v1
+### D5：Codex Support -> DECIDED：从 v1 开始支持
 
-Based on patterns from PRs #364/#365 in the compound-engineering plugin:
+基于 compound-engineering plugin 中 PRs #364/#365 的 patterns：
 
-**Dispatch pattern**: Write experiment prompt to a temp file, pipe to `codex exec` via stdin:
+**Dispatch pattern**：将 experiment prompt 写入 temp file，并通过 stdin pipe 给 `codex exec`：
 ```bash
 cat /tmp/optimize-exp-XXXXX.txt | codex exec --skip-git-repo-check - 2>&1
 ```
 
-**Security posture**: User selects once per session (same as ce-work-beta):
-- Workspace write (`--full-auto`)
-- Full access (`--dangerously-bypass-approvals-and-sandbox`)
+**Security posture**：用户每个 session 选择一次（与 ce-work-beta 相同）：
+- Workspace write（工作区写入，`--full-auto`）
+- Full access（完整访问，`--dangerously-bypass-approvals-and-sandbox`）
 
-**Result collection**: Inspect working directory diff after `codex exec` completes. No structured result format — Codex writes files, orchestrator reads the diff and runs the measurement harness.
+**Result collection**：`codex exec` 完成后检查 working directory diff。没有 structured result format；Codex 写文件，orchestrator 读取 diff 并运行 measurement harness。
 
-**Guard rails**:
-- Check for `CODEX_SANDBOX` / `CODEX_SESSION_ID` env vars to prevent recursive delegation
-- 3 consecutive delegate failures auto-disable Codex for remaining experiments
-- Orchestrator retains control of git operations, measurement, and keep/revert decisions
+**Guard rails（保护栏）**：
+- 检查 `CODEX_SANDBOX` / `CODEX_SESSION_ID` env vars，防止 recursive delegation
+- 连续 3 次 delegate failures 后，对剩余 experiments 自动禁用 Codex
+- Orchestrator 保留对 git operations、measurement 和 keep/revert decisions 的控制
 
-### D6: Parallel Execution -> DECIDED: Parallel by default
+### D6：Parallel Execution -> DECIDED: 默认 parallel
 
-Experiments run in parallel by default. The user can specify serial execution if the system under test requires it. The skill actively probes for parallelism blockers.
+Experiments 默认 parallel 运行。如果 system under test 有要求，用户可以指定 serial execution。skill 会主动探测 parallelism blockers。
 
-See full parallel execution design below.
+完整 parallel execution design 见下文。
 
 ---
 
-## Parallel Execution Design
+## Parallel Execution Design（并行执行设计）
 
-### Default: Parallel Experiments
+### 默认：Parallel Experiments
 
-The optimization loop dispatches multiple experiments simultaneously unless the user explicitly requests serial execution. This is the primary throughput lever — running 4-8 experiments in parallel vs. 1 at a time means 4-8x more iterations per hour.
+除非用户明确要求 serial execution，否则 optimization loop 会同时 dispatch 多个 experiments。这是主要 throughput lever：并行运行 4-8 个 experiments，而不是一次 1 个，意味着每小时 iterations 增加 4-8 倍。
 
-### Isolation Strategy
+### Isolation Strategy（隔离策略）
 
-Each parallel experiment needs full filesystem isolation. Two mechanisms, selectable per session:
+每个 parallel experiment 都需要完整 filesystem isolation。每个 session 可选择两种机制：
 
-**Local worktrees** (default):
+**Local worktrees**（默认）：
 ```
 .claude/worktrees/optimize-exp-001/   # full repo copy
 .claude/worktrees/optimize-exp-002/
 .claude/worktrees/optimize-exp-003/
 ```
-- Created via `git worktree add` with a unique branch per experiment
-- Each worktree gets its own copy of shared resources (see below)
-- Cleaned up after measurement: kept experiments merge to the optimization branch, reverted experiments have their worktree removed
+- 通过 `git worktree add` 创建，每个 experiment 使用唯一 branch
+- 每个 worktree 获取自己的 shared resources 副本（见下文）
+- measurement 后清理：kept experiments merge 到 optimization branch；reverted experiments 的 worktree 被移除
 
-**Codex sandboxes** (opt-in):
-- Each experiment dispatched as an independent `codex exec` invocation
-- Codex provides built-in filesystem isolation
-- Orchestrator collects diffs after completion
-- Best for maximizing parallelism (no local resource limits)
+**Codex sandboxes（Codex 沙盒）**（opt-in）：
+- 每个 experiment 作为独立 `codex exec` invocation dispatch
+- Codex 提供内建 filesystem isolation
+- Orchestrator 完成后收集 diffs
+- 最适合最大化 parallelism（无 local resource limits）
 
-**Hybrid** (future):
-- Use Codex for implementation, local worktree for measurement
-- Useful when measurement requires local resources (GPU, specific hardware, large datasets)
+**Hybrid（混合模式）**（future）：
+- 使用 Codex 做 implementation，local worktree 做 measurement
+- 当 measurement 需要 local resources（GPU、specific hardware、large datasets）时很有用
 
-### Parallelism Blocker Detection (Phase 1)
+### Parallelism Blocker Detection（并行阻塞检测，Phase 1）
 
-During Phase 1 (Measurement Scaffolding), the skill actively probes for common parallelism blockers:
+在 Phase 1（Measurement Scaffolding）期间，skill 会主动探测常见 parallelism blockers：
 
-**Port conflicts**:
-- Run the measurement harness and check if it binds to fixed ports
-- Search config and code for hardcoded port numbers
-- If found: parameterize via environment variable (e.g., `PORT=0` for random, or `BASE_PORT + experiment_index`)
-- Add to spec: `parallel.port_strategy: "parameterized"` with the env var name
+**Port conflicts（端口冲突）**：
+- 运行 measurement harness，检查它是否绑定 fixed ports
+- 搜索 config 和 code 中的 hardcoded port numbers
+- 如果发现：通过 environment variable parameterize（例如 `PORT=0` 表示 random，或 `BASE_PORT + experiment_index`）
+- 写入 spec：`parallel.port_strategy: "parameterized"`，并记录 env var name
 
-**Shared database files**:
-- Check for SQLite databases, local file-based stores
-- If found: each experiment gets a copy of the database in its worktree
-- Cleanup: remove copies after measurement
-- Add to spec: `parallel.shared_files: ["data/clusters.db"]` with copy strategy
+**Shared database files（共享数据库文件）**：
+- 检查 SQLite databases、local file-based stores
+- 如果发现：每个 experiment 在其 worktree 中获得 database 副本
+- Cleanup：measurement 后移除副本
+- 写入 spec：`parallel.shared_files: ["data/clusters.db"]`，并记录 copy strategy
 
-**Shared external services**:
-- Check if the system writes to a shared external database, API, or queue
-- If found: warn user, suggest serial mode or test database isolation
-- This is a hard blocker for parallel unless the user confirms isolation
+**Shared external services（共享外部服务）**：
+- 检查 system 是否写入 shared external database、API 或 queue
+- 如果发现：警告用户，建议 serial mode 或 test database isolation
+- 除非用户确认 isolation，否则这是 parallel 的 hard blocker
 
-**Resource contention**:
-- Check for GPU usage, large memory requirements
-- If the system needs exclusive access to a resource, serial mode is required
-- Add to spec: `parallel.exclusive_resources: ["gpu"]`
+**Resource contention（资源争用）**：
+- 检查 GPU usage、large memory requirements
+- 如果 system 需要独占某个 resource，则必须使用 serial mode
+- 写入 spec：`parallel.exclusive_resources: ["gpu"]`
 
-**Detection output**: Phase 1 produces a `parallel_readiness` assessment:
+**Detection output**：Phase 1 产生 `parallel_readiness` assessment：
 ```yaml
 parallel:
   mode: "parallel"            # parallel | serial | user-decision
@@ -615,7 +615,7 @@ parallel:
   blockers_unresolved: []     # these force serial unless user resolves
 ```
 
-### Parallel Loop Mechanics
+### Parallel Loop Mechanics（并行 loop 机制）
 
 ```
 Orchestrator (main branch)
@@ -648,15 +648,15 @@ Orchestrator (main branch)
   |-- Next batch
 ```
 
-### Parallel-Aware Keep/Revert
+### Parallel-Aware Keep/Revert（感知并行的保留/回退）
 
-With parallel experiments, multiple experiments might improve the metric but conflict with each other (they modify the same files in incompatible ways). Resolution strategy:
+在 parallel experiments 中，多个 experiments 可能都改进 metric，但彼此冲突（以不兼容方式修改同一批文件）。Resolution strategy：
 
-1. **Non-overlapping changes**: If the best experiment's changes don't overlap with the second-best, consider keeping both (merge sequentially, re-measure after merge to confirm)
-2. **Overlapping changes**: Keep only the best. Log the second-best as "promising but conflicts with experiment N" for potential future retry on top of the new baseline
-3. **Re-baseline**: After keeping any experiment, all remaining experiments in the batch that were reverted get re-measured mentally against the new baseline — their hypotheses go back into the backlog for potential retry
+1. **Non-overlapping changes**：如果最佳 experiment 的 changes 与第二名不重叠，考虑同时保留两者（顺序 merge，merge 后重新 measure 确认）
+2. **Overlapping changes**：只保留最佳项。将第二名记录为 “promising but conflicts with experiment N”，方便未来基于新 baseline 重试
+3. **Re-baseline**：保留任何 experiment 后，batch 中所有已 reverted 的剩余 experiments 都要针对新 baseline 重新评估；它们的 hypotheses 回到 backlog，供未来可能重试
 
-### Experiment Prompt Template (for Codex dispatch)
+### Experiment Prompt Template（用于 Codex dispatch）
 
 ```markdown
 # Optimization Experiment #{iteration}
@@ -690,7 +690,7 @@ DO NOT modify:
 4. Run `git diff --stat` when done so the orchestrator can see your changes
 ```
 
-### Concurrency Limits
+### Concurrency Limits（并发限制）
 
 ```yaml
 parallel:
@@ -702,9 +702,9 @@ parallel:
 
 ---
 
-## Updated Spec File Format
+## Updated Spec File Format（更新后的 Spec 文件格式）
 
-### Example A: Hard-Metric Primary (build performance, test pass rate)
+### Example A：Hard-Metric Primary（硬指标优先：build performance、test pass rate）
 
 ```yaml
 # .context/compound-engineering/optimize/spec.yaml
@@ -738,7 +738,7 @@ measurement:
     mode: "stable"
 ```
 
-### Example B: LLM-Judge Primary (clustering quality, search relevance)
+### Example B：LLM-Judge Primary（LLM judge 优先：clustering quality、search relevance）
 
 ```yaml
 # .context/compound-engineering/optimize/spec.yaml
@@ -853,7 +853,7 @@ stopping:
   target_reached: true
 ```
 
-### Evaluation Execution Order (per experiment)
+### Evaluation Execution Order（每个 experiment 的评估执行顺序）
 
 ```
 1. Run measurement command (evaluate.py)
@@ -877,101 +877,101 @@ stopping:
 
 ---
 
-## Open Questions (Remaining)
+## 开放问题（Remaining）
 
-1. **Should the agent propose hypotheses, or should the user provide them?**
-   - Both — agent generates from analysis, user can inject ideas, agent prioritizes
+1. **应该由 agent 提出 hypotheses，还是由用户提供？**
+   - 两者都支持：agent 基于 analysis 生成，用户也可以注入 ideas，agent 负责优先级排序
 
-2. **Judge calibration across experiments**
-   - LLM judges can drift or be inconsistent across calls
-   - Should we include "anchor samples" — a fixed set of clusters with known scores — in every judge batch to detect drift?
-   - If anchor scores shift >0.5 from baseline, re-calibrate or flag for user review
+2. **跨 experiments 的 judge calibration**
+   - LLM judges 可能在 calls 之间 drift 或不一致
+   - 是否应在每个 judge batch 中包含 “anchor samples”：一组带已知 scores 的固定 clusters，用于检测 drift？
+   - 如果 anchor scores 相对 baseline 偏移 >0.5，则 re-calibrate 或标记给用户 review
 
-3. **Judge rubric iteration**
-   - The rubric itself might need improvement after seeing early results
-   - But changing the rubric mid-loop invalidates comparisons to earlier experiments
-   - Solution: if rubric changes, re-judge the current best with the new rubric to re-baseline?
+3. **Judge rubric iteration（judge rubric 迭代）**
+   - rubric 本身在看到 early results 后可能需要改进
+   - 但在 mid-loop 修改 rubric 会让与早期 experiments 的比较失效
+   - 可能解法：如果 rubric 变化，用新 rubric 重新 judge current best，建立新 baseline？
 
-4. **Relationship to `/lfg` and `/slfg`?**
-   - `/lfg` is autonomous execution of a single task
-   - `/ce-optimize` is autonomous execution of an iterative search
-   - `/ce-optimize` can delegate each experiment to Codex (decided D5)
-   - Local experiments use subagent dispatch similar to `/ce:review`
+4. **与 `/lfg` 和 `/slfg` 的关系？**
+   - `/lfg` 是单个任务的 autonomous execution
+   - `/ce-optimize` 是 iterative search 的 autonomous execution
+   - `/ce-optimize` 可以将每个 experiment delegate 给 Codex（已在 D5 决定）
+   - Local experiments 使用类似 `/ce:review` 的 subagent dispatch
 
-5. **Branch strategy details?**
-   - Main optimization branch: `optimize/<spec-name>`
-   - Each kept experiment is a commit on that branch
-   - Branch points create `optimize/<spec-name>/direction-<N>`
-   - All branches preserved for later reference and comparison
+5. **Branch strategy details（branch 策略细节）？**
+   - Main optimization branch（主 optimization branch）：`optimize/<spec-name>`
+   - 每个 kept experiment 都是该 branch 上的一个 commit
+   - Branch points 创建 `optimize/<spec-name>/direction-<N>`
+   - 所有 branches 都保留，供之后 reference 和 comparison
 
-6. **Batch size adaptation?**
-   - Should the batch size grow/shrink based on success rate?
-   - High success rate -> larger batches (more exploration)
-   - Low success rate -> smaller batches (more focused)
-   - Or keep it simple and let the user tune `max_concurrent`
+6. **Batch size adaptation（batch size 自适应）？**
+   - batch size 是否应根据 success rate grow/shrink？
+   - High success rate -> 更大的 batches（更多 exploration）
+   - Low success rate -> 更小的 batches（更聚焦）
+   - 或保持简单，让用户调整 `max_concurrent`
 
-7. **Hypothesis diversity within a batch?**
-   - Should parallel experiments in the same batch be intentionally diverse?
-   - E.g., one threshold tweak + one new signal + one preprocessing change
-   - Or let the prioritization algorithm decide naturally?
+7. **batch 内的 hypothesis diversity？**
+   - 同一 batch 中的 parallel experiments 是否应刻意保持 diverse？
+   - 例如，一个 threshold tweak + 一个 new signal + 一个 preprocessing change
+   - 或让 prioritization algorithm 自然决定？
 
-8. **Judge cost budgets?**
-   - Should the spec include a `max_judge_cost_usd` budget?
-   - When budget is exhausted, switch to hard-metrics-only mode or stop?
-   - Or just track cost in the log and let the user decide?
+8. **Judge cost budgets（judge 成本预算）？**
+   - spec 是否应包含 `max_judge_cost_usd` budget？
+   - 当 budget 用尽时，切换到 hard-metrics-only mode 还是 stop？
+   - 或者只在 log 中 track cost，让用户决定？
 
-## What Makes This Different From "Just Using AutoResearch"
+## 它与“直接使用 AutoResearch”的区别
 
-AutoResearch is designed for ML training on a single GPU. CE's version needs to handle:
+AutoResearch 面向 single GPU 上的 ML training 设计。CE 版本需要处理：
 
-1. **Multi-file changes** — real code changes span multiple files
-2. **Complex metrics** — not just one scalar, but primary + guard rails + diagnostics
-3. **Varied execution environments** — not just `python train.py` but arbitrary commands
-4. **Integration with existing workflows** — learnings, review, ideation
-5. **User-in-the-loop** — pause for approval on scope-expanding changes, inject new hypotheses
-6. **Knowledge capture** — document what worked and why for the team, not just for the agent's context
-7. **Non-ML domains** — clustering, search quality, API performance, test coverage, build times, etc.
+1. **Multi-file changes**：真实 code changes 会跨多个 files
+2. **Complex metrics**：不只是一个 scalar，而是 primary + guard rails + diagnostics
+3. **Varied execution environments**：不只是 `python train.py`，而是任意 commands
+4. **Integration with existing workflows（与现有 workflow 集成）**：learnings、review、ideation
+5. **User-in-the-loop**：对 scope-expanding changes 暂停等待 approval，注入 new hypotheses
+6. **Knowledge capture**：为团队记录什么有效以及为什么，而不只是留在 agent 的 context 中
+7. **Non-ML domains**：clustering、search quality、API performance、test coverage、build times 等
 
-## Success Criteria for This Skill
+## 此 Skill 的成功标准
 
-- User can define an optimization target in <15 minutes
-- Measurement scaffolding is validated before the loop starts
-- Loop runs unattended for hours, producing measurable improvement
-- All experiments are preserved in git for later reference
-- The winning strategy is documented as a learning
-- A human reviewing the experiment log can understand what was tried and why
-- The skill handles failures gracefully (bad experiments don't corrupt state)
+- 用户可以在 <15 分钟内定义 optimization target
+- Measurement scaffolding 在 loop 开始前完成验证
+- Loop 可 unattended 运行数小时，并产生 measurable improvement
+- 所有 experiments 都保存在 git 中，供之后 reference
+- Winning strategy 被记录为 learning
+- 人类 review experiment log 时，能理解尝试了什么以及为什么
+- skill 能 graceful 处理 failures（bad experiments 不会污染 state）
 
-## Lessons from First Run (2026-03-30)
+## 第一次运行的经验（2026-03-30）
 
-The skill was tested on the clustering problem for ~90 minutes. Results:
+该 skill 在 clustering problem 上测试约 90 分钟。结果：
 
-**What worked:**
-- Ran 16 experiments, improved multi_member_pct from 31.4% to 72.1%
-- Explored multiple algorithm modes (basic, refine, bounded union-find)
-- Correctly identified size-bounded union-find as the winning approach
-- Hypothesis diversity across parameter sweeps was reasonable
+**有效的部分：**
+- 运行 16 个 experiments，将 multi_member_pct 从 31.4% 提升到 72.1%
+- 探索了多个 algorithm modes（basic、refine、bounded union-find）
+- 正确识别 size-bounded union-find 是 winning approach
+- parameter sweeps 中的 hypothesis diversity 合理
 
-**What failed:**
+**失败的部分：**
 
-1. **No LLM-as-judge evaluation** -- The skill defaulted to `type: hard` and optimized `multi_member_pct` as the primary metric. This is a proxy metric that can mislead. A solution that puts 72% of items in clusters is useless if the clusters are incoherent. The Phase 0.2 interactive spec creation did not actively probe whether the target was qualitative or guide toward judge mode.
+1. **没有 LLM-as-judge evaluation** -- skill 默认使用 `type: hard`，并将 `multi_member_pct` 作为 primary metric 优化。这是可能误导的 proxy metric。如果 clusters 不 coherent，把 72% items 放入 clusters 的方案也没有价值。Phase 0.2 interactive spec creation 没有主动探测 target 是否是 qualitative，也没有引导到 judge mode。
 
-   **Fix applied**: Phase 0.2 now includes explicit qualitative vs quantitative detection, concrete examples of when to use each type, sampling strategy guidance with walkthrough questions, and rubric design guidance. The skill now strongly recommends `type: judge` for qualitative targets.
+   **已应用修复**：Phase 0.2 现在包含明确的 qualitative vs quantitative detection、何时使用每种 type 的具体示例、带 walkthrough questions 的 sampling strategy guidance，以及 rubric design guidance。skill 现在会强烈建议 qualitative targets 使用 `type: judge`。
 
-2. **No disk persistence** -- Experiment results existed only in the conversation context (as a table dumped to chat). If the session had been compacted or crashed, all 90 minutes of results would have been lost. This directly contradicts the Karpathy model where `results.tsv` is written after every single experiment.
+2. **没有 disk persistence** -- Experiment results 只存在于 conversation context 中（作为表格 dump 到 chat）。如果 session 被 compact 或 crash，90 分钟 results 都会丢失。这直接违背了 Karpathy model：每个 experiment 后都会写入 `results.tsv`。
 
-   **Fix applied**: Added mandatory disk checkpoints (CP-0 through CP-5) at every phase boundary. Each checkpoint requires a write-then-verify cycle: write the file, read it back, confirm the content is present. The persistence discipline section now explicitly states "If you produce a results table in the conversation without writing those results to disk first, you have a bug."
+   **已应用修复**：在每个 phase boundary 增加 mandatory disk checkpoints（CP-0 到 CP-5）。每个 checkpoint 都要求 write-then-verify cycle：写文件、读回、确认内容存在。persistence discipline section 现在明确写明：“If you produce a results table in the conversation without writing those results to disk first, you have a bug.”
 
-3. **Sampling strategy not prompted** -- Even if `type: judge` had been used, the skill didn't guide the user through designing a sampling strategy. For clustering, the user wants stratified sampling across: top clusters by size (check for mega-clusters), mid-range clusters (representative quality), small clusters (check if connections are real), and singletons (check for false negatives). This domain-specific guidance was missing.
+3. **没有提示 sampling strategy** -- 即使使用了 `type: judge`，skill 也没有引导用户设计 sampling strategy。对 clustering 来说，用户需要跨这些维度做 stratified sampling：按 size 排序的 top clusters（检查 mega-clusters）、mid-range clusters（代表性质量）、small clusters（检查连接是否真实）和 singletons（检查 false negatives）。缺少这种 domain-specific guidance。
 
-   **Fix applied**: Phase 0.2 now walks through sampling strategy design with concrete questions and domain-specific examples.
+   **已应用修复**：Phase 0.2 现在会用具体 questions 和 domain-specific examples 引导 sampling strategy design。
 
-**Key takeaway**: The skill had all the right machinery in the schema and templates but the SKILL.md instructions didn't forcefully enough guide the agent toward using that machinery. Instructions that say "if judge type, do X" are ignored when the skill silently defaults to hard type. Instructions need to actively detect the right path and guide toward it.
+**关键 takeaway**：skill 在 schema 和 templates 中已经有正确 machinery，但 SKILL.md instructions 没有足够有力地引导 agent 使用这些 machinery。当 skill 静默默认到 hard type 时，“if judge type, do X” 这种 instructions 会被忽略。Instructions 需要主动检测正确路径并引导过去。
 
-## Next Steps
+## 下一步
 
-1. Re-test with the clustering use case using `type: judge` to validate the judge loop works end-to-end
-2. Verify disk persistence works on a long run (2+ hours) with context compaction
-3. Test with a second use case (e.g., prompt optimization, build performance) to validate generality
-4. Consider adding anchor samples for judge calibration across experiments (Open Question #2)
-5. Consider judge cost budgets (Open Question #8)
+1. 使用 `type: judge` 重新测试 clustering use case，验证 judge loop 可 end-to-end 工作
+2. 在带 context compaction 的长时间运行（2+ hours）中验证 disk persistence 可用
+3. 使用第二个 use case（例如 prompt optimization、build performance）测试 generality
+4. 考虑为跨 experiments 的 judge calibration 增加 anchor samples（Open Question #2）
+5. 考虑 judge cost budgets（Open Question #8）

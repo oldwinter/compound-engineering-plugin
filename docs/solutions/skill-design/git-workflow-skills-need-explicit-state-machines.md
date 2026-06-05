@@ -1,15 +1,15 @@
 ---
-title: "Git workflow skills need explicit state machines for branch, push, and PR state"
+title: "Git workflow skills 需要显式 state machines 来处理 branch、push 和 PR state"
 category: skill-design
 date: 2026-03-27
 module: plugins/compound-engineering/skills/ce-commit and ce-commit-push-pr
 problem_type: architecture_pattern
 component: tooling
 symptoms:
-  - Detached HEAD could fall through to invalid push or PR paths
-  - Untracked-only work could be misclassified as a clean working tree
-  - PR detection could select the wrong PR or mis-handle the no-PR case
-  - Default-branch flows could attempt invalid "open a PR from the default branch" behavior
+  - Detached HEAD 可能落入 invalid push 或 PR paths
+  - 只有 untracked files 的 work 可能被误判为 clean working tree
+  - PR detection 可能选中错误 PR，或错误处理 no-PR case
+  - Default-branch flows 可能尝试 invalid "open a PR from the default branch" behavior
 root_cause: missing_workflow_step
 resolution_type: workflow_improvement
 severity: high
@@ -23,36 +23,36 @@ tags:
   - default-branch
 ---
 
-# Git workflow skills need explicit state machines for branch, push, and PR state
+# Git workflow skills 需要显式 state machines 来处理 branch、push 与 PR state
 
-## Problem
+## 问题
 
-The `ce-commit` and `ce-commit-push-pr` skills had accumulated branch-state and PR-state bugs because they described Git flow in broad prose instead of modeling the workflow as a sequence of explicit state checks. Small wording changes kept introducing regressions around detached HEAD, untracked files, upstream detection, default-branch pushes, and PR lookup.
+`ce-commit` 和 `ce-commit-push-pr` skills 因为用宽泛 prose 描述 Git flow，而不是把 workflow 建模为一串 explicit state checks，已经积累了 branch-state 与 PR-state bugs。围绕 detached HEAD、untracked files、upstream detection、default-branch pushes 和 PR lookup 的小 wording changes 不断引入 regressions。
 
-## Symptoms
+## 症状
 
-- `git push -u origin HEAD` could be reached from detached HEAD, where Git rejects the push because `HEAD` is not a branch ref
-- A repo with only untracked files could be treated as "nothing changed" because `git diff HEAD` is empty for untracked files
-- A no-PR branch could trigger an error path that looked like a fatal failure instead of an expected "no PR for this branch" state
-- `gh pr list --head "<branch>"` could match an unrelated PR from another fork with the same branch name
-- Clean-working-tree flows on the default branch could push default-branch commits and then try to open a PR from the default branch to itself
+- detached HEAD 时可能走到 `git push -u origin HEAD`，Git 会拒绝 push，因为 `HEAD` 不是 branch ref
+- 只有 untracked files 的 repo 可能被视为 "nothing changed"，因为 `git diff HEAD` 对 untracked files 为空
+- no-PR branch 可能触发一个看起来像 fatal failure 的 error path，而不是 expected "no PR for this branch" state
+- `gh pr list --head "<branch>"` 可能匹配到另一个 fork 中同名 branch 的 unrelated PR
+- default branch 上的 clean-working-tree flows 可能 push default-branch commits，然后尝试从 default branch 对自己 open PR
 
-## What Didn't Work
+## 无效做法
 
-- Using a single early `git branch --show-current` result and referring back to it later. Once the workflow creates a branch, the earlier value is stale.
-- Using `git diff HEAD` as the definition of "has changes." It does not account for untracked files.
-- Treating every non-zero exit from `gh pr view` as a fatal failure. "No PR for this branch" is often a normal branch state.
-- Letting the shell tool surface that expected `gh pr view` non-zero exit as a visible failed step. Even when the logic recovers correctly, the UX looks broken and pushes future edits toward less-correct commands.
-- Switching from `gh pr view` to `gh pr list --head "<branch>"` to avoid the no-PR error path. This improved ergonomics but weakened correctness because `gh pr list` cannot disambiguate `<owner>:<branch>`.
-- Adding a "clean working tree" fast path before re-checking whether the current branch was still the default branch. That let the workflow skip the feature-branch safety gate and head straight toward invalid push/PR transitions.
+- 使用一次 early `git branch --show-current` result，并在后续引用它。一旦 workflow 创建 branch，早期 value 就 stale。
+- 用 `git diff HEAD` 定义 "has changes"。它不包含 untracked files。
+- 将 `gh pr view` 的每个 non-zero exit 都视为 fatal failure。"No PR for this branch" 往往是 normal branch state。
+- 让 shell tool 将 expected `gh pr view` non-zero exit 作为 visible failed step surface。即使 logic 正确 recover，UX 也看起来 broken，并推动未来 edits 走向 less-correct commands。
+- 从 `gh pr view` 切换到 `gh pr list --head "<branch>"` 来避免 no-PR error path。这改善了 ergonomics，但削弱 correctness，因为 `gh pr list` 不能 disambiguate `<owner>:<branch>`。
+- 在重新检查当前 branch 是否仍为 default branch 前，添加 "clean working tree" fast path。这会让 workflow 跳过 feature-branch safety gate，直接走向 invalid push/PR transitions。
 
-## Solution
+## 解决方案
 
-Treat the skill as a small state machine. For each transition, run the command that answers the next question directly, then branch on that result instead of carrying state forward in prose.
+把 skill 当作一个小 state machine。对每个 transition，运行能直接回答下一个问题的 command，然后根据该 result branch，而不是在 prose 中 carry state forward。
 
-### 1. Use `git status` as the source of truth for working-tree cleanliness
+### 1. 使用 `git status` 作为 working-tree cleanliness 的 source of truth
 
-Use the `git status` result from Step 1 to decide whether the tree is clean. This covers staged, modified, and untracked files.
+使用 Step 1 中的 `git status` result 判断 tree 是否 clean。这覆盖 staged、modified 和 untracked files。
 
 ```text
 Clean working tree:
@@ -61,11 +61,11 @@ Clean working tree:
 - no untracked files
 ```
 
-Do not use `git diff HEAD` as the cleanliness check.
+不要使用 `git diff HEAD` 作为 cleanliness check。
 
-### 2. Re-read branch state after every branch-changing transition
+### 2. 每次 branch-changing transition 后重新读取 branch state
 
-When the workflow starts in detached HEAD:
+workflow 从 detached HEAD 开始时：
 
 ```bash
 git branch --show-current
@@ -73,183 +73,183 @@ git checkout -b <branch-name>
 git branch --show-current
 ```
 
-The second `git branch --show-current` is not redundant. It converts "the skill thinks it created branch X" into "Git says the current branch is X."
+第二个 `git branch --show-current` 不是 redundant。它把 "skill thinks it created branch X" 转换为 "Git says the current branch is X."
 
-Apply the same pattern before default-branch safety checks:
+同一 pattern 应用于 default-branch safety checks 前：
 
 ```bash
 git branch --show-current
 ```
 
-Run it again at the moment the decision is needed. Do not rely on a branch value captured earlier in the workflow.
+在需要 decision 的时刻再运行它。不要依赖 workflow 早先 captured branch value。
 
-### 3. Split "upstream exists" from "there are unpushed commits"
+### 3. 拆分 "upstream exists" 与 "there are unpushed commits"
 
-Check upstream existence first:
+先检查 upstream existence：
 
 ```bash
 git rev-parse --abbrev-ref --symbolic-full-name @{u}
 ```
 
-Only if that succeeds, check for unpushed commits:
+只有成功后，才检查 unpushed commits：
 
 ```bash
 git log <upstream>..HEAD --oneline
 ```
 
-This avoids conflating "no upstream configured yet" with "nothing to push."
+这避免把 "no upstream configured yet" 与 "nothing to push" 混为一谈。
 
-### 4. Prefer current-branch `gh pr view` semantics over bare branch-name search
+### 4. 偏好 current-branch `gh pr view` semantics，而不是 bare branch-name search
 
-For "does this branch already have a PR?" use:
+对于 "does this branch already have a PR?" 使用：
 
 ```bash
 gh pr view --json url,title,state
 ```
 
-Interpret it as a state check:
+把它解释为 state check：
 
-- PR data returned -> PR exists for the current branch
-- Non-zero exit with output indicating no PR for the current branch -> expected "no PR yet" state
-- Any other failure -> real error
+- 返回 PR data -> 当前 branch 已有 PR
+- Non-zero exit 且 output 表明 current branch 没有 PR -> 预期中的 "no PR yet" state
+- 其他任何 failure -> 真实 error
 
-When the shell/tooling layer renders non-zero exits as scary visible failures, wrap the command so the skill captures both the output and exit code and then interprets them explicitly. The user should see "no PR for this branch" as a normal state transition, not as a broken Bash step.
+当 shell/tooling layer 把 non-zero exits 渲染成 scary visible failures 时，wrap command，让 skill 捕获 output 与 exit code，并显式解释它们。用户应看到 "no PR for this branch" 是 normal state transition，而不是 broken Bash step。
 
-This keeps PR detection tied to the current branch context instead of a bare branch name that may be reused across forks.
+这让 PR detection 绑定到 current branch context，而不是可能在 forks 间复用的 bare branch name。
 
-### 5. Keep the default-branch safety gate ahead of push/PR transitions
+### 5. 将 default-branch safety gate 保持在 push/PR transitions 前
 
-If the current branch is `main`, `master`, or the resolved default branch, and the workflow is about to push or create a PR:
+如果当前 branch 是 `main`、`master` 或 resolved default branch，且 workflow 即将 push 或 create PR：
 
-- ask whether to create a feature branch first
-- if the user agrees, create the branch and re-read the branch name
-- if the user declines in `ce-commit-push-pr`, stop rather than trying to open a PR from the default branch
+- 询问是否先创建 feature branch
+- 如果用户同意，创建 branch 并重新读取 branch name
+- 如果用户在 `ce-commit-push-pr` 中拒绝，则 stop，而不是尝试从 default branch open PR
 
-This prevents "push default branch, then attempt impossible PR flow" behavior.
+这可以防止 "push default branch, then attempt impossible PR flow" behavior。
 
-## Why This Works
+## 为什么有效
 
-Git workflows look linear in prose but are actually stateful. Detached HEAD, missing upstreams, untracked files, and existing-vs-missing PRs are all separate dimensions of state. The bug pattern was always the same: the skill would observe one dimension once, then assume it remained true after a later transition.
+Git workflows 在 prose 中看似 linear，但实际上 stateful。Detached HEAD、missing upstreams、untracked files、existing-vs-missing PRs 都是独立 state dimensions。bug pattern 始终相同：skill 观察某个 dimension 一次，然后假设后来 transition 后它仍为真。
 
-The fix is not more prose. The fix is explicit re-checks at each transition boundary:
+修复不是更多 prose。修复是每个 transition boundary 都 explicit re-check：
 
-- branch state after branch creation
-- cleanliness from `git status`, not a partial diff
-- upstream existence before unpushed-commit checks
-- PR existence tied to the current branch, not only its name
-- default-branch safety before any push/PR transition
+- branch creation 后检查 branch state
+- 用 `git status` 而不是 partial diff 检查 cleanliness
+- 在 unpushed-commit checks 前检查 upstream existence
+- PR existence 绑定 current branch，而不是只有 branch name
+- 任何 push/PR transition 前做 default-branch safety
 
-This turns a brittle narrative into a deterministic control flow with a small number of clear state transitions.
+这把 brittle narrative 变成 deterministic control flow，具有少量 clear state transitions。
 
-## Edge Cases We Hit While Fixing This
+## 修复过程中遇到的边界情况
 
-These were not hypothetical concerns. Each one showed up while revising `ce-commit` and `ce-commit-push-pr`, and several "fixes" introduced a new bug one step later in the flow.
+这些不是 hypothetical concerns。每一项都在修订 `ce-commit` 与 `ce-commit-push-pr` 时出现过，其中几次 "fixes" 在 flow 的下一步引入新 bug。
 
-### 1. Detached HEAD can reappear as a later bug even after it seems "handled"
+### 1. Detached HEAD 即使看似 "handled"，也会作为后续 bug 再出现
 
-An early version only guarded detached HEAD in the PR-detection step. That looked fine until the workflow added a "clean working tree" shortcut before PR detection. In detached HEAD with committed local work, that shortcut could jump directly to push logic and hit:
+早期版本只在 PR-detection step guard detached HEAD。看起来没问题，直到 workflow 在 PR detection 前加入 "clean working tree" shortcut。在 detached HEAD 且已有 committed local work 时，该 shortcut 可能直接跳到 push logic 并触发：
 
 ```bash
 git push -u origin HEAD
 ```
 
-which fails because detached HEAD is not a branch ref.
+这会失败，因为 detached HEAD 不是 branch ref。
 
-Learning: detached HEAD must be handled before any later shortcut can skip around it.
+Learning: detached HEAD 必须在任何可能 skip around it 的后续 shortcut 前处理。
 
-### 2. Creating a branch is not enough; the skill must re-read which branch Git says is current
+### 2. 创建 branch 不够；skill 必须重新读取 Git 认为当前是哪条 branch
 
-Another revision created a branch from detached HEAD but still described later steps as using "the branch name from Step 1." If Step 1 originally ran in detached HEAD, that earlier branch value was empty. Later PR detection could still use the stale empty value.
+另一个 revision 从 detached HEAD 创建了 branch，但后续 steps 仍描述为使用 "the branch name from Step 1." 如果 Step 1 最初运行在 detached HEAD，早期 branch value 是空。后续 PR detection 仍可能使用 stale empty value。
 
-Learning: after `git checkout -b <branch-name>`, run `git branch --show-current` again and treat that output as the only trusted branch name.
+Learning: `git checkout -b <branch-name>` 后，重新运行 `git branch --show-current`，并把 output 作为唯一可信 branch name。
 
-### 3. Bare branch-name PR lookup fixed one problem and created another
+### 3. Bare branch-name PR lookup 修复一个问题，又制造另一个问题
 
-We switched from `gh pr view` to:
+我们从 `gh pr view` 切换到：
 
 ```bash
 gh pr list --head "<branch>" --json url,title,state --jq '.[0] // empty'
 ```
 
-because `gh pr view` was surfacing a non-zero exit when no PR existed. That improved the no-PR path, but it introduced a correctness problem: `gh pr list --head` matches on branch name only, and GitHub CLI does not support `<owner>:<branch>` syntax for that flag. In a multi-fork repo, another person's PR can reuse the same branch name.
+因为 `gh pr view` 在没有 PR 时会 surface non-zero exit。这改善了 no-PR path，但引入 correctness problem：`gh pr list --head` 只按 branch name 匹配，而 GitHub CLI 不支持该 flag 的 `<owner>:<branch>` syntax。在 multi-fork repo 中，另一个人的 PR 可以复用同一 branch name。
 
-Learning: for "PR for the current branch," `gh pr view` is safer even if the no-PR state must be interpreted explicitly.
+Learning: 对 "PR for the current branch" 来说，`gh pr view` 更安全，即使 no-PR state 需要显式解释。
 
-### 4. "No PR" is not an error in the workflow, even if the CLI exits non-zero
+### 4. "No PR" 在 workflow 中不是 error，即使 CLI exits non-zero
 
-The original reason for changing away from `gh pr view` was that a branch with no PR looked like a command failure. But for this workflow, "no PR yet" is often the expected state and should lead to creation logic, not stop the skill.
+最初改掉 `gh pr view` 的原因是 branch 没有 PR 时看起来像 command failure。但对这个 workflow，"no PR yet" 通常是 expected state，应导向 creation logic，而不是 stop skill。
 
-Learning: document expected non-zero exits as state transitions, not generic failures.
+Learning: 将 expected non-zero exits 记录为 state transitions，而不是 generic failures。
 
-### 5. `git diff HEAD` misses one of the most common commit cases: untracked files
+### 5. `git diff HEAD` 漏掉最常见 commit cases 之一：untracked files
 
-At one point the skill used `git diff HEAD` to decide whether work existed. In a repo with only a newly created file, `git diff HEAD` is empty even though `git status` shows `?? file`.
+某个版本用 `git diff HEAD` 判断是否存在 work。只有 newly created file 的 repo 中，`git diff HEAD` 为空，但 `git status` 显示 `?? file`。
 
-Learning: untracked-only work is a first-class case. Use `git status` as the cleanliness check.
+Learning: untracked-only work 是 first-class case。使用 `git status` 作为 cleanliness check。
 
-### 6. "No upstream" and "nothing to push" are different states
+### 6. "No upstream" 与 "nothing to push" 是不同 states
 
-An early shortcut treated an error from `git log @{u}..HEAD` as "nothing to push." That is wrong on a new feature branch with local commits but no upstream yet. The branch still needs its first push.
+早期 shortcut 把 `git log @{u}..HEAD` 的 error 当作 "nothing to push." 这在有 local commits 但尚未配置 upstream 的 new feature branch 上是错的。branch 仍需要 first push。
 
-Learning: first check whether an upstream exists, then check whether there are unpushed commits.
+Learning: 先检查 upstream 是否存在，再检查是否有 unpushed commits。
 
-### 7. Default-branch safety can be bypassed by a convenience shortcut
+### 7. Default-branch safety 会被 convenience shortcut 绕过
 
-Another revision added a clean-working-tree shortcut that said "if there are unpushed commits, skip commit and continue to push." That worked on feature branches but accidentally skipped the normal "don't work directly on main/default branch" safety gate. The result was: push default-branch commits, then head toward PR creation.
+另一个 revision 添加了 clean-working-tree shortcut："if there are unpushed commits, skip commit and continue to push." 这在 feature branches 上有效，但意外跳过了正常的 "don't work directly on main/default branch" safety gate。结果是：push default-branch commits，然后走向 PR creation。
 
-Learning: every path that can lead to push or PR creation must pass through a default-branch safety check.
+Learning: 每条可能导向 push 或 PR creation 的 path 都必须经过 default-branch safety check。
 
-### 8. Declining feature-branch creation on the default branch must stop the PR workflow
+### 8. 在 default branch 上拒绝 feature-branch creation 必须停止 PR workflow
 
-One fix asked the user whether to create a feature branch first when clean-tree logic found unpushed default-branch commits. But if the user declined, the workflow still continued to push and then attempt PR creation. That leads to an impossible "open a PR from the default branch to itself" situation.
+一次 fix 在 clean-tree logic 发现 unpushed default-branch commits 时询问用户是否先创建 feature branch。但如果用户拒绝，workflow 仍继续 push，然后尝试 PR creation。这会导致 impossible "open a PR from the default branch to itself" 状况。
 
-Learning: in `ce-commit-push-pr`, declining feature-branch creation on the default branch is a stop condition, not a continue condition.
+Learning: 在 `ce-commit-push-pr` 中，default branch 上拒绝 feature-branch creation 是 stop condition，不是 continue condition。
 
-### 9. Clean-working-tree shortcuts interact with branch safety, PR state, and upstream state all at once
+### 9. Clean-working-tree shortcuts 同时牵涉 branch safety、PR state 与 upstream state
 
-The hardest bugs came from the "no local edits, but there may still be work to do" path. That single branch of logic had to answer all of these:
+最难的 bugs 来自 "no local edits, but there may still be work to do" path。这一条 logic branch 必须回答：
 
-- Is the current branch detached?
-- Is the current branch the default branch?
-- Does the branch have an upstream?
-- Are there unpushed commits?
-- Does a PR already exist?
+- 当前 branch 是否 detached？
+- 当前 branch 是否 default branch？
+- branch 是否有 upstream？
+- 是否有 unpushed commits？
+- 是否已经存在 PR？
 
-Missing any one of those checks produced a new bug.
+漏掉任一 check 都会产生新 bug。
 
-Learning: clean-working-tree shortcuts are the highest-risk part of Git workflow skills because they combine the most state dimensions at once.
+Learning: clean-working-tree shortcuts 是 Git workflow skills 中风险最高的部分，因为它们同时组合最多 state dimensions。
 
-### 10. Git workflow skills are unusually prone to whack-a-mole regressions
+### 10. Git workflow skills 极易出现 whack-a-mole regressions
 
-The meta-pattern across all these fixes was:
+这些 fixes 背后的 meta-pattern 是：
 
-1. Improve one failure mode
-2. Reveal that another state transition was only implicitly modeled
-3. Add a new branch in the prose
-4. Discover that the new branch skipped a previously safe checkpoint
+1. 改善一个 failure mode
+2. 暴露另一个 state transition 其实只被隐式建模
+3. 在 prose 中添加一个 new branch
+4. 发现 new branch 跳过了先前安全的 checkpoint
 
-Learning: these skills should be designed and reviewed like tiny state machines, not as narrative instructions. Any change to one state transition should trigger a walkthrough of all adjacent states before considering the skill fixed.
+Learning: 这些 skills 应像 tiny state machines 一样设计和 review，而不是 narrative instructions。对一个 state transition 的任何 change，都应触发相邻所有 states 的 walkthrough，然后才认为 skill fixed。
 
-## Prevention
+## 预防
 
-- For Git/GitHub skills, treat workflow design as a state machine, not as a linear checklist.
-- Re-run the command that answers the current question at the point of decision. Do not rely on values gathered earlier if a mutating command may have changed them.
-- Use `git status` for "is there local work?" and reserve `git diff` for describing content, not determining whether work exists.
-- Model expected non-zero CLI exits explicitly when they represent state, such as `gh pr view` on a branch with no PR.
-- When a tool visually highlights non-zero exits as failures, capture the exit code yourself for expected state probes so correct logic does not still look broken to the user.
-- Avoid branch-name-only PR detection for multi-fork repos. If the command cannot disambiguate branch ownership, prefer a current-branch-aware command even if the failure path is slightly messier.
-- Keep default-branch safety checks in every path that can lead to push or PR creation, including "clean working tree but unpushed commits" shortcuts.
-- When editing skill logic, manually walk these cases before considering the change complete:
-  - detached HEAD with uncommitted changes
-  - detached HEAD with committed but unpushed work
-  - untracked-only files
-  - feature branch with no upstream
-  - feature branch with upstream and no PR
-  - feature branch with upstream and an existing PR
-  - default branch with unpushed commits
-  - non-`main` default branch names such as `develop` or `trunk`
+- 对 Git/GitHub skills，将 workflow design 视为 state machine，而不是 linear checklist。
+- 在 decision point 重新运行能回答当前问题的 command。如果 mutating command 可能改变了值，不要依赖 earlier gathered values。
+- 用 `git status` 判断 "is there local work?"，将 `git diff` 留给 describing content，而不是 determining whether work exists。
+- 当 non-zero CLI exits 代表 state（例如 branch 无 PR 时的 `gh pr view`），显式建模 expected exits。
+- 当 tool 会将 non-zero exits 视觉高亮为 failures 时，自己捕获 expected state probes 的 exit code，使正确 logic 不会看起来 broken。
+- 对 multi-fork repos，避免 branch-name-only PR detection。如果 command 无法 disambiguate branch ownership，偏好 current-branch-aware command，即使 failure path 稍微 messy。
+- 在每条可导向 push 或 PR creation 的 path 中保留 default-branch safety checks，包括 "clean working tree but unpushed commits" shortcuts。
+- 编辑 skill logic 时，在认为 change complete 前，手动 walkthrough 这些 cases：
+  - detached HEAD 且有 uncommitted changes
+  - detached HEAD 且有 committed but unpushed work
+  - 只有 untracked files
+  - feature branch 没有 upstream
+  - feature branch 有 upstream 但没有 PR
+  - feature branch 有 upstream 且已有 PR
+  - default branch 有 unpushed commits
+  - 非 `main` 的 default branch names，例如 `develop` 或 `trunk`
 
-## Related Issues
+## 相关 Issues
 
 - [script-first-skill-architecture.md](script-first-skill-architecture.md)
 - [pass-paths-not-content-to-subagents.md](pass-paths-not-content-to-subagents.md)

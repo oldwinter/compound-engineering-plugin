@@ -1,76 +1,76 @@
 # `ce-clean-gone-branches`
 
-> Delete local branches whose remote tracking branch has been deleted, including any associated worktrees.
+> 删除 remote tracking branch 已被删除的 local branches，包括任何关联 worktrees。
 
-`ce-clean-gone-branches` is the **branch-hygiene** skill. After PRs merge upstream, the remote tracking branches go away — but the local branches stick around indefinitely, cluttering `git branch` and inflating `git fetch` time. This skill discovers those orphaned local branches via `git fetch --prune` + `git branch -vv` parsing, presents the list, asks for confirmation, then deletes them — including any associated worktrees.
+`ce-clean-gone-branches` 是 **branch-hygiene** skill。PRs upstream merge 后，remote tracking branches 会消失，但 local branches 会长期留下，弄乱 `git branch`，并增加 `git fetch` 时间。这个 skill 通过 `git fetch --prune` + `git branch -vv` parsing 发现 orphaned local branches，展示列表，请求确认，然后删除它们，包括任何关联 worktrees。
 
-A simple, high-frequency utility. Run it whenever your branch list feels noisy.
+这是一个简单、高频的 utility。只要你的 branch list 看起来吵，就运行它。
 
 ---
 
 ## TL;DR
 
-| Question | Answer |
+| Question（问题） | Answer（答案） |
 |----------|--------|
-| What does it do? | Discovers local branches whose remote tracking branch is `: gone]`, then deletes them on confirmation (worktrees first, then branches) |
-| When to use it | "Clean up branches", "delete gone branches", "prune local branches" — periodic branch-list hygiene |
-| What it produces | Removed worktrees, deleted local branches; nothing committed |
-| Scope | Yes-or-no on the entire list — no per-branch picking |
+| 它做什么？ | 发现 remote tracking branch 为 `: gone]` 的 local branches，在确认后删除它们（先 worktrees，再 branches） |
+| 何时使用 | "Clean up branches"、"delete gone branches"、"prune local branches"：周期性 branch-list hygiene |
+| 产出什么 | Removed worktrees、deleted local branches；不会 commit |
+| Scope | 对整个列表 yes-or-no；不做 per-branch picking |
 
 ---
 
-## The Problem
+## 问题
 
-After PRs merge, local branches accumulate:
+PRs merge 后，local branches 会堆积：
 
-- **`git branch` becomes noisy** — 30+ local branches, most representing already-shipped work
-- **`git fetch` and tab-completion get slower** — more refs to enumerate
-- **Worktrees orphan** — worktrees attached to long-merged branches keep their disk space and tooling overhead
-- **Manual cleanup is tedious** — `git branch -vv | grep gone` then `git branch -D` for each one, with worktree handling layered on top
-- **Auto-generated worktree names** like `worktree-jolly-beaming-raven` make it unclear which orphans belong to what
+- **`git branch` 变吵**：30+ local branches，大多数代表已经 shipped 的工作
+- **`git fetch` 和 tab-completion 变慢**：需要枚举更多 refs
+- **Worktrees orphan**：附着在很久前 merged branches 上的 worktrees 仍占 disk space 和 tooling overhead
+- **Manual cleanup tedious**：先 `git branch -vv | grep gone`，再逐个 `git branch -D`，还要额外处理 worktrees
+- **Auto-generated worktree names**（例如 `worktree-jolly-beaming-raven`）让人不清楚哪些 orphans 属于什么
 
-## The Solution
+## 方案
 
-`ce-clean-gone-branches` runs cleanup in three stages:
+`ce-clean-gone-branches` 分三步运行 cleanup：
 
-- **Discovery** — `git fetch --prune` to refresh remote state, then parse `git branch -vv` for `: gone]` markers
-- **Confirmation** — show the full list, ask yes-or-no on the entire list (no per-branch picking)
-- **Deletion** — for each branch, remove its worktree first if one exists, then `git branch -D`
+- **Discovery**：运行 `git fetch --prune` 刷新 remote state，然后 parse `git branch -vv` 中的 `: gone]` markers
+- **Confirmation**：展示完整列表，对整个列表问 yes-or-no（不做 per-branch picking）
+- **Deletion**：对每个 branch，若存在 worktree，先 remove worktree，再运行 `git branch -D`
 
-A simple all-or-nothing decision keeps the skill fast. If you only want some branches gone, decline and use `git branch -D` directly for the ones you actually want.
-
----
-
-## What Makes It Novel
-
-### 1. Discovery via `git fetch --prune` + `: gone]` parsing
-
-The skill runs `git fetch --prune` first to refresh local knowledge of remote state, then parses `git branch -vv` for branches whose tracking branch shows `: gone]` — the canonical signal that the remote branch was deleted. Without the prune, local refs would still believe stale remote branches exist; the skill never relies on the user having pruned recently.
-
-### 2. Worktree-aware cleanup
-
-For each branch slated for deletion, the skill checks `git worktree list` for an associated worktree. If one exists and isn't the main repo root, it's removed first via `git worktree remove --force` before the branch itself is deleted. This avoids the "cannot delete branch — checked out in worktree" error that bare `git branch -D` would hit.
-
-### 3. All-or-nothing confirmation
-
-The user sees the full list and answers yes or no on the entire list. The skill **doesn't** offer multi-select or per-branch choices. Two reasons:
-
-- The list is usually small (5-20 branches); the cost of seeing them all and saying "yes" is low
-- A multi-select adds UI overhead that doesn't pay off for a routine cleanup task
-
-If the user wants finer control, declining and running `git branch -D <specific-branch>` is fast.
-
-### 4. Reports as it goes
-
-While deleting, the skill prints each action — "Removed worktree: ...", "Deleted branch: ..." — so the user sees progress in real time. Final summary names the count.
+简单的 all-or-nothing decision 让 skill 保持快速。如果只想删除部分 branches，请 decline，然后直接对想删的分支运行 `git branch -D`。
 
 ---
 
-## Quick Example
+## 它的新意
 
-You haven't cleaned local branches in a while. You invoke `/ce-clean-gone-branches`.
+### 1. 通过 `git fetch --prune` + `: gone]` parsing 发现
 
-The skill runs `bash scripts/clean-gone`, which fetches with prune and parses `git branch -vv`. Output: 5 gone branches.
+Skill 先运行 `git fetch --prune` 刷新 local 对 remote state 的认知，然后 parse `git branch -vv`，寻找 tracking branch 显示 `: gone]` 的 branches；这是 remote branch 已删除的 canonical signal。没有 prune 时，local refs 仍会认为 stale remote branches 存在；skill 不依赖用户最近手动 prune 过。
+
+### 2. Worktree-aware cleanup（感知 worktree 的清理）
+
+对每个将被删除的 branch，skill 会检查 `git worktree list` 是否存在 associated worktree。如果存在且不是 main repo root，会先通过 `git worktree remove --force` 删除它，再删除 branch 本身。这样可以避免 bare `git branch -D` 遇到的 "cannot delete branch — checked out in worktree" error。
+
+### 3. All-or-nothing confirmation（全有或全无确认）
+
+用户看到完整列表，并对整个列表回答 yes 或 no。Skill **不会**提供 multi-select 或 per-branch choices。两个原因：
+
+- 列表通常很小（5-20 branches）；看完并说 "yes" 成本很低
+- Multi-select 会给高频 routine cleanup task 增加不划算的 UI overhead
+
+如果用户需要更精细控制，decline 后运行 `git branch -D <specific-branch>` 很快。
+
+### 4. 边删边报告
+
+删除时，skill 会打印每个 action：`Removed worktree: ...`、`Deleted branch: ...`，让用户实时看到 progress。Final summary 会说明 count。
+
+---
+
+## 快速示例
+
+你很久没清理 local branches。调用 `/ce-clean-gone-branches`。
+
+Skill 运行 `bash scripts/clean-gone`，它会 fetch with prune 并 parse `git branch -vv`。输出：5 个 gone branches。
 
 ```text
 These local branches have been deleted from the remote:
@@ -84,13 +84,13 @@ These local branches have been deleted from the remote:
 Delete all of them? (y/n)
 ```
 
-You answer yes. The skill processes each:
+你回答 yes。Skill 逐个处理：
 
-- `feat/notification-mute` has a worktree at `.worktrees/feat-notification-mute`. Remove worktree first: ✓. Delete branch: ✓.
-- `fix/auth-redirect` no worktree. Delete branch: ✓.
+- `feat/notification-mute` 在 `.worktrees/feat-notification-mute` 有 worktree。先 remove worktree：✓。再 delete branch：✓。
+- `fix/auth-redirect` 没有 worktree。Delete branch：✓。
 - ...
 
-Final summary:
+Final summary（最终摘要）：
 
 ```text
 Removed worktree: .worktrees/feat-notification-mute
@@ -105,74 +105,74 @@ Cleaned up 5 branches.
 
 ---
 
-## When to Reach For It
+## 何时使用
 
-Reach for `ce-clean-gone-branches` when:
+在以下情况使用 `ce-clean-gone-branches`：
 
-- Your `git branch` list is getting noisy after several PRs have merged
-- You're noticing worktrees lingering for branches you no longer remember
-- It's been a while since you cleaned up; periodic hygiene is overdue
+- 多个 PRs merge 后，`git branch` list 开始变吵
+- 你注意到一些已不记得的 branches 仍有 lingering worktrees
+- 已经一段时间没清理；periodic hygiene 过期了
 
-Skip `ce-clean-gone-branches` when:
+以下情况跳过 `ce-clean-gone-branches`：
 
-- You want to delete only specific branches → `git branch -D <name>` directly
-- You want to keep a local branch even though remote is gone → decline the prompt
-- You're not on a working copy with a remote configured → the skill needs a remote to compare against
-
----
-
-## Use as Part of the Workflow
-
-`ce-clean-gone-branches` is mostly standalone — it doesn't sit inside the chain. It's invoked when:
-
-- Several PRs have merged and the user wants to tidy local state
-- Worktree creation is failing because of orphaned worktrees on dead branches
-- The user is preparing to start a new line of work and wants a clean slate
+- 只想删除 specific branches：直接运行 `git branch -D <name>`
+- 即使 remote 已 gone，也想保留 local branch：decline prompt
+- 当前不是配置了 remote 的 working copy：skill 需要 remote 才能比较
 
 ---
 
-## Use Standalone
+## 作为 Workflow 的一部分使用
 
-Direct invocation with no arguments:
+`ce-clean-gone-branches` 基本是 standalone，不位于 chain 内。以下情况调用：
+
+- 几个 PRs 已 merge，用户想整理 local state
+- Worktree creation 因 dead branches 上的 orphaned worktrees 失败
+- 用户准备开始新一条 work line，希望 clean slate
+
+---
+
+## 单独使用
+
+不带 arguments 直接调用：
 
 - `/ce-clean-gone-branches`
 
-The skill discovers, asks, and deletes. No flags, no selection — just yes or no on the full list.
+Skill 会 discover、ask 并 delete。没有 flags，没有 selection；只对完整列表 yes 或 no。
 
 ---
 
-## Reference
+## 参考
 
-| Step | Action |
+| Step | Action（动作） |
 |------|--------|
-| 1 | Run `bash scripts/clean-gone` (fetches with prune, parses for `: gone]`) |
-| 2 | Present the list of stale branches; ask yes/no on the entire list |
-| 3 | For each confirmed branch: remove worktree if present, then `git branch -D` |
-| 4 | Report results as deletions happen; final summary with count |
+| 1 | 运行 `bash scripts/clean-gone`（fetches with prune，parse `: gone]`） |
+| 2 | 展示 stale branches 列表；对整个列表问 yes/no |
+| 3 | 对每个 confirmed branch：如果存在 worktree，先 remove worktree，再 `git branch -D` |
+| 4 | 删除过程中报告 results；final summary 带 count |
 
-If the script outputs `__NONE__`, the skill reports that no stale branches were found and stops.
-
----
-
-## FAQ
-
-**What's a "gone" branch?**
-A local branch whose remote tracking branch was deleted upstream (typically because the PR merged and GitHub deleted the source branch). `git branch -vv` shows `: gone]` next to such branches.
-
-**Why all-or-nothing instead of per-branch picking?**
-Because the list is usually small and reviewing them all takes seconds. A multi-select UI adds friction for a high-frequency task. If you need surgical control, decline and use `git branch -D <name>` for specific branches.
-
-**Why does it remove the worktree before deleting the branch?**
-Because `git branch -D` on a checked-out branch (in a worktree) fails. The skill removes the worktree first to avoid that error.
-
-**What if a worktree has uncommitted changes?**
-`--force` is used on `git worktree remove`, so uncommitted changes are discarded. If the branch has been "gone" (merged remotely and deleted), you almost certainly don't want lingering uncommitted changes there. If you do, decline the prompt and handle that worktree manually first.
-
-**What if the script fails or returns no branches?**
-If no gone branches exist, the skill stops cleanly and reports "no stale branches found." If the script itself errors, the skill surfaces the error.
+如果 script 输出 `__NONE__`，skill 会报告没有发现 stale branches 并停止。
 
 ---
 
-## See Also
+## 常见问题
 
-- [`/ce-worktree`](./ce-worktree.md) — sibling skill for worktree creation; this skill cleans up after worktrees become orphaned
+**什么是 "gone" branch？**
+Remote tracking branch 已在 upstream 删除的 local branch（通常因为 PR merged，GitHub 删除了 source branch）。`git branch -vv` 会在这类 branch 旁显示 `: gone]`。
+
+**为什么 all-or-nothing，而不是 per-branch picking？**
+因为列表通常很小，全部 review 只要几秒。Multi-select UI 会给高频任务增加 friction。如果需要 surgical control，请 decline，并对 specific branches 使用 `git branch -D <name>`。
+
+**为什么先 remove worktree 再 delete branch？**
+因为对 checked-out branch（位于 worktree 中）运行 `git branch -D` 会失败。Skill 先 remove worktree 来避免该 error。
+
+**如果 worktree 有 uncommitted changes 怎么办？**
+`git worktree remove` 使用 `--force`，所以 uncommitted changes 会被丢弃。如果 branch 已经 "gone"（远端 merged 并删除），你几乎肯定不需要那里 lingering 的 uncommitted changes。如果确实需要，请 decline prompt，并先手动处理该 worktree。
+
+**如果 script 失败或没有返回 branches 怎么办？**
+如果不存在 gone branches，skill 会 cleanly stop 并报告 "no stale branches found"。如果 script 本身报错，skill 会 surface error。
+
+---
+
+## 另见
+
+- [`/ce-worktree`](./ce-worktree.md) - sibling skill，用于 worktree creation；本 skill 在 worktrees 变成 orphan 后负责 cleanup

@@ -1,89 +1,89 @@
 # `ce-commit`
 
-> Create a single, well-crafted git commit from working tree changes — convention-aware, sensitive-file-safe, with logical splitting when concerns are clearly distinct.
+> 从 working tree changes 创建一个精心组织的 git commit：遵循 convention、避开 sensitive files，并在 concerns 明确不同时做 logical splitting。
 
-`ce-commit` is the **commit-only** skill — sibling to `/ce-commit-push-pr` for the case where you want commits without pushing or opening a PR. It picks up your repo's existing commit conventions (project instructions first, then recent commit history, then conventional-commits as fallback), groups changed files by naturally distinct concerns (no `git add -p`, file level only), and avoids `git add -A` / `git add .` so sensitive files (`.env`, credentials, build artifacts) don't sneak in.
+`ce-commit` 是 **commit-only** skill，是 `/ce-commit-push-pr` 的 sibling，用于你只想要 commits、不想 push 或打开 PR 的情况。它会读取 repo 的既有 commit conventions（先看 project instructions，再看 recent commit history，最后 fallback 到 conventional-commits），按自然不同的 concerns 对 changed files 分组（不使用 `git add -p`，只在 file level 操作），并避免 `git add -A` / `git add .`，防止 sensitive files（`.env`、credentials、build artifacts）混入。
 
-For the full ship flow (commit + push + PR), use `/ce-commit-push-pr`. For just the commit, this skill.
+完整 shipping flow（commit + push + PR）请使用 `/ce-commit-push-pr`。只需要 commit 时，用这个 skill。
 
 ---
 
-## TL;DR
+## 摘要（TL;DR）
 
-| Question | Answer |
+| 问题 | 答案 |
 |----------|--------|
-| What does it do? | Creates one or two well-formed commits from the working tree, following repo conventions, staging files explicitly |
-| When to use it | "Commit this", "save my changes" — when you want commits without push or PR |
-| What it produces | One or two commits on the current branch (no push, no PR) |
-| What's next | `/ce-commit-push-pr` later if you want to open a PR; otherwise `git push` manually |
+| 它做什么？ | 从 working tree 创建一两个 well-formed commits，遵循 repo conventions，并显式 stage files |
+| 何时使用？ | "Commit this"、"save my changes"；想要 commits 但不 push、不 PR 时 |
+| 产出什么？ | 当前 branch 上的一两个 commits（不 push，不 PR） |
+| 下一步 | 之后如需打开 PR，可用 `/ce-commit-push-pr`；否则手动 `git push` |
 
 ---
 
-## The Problem
+## 问题
 
-Manual commits go wrong in predictable ways:
+手动 commits 常以可预测方式出错：
 
-- **`git add -A` / `git add .`** sweep in unintended files — `.env` files, build artifacts, generated files, untracked notes
-- **Wrong commit convention** — defaulting to conventional commits when the repo uses ticket-prefix style, or vice versa
-- **Mixing distinct concerns** — backend models + frontend components + docs all in one commit because nobody bothered to split
-- **Subject lines that describe what changed, not why** — `update foo.rb` tells future readers nothing
-- **Detached-HEAD commits** that the user doesn't realize will be hard to recover later
-- **Default-branch commits** that surprise the user (no warning before committing to `main`)
+- **`git add -A` / `git add .`** 会扫入 unintended files：`.env` files、build artifacts、generated files、untracked notes
+- **错误的 commit convention**：repo 用 ticket-prefix style，却默认 conventional commits，或反过来
+- **混合 distinct concerns**：backend models + frontend components + docs 全塞进一个 commit，只因为没人拆
+- **Subject lines 只描述改了什么，不说明为什么**：`update foo.rb` 对未来读者没有帮助
+- **Detached-HEAD commits**：用户没意识到之后会很难找回
+- **Default-branch commits**：在 `main` 上 commit 前没有 warning，造成 surprise
 
-## The Solution
+## 解决方案
 
-`ce-commit` runs commit creation as a structured pass:
+`ce-commit` 把 commit creation 作为 structured pass：
 
-- **Convention detection** — repo conventions in context first, then recent 10 commits, then conventional-commits fallback
-- **Explicit staging** — never `git add -A`/`git add .`; stage files by name
-- **Logical splitting** at the file level (no `git add -p`) when 2-3 distinct concerns are present; single commit when ambiguous
-- **Detached-HEAD handling** — asks whether to create a feature branch before committing
-- **Default-branch warning** — asks before committing to `main`/`master`
-- **Heredoc commit messages** — preserves multi-line formatting without shell-escape pain
+- **Convention detection**：先看 context 中的 repo conventions，再看最近 10 个 commits，最后 fallback 到 conventional-commits
+- **Explicit staging**：绝不 `git add -A`/`git add .`；按文件名 stage
+- **File level logical splitting**：当存在 2-3 个 distinct concerns 时拆 commit（不 `git add -p`）；ambiguous 时一个 commit 即可
+- **Detached-HEAD handling**：commit 前询问是否先创建 feature branch
+- **Default-branch warning**：在 `main`/`master` 上 commit 前先询问
+- **Heredoc commit messages**：保留 multi-line formatting，避免 shell escaping pain
 
 ---
 
-## What Makes It Novel
+## 新颖之处
 
-### 1. Convention detection in priority order
+### 1. 按优先级检测 convention
 
-For the commit message format, the skill consults sources in priority:
+对于 commit message format，skill 按优先级读取来源：
 
-1. **Repo conventions in context** — project instructions (`AGENTS.md`, `CLAUDE.md`) already loaded at session start; if they specify conventions, follow those
-2. **Recent commit history** — examine the last 10 commits; if a clear pattern emerges (conventional commits, ticket prefixes, emoji prefixes), match it
-3. **Default to conventional commits** — `type(scope): description` with `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`, `style`, `build` as types
+1. **Context 中的 repo conventions**：session start 已加载的 project instructions（`AGENTS.md`、`CLAUDE.md`）；如果指定 convention，就遵守它
+2. **Recent commit history**：检查最近 10 个 commits；如果出现清晰 pattern（conventional commits、ticket prefixes、emoji prefixes），就匹配它
+3. **默认 conventional commits**：`type(scope): description`，types 包括 `feat`、`fix`、`docs`、`refactor`、`test`、`chore`、`perf`、`ci`、`style`、`build`
 
-When using conventional commits and `fix:` vs `feat:` both seem to fit, the skill defaults to `fix:` (a change that remedies broken or missing behavior is `fix:` even when implemented by adding code). The user can override.
+使用 conventional commits 时，如果 `fix:` 和 `feat:` 都看起来合适，skill 默认 `fix:`（修复 broken 或 missing behavior 的 change 是 `fix:`，即使用新增代码实现）。用户可以 override。
 
-### 2. Explicit staging — no `git add -A`
+### 2. Explicit staging：不用 `git add -A`
 
-The skill stages files by name in a single command (`git add file1 file2 file3`). This avoids accidentally including:
+Skill 在单条命令中按文件名 stage（`git add file1 file2 file3`）。这避免意外包含：
 
-- `.env` files with credentials
-- Build artifacts (`dist/`, `.next/`, compiled binaries)
-- Generated files
-- Notes or scratch files in untracked directories
+- 带 credentials 的 `.env` files
+- Build artifacts（build artifacts，构建产物，`dist/`、`.next/`、compiled binaries）
+- Generated files（生成文件）
+- Untracked directories 中的 notes 或 scratch files
 
-The deliberate avoidance is documented in the skill — `git add -A` and `git add .` are explicitly called out as the wrong move.
+这种刻意规避写在 skill 中：`git add -A` 和 `git add .` 被明确标为错误动作。
 
-### 3. Logical splitting at file level
+### 3. File-level logical splitting（file-level 逻辑拆分）
 
-Before staging, the skill scans changed files for naturally distinct concerns. If files clearly group into 2-3 separate logical changes (a refactor in one directory, a new feature in another; or test files for a different change than source files), the skill creates separate commits. Splits happen at the **file level only** — no `git add -p`, no hunk-level interactive splitting. When the split is ambiguous, one commit is fine. The sweet spot is 2-3 commits, not many tiny ones.
+Stage 前，skill 会扫描 changed files，寻找自然不同的 concerns。如果文件明显分成 2-3 个 logical changes（一个 directory 的 refactor，另一个 directory 的 new feature；或 test files 属于与 source files 不同的 change），skill 会创建 separate commits。Splits 只发生在 **file level**：不 `git add -p`，不做 hunk-level interactive splitting。拆分 ambiguous 时，一个 commit 就好。甜点区间是 2-3 个 commits，而不是很多 tiny commits。
 
-### 4. Detached-HEAD handling
+### 4. Detached-HEAD handling（detached HEAD 处理）
 
-If the current branch is empty (detached HEAD), the skill explains the situation and asks whether to create a feature branch first. The user can:
+如果当前 branch 为空（detached HEAD），skill 会解释状况，并询问是否先创建 feature branch。用户可以：
 
-- Create a branch (skill derives the name from change content)
-- Continue with the detached-HEAD commit (rarely the right answer)
+- 创建 branch（skill 根据 change content 推导 name）
+- 继续 detached-HEAD commit（很少是正确答案）
 
-### 5. Default-branch warning
+### 5. Default-branch warning（default branch 警告）
 
-If the current branch is `main`, `master`, or the resolved default branch, the skill warns before committing and offers to create a feature branch first. This prevents the case where someone accidentally commits to the default branch in a repo with branch-protection that they'll have to back out.
+如果当前 branch 是 `main`、`master` 或 resolved default branch，skill 会在 commit 前 warning，并提供先创建 feature branch 的选项。这能避免有人意外 commit 到有 branch protection 的 default branch，随后还要回退。
 
-### 6. Heredoc commit messages — clean multi-line formatting
+### 6. Heredoc commit messages：干净的 multi-line formatting
 
-The skill uses a `cat <<'EOF'` heredoc for the commit message so multi-line bodies preserve their formatting. Example:
+Skill 使用 `cat <<'EOF'` heredoc 生成 commit message，确保 multi-line bodies 保留格式。示例：
 
 ```bash
 git add file1 file2 file3 && git commit -m "$(cat <<'EOF'
@@ -95,23 +95,23 @@ EOF
 )"
 ```
 
-The quoted sentinel (`'EOF'`) prevents `$VAR`, backticks, and embedded `EOF` from being expanded inside the body.
+Quoted sentinel（`'EOF'`）防止 `$VAR`、backticks 和嵌入的 `EOF` 在 body 中被展开。
 
-### 7. Subject focused on *why*, not *what*
+### 7. Subject 关注 *why*，不只是 *what*
 
-The skill writes subject lines in imperative mood, focused on motivation rather than mechanical description. "Fix double-submit on checkout" beats "Update checkout.rb." The body explains motivation, trade-offs, or context a future reader would need; it's omitted for obvious single-purpose changes.
+Skill 用 imperative mood 写 subject line，关注 motivation，而不是机械描述。"Fix double-submit on checkout" 比 "Update checkout.rb" 更好。Body 说明未来读者需要的 motivation、trade-offs 或 context；显而易见的 single-purpose changes 则省略 body。
 
 ---
 
-## Quick Example
+## 快速示例
 
-You finish a feature touching backend models, controller, and frontend component. You invoke `/ce-commit`.
+你完成了一个 feature，触及 backend models、controller 和 frontend component。你调用 `/ce-commit`。
 
-The skill reads git status: 4 files modified across `app/models/`, `app/controllers/`, and `app/javascript/`. Reads recent commits — the project uses conventional commits with scope (`feat(auth): ...`, `fix(billing): ...`). On feature branch `tmchow/notification-mute`, not on default branch.
+Skill 读取 git status：4 个 files modified，分布在 `app/models/`、`app/controllers/` 和 `app/javascript/`。读取 recent commits 后发现 project 使用带 scope 的 conventional commits（`feat(auth): ...`、`fix(billing): ...`）。当前在 feature branch `tmchow/notification-mute`，不是 default branch。
 
-The skill scans changed files for distinct concerns: model + controller hang together (data layer); the JS component is its own concern (UI). Two logical commits.
+Skill 扫描 changed files 的 distinct concerns：model + controller 属于同一组（data layer）；JS component 是自己的 concern（UI）。于是创建两个 logical commits。
 
-Commit 1: stages `app/models/notification_subscription.rb`, `app/controllers/settings_controller.rb`. Composes message:
+Commit 1：stage `app/models/notification_subscription.rb`、`app/controllers/settings_controller.rb`。Message（message，提交信息）：
 
 ```text
 feat(notifications): add per-subscription mute_until column
@@ -120,89 +120,89 @@ Subscriptions can now carry a mute timestamp; nil means not muted.
 Controller exposes the toggle endpoint.
 ```
 
-Commit 2: stages `app/javascript/controllers/notification_toggle_controller.js`. Composes:
+Commit 2：stage `app/javascript/controllers/notification_toggle_controller.js`。Message（message，提交信息）：
 
 ```text
 feat(notifications): wire toggle UI to mute endpoint
 ```
 
-Reports both commit hashes and subject lines.
+最后报告两个 commit hashes 和 subject lines。
 
 ---
 
-## When to Reach For It
+## 何时使用
 
-Reach for `ce-commit` when:
+在以下情况使用 `ce-commit`：
 
-- You have changes to commit and you want them on the local branch only — no push, no PR
-- You're committing mid-flow and intend to push later
-- You want repo-convention-aware commit messages
-- You want `git add -A` avoided and logical splitting handled
+- 有 changes 要 commit，且只想放在 local branch 上：不 push、不 PR
+- 在流程中途 commit，计划之后再 push
+- 想要遵循 repo convention 的 commit messages
+- 想避免 `git add -A`，并让 logical splitting 被处理
 
-Skip `ce-commit` when:
+以下情况跳过 `ce-commit`：
 
-- You also want to push and open a PR → `/ce-commit-push-pr` does it all
-- You need very specific hunk-level splitting → use `git add -p` directly; the skill is file-level
-- The change is so trivial that the agent can run `git add` + `git commit` in one breath without the skill — though even tiny changes benefit from the convention detection
-
----
-
-## Use as Part of the Workflow
-
-`ce-commit` is invoked from skills that explicitly want commit-only flow:
-
-- **`/ce-debug` Phase 4** — when the skill is on a pre-existing branch (not skill-owned) and the user picks "Commit the fix" instead of "Commit and PR", `ce-commit` handles the local commit
-- **`/ce-work` Phase 4 (no-PR path)** — when the user prefers to commit without pushing, `ce-commit` is the alternate handoff
-- Standalone via `/ce-commit`
-
-The full ship flow (commit + push + PR) is `/ce-commit-push-pr`; this skill is the local-only sibling.
+- 还想 push 并打开 PR -> `/ce-commit-push-pr` 会全做
+- 需要非常具体的 hunk-level splitting -> 直接使用 `git add -p`；此 skill 是 file-level
+- Change 简单到 agent 可以一口气跑 `git add` + `git commit`，不过即使 tiny changes 也会受益于 convention detection
 
 ---
 
-## Use Standalone
+## 作为工作流的一部分使用
 
-Direct invocation with no arguments — the skill reads git context and proceeds:
+`ce-commit` 会被明确需要 commit-only flow 的 skills 调用：
 
-- `/ce-commit` — commit current changes following repo conventions
-- The user describes what to commit ("commit the auth changes") in conversation; the skill applies that as a hint when grouping or composing the message
+- **`/ce-debug` Phase 4**：当 skill 在 pre-existing branch（非 skill-owned）上，且用户选择 "Commit the fix" 而不是 "Commit and PR" 时，由 `ce-commit` 处理 local commit
+- **`/ce-work` Phase 4（no-PR path）**：当用户偏好 commit 而不 push 时，`ce-commit` 是 alternate handoff
+- Standalone：通过 `/ce-commit`
 
-There are no arguments. Convention detection, file grouping, and message composition all happen from context.
+完整 shipping flow（commit + push + PR）是 `/ce-commit-push-pr`；此 skill 是 local-only sibling。
 
 ---
 
-## Reference
+## 单独使用
+
+无参数直接调用；skill 读取 git context 并继续：
+
+- `/ce-commit`：按 repo conventions commit 当前 changes
+- 用户在对话中描述要 commit 什么（"commit the auth changes"）；skill 把它作为 grouping 或 message composition 的 hint
+
+没有 arguments。Convention detection、file grouping 和 message composition 都从 context 中完成。
+
+---
+
+## 参考
 
 | Step | Action |
 |------|--------|
-| 1 | Gather context (git status, diff, branch, recent commits, default branch) |
-| 2 | Determine commit message convention (instructions > recent history > conventional-commits) |
-| 3 | Consider logical commits (file-level split when concerns are clearly distinct) |
-| 4 | Stage and commit (per-group; warn on default branch; handle detached HEAD) |
-| 5 | Confirm via `git status`; report commit hashes |
+| 1 | Gather context（git status、diff、branch、recent commits、default branch） |
+| 2 | Determine commit message convention（instructions > recent history > conventional-commits） |
+| 3 | Consider logical commits（concerns 明显不同时 file-level split） |
+| 4 | Stage and commit（per-group；default branch warning；detached HEAD handling） |
+| 5 | 通过 `git status` 确认；报告 commit hashes |
 
 ---
 
-## FAQ
+## 常见问题（FAQ）
 
-**Why not `git add -A`?**
-Because it sweeps in unintended files — `.env` with credentials, build artifacts, generated files. Explicit staging by name keeps commits clean and prevents secret leakage.
+**为什么不用 `git add -A`？**
+因为它会扫入 unintended files：带 credentials 的 `.env`、build artifacts、generated files。按文件名 explicit staging 能保持 commits 干净，并防止 secret leakage。
 
-**Why no hunk-level splitting?**
-Because hunk-level splitting (`git add -p`) is interactive and fragile in agent flows. File-level splitting is the right granularity for "logical commits" — distinct concerns naturally separate at the file level. If you genuinely need hunk-level, do it manually.
+**为什么不做 hunk-level splitting？**
+因为 hunk-level splitting（`git add -p`）在 agent flows 中 interactive 且脆弱。File-level splitting 是 "logical commits" 的合适粒度：distinct concerns 通常自然分离在 file level。如果你确实需要 hunk-level，请手动完成。
 
-**What if my repo uses a non-standard convention?**
-The skill detects from project instructions first (which is the right place to document conventions), then recent commit history (which is the de facto convention even when not documented). Conventional commits is just the fallback when neither source applies.
+**如果我的 repo 使用 non-standard convention 怎么办？**
+Skill 先从 project instructions 检测（这是记录 conventions 的正确位置），再看 recent commit history（即使没有文档，它也是事实上的 convention）。Conventional commits 只是两者都不适用时的 fallback。
 
-**Why ask before committing on the default branch?**
-Because most repos with branch protection will reject a default-branch commit, and the user usually didn't intend to commit there. The warning catches the case before anything irreversible happens.
+**为什么在 default branch 上 commit 前要询问？**
+因为大多数带 branch protection 的 repos 会拒绝 default-branch commit，而且用户通常不想在那里 commit。Warning 会在不可逆操作前拦住这种情况。
 
-**What if I want to push and PR after?**
-Use `/ce-commit-push-pr` for the full flow, or run `git push` and `gh pr create` manually after this skill commits.
+**如果之后我想 push 和 PR 怎么办？**
+使用 `/ce-commit-push-pr` 走完整 flow，或在此 skill commit 后手动运行 `git push` 和 `gh pr create`。
 
 ---
 
-## See Also
+## 另见（See Also）
 
-- [`/ce-commit-push-pr`](./ce-commit-push-pr.md) — full flow: commit + push + PR
-- [`/ce-debug`](./ce-debug.md) — invokes this skill at Phase 4 for the commit-only handoff path
-- [`/ce-work`](./ce-work.md) — invokes this skill at Phase 4 when the user picks no-PR
+- [`/ce-commit-push-pr`](./ce-commit-push-pr.md) - full flow（完整 flow）：commit + push + PR
+- [`/ce-debug`](./ce-debug.md) - commit-only handoff path 的 Phase 4 会调用此 skill
+- [`/ce-work`](./ce-work.md) - 用户选择 no-PR 时，Phase 4 会调用此 skill

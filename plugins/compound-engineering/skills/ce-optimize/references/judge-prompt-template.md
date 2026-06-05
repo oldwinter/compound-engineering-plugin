@@ -1,17 +1,17 @@
-# Judge Evaluation Prompt Template
+# Judge Evaluation Prompt Template（Judge 评估 Prompt 模板）
 
-This template is used by the orchestrator to dispatch batched LLM-as-judge evaluation calls. Each judge sub-agent evaluates a batch of sampled output items and returns structured JSON scores.
+此 template 由 orchestrator 用于 dispatch batched LLM-as-judge evaluation calls。每个 judge sub-agent 会评估一批 sampled output items，并返回 structured JSON scores。
 
-The orchestrator:
-1. Reads the experiment's output
-2. Selects samples per the stratification config (using fixed seed)
-3. Groups samples into batches of `judge.batch_size`
-4. Dispatches `ceil(sample_size / batch_size)` parallel sub-agents using this template
-5. Aggregates returned JSON scores
+Orchestrator（编排器）：
+1. 读取 experiment output
+2. 按 stratification config 选择 samples（使用 fixed seed）
+3. 将 samples 分组为 `judge.batch_size` 大小的 batches
+4. 使用此 template dispatch `ceil(sample_size / batch_size)` 个 parallel sub-agents
+5. 聚合返回的 JSON scores
 
 ---
 
-## Item Evaluation Template
+## Item Evaluation Template（Item 评估模板）
 
 ```
 You are a quality judge evaluating output items for an optimization experiment.
@@ -50,7 +50,7 @@ Rules:
 </output-contract>
 ```
 
-## Singleton Evaluation Template
+## Singleton Evaluation Template（Singleton 评估模板）
 
 ```
 You are a quality judge evaluating singleton items -- items that are currently NOT in any group/cluster.
@@ -91,20 +91,20 @@ Rules:
 </output-contract>
 ```
 
-## Variable Reference
+## Variable Reference（变量参考）
 
 | Variable | Source | Description |
 |----------|--------|-------------|
 | `{rubric}` | Spec `metric.judge.rubric` | User-defined scoring rubric |
-| `{items_json}` | Sampled output items | JSON array of items to evaluate (one batch worth) |
-| `{singleton_rubric}` | Spec `metric.judge.singleton_rubric` | User-defined rubric for singleton evaluation |
-| `{singletons_json}` | Sampled singleton items | JSON array of singleton items to evaluate |
-| `{cluster_summaries}` | Experiment output | Summary of existing clusters (titles/themes) for singleton reference |
+| `{items_json}` | Sampled output items | 要 evaluate 的 items JSON array（一个 batch） |
+| `{singleton_rubric}` | Spec `metric.judge.singleton_rubric` | 用于 singleton evaluation 的 user-defined rubric |
+| `{singletons_json}` | Sampled singleton items | 要 evaluate 的 singleton items JSON array |
+| `{cluster_summaries}` | Experiment output | 用于 singleton reference 的 existing clusters summary（titles/themes） |
 
-## Notes
+## Notes（说明）
 
-- Designed for Haiku by default -- prompts are concise and well-structured for smaller models
-- The rubric is part of the immutable measurement harness -- the experiment agent cannot modify it
-- The `ambiguous` flag on items helps the orchestrator identify noisy evaluations without forcing bad scores
-- For singleton evaluation, the orchestrator provides cluster summaries (not full contents) to keep judge context lean
-- Each sub-agent evaluates one batch independently -- sub-agents do not see each other's results
+- 默认为 Haiku 设计：prompts 对 smaller models 来说 concise 且 well-structured
+- Rubric 是 immutable measurement harness 的一部分；experiment agent 不能修改它
+- Items 上的 `ambiguous` flag 帮助 orchestrator 识别 noisy evaluations，而不强迫给出 bad scores
+- 对 singleton evaluation，orchestrator 提供 cluster summaries（不是 full contents）以保持 judge context lean
+- 每个 sub-agent 独立 evaluate 一个 batch；sub-agents 看不到彼此 results

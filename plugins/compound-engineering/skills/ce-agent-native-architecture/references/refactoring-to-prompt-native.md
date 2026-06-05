@@ -1,13 +1,13 @@
 <overview>
-How to refactor existing agent code to follow prompt-native principles. The goal: move behavior from code into prompts, and simplify tools into primitives.
+如何将 existing agent code refactor 到遵循 prompt-native principles。目标：把 behavior 从 code 移到 prompts 中，并将 tools 简化为 primitives。
 </overview>
 
 <diagnosis>
-## Diagnosing Non-Prompt-Native Code
+## 诊断非 Prompt-Native 代码
 
-Signs your agent isn't prompt-native:
+你的 agent 不是 prompt-native 的迹象：
 
-**Tools that encode workflows:**
+**把 workflows 写进 code 的 tools：**
 ```typescript
 // RED FLAG: Tool contains business logic
 tool("process_feedback", async ({ message }) => {
@@ -18,7 +18,7 @@ tool("process_feedback", async ({ message }) => {
 });
 ```
 
-**Agent calls functions instead of figuring things out:**
+**Agent 只是在调用 functions，而不是自己判断：**
 ```typescript
 // RED FLAG: Agent is just a function caller
 "Use process_feedback to handle incoming messages"
@@ -26,7 +26,7 @@ tool("process_feedback", async ({ message }) => {
 "When feedback comes in, decide importance, store it, notify if high"
 ```
 
-**Artificial limits on agent capability:**
+**对 agent capability 设置 artificial limits：**
 ```typescript
 // RED FLAG: Tool prevents agent from doing what users can do
 tool("read_file", async ({ path }) => {
@@ -37,7 +37,7 @@ tool("read_file", async ({ path }) => {
 });
 ```
 
-**Prompts that specify HOW instead of WHAT:**
+**指定 HOW 而不是 WHAT 的 prompts：**
 ```markdown
 // RED FLAG: Micromanaging the agent
 When creating a summary:
@@ -49,29 +49,29 @@ When creating a summary:
 </diagnosis>
 
 <refactoring_workflow>
-## Step-by-Step Refactoring
+## 分步骤重构
 
-**Step 1: Identify workflow tools**
+**Step 1：识别 workflow tools**
 
-List all your tools. Mark any that:
-- Have business logic (categorize, calculate, decide)
-- Orchestrate multiple operations
-- Make decisions on behalf of the agent
-- Contain conditional logic (if/else based on content)
+列出所有 tools。标记任何符合以下条件的 tool：
+- 有 business logic（categorize、calculate、decide）
+- 编排多个 operations
+- 代表 agent 做 decisions
+- 包含 conditional logic（基于 content 的 if/else）
 
-**Step 2: Extract the primitives**
+**Step 2：提取 primitives**
 
-For each workflow tool, identify the underlying primitives:
+对每个 workflow tool，识别 underlying primitives：
 
-| Workflow Tool | Hidden Primitives |
+| Workflow Tool | 隐藏的 Primitives |
 |---------------|-------------------|
 | `process_feedback` | `store_item`, `send_message` |
 | `generate_report` | `read_file`, `write_file` |
 | `deploy_and_notify` | `git_push`, `send_message` |
 
-**Step 3: Move behavior to the prompt**
+**Step 3：把 behavior 移到 prompt**
 
-Take the logic from your workflow tools and express it in natural language:
+将 workflow tools 中的 logic 取出，用自然语言表达：
 
 ```typescript
 // Before (in code):
@@ -98,7 +98,7 @@ When someone shares feedback:
 Use your judgment. Context matters more than keywords.
 ```
 
-**Step 4: Simplify tools to primitives**
+**Step 4：将 tools 简化为 primitives**
 
 ```typescript
 // Before: 1 workflow tool
@@ -109,7 +109,7 @@ tool("store_item", { key: z.string(), value: z.any() }, ...simple storage...)
 tool("send_message", { channel: z.string(), content: z.string() }, ...simple send...)
 ```
 
-**Step 5: Remove artificial limits**
+**Step 5：移除 artificial limits**
 
 ```typescript
 // Before: Limited capability
@@ -125,9 +125,9 @@ tool("read_file", async ({ path }) => {
 // Use approval gates for WRITES, not artificial limits on READS
 ```
 
-**Step 6: Test with outcomes, not procedures**
+**Step 6：按 outcomes 测试，而不是按 procedures 测试**
 
-Instead of testing "does it call the right function?", test "does it achieve the outcome?"
+不要测试 "does it call the right function?"，要测试 "does it achieve the outcome?"
 
 ```typescript
 // Before: Testing procedure
@@ -140,11 +140,11 @@ expect(mockProcessFeedback).toHaveBeenCalledWith(...)
 </refactoring_workflow>
 
 <before_after>
-## Before/After Examples
+## Before/After 示例
 
-**Example 1: Feedback Processing**
+**Example 1：Feedback Processing（反馈处理）**
 
-Before:
+Before（之前）：
 ```typescript
 tool("handle_feedback", async ({ message, author }) => {
   const category = detectCategory(message);
@@ -166,7 +166,7 @@ tool("handle_feedback", async ({ message, author }) => {
 });
 ```
 
-After:
+After（之后）：
 ```typescript
 // Simple storage primitive
 tool("store_feedback", async ({ item }) => {
@@ -181,7 +181,7 @@ tool("send_message", async ({ channel, content }) => {
 });
 ```
 
-System prompt:
+System prompt（系统 prompt）：
 ```markdown
 ## Feedback Processing
 
@@ -199,9 +199,9 @@ Importance guidelines:
 - 1: Minimal (off-topic, duplicates)
 ```
 
-**Example 2: Report Generation**
+**Example 2：Report Generation（报告生成）**
 
-Before:
+Before（之前）：
 ```typescript
 tool("generate_weekly_report", async ({ startDate, endDate, format }) => {
   const data = await fetchMetrics(startDate, endDate);
@@ -218,7 +218,7 @@ tool("generate_weekly_report", async ({ startDate, endDate, format }) => {
 });
 ```
 
-After:
+After（之后）：
 ```typescript
 tool("query_metrics", async ({ start, end }) => {
   const data = await db.metrics.query({ start, end });
@@ -231,7 +231,7 @@ tool("write_file", async ({ path, content }) => {
 });
 ```
 
-System prompt:
+System prompt（系统 prompt）：
 ```markdown
 ## Report Generation
 
@@ -246,11 +246,11 @@ Use your judgment about format and structure. Make it useful.
 </before_after>
 
 <common_challenges>
-## Common Refactoring Challenges
+## 常见重构挑战
 
-**"But the agent might make mistakes!"**
+**"But the agent might make mistakes!"（但 agent 可能会犯错！）**
 
-Yes, and you can iterate. Change the prompt to add guidance:
+是的，所以你可以 iterate。修改 prompt 来添加 guidance：
 ```markdown
 // Before
 Rate importance 1-5.
@@ -260,9 +260,9 @@ Rate importance 1-5. Be conservative—most feedback is 2-3.
 Only use 4-5 for truly blocking or critical issues.
 ```
 
-**"The workflow is complex!"**
+**"The workflow is complex!"（但 workflow 很复杂！）**
 
-Complex workflows can still be expressed in prompts. The agent is smart.
+复杂 workflows 仍然可以用 prompts 表达。agent 是 smart 的。
 ```markdown
 When processing video feedback:
 1. Check if it's a Loom, YouTube, or direct link
@@ -272,46 +272,46 @@ When processing video feedback:
 5. Rate based on issue density and severity
 ```
 
-**"We need deterministic behavior!"**
+**"We need deterministic behavior!"（我们需要确定性行为！）**
 
-Some operations should stay in code. That's fine. Prompt-native isn't all-or-nothing.
+有些 operations 应该留在 code 中。这没问题。Prompt-native 不是全有或全无。
 
-Keep in code:
-- Security validation
-- Rate limiting
-- Audit logging
-- Exact format requirements
+保留在 code 中：
+- Security validation（安全验证）
+- Rate limiting（速率限制）
+- Audit logging（审计日志）
+- Exact format requirements（精确格式要求）
 
-Move to prompts:
-- Categorization decisions
-- Priority judgments
-- Content generation
-- Workflow orchestration
+移到 prompts 中：
+- Categorization decisions（分类决策）
+- Priority judgments（优先级判断）
+- Content generation（内容生成）
+- Workflow orchestration（workflow 编排）
 
-**"What about testing?"**
+**"What about testing?"（那测试怎么办？）**
 
-Test outcomes, not procedures:
-- "Given this input, does the agent achieve the right result?"
-- "Does stored feedback have reasonable importance ratings?"
-- "Are notifications sent for truly high-priority items?"
+测试 outcomes，而不是 procedures：
+- "Given this input, does the agent achieve the right result?"（给定这个输入，agent 是否达成正确结果？）
+- "Does stored feedback have reasonable importance ratings?"（存储的 feedback 是否有合理的重要性评分？）
+- "Are notifications sent for truly high-priority items?"（真正高优先级的 items 是否发送了通知？）
 </common_challenges>
 
 <checklist>
-## Refactoring Checklist
+## 重构检查清单
 
-Diagnosis:
-- [ ] Listed all tools with business logic
-- [ ] Identified artificial limits on agent capability
-- [ ] Found prompts that micromanage HOW
+诊断：
+- [ ] 已列出所有包含 business logic 的 tools
+- [ ] 已识别对 agent capability 的 artificial limits
+- [ ] 已发现 micromanage HOW 的 prompts
 
-Refactoring:
-- [ ] Extracted primitives from workflow tools
-- [ ] Moved business logic to system prompt
-- [ ] Removed artificial limits
-- [ ] Simplified tool inputs to data, not decisions
+重构：
+- [ ] 已从 workflow tools 中提取 primitives
+- [ ] 已将 business logic 移到 system prompt
+- [ ] 已移除 artificial limits
+- [ ] 已将 tool inputs 简化为 data，而不是 decisions
 
-Validation:
-- [ ] Agent achieves same outcomes with primitives
-- [ ] Behavior can be changed by editing prompts
-- [ ] New features could be added without new tools
+验证：
+- [ ] Agent 使用 primitives 达成相同 outcomes
+- [ ] Behavior 可通过编辑 prompts 改变
+- [ ] 可在不新增 tools 的情况下添加 new features
 </checklist>

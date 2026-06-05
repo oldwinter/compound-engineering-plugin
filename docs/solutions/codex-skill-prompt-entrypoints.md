@@ -1,5 +1,5 @@
 ---
-title: Codex Conversion Skills, Prompts, and Canonical Entry Points
+title: Codex Conversion Skills、Prompts 与 Canonical Entry Points
 category: architecture
 tags: [codex, converter, skills, prompts, workflows, deprecation]
 created: 2026-03-15
@@ -9,137 +9,137 @@ problem_type: convention
 root_cause: outdated_target_model
 ---
 
-# Codex Conversion Skills, Prompts, and Canonical Entry Points
+# Codex Conversion Skills、Prompts 与 Canonical Entry Points
 
-## Problem
+## 问题
 
-The Codex target had two conflicting assumptions:
+Codex target 有两个互相冲突的 assumptions：
 
-1. Compound workflow entrypoints like `ce:brainstorm` and `ce:plan` were treated in docs as slash-command-style surfaces.
-2. The Codex converter installed those entries as copied skills, not as generated prompts.
+1. `ce:brainstorm` 和 `ce:plan` 这样的 compound workflow entrypoints 在 docs 中被当作 slash-command-style surfaces。
+2. Codex converter 将这些 entries 安装为 copied skills，而不是 generated prompts。
 
-That created an inconsistent runtime for cross-workflow handoffs. Copied skill content still contained Claude-style references like `/ce:plan`, but no Codex-native translation was applied to copied `SKILL.md` files, and there was no clear canonical Codex entrypoint model for those workflow skills.
+这为 cross-workflow handoffs 创造了不一致 runtime。Copied skill content 仍包含 Claude-style references，例如 `/ce:plan`，但 copied `SKILL.md` files 没有应用 Codex-native translation，也没有清晰的 canonical Codex entrypoint model 来表示这些 workflow skills。
 
-## What We Learned
+## 我们学到的内容
 
-### 1. Codex supports both skills and prompts, and they are different surfaces
+### 1. Codex 同时支持 skills 和 prompts，但它们是不同 surfaces
 
-- Skills are loaded from skill roots such as `~/.codex/skills`, and newer Codex code also supports `.agents/skills`.
-- Prompts are a separate explicit entrypoint surface under `.codex/prompts`.
-- A skill is not automatically a prompt, and a prompt is not automatically a skill.
+- Skills 从 skill roots 加载，例如 `~/.codex/skills`；较新的 Codex code 也支持 `.agents/skills`。
+- Prompts 是 `.codex/prompts` 下单独的 explicit entrypoint surface。
+- skill 不会自动成为 prompt，prompt 也不会自动成为 skill。
 
-For this repo, that means a copied skill like `ce:plan` is only a skill unless the converter also generates a prompt wrapper for it.
+对本 repo 而言，这意味着像 `ce:plan` 这样的 copied skill 只是一项 skill，除非 converter 也为它生成 prompt wrapper。
 
-### 2. Codex skill names come from the directory name
+### 2. Codex skill names 来自 directory name
 
-Codex derives the skill name from the skill directory basename, not from our normalized hyphenated converter name.
+Codex 从 skill directory basename 推导 skill name，而不是从我们 normalized hyphenated converter name 推导。
 
-Implication:
+Implication（影响）：
 
-- `~/.codex/skills/ce:plan` loads as the skill `ce:plan`
-- Rewriting that to `ce-plan` is wrong for skill-to-skill references
+- `~/.codex/skills/ce:plan` 会加载为 skill `ce:plan`
+- 将其 rewrite 为 `ce-plan` 对 skill-to-skill references 是错误的
 
-### 3. The original bug was structural, not just wording
+### 3. 原始 bug 是结构性的，不只是措辞问题
 
-The issue was not that `ce:brainstorm` needed slightly different prose. The real problem was:
+问题不在于 `ce:brainstorm` 需要略微不同的 prose。真正问题是：
 
-- copied skills bypassed Codex-specific transformation
-- workflow handoffs referenced a surface that was not clearly represented in installed Codex artifacts
+- copied skills 绕过了 Codex-specific transformation
+- workflow handoffs 引用的 surface 在 installed Codex artifacts 中没有清晰表示
 
-### 4. Deprecated `workflows:*` aliases add noise in Codex
+### 4. Deprecated `workflows:*` aliases 会在 Codex 中增加噪声
 
-The `workflows:*` names exist only for backward compatibility in Claude.
+`workflows:*` names 只为 Claude 中的 backward compatibility 存在。
 
-Copying them into Codex would:
+将它们复制到 Codex 会：
 
-- duplicate user-facing entrypoints
-- complicate handoff rewriting
-- increase ambiguity around which name is canonical
+- duplicate user-facing entrypoints（重复的用户可见入口）
+- 使 handoff rewriting 复杂化
+- 增加哪个 name 是 canonical 的歧义
 
-For Codex, the simpler model is to treat `ce:*` as the only canonical workflow namespace and omit `workflows:*` aliases from installed output.
+对 Codex 而言，更简单的模型是将 `ce:*` 视为唯一 canonical workflow namespace，并从 installed output 中省略 `workflows:*` aliases。
 
-## Recommended Codex Model
+## 推荐的 Codex Model
 
-Use a two-layer mapping for workflow entrypoints:
+对 workflow entrypoints 使用两层 mapping：
 
-1. **Skills remain the implementation units**
-   - Copy the canonical workflow skills using their exact names, such as `ce:plan`
-   - Preserve exact skill names for any Codex skill references
+1. **Skills 仍是 implementation units**
+   - 使用精确 names 复制 canonical workflow skills，例如 `ce:plan`
+   - 为所有 Codex skill references 保留精确 skill names
 
-2. **Prompts are the explicit entrypoint layer**
-   - Generate prompt wrappers for canonical user-facing workflow entrypoints
-   - Use Codex-safe prompt slugs such as `ce-plan`, `ce-work`, `ce-review`
-   - Prompt wrappers delegate to the exact underlying skill name, such as `ce:plan`
+2. **Prompts 是 explicit entrypoint layer**
+   - 为 canonical user-facing workflow entrypoints 生成 prompt wrappers
+   - 使用 Codex-safe prompt slugs，例如 `ce-plan`、`ce-work`、`ce-review`
+   - Prompt wrappers delegate 到精确 underlying skill name，例如 `ce:plan`
 
-This gives Codex one clear manual invocation surface while preserving the real loaded skill names internally.
+这给 Codex 一个清晰的 manual invocation surface，同时在内部保留真实 loaded skill names。
 
-## Rewrite Rules
+## Rewrite Rules（重写规则）
 
-When converting copied `SKILL.md` content for Codex:
+将 copied `SKILL.md` content 转换到 Codex 时：
 
-- References to canonical workflow entrypoints should point to generated prompt wrappers
+- 指向 canonical workflow entrypoints 的 references 应指向 generated prompt wrappers
   - `/ce:plan` -> `/prompts:ce-plan`
   - `/ce:work` -> `/prompts:ce-work`
-- References to deprecated aliases should canonicalize to the modern `ce:*` prompt
+- deprecated aliases 的 references 应 canonicalize 到现代 `ce:*` prompt
   - `/workflows:plan` -> `/prompts:ce-plan`
-- References to non-entrypoint skills should use the exact skill name, not a normalized alias
-- Actual Claude commands that are converted to Codex prompts can continue using `/prompts:...`
+- 指向 non-entrypoint skills 的 references 应使用精确 skill name，而不是 normalized alias
+- 实际由 Claude commands 转换成的 Codex prompts 可以继续使用 `/prompts:...`
 
-### Regression hardening
+### Regression hardening（回归加固）
 
-When rewriting copied `SKILL.md` files, only known workflow and command references should be rewritten.
+rewrite copied `SKILL.md` files 时，只 rewrite 已知 workflow 和 command references。
 
-Do not rewrite arbitrary slash-shaped text such as:
+不要 rewrite 任意 slash-shaped text，例如：
 
-- application routes like `/users` or `/settings`
-- API path segments like `/state` or `/ops`
-- URLs such as `https://www.proofeditor.ai/...`
+- `/users` 或 `/settings` 这样的 application routes
+- `/state` 或 `/ops` 这样的 API path segments
+- `https://www.proofeditor.ai/...` 这样的 URLs
 
-Unknown slash references should remain unchanged in copied skill content. Otherwise Codex installs silently corrupt unrelated skills while trying to canonicalize workflow handoffs.
+Unknown slash references 应在 copied skill content 中保持不变。否则 Codex install 在 canonicalize workflow handoffs 时，会 silently corrupt unrelated skills。
 
-Personal skills loaded from `~/.claude/skills` also need tolerant metadata parsing:
+从 `~/.claude/skills` 加载的 personal skills 也需要 tolerant metadata parsing：
 
-- malformed YAML frontmatter should not cause the entire skill to disappear
-- keep the directory name as the stable skill name
-- treat frontmatter metadata as best-effort only
+- malformed YAML frontmatter 不应导致整个 skill 消失
+- 保持 directory name 作为 stable skill name
+- 将 frontmatter metadata 视为 best-effort
 
-## Future Entry Points
+## Future Entry Points（未来入口）
 
-Do not hard-code an allowlist of workflow names in the converter.
+不要在 converter 中 hard-code workflow names allowlist。
 
-Instead, use a stable rule:
+改用稳定规则：
 
 - `ce:*` = canonical workflow entrypoint
-  - auto-generate a prompt wrapper
+  - 自动生成 prompt wrapper
 - `workflows:*` = deprecated alias
-  - omit from Codex output
-  - rewrite references to the canonical `ce:*` target
-- non-`ce:*` skills = skill-only by default
-  - if a non-`ce:*` skill should also be a prompt entrypoint, mark it explicitly with Codex-specific metadata
+  - 从 Codex output 中省略
+  - 将 references rewrite 到 canonical `ce:*` target
+- non-`ce:*` skills = 默认 skill-only
+  - 如果某个 non-`ce:*` skill 也应成为 prompt entrypoint，用 Codex-specific metadata 显式标记
 
-This means future skills like `ce:ideate` should work without manual converter changes.
+这意味着未来的 `ce:ideate` 这类 skills 无需手动 converter changes 即可工作。
 
-## Implementation Guidance
+## Implementation Guidance（实现指导）
 
-For the Codex target:
+对于 Codex target：
 
-1. Parse enough skill frontmatter to distinguish command-like entrypoint skills from background skills
-2. Filter deprecated `workflows:*` alias skills out of Codex installation
-3. Generate prompt wrappers for canonical `ce:*` workflow skills
-4. Apply Codex-specific transformation to copied `SKILL.md` files
-5. Preserve exact Codex skill names internally
-6. Update README language so Codex entrypoints are documented as Codex-native surfaces, not assumed to be identical to Claude slash commands
+1. 解析足够的 skill frontmatter，以区分 command-like entrypoint skills 与 background skills
+2. 从 Codex installation 中过滤 deprecated `workflows:*` alias skills
+3. 为 canonical `ce:*` workflow skills 生成 prompt wrappers
+4. 对 copied `SKILL.md` files 应用 Codex-specific transformation
+5. 内部保留精确 Codex skill names
+6. 更新 README language，使 Codex entrypoints 被记录为 Codex-native surfaces，而不是假设它们与 Claude slash commands 完全相同
 
-## Prevention
+## 预防
 
-Before changing the Codex converter again:
+再次修改 Codex converter 前：
 
-1. Verify whether the target surface is a skill, a prompt, or both
-2. Check how Codex derives names from installed artifacts
-3. Decide which names are canonical before copying deprecated aliases
-4. Add tests for copied skill content, not just generated prompt content
+1. 验证 target surface 是 skill、prompt，还是两者都是
+2. 检查 Codex 如何从 installed artifacts 推导 names
+3. 在复制 deprecated aliases 前决定哪些 names 是 canonical
+4. 为 copied skill content 添加 tests，而不只是 generated prompt content
 
-## Related Files
+## 相关文件
 
 - `src/converters/claude-to-codex.ts`
 - `src/targets/codex.ts`

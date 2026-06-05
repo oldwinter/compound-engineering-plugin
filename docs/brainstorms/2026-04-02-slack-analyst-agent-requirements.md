@@ -3,99 +3,99 @@ date: 2026-04-02
 topic: ce-slack-researcher-agent
 ---
 
-# Slack Analyst Agent
+# Slack Analyst Agent（Slack 分析 Agent）
 
-## Problem Frame
+## 问题框架
 
-Coding agents operating within compound-engineering workflows (ideate, plan, brainstorm) have no visibility into organizational knowledge that lives in Slack. Decisions, constraints, ongoing discussions, and context about projects are often undocumented anywhere except Slack conversations. When a developer is about to make a change, relevant Slack context -- a discussion about why something was designed a certain way, a decision to deprecate a feature, constraints mentioned by another team -- is invisible to the agent assisting them.
+在 compound-engineering workflows（ideate、plan、brainstorm）中运行的 coding agents 看不到存在于 Slack 中的组织知识。关于项目的决策、约束、持续讨论和 context，往往除了 Slack conversations 之外没有记录。当 developer 准备修改时，相关 Slack context——例如某个设计为何如此的讨论、弃用某功能的决定、其他团队提到的约束——对辅助他们的 agent 是不可见的。
 
-The official Slack plugin provides user-facing commands (`/slack:find-discussions`, `/slack:summarize-channel`), but these are standalone and manual. There is no research agent that compound-engineering workflows can dispatch programmatically to surface Slack context as part of their normal research phase.
+官方 Slack plugin 提供 user-facing commands（`/slack:find-discussions`、`/slack:summarize-channel`），但它们是 standalone 且手动的。compound-engineering workflows 还没有可 programmatically dispatch 的 research agent，无法在正常 research phase 中浮现 Slack context。
 
-## Requirements
+## 需求
 
-**Agent Identity and Placement**
+**Agent 身份与位置**
 
-- R1. Create a research-category agent at `agents/research/ce-slack-researcher.md` following the established research agent pattern (frontmatter with name, description, model:inherit; examples block; phased execution).
-- R2. The agent's role is analytical: it searches Slack for context relevant to the task at hand and returns a concise, structured digest. It does not send messages, create canvases, or take any write actions in Slack.
-
----
-
-**Precondition and Short-Circuit Design**
-
-- R3. Two-level short-circuit to minimize token waste:
-  - **Caller level:** Calling workflows check whether the Slack MCP server is connected before dispatching the agent. If unavailable, skip dispatch entirely. Detection should check for MCP availability (not specific tool names, which may change).
-  - **Agent level:** The agent performs its own precondition check on entry. If Slack MCP tools are not accessible, return a short message ("Slack MCP not connected -- skipping Slack analysis") and exit immediately.
-- R4. The agent should also short-circuit if the caller provides no meaningful search context (e.g., an empty or overly generic topic). Return a message indicating insufficient context rather than running broad, low-value searches.
+- R1. 在 `agents/research/ce-slack-researcher.md` 创建 research-category agent，遵循既有 research agent pattern（frontmatter 包含 name、description、model:inherit；examples block；phased execution）。
+- R2. 该 agent 的角色是 analytical：搜索 Slack 中与当前任务相关的 context，并返回简洁、结构化的 digest。它不发送消息、不创建 canvases，也不在 Slack 中执行任何 write actions。
 
 ---
 
-**Search Strategy**
+**Precondition 与 Short-Circuit 设计**
 
-- R5. Default behavior is search-first: run 2-3 targeted searches using `slack_search_public_and_private` based on keywords derived from the task topic. Search both public and private channels by default (user has already authed the Slack MCP).
-- R6. Read threads (`slack_read_thread`) only for high-relevance search hits -- not speculatively. Limit thread reads to avoid runaway token consumption (cap at ~3-5 thread reads per invocation).
-- R7. Accept an optional channel hint from the caller. When provided, also read recent history from the specified channel(s) using `slack_read_channel` with appropriate time bounds. Without a channel hint, do not read channel history -- search results are sufficient.
-- R8. Future consideration (not in scope): a user preference/setting for channels that should always be searched. Defer to a later iteration.
-
----
-
-**Output Format**
-
-- R9. Return a concise summary digest organized by topic/theme. Each finding should include:
-  - The topic or theme
-  - A brief summary of what was discussed/decided
-  - Source attribution (channel name, approximate date, participants if notable)
-  - Relevance to the current task
-- R10. When no relevant Slack context is found, return a short explicit statement ("No relevant Slack discussions found for [topic]") rather than generating filler.
-- R11. Keep output compact enough to be useful context without dominating the calling workflow's token budget. Target roughly 200-500 tokens for typical results.
+- R3. 两级 short-circuit 以最小化 token waste：
+  - **Caller level：** Calling workflows 在 dispatch agent 前检查 Slack MCP server 是否已连接。不可用时完全跳过 dispatch。检测应检查 MCP availability（而不是可能变化的具体 tool names）。
+  - **Agent level：** agent 进入时执行自己的 precondition check。如果 Slack MCP tools 不可访问，返回短消息（"Slack MCP not connected -- skipping Slack analysis"）并立即退出。
+- R4. 如果 caller 没有提供有意义的 search context（例如 topic 为空或过于泛化），agent 也应 short-circuit。返回说明 context 不足的消息，而不是运行宽泛、低价值搜索。
 
 ---
 
-**Workflow Integration**
+**Search Strategy（搜索策略）**
 
-- R12. Integrate into three calling workflows:
-  - **ce-ideate** -- dispatch during Phase 1 (Codebase Scan), alongside learnings-researcher. Slack context enriches ideation by surfacing org discussions about the focus area.
-  - **ce-plan** -- dispatch during the research/context-gathering phase. Slack context surfaces constraints, prior decisions, and ongoing discussions relevant to the implementation.
-  - **ce-brainstorm** -- dispatch during Phase 1.1 (Existing Context Scan). Brainstorming especially benefits from knowing what the org has already discussed about the topic.
-- R13. In all calling workflows, dispatch the Slack analyst agent in parallel with other research agents (learnings-researcher, etc.) to avoid adding latency. Callers wait for all parallel agents to return before consolidating results (this is the existing pattern for parallel research dispatch). The Slack analyst's dispatch condition is MCP availability (R3). The agent itself handles the meaningful-context check (R4) internally.
-- R14. Callers should incorporate the Slack analyst's output into their existing context summary alongside other research results, not as a separate section.
+- R5. 默认行为是 search-first：基于从 task topic 派生的 keywords，使用 `slack_search_public_and_private` 运行 2-3 次 targeted searches。默认同时搜索 public 和 private channels（用户已经 auth 过 Slack MCP）。
+- R6. 只针对 high-relevance search hits 读取 threads（`slack_read_thread`），不要 speculative 读取。限制 thread reads，避免 runaway token consumption（每次 invocation 上限约 3-5 个 thread reads）。
+- R7. 接受 caller 提供的可选 channel hint。提供时，也使用 `slack_read_channel` 并配合适当 time bounds 读取指定 channel(s) 的 recent history。没有 channel hint 时，不读取 channel history，search results 已足够。
+- R8. 未来考虑（不在范围内）：为应始终搜索的 channels 提供 user preference/setting。推迟到后续迭代。
 
 ---
 
-**Dependency on External Plugin**
+**输出格式**
 
-- R15. The Slack MCP server is owned by the official Slack plugin, not compound-engineering. The agent uses MCP tools that the Slack plugin configures. This creates a soft dependency: the agent is useful only when the Slack plugin is installed and authenticated, but compound-engineering must not require it.
-- R16. Do not bundle or reference the Slack plugin's `.mcp.json` or configuration from within compound-engineering. The agent relies solely on MCP tools being available at runtime.
+- R9. 返回按 topic/theme 组织的简洁 summary digest。每条 finding 应包含：
+  - topic 或 theme
+  - 对讨论/决定内容的简短摘要
+  - Source attribution（来源标注：channel name、approximate date、participants if notable）
+  - 与当前任务的 relevance
+- R10. 找不到相关 Slack context 时，返回简短明确陈述（"No relevant Slack discussions found for [topic]"），而不是生成 filler。
+- R11. 保持输出足够紧凑，使其能作为有用 context，但不主导 calling workflow 的 token budget。典型结果目标约 200-500 tokens。
 
-## Success Criteria
+---
 
-- When Slack MCP is connected, the agent surfaces relevant org context that would not have been available from codebase analysis alone, enriching the output of ideate/plan/brainstorm workflows.
-- When Slack MCP is not connected, the agent adds zero token overhead (caller-level short-circuit prevents dispatch).
-- The agent completes within a reasonable time budget (~10-15 seconds) and returns compact output that doesn't bloat calling workflows.
+**Workflow Integration（Workflow 集成）**
 
-## Scope Boundaries
+- R12. 集成到三个 calling workflows：
+  - **ce-ideate** -- 在 Phase 1（Codebase Scan）期间与 learnings-researcher 一起 dispatch。Slack context 通过浮现关于 focus area 的组织讨论来丰富 ideation。
+  - **ce-plan** -- 在 research/context-gathering phase 期间 dispatch。Slack context 会浮现与 implementation 相关的 constraints、prior decisions 和 ongoing discussions。
+  - **ce-brainstorm** -- 在 Phase 1.1（Existing Context Scan）期间 dispatch。Brainstorming 尤其受益于了解组织已经围绕该 topic 讨论过什么。
+- R13. 在所有 calling workflows 中，将 Slack analyst agent 与其他 research agents（learnings-researcher 等）并行 dispatch，以避免增加 latency。Callers 等待所有 parallel agents 返回后再 consolidating results（这是 parallel research dispatch 的既有 pattern）。Slack analyst 的 dispatch condition 是 MCP availability（R3）。agent 自身在内部处理 meaningful-context check（R4）。
+- R14. Callers 应将 Slack analyst 的输出与其他 research results 一起纳入现有 context summary，而不是作为单独 section。
 
-- No write actions to Slack (no sending messages, no creating canvases).
-- No channel history reads unless the caller provides an explicit channel hint.
-- No user preference/settings system for default channels (deferred).
-- No replacement of existing Slack plugin commands -- this agent is complementary, not competitive.
-- No installation or configuration of the Slack MCP -- that remains the Slack plugin's responsibility.
+---
 
-## Key Decisions
+**对外部 Plugin 的依赖**
 
-- **Agent, not skill:** This is a sub-agent invoked programmatically by workflows, not a user-facing slash command. It lives in `agents/research/`.
-- **Public + private search by default:** The user already authed the Slack MCP, so searching private channels avoids missing the richest context.
-- **Search-first, reads on demand:** Avoids the token cost of speculatively reading channel history. Thread reads are limited to high-relevance hits.
-- **Concise digest output:** Callers are responsible for interpreting the output for their specific context. The agent returns useful summaries, not raw message dumps.
-- **MCP availability check, not tool-name check:** Callers check if the Slack MCP is connected, not for specific tool names (which may change in future Slack MCP versions).
+- R15. Slack MCP server 由官方 Slack plugin 拥有，不属于 compound-engineering。该 agent 使用 Slack plugin 配置的 MCP tools。这会形成 soft dependency：只有在 Slack plugin 已安装并认证时，该 agent 才有用，但 compound-engineering 不能强制依赖它。
+- R16. 不要在 compound-engineering 内 bundle 或 reference Slack plugin 的 `.mcp.json` 或配置。该 agent 仅依赖 runtime 可用的 MCP tools。
 
-## Outstanding Questions
+## 成功标准
 
-### Deferred to Planning
+- 当 Slack MCP 已连接时，agent 能浮现仅靠 codebase analysis 无法得到的相关 org context，从而丰富 ideate/plan/brainstorm workflows 的输出。
+- 当 Slack MCP 未连接时，agent 增加零 token overhead（caller-level short-circuit 防止 dispatch）。
+- agent 在合理 time budget（约 10-15 秒）内完成，并返回不会膨胀 calling workflows 的紧凑输出。
 
-- [Affects R3][Technical] How exactly should callers detect Slack MCP availability? Claude Code's tool list inspection, checking for any `slack_*` tool prefix, or another mechanism?
-- [Affects R5][Needs research] What is the optimal number of search queries per invocation to balance coverage vs. token cost? Start with 2-3 and tune based on real usage.
-- [Affects R12][Technical] What modifications are needed in ce-ideate, ce-plan, and ce-brainstorm skill files to add the conditional dispatch? Review each skill's research phase to find the right insertion point.
+## 范围边界
 
-## Next Steps
+- 不对 Slack 执行 write actions（不发送消息、不创建 canvases）。
+- 除非 caller 提供显式 channel hint，否则不读取 channel history。
+- 不提供 default channels 的 user preference/settings system（deferred）。
+- 不替代现有 Slack plugin commands；该 agent 是 complementary，不是 competitive。
+- 不安装或配置 Slack MCP；这仍是 Slack plugin 的责任。
 
--> `/ce:plan` for structured implementation planning
+## 关键决策
+
+- **Agent, not skill：** 这是 workflows programmatically 调用的 sub-agent，不是 user-facing slash command。它位于 `agents/research/`。
+- **默认 public + private search：** 用户已经 auth 了 Slack MCP，因此搜索 private channels 可避免错过最丰富的 context。
+- **Search-first, reads on demand：** 避免 speculative 读取 channel history 的 token 成本。Thread reads 限于 high-relevance hits。
+- **Concise digest output：** Callers 负责为其具体 context 解读输出。agent 返回有用摘要，而不是 raw message dumps。
+- **检查 MCP availability，而不是 tool-name：** Callers 检查 Slack MCP 是否已连接，而不是检查具体 tool names（它们可能在未来 Slack MCP versions 中变化）。
+
+## 未决问题
+
+### 推迟到 Planning
+
+- [Affects R3][Technical] callers 应如何精确检测 Slack MCP availability？Claude Code 的 tool list inspection、检查任意 `slack_*` tool prefix，还是其他机制？
+- [Affects R5][Needs research] 每次 invocation 的最优 search query 数量是多少，才能平衡 coverage 与 token cost？从 2-3 开始，并基于真实使用调优。
+- [Affects R12][Technical] 为添加 conditional dispatch，需要在 ce-ideate、ce-plan 和 ce-brainstorm skill files 中做哪些修改？Review 每个 skill 的 research phase，找到正确插入点。
+
+## 下一步
+
+-> `/ce:plan` 进行 structured implementation planning

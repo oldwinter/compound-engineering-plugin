@@ -3,58 +3,58 @@ date: 2026-03-27
 topic: ce-skill-prefix-rename
 ---
 
-# Consistent `ce-` Prefix for All Skills and Agents
+# 所有 Skills 与 Agents 使用一致的 `ce-` Prefix
 
-## Problem Frame
+## 问题框架（Problem Frame）
 
-As the Claude Code plugin ecosystem grows, generic skill names like `setup`, `plan`, `review`, and `frontend-design` collide when users have multiple plugins installed. Typing `/plan` surfaces every plugin's plan skill, forcing users to scan descriptions. Agent names also collide across plugins — generic names like `adversarial-reviewer` or `security-reviewer` are common enough that multiple plugins could define them. The compound-engineering plugin currently uses an inconsistent mix: 8 core workflow skills have a `ce:` colon prefix, while 33 others have no prefix at all. Agents use verbose 3-segment references (`compound-engineering:<category>:<agent-name>`) that are cumbersome and can be simplified now that agents will have a unique `ce-` prefix. This creates collision risk, a confusing naming taxonomy, and unnecessarily verbose agent references.
+随着 Claude Code plugin ecosystem 增长，`setup`、`plan`、`review`、`frontend-design` 这类 generic skill names 会在用户安装多个 plugins 时冲突。输入 `/plan` 会展示每个 plugin 的 plan skill，迫使用户扫描 descriptions。Agent names 也会跨 plugins 冲突 -- `adversarial-reviewer` 或 `security-reviewer` 这类 generic names 足够常见，多个 plugins 都可能定义它们。compound-engineering plugin 当前混用不一致：8 个 core workflow skills 使用 `ce:` colon prefix，另外 33 个完全无 prefix。Agents 使用冗长的 3-segment references（`compound-engineering:<category>:<agent-name>`），既笨重，又因为 agents 将有唯一 `ce-` prefix 而可简化。这造成 collision risk、令人困惑的 naming taxonomy，以及不必要冗长的 agent references。
 
-Standardizing on a `ce-` hyphen prefix for all owned skills and agents eliminates collisions, creates a consistent namespace, simplifies agent references, and removes the colon character that requires filesystem sanitization on Windows.
+将所有 owned skills 与 agents 标准化为 `ce-` hyphen prefix，可以消除 collisions，创建一致 namespace，简化 agent references，并移除在 Windows 上需要 filesystem sanitization 的 colon character。
 
-Related: [GitHub Issue #337](https://github.com/EveryInc/compound-engineering-plugin/issues/337)
+Related（相关）: [GitHub Issue #337](https://github.com/EveryInc/compound-engineering-plugin/issues/337)
 
-## Requirements
+## 需求（Requirements）
 
-When doing renames of files and folders, you are required to use `git mv` whenever possible for simplicity and explicit intent and history preservation.  You can fallback provided you notify when it happens and why.
+进行 files 和 folders rename 时，必须尽可能使用 `git mv`，以保持简单、显式 intent 和 history preservation。如果 fallback，需通知发生了什么以及原因。
 
-### Naming Rules
+### 命名规则（Naming Rules）
 
-- R1. All compound-engineering-owned skills and agents adopt a `ce-` hyphen prefix
-- R2. Skills currently using `ce:` colon prefix change to `ce-` hyphen prefix (e.g., `ce:plan` -> `ce-plan`)
-- R3. Skills and Agents currently without a prefix get `ce-` prepended (e.g., `setup` -> `ce-setup`, `frontend-design` -> `ce-frontend-design`, `repo-research-analyst` -> `ce-repo-research-analyst`)
-- R4. `git-*` skills replace the `git-` prefix with `ce-` (e.g., `git-commit` -> `ce-commit`, `git-worktree` -> `ce-worktree`)
-- R5. `report-bug-ce` normalizes to `ce-report-bug` (drops redundant suffix)
+- R1. 所有 compound-engineering-owned skills 和 agents 采用 `ce-` hyphen prefix
+- R2. 当前使用 `ce:` colon prefix 的 skills 改为 `ce-` hyphen prefix（例如 `ce:plan` -> `ce-plan`）
+- R3. 当前无 prefix 的 Skills 和 Agents 加上 `ce-` 前缀（例如 `setup` -> `ce-setup`，`frontend-design` -> `ce-frontend-design`，`repo-research-analyst` -> `ce-repo-research-analyst`）
+- R4. `git-*` skills 用 `ce-` 替换 `git-` prefix（例如 `git-commit` -> `ce-commit`，`git-worktree` -> `ce-worktree`）
+- R5. `report-bug-ce` normalize 为 `ce-report-bug`（drop redundant suffix）
 
-### Exclusions
+### 排除项（Exclusions）
 
-- R6. `agent-browser` and `rclone` are excluded (sourced from upstream, not our skills)
-- R7. `lfg` and `slfg` are excluded from renaming (short memorable workflow entry points), but their internal skill invocations must be updated per R12	
+- R6. `agent-browser` 和 `rclone` excluded（来自 upstream，不是我们的 skills）
+- R7. `lfg` 和 `slfg` excluded from renaming（短且 memorable 的 workflow entry points），但其 internal skill invocations 必须按 R12 更新
 
-### Propagation
+### 传播更新（Propagation）
 
-- R8. The skill and agent frontmatter `name:` field must match after rename (no more colon-vs-hyphen divergence). Directories need to reflect the new names as well when applicable.
-- R9. All cross-references updated: skill-to-skill invocations (`/ce:plan` -> `/ce-plan`), fully-qualified references (`/compound-engineering:todo-resolve` -> `/compound-engineering:ce-todo-resolve`), `Skill("compound-engineering:...")` programmatic invocations, prose mentions, skill `description:` frontmatter fields, and intra-skill path references (`${CLAUDE_PLUGIN_ROOT}/skills/<old-name>/...`)
-- R10. Active documentation updated: root README, plugin README, AGENTS.md. Note: the AGENTS.md "Why `ce:`?" rationale section (lines 53-60) needs a conceptual rewrite explaining the `ce-` convention, not just find-and-replace. Historical docs in `docs/` (past brainstorms, plans, solutions) are left as-is -- they are records of past decisions.
-- R11. Agent prompt files updated where they reference skill names.
-- R11b. Skill prompt files updated where they reference Agent names.
-- R11c. Agent references drop the `compound-engineering:` plugin prefix and keep the category. The agent name itself gets the `ce-` prefix. (e.g. `compound-engineering:review:adversarial-reviewer` -> `review:ce-adversarial-reviewer`)
-- R12. lfg and slfg orchestration chains updated to use new skill names (lfg/slfg themselves are not renamed per R7, but their internal skill and agent invocations must reflect new names)
-- R13. Converter infrastructure preserved: `sanitizePathName()` and colon-handling logic stays as future protection, not removed. Add a test assertion that no skill `name:` field contains a colon, so the sanitizer is defense-in-depth rather than a silent workaround.
-- R17. Codex converter's `isCanonicalCodexWorkflowSkill()` and `toCanonicalWorkflowSkillName()` in `src/converters/claude-to-codex.ts` updated to match `ce-` prefix pattern (currently hardcodes `ce:` prefix check). Related test fixtures in `tests/codex-converter.test.ts` and `tests/codex-writer.test.ts` updated accordingly.
+- R8. Rename 后，skill 与 agent frontmatter `name:` field 必须匹配（不再有 colon-vs-hyphen divergence）。Directories 在适用时也需要反映 new names。
+- R9. 更新所有 cross-references：skill-to-skill invocations（`/ce:plan` -> `/ce-plan`）、fully-qualified references（`/compound-engineering:todo-resolve` -> `/compound-engineering:ce-todo-resolve`）、`Skill("compound-engineering:...")` programmatic invocations、prose mentions、skill `description:` frontmatter fields，以及 intra-skill path references（`${CLAUDE_PLUGIN_ROOT}/skills/<old-name>/...`）
+- R10. 更新 active documentation：root README、plugin README、AGENTS.md。注意：AGENTS.md 的 "Why `ce:`?" rationale section（lines 53-60）需要 conceptual rewrite，解释 `ce-` convention，而不是简单 find-and-replace。`docs/` 中 historical docs（past brainstorms、plans、solutions）保持原样 -- 它们是 past decisions 的记录。
+- R11. 更新引用 skill names 的 agent prompt files。
+- R11b. 更新引用 Agent names 的 skill prompt files。
+- R11c. Agent references drop `compound-engineering:` plugin prefix，并保留 category。agent name 本身获得 `ce-` prefix。（例如 `compound-engineering:review:adversarial-reviewer` -> `review:ce-adversarial-reviewer`）
+- R12. lfg 和 slfg orchestration chains 更新为使用 new skill names（lfg/slfg 本身按 R7 不 rename，但其 internal skill 和 agent invocations 必须反映 new names）
+- R13. 保留 Converter infrastructure：`sanitizePathName()` 和 colon-handling logic 作为未来保护，不删除。添加 test assertion，确保没有 skill `name:` field 包含 colon，使 sanitizer 成为 defense-in-depth，而不是 silent workaround。
+- R17. 更新 `src/converters/claude-to-codex.ts` 中 Codex converter 的 `isCanonicalCodexWorkflowSkill()` 与 `toCanonicalWorkflowSkillName()`，匹配 `ce-` prefix pattern（当前 hardcodes `ce:` prefix check）。相应更新 `tests/codex-converter.test.ts` 和 `tests/codex-writer.test.ts` 中的 test fixtures。
 
-### Testing
+### 测试（Testing）
 
-- R14. Path sanitization tests updated to reflect new naming (collision detection still works)
-- R15. `bun test` passes after all changes
-- R16. `bun run release:validate` passes after all changes
-- R18. Converter test fixtures that hardcode `ce:plan` etc. updated to `ce-plan` where they test compound-engineering plugin behavior. Fixtures testing abstract colon-handling for other plugins may remain.
-- R19. Sanity check and for every skill and agent name, grep to confirm new names are correct and old names do not persist except in historical planning, requirements, etc docs.
+- R14. Path sanitization tests 更新以反映 new naming（collision detection 仍然工作）
+- R15. 所有 changes 后 `bun test` passes
+- R16. 所有 changes 后 `bun run release:validate` passes
+- R18. Converter test fixtures 中 hardcode `ce:plan` 等、且测试 compound-engineering plugin behavior 的，更新为 `ce-plan`。测试其他 plugins 的 abstract colon-handling 的 fixtures 可保留。
+- R19. Sanity check：对每个 skill 和 agent name grep，确认 new names 正确，old names 不持续存在，除 historical planning、requirements 等 docs 外。
 
 ---
 
-## Complete Rename Map
+## 完整 Rename Map（Complete Rename Map）
 
-### Excluded (no change) - 4 skills
+### Excluded (no change) - 4 skills（排除项，不变）
 
 | Current Name | Reason |
 |---|---|
@@ -63,7 +63,7 @@ When doing renames of files and folders, you are required to use `git mv` whenev
 | `lfg` | Exception (memorable name) |
 | `slfg` | Exception (memorable name) |
 
-### `ce:` -> `ce-` (frontmatter only, dirs already match) - 8 skills
+### `ce:` -> `ce-` (frontmatter only, dirs already match) - 8 skills（仅 frontmatter，dirs 已匹配）
 
 | Current Name | New Name | Dir Rename? |
 |---|---|---|
@@ -76,7 +76,7 @@ When doing renames of files and folders, you are required to use `git mv` whenev
 | `ce:work` | `ce-work` | No |
 | `ce:work-beta` | `ce-work-beta` | No |
 
-### `git-*` -> `ce-*` (replace prefix) - 4 skills
+### `git-*` -> `ce-*` (replace prefix) - 4 skills（替换 prefix）
 
 | Current Name | New Name | Dir Rename |
 |---|---|---|
@@ -85,13 +85,13 @@ When doing renames of files and folders, you are required to use `git mv` whenev
 | `git-commit-push-pr` | `ce-commit-push-pr` | `git-commit-push-pr/` -> `ce-commit-push-pr/` |
 | `git-worktree` | `ce-worktree` | `git-worktree/` -> `ce-worktree/` |
 
-### Special normalization - 1 skill
+### 特殊规范化（Special normalization）- 1 skill
 
 | Current Name | New Name | Dir Rename |
 |---|---|---|
 | `report-bug-ce` | `ce-report-bug` | `report-bug-ce/` -> `ce-report-bug/` |
 
-### Standard prefix addition - 24 skills
+### 标准 prefix 添加（Standard prefix addition）- 24 skills
 
 | Current Name | New Name | Dir Rename |
 |---|---|---|
@@ -120,11 +120,11 @@ When doing renames of files and folders, you are required to use `git mv` whenev
 | `todo-resolve` | `ce-todo-resolve` | `todo-resolve/` -> `ce-todo-resolve/` |
 | `todo-triage` | `ce-todo-triage` | `todo-triage/` -> `ce-todo-triage/` |
 
-**Total: 37 skills renamed, 4 excluded (41 skills total)**
+**Total（总计）: 37 skills renamed, 4 excluded (41 skills total)**
 
-### Agent renames - 49 agents
+### Agent renames（agent rename）- 49 agents
 
-All agents are renamed with `ce-` prefix within their existing category subdirs. The `compound-engineering:` plugin prefix is dropped from references, keeping the `<category>:ce-<agent-name>` format. Category subdirs are preserved for organization.
+所有 agents 都在现有 category subdirs 内加 `ce-` prefix。References 中 drop `compound-engineering:` plugin prefix，保留 `<category>:ce-<agent-name>` format。Category subdirs 保留用于 organization。
 
 | Current File | New File | Old Reference | New Reference |
 |---|---|---|---|
@@ -178,55 +178,55 @@ All agents are renamed with `ce-` prefix within their existing category subdirs.
 | `agents/workflow/pr-comment-resolver.md` | `agents/workflow/ce-pr-comment-resolver.md` | `compound-engineering:workflow:pr-comment-resolver` | `workflow:ce-pr-comment-resolver` |
 | `agents/workflow/spec-flow-analyzer.md` | `agents/workflow/ce-spec-flow-analyzer.md` | `compound-engineering:workflow:spec-flow-analyzer` | `workflow:ce-spec-flow-analyzer` |
 
-**Total: 49 agents renamed in place (category subdirs preserved)**
+**Total（总计）: 49 agents renamed in place (category subdirs preserved)**
 
 ---
 
-## Success Criteria
+## 成功标准（Success Criteria）
 
-- Every owned skill (except the 4 exclusions) has a `ce-` prefix in both directory name and frontmatter
-- Every agent has a `ce-` prefix in filename and frontmatter within its category subdir
-- All cross-references across skills, agents, docs, and orchestration chains use new names
-- All 3-segment agent references (`compound-engineering:<category>:<agent>`) simplified to `<category>:ce-<agent>`
-- `bun test` and `bun run release:validate` pass
-- No colon characters remain in any skill `name:` field (though sanitization infra is preserved)
-- Slash command invocations work with new names (e.g., `/ce-plan`)
-- lfg and slfg orchestration chains reference new skill and agent names (R12)
-- Grep sanity check confirms no old names persist in active code (R19)
+- 每个 owned skill（4 个 exclusions 除外）在 directory name 和 frontmatter 中都有 `ce-` prefix
+- 每个 agent 在其 category subdir 内的 filename 和 frontmatter 中都有 `ce-` prefix
+- skills、agents、docs 和 orchestration chains 中所有 cross-references 使用 new names
+- 所有 3-segment agent references（`compound-engineering:<category>:<agent>`）简化为 `<category>:ce-<agent>`
+- `bun test` 和 `bun run release:validate` pass
+- 任何 skill `name:` field 中不再有 colon characters（虽然 sanitization infra 保留）
+- Slash command invocations 使用 new names 工作（例如 `/ce-plan`）
+- lfg 和 slfg orchestration chains 引用 new skill 与 agent names（R12）
+- Grep sanity check 确认 active code 中没有 old names（R19）
 
-## Scope Boundaries
+## 范围边界（Scope Boundaries）
 
-- **Not removing sanitization infrastructure** — `sanitizePathName()` stays as future protection for any colons
-- **Not adding backward-compatibility aliases** — No alias mechanism exists; this is a clean break
-- **Not renaming external skills** — `agent-browser` and `rclone` are upstream
-- **Not renaming lfg/slfg** — Kept as memorable exceptions
-- **Historical docs are not updated** — Past brainstorms, plans, and solutions in `docs/` reference old names; this is expected and acceptable (they're historical records). R10 applies only to active docs (README, AGENTS.md), not historical docs.
+- **不移除 sanitization infrastructure** -- `sanitizePathName()` 继续作为未来任何 colons 的保护
+- **不添加 backward-compatibility aliases** -- 没有 alias mechanism；这是 clean break
+- **不 rename external skills** -- `agent-browser` 和 `rclone` 是 upstream
+- **不 rename lfg/slfg** -- 保留为 memorable exceptions
+- **Historical docs 不更新** -- `docs/` 中 past brainstorms、plans 和 solutions 引用 old names；这是 expected and acceptable（它们是 historical records）。R10 仅适用于 active docs（README、AGENTS.md），不适用于 historical docs。
 
-## Key Decisions
+## 关键决策（Key Decisions）
 
-- **Hyphen over colon**: `ce-` not `ce:` — eliminates filesystem sanitization divergence and is more portable
-- **git-* replaces prefix**: `git-commit` -> `ce-commit` rather than `ce-git-commit` — avoids verbose double-prefix
-- **report-bug-ce normalizes**: Drops redundant `-ce` suffix -> `ce-report-bug`
-- **Agents renamed in place**: Category subdirs preserved for organization. Agent files get `ce-` prefix within their category dir. 3-segment refs drop plugin prefix: `compound-engineering:review:adversarial-reviewer` -> `review:ce-adversarial-reviewer`.
-- **Major version bump**: This is a breaking change; plugin version will bump the major version to signal it.
-- **Clean break, no aliases**: Users learn new names immediately; the old names stop working
-- **Preserve sanitization**: Keep colon-handling code even though no skills currently use colons — future-proofing
-- **git mv required**: All renames use `git mv` for history preservation. Fallback only with notification.
+- **Hyphen over colon**：`ce-` 而不是 `ce:` -- 消除 filesystem sanitization divergence，并更 portable
+- **git-* replaces prefix**：`git-commit` -> `ce-commit`，而不是 `ce-git-commit` -- 避免 verbose double-prefix
+- **report-bug-ce normalizes（规范化 report-bug-ce）**：drop redundant `-ce` suffix -> `ce-report-bug`
+- **Agents renamed in place**：保留 category subdirs 用于 organization。Agent files 在其 category dir 内加 `ce-` prefix。3-segment refs drop plugin prefix：`compound-engineering:review:adversarial-reviewer` -> `review:ce-adversarial-reviewer`。
+- **Major version bump**：这是 breaking change；plugin version 会 bump major version 来 signal。
+- **Clean break, no aliases**：用户立即学习 new names；old names 停止工作
+- **Preserve sanitization**：即使当前没有 skills 使用 colons，也保留 colon-handling code -- future-proofing
+- **git mv required**：所有 renames 用 `git mv` 保留 history。只有通知后才 fallback。
 
-## Dependencies / Assumptions
+## 依赖与假设（Dependencies / Assumptions）
 
-- Skill directory renames via `git mv` preserve git history. Commit strategy (single vs multiple commits) deferred to planning.
-- lfg/slfg reference other skills both by short name (`/ce:plan`) and fully-qualified (`/compound-engineering:todo-resolve`) — both patterns need updating
-- README may contain stale skill references (e.g., `/sync`) — clean up during R10 documentation pass
+- 通过 `git mv` 进行 skill directory renames 可保留 git history。Commit strategy（single vs multiple commits）deferred to planning。
+- lfg/slfg 会同时通过 short name（`/ce:plan`）和 fully-qualified（`/compound-engineering:todo-resolve`）引用其他 skills -- 两种 patterns 都需要更新
+- README 可能包含 stale skill references（例如 `/sync`）-- 在 R10 documentation pass 中 cleanup
 
-## Outstanding Questions
+## 未决问题（Outstanding Questions）
 
-### Deferred to Planning
+### 延后到规划阶段（Deferred to Planning）
 
-- [Affects R9][Needs research] Exact inventory of every cross-reference in every SKILL.md, agent file, and doc that needs updating — planner should grep comprehensively
-- [Affects R8][Technical] Should directory renames be done via `git mv` in a single commit or spread across multiple commits for reviewability?
-- [Affects R14, R18][Technical] What specific test assertions reference skill names and need updating? Which test fixtures test compound-engineering behavior (should update) vs abstract colon-handling (may keep)?
+- [Affects R9][Needs research] 每个 SKILL.md、agent file 和 doc 中所有需要更新的 cross-reference 的 exact inventory -- planner 应全面 grep
+- [Affects R8][Technical] directory renames 应通过 `git mv` 在单个 commit 中完成，还是拆成多个 commits 以提升 reviewability？
+- [Affects R14, R18][Technical] 哪些具体 test assertions 引用 skill names 并需要更新？哪些 test fixtures 测 compound-engineering behavior（应更新）vs abstract colon-handling（可保留）？
 
-## Next Steps
+## 下一步（Next Steps）
 
--> `/ce:plan` for structured implementation planning (will itself be renamed to `/ce-plan` as part of this work)
+-> `/ce:plan` 做 structured implementation planning（它本身也会作为本工作的一部分 rename 为 `/ce-plan`）

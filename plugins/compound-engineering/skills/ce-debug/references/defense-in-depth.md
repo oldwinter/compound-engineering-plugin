@@ -1,35 +1,35 @@
-# Defense-in-Depth
+# Defense-in-Depth（纵深防御）
 
-When a bug is caused by invalid state reaching a vulnerable code path, fixing just one layer leaves the door open for different code paths, refactors, or mocks to re-introduce the same bug. Defense-in-depth makes the bug structurally harder to re-create by validating at multiple layers.
+当 bug 是由 invalid state 到达 vulnerable code path 引起时，只修一层会让其他 code paths、refactors 或 mocks 重新引入同一 bug。Defense-in-depth 通过在多层验证，让该 bug 在结构上更难被重新制造。
 
-Not every bug warrants this. Use when:
+不是每个 bug 都值得这样做。以下情况使用：
 
-- The root-cause pattern exists in 3+ other files (grep the fix signature)
-- The bug would have been catastrophic in production
-- The vulnerable operation is dangerous regardless of caller (destructive side effects, security-sensitive, irreversible)
+- root-cause pattern 存在于另外 3+ 个文件中（grep fix signature）
+- bug 如果进入 production 会造成灾难性后果
+- vulnerable operation 无论 caller 是谁都危险（destructive side effects、security-sensitive、irreversible）
 
-Skip when the root cause is a one-off logic error with no realistic recurrence path.
+当 root cause 是一次性 logic error，且没有现实的 recurrence path 时，跳过。
 
-## The four layers
+## 四层
 
-Pick the layers that apply. Not every bug needs all four.
+选择适用的 layers。不是每个 bug 都需要全部四层。
 
-| Layer | Purpose | Apply when | Example |
+| Layer（层） | Purpose（目的） | Apply when（适用条件） | Example（示例） |
 |-------|---------|------------|---------|
-| 1. Entry validation | Reject obviously invalid input at the API boundary | The bug was caused by a caller passing bad data that should have been rejected | Throw if `workingDirectory` is empty or doesn't exist, before any downstream code touches it |
-| 2. Invariant / business-logic check | Enforce that data makes sense for this operation | The operation has preconditions that entry validation cannot express | Assert `user.state === 'verified'` before issuing a password reset |
-| 3. Environment guard | Refuse dangerous operations in contexts where they make no sense | The operation can be catastrophic if run in the wrong environment | In tests (`NODE_ENV === 'test'`), refuse `git init` outside the OS temp dir |
-| 4. Diagnostic breadcrumb | Capture forensic context before the risky operation | Other layers might still be bypassed; future failures need evidence | Log `{ directory, cwd, env, stack }` immediately before `git init` |
+| 1. Entry validation | 在 API boundary 拒绝明显 invalid input | bug 是由 caller 传入本应被拒绝的 bad data 引起 | 在任何 downstream code 接触 `workingDirectory` 前，如果它为空或不存在就 throw |
+| 2. Invariant / business-logic check | 强制 data 对此 operation 有意义 | operation 有 entry validation 无法表达的 preconditions | 在发起 password reset 前 assert `user.state === 'verified'` |
+| 3. Environment guard | 在无意义的 contexts 中拒绝 dangerous operations | operation 如果在错误 environment 中运行会造成灾难性后果 | 在 tests（`NODE_ENV === 'test'`）中，拒绝在 OS temp dir 外执行 `git init` |
+| 4. Diagnostic breadcrumb | 在 risky operation 前捕获 forensic context | 其他 layers 仍可能被绕过；未来 failures 需要 evidence | 在 `git init` 前立即 log `{ directory, cwd, env, stack }` |
 
-## Applying the pattern
+## 应用此 pattern
 
-1. Trace the data flow from the bad value's origin through every function that passed it along.
-2. Map the checkpoints: at which of those points could validation have rejected the bad value earlier?
-3. Add guards at the appropriate layers. Each guard should be as narrow as possible — validating exactly what this layer is responsible for, not duplicating checks from other layers.
-4. Test each guard independently: construct a case that bypasses layer 1 and verify layer 2 still catches it.
+1. 从 bad value 的 origin 开始，追踪它经过的每个 function 的 data flow。
+2. 映射 checkpoints：在哪些点 validation 本可以更早拒绝 bad value？
+3. 在适当 layers 添加 guards。每个 guard 都应尽可能窄：只验证该 layer 负责的内容，不重复其他 layers 的 checks。
+4. 独立测试每个 guard：构造绕过 layer 1 的 case，并验证 layer 2 仍能捕获它。
 
-## Common mistakes
+## 常见错误
 
-- **Duplicating the same check at every layer.** Each layer should catch a distinct class of failure. If layer 2 just repeats layer 1, the second one is noise.
-- **Adding guards speculatively without a bug to justify them.** Defense-in-depth is a response to an observed failure mode, not a generic code-hygiene practice.
-- **Leaving layer 4 (diagnostic breadcrumb) out.** When layers 1-3 still get bypassed — they will, eventually — the breadcrumb is what makes the next bug debuggable.
+- **在每层重复同一个 check。** 每层都应捕获不同类别的 failure。如果 layer 2 只是重复 layer 1，第二个 check 就是噪音。
+- **没有 bug 证明必要性就 speculative 添加 guards。** Defense-in-depth 是对已观察到 failure mode 的响应，不是通用 code-hygiene practice。
+- **遗漏 layer 4（diagnostic breadcrumb）。** 当 layers 1-3 仍被绕过时（迟早会发生），breadcrumb 才能让下一个 bug 可 debug。

@@ -1,258 +1,258 @@
 ---
-title: "refactor: Adopt anchored confidence, validation gate, and mode-aware precision in ce-code-review"
+title: "refactor: 在 ce-code-review 中采用 anchored confidence、validation gate 和 mode-aware precision"
 type: refactor
 status: active
 date: 2026-04-21
 ---
 
-# refactor: Adopt anchored confidence, validation gate, and mode-aware precision in ce-code-review
+# refactor: 在 ce-code-review 中采用 anchored confidence、validation gate 和 mode-aware precision
 
-## Overview
+## 概览
 
-Port the ce-doc-review anchored-confidence pattern into ce-code-review and add three code-review-specific precision controls inspired by Anthropic's official `code-review` plugin: a per-finding validation stage before externalization, mode-aware false-positive policy, and an explicit lint-ignore suppression rule. Also add a PR-mode-only skip-condition pre-check (closed/draft/trivial/already-reviewed) to avoid wasted review cycles.
+将 ce-doc-review 的 anchored-confidence pattern 移植到 ce-code-review，并加入三个受 Anthropic 官方 `code-review` plugin 启发的 code-review-specific precision controls：externalization 前的 per-finding validation stage、mode-aware false-positive policy，以及 explicit lint-ignore suppression rule。同时增加 PR-mode-only skip-condition pre-check（closed/draft/trivial/already-reviewed），避免浪费 review cycles。
 
-The goal is to make ce-code-review's externalizing modes (autofix, headless, future PR-comment) materially higher-precision while preserving interactive mode's broader review surface.
+目标是显著提高 ce-code-review 的 externalizing modes（autofix、headless、未来 PR-comment）的 precision，同时保留 interactive mode 更宽的 review surface。
 
-## Problem Frame
+## 问题框架
 
-ce-code-review currently uses a continuous `confidence: 0.0-1.0` field with a 0.60 suppress gate, a 0.50+ P0 exception, and a `+0.10` cross-reviewer agreement boost. The same false-precision problem ce-doc-review just fixed applies here: personas anchor on round numbers (0.65, 0.72, 0.85), the gate boundary creates a coin-flip band, and the additive boost hides what the score actually measures.
+ce-code-review 当前使用 continuous `confidence: 0.0-1.0` field，带 0.60 suppress gate、0.50+ P0 exception，以及 `+0.10` cross-reviewer agreement boost。ce-doc-review 刚修复的同一种 false-precision 问题也适用于这里：personas 会锚定 round numbers（0.65、0.72、0.85），gate boundary 形成 coin-flip band，additive boost 掩盖 score 实际衡量的内容。
 
-Reviewing Anthropic's official `code-review` plugin (`anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`) surfaced four additional precision techniques worth adopting:
+Review Anthropic 官方 `code-review` plugin（`anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`）后，发现四个值得采用的 precision techniques：
 
-1. **Anchored 0/25/50/75/100 rubric** — discrete buckets tied to behavioral criteria reduce model-fabricated precision. ce-doc-review already proved this works (commit `6caf3303`); ce-code-review was deferred at the time.
-2. **Per-finding validation subagent** — Anthropic's actual command relies on a binary validated/not-validated gate more than on the numeric score. Independent validation catches false positives that confident-sounding personas produce. We rely on cross-reviewer agreement, which only fires when 2+ reviewers happen to converge — many real findings only fire once.
-3. **Skip-condition pre-check** — Anthropic skips closed, draft, trivial, or already-reviewed PRs before doing any work. We have no equivalent; PR-mode invocations spend full review effort on PRs that should not be reviewed.
-4. **Lint-ignore suppression** — code carrying an explicit `eslint-disable`, `rubocop:disable`, etc. for the rule a reviewer is about to flag should suppress the finding. Not currently in our false-positive catalog.
+1. **Anchored 0/25/50/75/100 rubric**：与 behavioral criteria 绑定的离散 buckets 能降低 model-fabricated precision。ce-doc-review 已证明该模式有效（commit `6caf3303`）；ce-code-review 当时被 deferred。
+2. **Per-finding validation subagent**：Anthropic 的实际 command 比起 numeric score 更依赖 binary validated/not-validated gate。独立 validation 能捕获 confident-sounding personas 产出的 false positives。我们依赖 cross-reviewer agreement，但它只在 2+ reviewers 恰好收敛时触发；许多真实 findings 只会触发一次。
+3. **Skip-condition pre-check**：Anthropic 在做任何工作前跳过 closed、draft、trivial 或 already-reviewed PRs。我们没有等价机制；PR-mode invocations 会在不该 review 的 PR 上花完整 review effort。
+4. **Lint-ignore suppression**：如果 code 带有 explicit `eslint-disable`、`rubocop:disable` 等针对 reviewer 即将 flag 的 rule 的 suppress comment，应 suppress 该 finding。当前 false-positive catalog 中没有这一条。
 
-The right framing for ce-code-review's broader surface is not "narrow to Anthropic's 4-agent shape" but "tier the precision bar by mode": externalizing modes (PR-comment, autofix, headless) need narrow Anthropic-style precision; interactive mode is allowed broader findings as long as weak general-quality concerns route to soft buckets (`advisory` / `residual_risks` / `testing_gaps`) rather than primary findings.
+ce-code-review 更宽 review surface 的正确 framing 不是 "narrow to Anthropic's 4-agent shape"，而是 "按 mode 分层 precision bar"：externalizing modes（PR-comment、autofix、headless）需要窄的 Anthropic-style precision；interactive mode 可以允许更宽 findings，只要弱的 general-quality concerns route 到 soft buckets（`advisory` / `residual_risks` / `testing_gaps`），而不是 primary findings。
 
-Independent validation as a Stage 5b *gate* (drop rejected findings, keep approved ones) is the right framing. An earlier draft of this plan added a `validated: boolean` field to every finding — that field was YAGNI and is removed. The validator's effect is on the population of surviving findings, not on per-finding metadata.
+将 independent validation 作为 Stage 5b *gate*（drop rejected findings，keep approved ones）是正确 framing。该 plan 的早期草稿给每个 finding 增加了 `validated: boolean` field；该 field 是 YAGNI，已移除。validator 的影响体现在 surviving findings 的集合上，而不是 per-finding metadata 上。
 
-## Requirements Trace
+## 需求追踪
 
-- R1. Replace continuous `confidence` field with 5 discrete anchor points (0, 25, 50, 75, 100) and a behavioral rubric per anchor. Mirror ce-doc-review's pattern.
-- R2. Update Stage 5 synthesis to consume anchor values: `>= 75` filter threshold (P0 exception at 50+), one-anchor cross-reviewer promotion (replaces `+0.10`), anchor-descending sort.
-- R3. Add a new Stage 5b validation pass that spawns one validator subagent per surviving finding before externalization. Scope: required for autofix/headless externalization and downstream-resolver handoff; skipped for interactive terminal display where the human is the validator. Validation is process logic — findings the validator rejects are dropped; no metadata field is added to surviving findings.
-- R4. Make the false-positive policy mode-aware in synthesis. Headless and autofix apply the narrow Anthropic-style filter (concrete bugs, compile/parse failures, traceable security, explicit standards violations only). Interactive demotes weak general-quality concerns to `advisory` / `residual_risks` / `testing_gaps` rather than suppressing them.
-- R5. Add an explicit lint-ignore suppression rule to the subagent template's false-positive catalog: if the code carries a lint disable comment for the rule the reviewer is about to flag, suppress unless the suppression itself violates project standards.
-- R6. Add a PR-mode-only skip-condition pre-check (closed, draft, trivial automated, or already-reviewed by Claude). Skip cleanly without dispatching reviewers. Standalone branch and `base:` modes are unaffected.
-- R7. Update all persona files for hardcoded float confidence references and mode-aware suppression hints where applicable.
-- R8. Update test fixtures and contract tests in `tests/review-skill-contract.test.ts` and any related fixtures.
-- R9. Document the migration in `docs/solutions/skill-design/` extending the existing ce-doc-review note, including the rationale for ce-code-review's specific threshold and the validation-stage scoping decision.
+- R1. 将 continuous `confidence` field 替换为 5 个 discrete anchor points（0、25、50、75、100）和每个 anchor 的 behavioral rubric。镜像 ce-doc-review pattern。
+- R2. 更新 Stage 5 synthesis 以消费 anchor values：`>= 75` filter threshold（P0 exception at 50+）、one-anchor cross-reviewer promotion（替代 `+0.10`）、anchor-descending sort。
+- R3. 增加新的 Stage 5b validation pass，在 externalization 前对每个 surviving finding spawn 一个 validator subagent。Scope：autofix/headless externalization 和 downstream-resolver handoff 必须运行；interactive terminal display 跳过，因为 human 是 validator。Validation 是 process logic：validator 拒绝的 findings 被 drop；surviving findings 不新增 metadata field。
+- R4. 在 synthesis 中让 false-positive policy mode-aware。Headless 和 autofix 应用窄的 Anthropic-style filter（只保留 concrete bugs、compile/parse failures、traceable security、explicit standards violations）。Interactive 将弱的 general-quality concerns demote 到 `advisory` / `residual_risks` / `testing_gaps`，而不是 suppress。
+- R5. 在 subagent template 的 false-positive catalog 中增加 explicit lint-ignore suppression rule：如果 code 对 reviewer 即将 flag 的 rule 带有 lint disable comment，则 suppress，除非该 suppression 本身违反 project standards。
+- R6. 增加 PR-mode-only skip-condition pre-check（closed、draft、trivial automated、或 already-reviewed by Claude）。干净 skip，不 dispatch reviewers。Standalone branch 和 `base:` modes 不受影响。
+- R7. 更新所有 persona files 中 hardcoded float confidence references，以及相关 mode-aware suppression hints。
+- R8. 更新 `tests/review-skill-contract.test.ts` 和相关 fixtures 中的 test fixtures 和 contract tests。
+- R9. 在 `docs/solutions/skill-design/` 中记录 migration，扩展现有 ce-doc-review note，包含 ce-code-review 特定 threshold 的 rationale 和 validation-stage scoping decision。
 
-## Scope Boundaries
+## 范围边界
 
-- No change to persona-specific domain logic (what each persona looks for). Only confidence rubric, validation flow, mode-aware policy, and skip-conditions change.
-- No change to severity taxonomy (`P0 | P1 | P2 | P3`).
-- No change to `autofix_class` or `owner` enums.
-- No collapse of the 17-persona architecture to Anthropic's 4-agent shape. ce-code-review's broader surface is intentional.
-- No change to the standalone / branch / PR / `base:` scope-resolution paths in Stage 1.
+- 不改变 persona-specific domain logic（每个 persona 查找什么）。只改变 confidence rubric、validation flow、mode-aware policy 和 skip-conditions。
+- 不改变 severity taxonomy（`P0 | P1 | P2 | P3`）。
+- 不改变 `autofix_class` 或 `owner` enums。
+- 不把 17-persona architecture collapse 成 Anthropic 的 4-agent shape。ce-code-review 更宽的 surface 是刻意设计。
+- 不改变 standalone / branch / PR / `base:` scope-resolution paths in Stage 1。
 
-### Deferred to Separate Tasks
+### 推迟到单独任务
 
-- **PR inline comment posting mode**: Anthropic's `--comment` flag posts findings as inline GitHub PR comments via `mcp__github_inline_comment__create_inline_comment` with full-SHA link discipline and committable suggestion blocks for small fixes. We have no PR-comment mode at all today. This is a substantial new mode (link format, suggestion-block handling, deduplication semantics, tracker integration overlap). Worth its own plan; this refactor sets the precision foundation it would build on.
-- **Haiku-tier orchestrator-side checks**: Anthropic uses haiku for the skip-condition probe and CLAUDE.md path discovery. We currently use sonnet for everything; pushing cheap checks to haiku is a separate cost-optimization task.
-- **Re-evaluating which always-on personas earn their noise**: Anthropic's HIGH-SIGNAL philosophy raises the question of whether `testing` and `maintainability` should remain always-on. Out of scope here — handled by the mode-aware soft-bucket routing in this plan, but a deeper re-think is its own conversation.
+- **PR inline comment posting mode**：Anthropic 的 `--comment` flag 会通过 `mcp__github_inline_comment__create_inline_comment` 将 findings 作为 inline GitHub PR comments 发布，并要求 full-SHA link discipline 和适用于 small fixes 的 committable suggestion blocks。我们今天完全没有 PR-comment mode。这是一个 substantial new mode（link format、suggestion-block handling、deduplication semantics、tracker integration overlap），值得单独 plan；本 refactor 为它建立 precision foundation。
+- **Haiku-tier orchestrator-side checks**：Anthropic 使用 haiku 做 skip-condition probe 和 CLAUDE.md path discovery。我们目前所有步骤都用 sonnet；将 cheap checks 推到 haiku 是单独的 cost-optimization task。
+- **Re-evaluating which always-on personas earn their noise**：Anthropic 的 HIGH-SIGNAL philosophy 引出一个问题：`testing` 和 `maintainability` 是否仍应 always-on。本 plan 不处理；通过 mode-aware soft-bucket routing 暂时承接，但更深 rethink 应单独讨论。
 
-## Context & Research
+## 上下文与调研
 
-### Relevant Code and Patterns
+### 相关代码和模式
 
-**Direct port targets (ce-doc-review prior art):**
-- `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json` — anchored integer enum precedent
-- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md` — verbatim rubric + consolidated false-positive catalog
-- `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md` — anchor gate, one-anchor promotion, anchor-descending sort
-- Commit `6caf3303` — the migration diff is the canonical reference for what to change in this skill
+**直接移植目标（ce-doc-review prior art）：**
+- `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json`：anchored integer enum precedent
+- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md`：verbatim rubric + consolidated false-positive catalog
+- `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md`：anchor gate、one-anchor promotion、anchor-descending sort
+- Commit `6caf3303`：migration diff 是该 skill 需要修改内容的 canonical reference
 
-**Files this plan modifies:**
-- `plugins/compound-engineering/skills/ce-code-review/SKILL.md` — Stage 1 (skip-condition gate), Stage 5 (anchor gate, promotion), new Stage 5b (validation), Stage 6 (mode-aware false-positive policy)
-- `plugins/compound-engineering/skills/ce-code-review/references/findings-schema.json` — confidence enum, threshold table in `_meta`
-- `plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md` — anchored rubric, expanded false-positive catalog with lint-ignore rule, mode-aware suppression hints
-- `plugins/compound-engineering/skills/ce-code-review/references/persona-catalog.md` — verify no float references remain (no behavioral changes needed)
-- `plugins/compound-engineering/skills/ce-code-review/references/review-output-template.md` — anchor-as-integer rendering in confidence column
-- `plugins/compound-engineering/skills/ce-code-review/references/walkthrough.md` — anchor display in per-finding block
-- `plugins/compound-engineering/skills/ce-code-review/references/bulk-preview.md` — anchor rendering if confidence appears
-- `plugins/compound-engineering/agents/ce-*-reviewer.agent.md` — sweep for hardcoded float references
-- `tests/review-skill-contract.test.ts` — anchor enum assertions, validation-stage assertions, skip-condition assertions
-- `tests/fixtures/` — any seeded review fixtures with embedded confidence values
-- `docs/solutions/skill-design/confidence-anchored-scoring.md` — extend with ce-code-review section
+**本 plan 修改的 files：**
+- `plugins/compound-engineering/skills/ce-code-review/SKILL.md`：Stage 1（skip-condition gate）、Stage 5（anchor gate、promotion）、new Stage 5b（validation）、Stage 6（mode-aware false-positive policy）
+- `plugins/compound-engineering/skills/ce-code-review/references/findings-schema.json`：confidence enum、`_meta` 中的 threshold table
+- `plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md`：anchored rubric、加入 lint-ignore rule 的 expanded false-positive catalog、mode-aware suppression hints
+- `plugins/compound-engineering/skills/ce-code-review/references/persona-catalog.md`：确认无 float references 残留（无需行为变化）
+- `plugins/compound-engineering/skills/ce-code-review/references/review-output-template.md`：confidence column 中的 anchor-as-integer rendering
+- `plugins/compound-engineering/skills/ce-code-review/references/walkthrough.md`：per-finding block 中的 anchor display
+- `plugins/compound-engineering/skills/ce-code-review/references/bulk-preview.md`：若出现 confidence，则 anchor rendering
+- `plugins/compound-engineering/agents/ce-*-reviewer.agent.md`：sweep hardcoded float references
+- `tests/review-skill-contract.test.ts`：anchor enum assertions、validation-stage assertions、skip-condition assertions
+- `tests/fixtures/`：任何含 embedded confidence values 的 seeded review fixtures
+- `docs/solutions/skill-design/confidence-anchored-scoring.md`：扩展 ce-code-review section
 
-### Institutional Learnings
+### 机构经验
 
-- `docs/solutions/skill-design/confidence-anchored-scoring.md` — the canonical writeup of the anchored-rubric pattern. Establishes the ce-doc-review threshold of `>= 50` and explicitly anticipates ce-code-review's threshold of `>= 75` due to opposite economics (linter backstop, PR-comment cost, ground-truth verifiability of code claims).
-- `docs/plans/2026-04-21-001-refactor-ce-doc-review-anchored-confidence-scoring-plan.md` — the ce-doc-review plan, particularly its "Deferred to Separate Tasks" entry naming this exact follow-up. Sequencing rationale ("do ce-doc-review first, observe, then plan ce-code-review") was honored.
+- `docs/solutions/skill-design/confidence-anchored-scoring.md`：anchored-rubric pattern 的 canonical writeup。它确立 ce-doc-review 的 `>= 50` threshold，并明确预期 ce-code-review 的 threshold 是 `>= 75`，因为经济学相反（有 linter backstop、PR-comment cost、高可验证性 code claims）。
+- `docs/plans/2026-04-21-001-refactor-ce-doc-review-anchored-confidence-scoring-plan.md`：ce-doc-review plan，尤其是 "Deferred to Separate Tasks" 中点名本 follow-up 的条目。Sequencing rationale（"do ce-doc-review first, observe, then plan ce-code-review"）已被遵守。
 
-### External References
+### 外部参考
 
-- `anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md` — canonical source for the four code-review-specific patterns (anchored rubric, validation step, skip-conditions, lint-ignore). Note: the README describes a 0/25/50/75/100 scale with threshold 80, but the actual command prompt relies more heavily on the binary validated/not-validated gate (their Step 5) than on the numeric score. We model this faithfully by adopting both the anchored rubric *and* the validation gate, recognizing the validation gate is the load-bearing precision mechanism.
-- Two-model comparative analysis (this conversation, 2026-04-21) — original reflection plus second-model critique that surfaced (a) validation gate is more important than the numeric score in the upstream design, (b) false-positive policy should be mode-aware, (c) confidence and validation should be decoupled fields. All three insights are R-traced above.
+- `anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`：四个 code-review-specific patterns（anchored rubric、validation step、skip-conditions、lint-ignore）的 canonical source。注意：README 描述了 0/25/50/75/100 scale 和 threshold 80，但实际 command prompt 更依赖 binary validated/not-validated gate（他们的 Step 5）而不是 numeric score。我们忠实建模该设计：同时采用 anchored rubric 和 validation gate，并承认 validation gate 是 load-bearing precision mechanism。
+- Two-model comparative analysis（this conversation, 2026-04-21）：原始 reflection 加第二模型 critique，提出 (a) validation gate 比 upstream design 中的 numeric score 更重要，(b) false-positive policy 应 mode-aware，(c) confidence 与 validation 应是 decoupled fields。三点 insights 都已 R-traced。
 
-### Slack Context
+### Slack 上下文
 
-Slack tools detected. Ask me to search Slack for organizational context at any point, or include it in your next prompt.
+Slack tools detected。可随时要求我搜索 Slack 获取 organizational context，或在下一条 prompt 中包含它。
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **Threshold `>= 75`, not `>= 80`**: Matches ce-doc-review's stylistic choice of using the anchor itself as the threshold (no awkward `>= 80` middle-bucket gap that effectively means "100 only" under the discrete scale). At `>= 75`, anchor 75 ("real, will hit in practice") and anchor 100 ("evidence directly confirms") survive; anchors 0 / 25 / 50 are dropped. P0 exception at 50+ preserves the current escape hatch for critical-but-uncertain issues.
-- **Validation is process logic, not a metadata field**: An earlier draft of this plan added a `validated: boolean` field to every finding. Removed: rejected findings are dropped, so surviving findings post-validation are validated by definition; in modes where validation does not run, no consumer needs a per-finding flag because the run's mode already tells them whether validation ran. A field that is constant within any mode does no work and the name implies a truth claim it does not carry. Validation stays as a Stage 5b gate; no schema change.
-- **Validation is scoped to externalization, not universal**: Validating every finding roughly doubles agent calls. The cost is justified when findings will be posted to GitHub, applied automatically, or handed off to downstream automation — places where false positives have real cost. For interactive terminal display, the user provides the validation by reviewing.
-- **One validator subagent per finding, not batched**: Independence is the product. A single batched validator looking at all findings together pattern-matches across them and effectively becomes an opinionated re-reviewer, recreating the persona-bias problem we are escaping. Per-finding parallel dispatch keeps fresh context per call. Per-file batching is a plausible future optimization for reviews with many findings clustered in few files, but not needed today (typical reviews surface 3-8 findings post-gate).
-- **Validator dispatch budget cap**: To bound worst-case cost when a review surfaces an unusually large finding set, cap parallel validator dispatch at 15. If more findings survive Stage 5, validate the highest-severity 15 in parallel and queue the rest for a second wave. This is a safety bound; typical reviews never hit it.
-- **Mode-aware false-positive policy uses existing soft buckets, not a new schema field**: Weak general-quality findings already have well-defined homes (`residual_risks` for "noticed but couldn't confirm," `testing_gaps` for missing coverage, `advisory` autofix_class for "report-only"). Mode-aware demotion routes weak findings into these buckets in interactive mode and suppresses them in headless/autofix. No new schema needed.
-- **One-anchor cross-reviewer promotion replaces `+0.10` boost**: Mirrors ce-doc-review. Cleaner than additive math and semantically meaningful (independent corroboration moves a "real but minor" finding to "real, will hit in practice").
-- **Skip-condition gate is PR-mode only**: Standalone, branch, and `base:` modes always run. The closed/draft/trivial/already-reviewed checks only make sense when there's a PR. Already-reviewed detection uses `gh pr view <PR> --comments` filtering for prior Claude-authored comments; the same pattern Anthropic uses.
-- **Lint-ignore suppression has a project-standards exception**: If a finding is about a CLAUDE.md/AGENTS.md rule violation and the code uses a lint disable to suppress that specific rule, the suppression itself may violate project standards (e.g., "do not use `eslint-disable-next-line` for security rules"). The rule is "suppress the finding *unless* the suppression itself is the violation."
-- **No haiku-tier downgrade in this plan**: The skip-condition pre-check is a natural haiku candidate, but model-tier choices are out of scope here. Use the same mid-tier (sonnet) the rest of the skill uses; haiku is its own optimization plan.
+- **Threshold `>= 75`, not `>= 80`**：匹配 ce-doc-review 的风格，即用 anchor 本身作为 threshold（避免离散 scale 下 awkward 的 `>= 80` middle-bucket gap，因为那实际上意味着只剩 "100"）。在 `>= 75` 下，anchor 75（"real, will hit in practice"）和 anchor 100（"evidence directly confirms"）会 survive；anchors 0 / 25 / 50 被 drop。P0 exception at 50+ 保留当前对 critical-but-uncertain issues 的 escape hatch。
+- **Validation is process logic, not a metadata field**：该 plan 早期草稿给每个 finding 增加 `validated: boolean` field。已移除：rejected findings 被 drop，因此 post-validation 的 surviving findings 默认已 validated；不运行 validation 的 modes 中，没有 consumer 需要 per-finding flag，因为 run mode 已说明 validation 是否运行。任何 mode 中常量的 field 都没有工作要做，而且 `validated` 这个名字暗含它并不承载的 truth claim。Validation 只作为 Stage 5b gate；不做 schema change。
+- **Validation is scoped to externalization, not universal**：验证每个 finding 大致会使 agent calls 翻倍。只有 findings 将发布到 GitHub、自动 apply、或 hand off 给 downstream automation 时，这个成本才合理，因为 false positives 有实际代价。Interactive terminal display 中，user 通过阅读提供 validation。
+- **One validator subagent per finding, not batched**：独立性就是产品价值。单个 batched validator 同时看所有 findings，会在它们之间 pattern-match，本质上变成 opinionated re-reviewer，重新制造 persona-bias 问题。Per-finding parallel dispatch 为每次调用保持 fresh context。Per-file batching 是未来 plausible optimization，适合许多 findings clustered in few files 的 review，但今天不需要（typical reviews post-gate 后产生 3-8 findings）。
+- **Validator dispatch budget cap**：为限制异常大 finding set 的 worst-case cost，将 parallel validator dispatch cap 设为 15。如果 Stage 5 后有更多 findings survive，先按最高 severity 验证前 15 个，剩余 queue 到第二 wave。这是 safety bound；typical reviews 不会触发。
+- **Mode-aware false-positive policy uses existing soft buckets, not a new schema field**：弱的 general-quality findings 已经有明确归宿（`residual_risks` 表示 noticed but couldn't confirm，`testing_gaps` 表示 missing coverage，`advisory` autofix_class 表示 report-only）。Mode-aware demotion 在 interactive mode 中把 weak findings route 到这些 buckets，在 headless/autofix 中 suppress。无需新 schema。
+- **One-anchor cross-reviewer promotion replaces `+0.10` boost**：镜像 ce-doc-review。比 additive math 更清晰，语义上也有意义（independent corroboration 将 "real but minor" finding 提升为 "real, will hit in practice"）。
+- **Skip-condition gate is PR-mode only**：Standalone、branch、`base:` modes 始终运行。closed/draft/trivial/already-reviewed checks 只在存在 PR 时有意义。Already-reviewed detection 使用 `gh pr view <PR> --comments` 过滤 prior Claude-authored comments；与 Anthropic 使用的模式相同。
+- **Lint-ignore suppression has a project-standards exception**：如果 finding 关于 CLAUDE.md/AGENTS.md rule violation，而 code 使用 lint disable 来 suppress 该 specific rule，那么 suppression 本身可能违反 project standards（例如 "do not use `eslint-disable-next-line` for security rules"）。规则是 "suppress the finding *unless* the suppression itself is the violation."
+- **No haiku-tier downgrade in this plan**：skip-condition pre-check 自然适合 haiku，但 model-tier choices 不在本 scope。使用该 skill 其余部分同样的 mid-tier（sonnet）；haiku 是自己的 optimization plan。
 
-## Open Questions
+## 开放问题
 
-### Resolved During Planning
+### 规划期间已解决
 
-- **Threshold value (`>= 75` vs `>= 80`)?** Resolved: `>= 75`. Matches ce-doc-review's use of the anchor as the threshold and avoids the "`>= 80` collapses to anchor 100 only" gotcha under a discrete scale.
-- **Add a `validated` field on findings or keep validation as process-only?** Resolved: process-only. Surviving findings post-validation are validated by definition; mode metadata in `metadata.json` already tells consumers whether validation ran. A per-finding flag is YAGNI and the name implies a truth claim it does not carry.
-- **Validate every finding or only externalizing ones?** Resolved: only externalizing (autofix, headless, downstream-resolver handoff). Interactive uses the human as the validator.
-- **One validator per finding, batched, or per file?** Resolved: per finding, parallel. Independence is the design point. Per-file batching is documented as a future optimization if real-world data shows reviews routinely cluster many findings in few files.
-- **Adopt PR-comment posting mode in this plan?** Resolved: deferred. It's a substantial new mode and would dilute the precision-foundation focus of this refactor.
-- **Should we collapse to Anthropic's 4-agent architecture?** Resolved: no. Our 17-persona surface serves a broader workflow (pre-PR review, learnings, deployment notes). Adopt their precision techniques without their narrowness.
+- **Threshold value（`>= 75` vs `>= 80`）？** 结论：`>= 75`。匹配 ce-doc-review 用 anchor 作为 threshold 的方式，并避免离散 scale 下 "`>= 80` collapses to anchor 100 only" 的坑。
+- **在 findings 上添加 `validated` field，还是让 validation 保持 process-only？** 结论：process-only。post-validation surviving findings 默认已 validated；`metadata.json` 中的 mode metadata 已说明 validation 是否运行。Per-finding flag 是 YAGNI，而且名字暗含它不承载的 truth claim。
+- **Validate every finding or only externalizing ones?** 结论：只验证 externalizing（autofix、headless、downstream-resolver handoff）。Interactive 使用 human as validator。
+- **One validator per finding、batched、or per file?** 结论：per finding，parallel。独立性是设计点。若真实数据表明 reviews 经常在少数 files 中聚集大量 findings，则未来可做 per-file batching optimization。
+- **Adopt PR-comment posting mode in this plan?** 结论：deferred。这是 substantial new mode，会冲淡 precision-foundation focus。
+- **Should we collapse to Anthropic's 4-agent architecture?** 结论：不。我们的 17-persona surface 服务更宽 workflow（pre-PR review、learnings、deployment notes）。采用他们的 precision techniques，而不采用他们的 narrowness。
 
-### Deferred to Implementation
+### 推迟到实现阶段
 
-- **Exact rubric wording per anchor for code-review economics**. ce-doc-review's wording works as a starting point, but code review has unambiguous ground truth (compile errors, runtime bugs) that doc review lacks. Anchor 100 should reference "directly verifiable from the code without execution" or similar; implementation pass writes the final text.
-- **Validator subagent prompt design**. The validator's job is independent re-verification, not re-reasoning. Prompt should give it the finding's title, file, line range, and `why_it_matters`, plus the diff and surrounding code, and ask "is this real, introduced by this diff, and not handled elsewhere?" Final wording during implementation; Anthropic's Step 5 prompt is reference material.
-- **Whether to validate findings about to be presented in interactive mode's walk-through**. The walk-through is technically interactive (human in the loop) but the user may LFG-bulk-apply, which crosses into externalization. Decision-deferral candidate: validate before LFG bulk-apply; skip otherwise.
-- **Whether persona files need any additional updates beyond a float-reference sweep**. A few personas may carry domain-specific calibration text (e.g., security: "always flag SQL injection at high confidence") that needs anchor-rewriting. Per-file judgment during implementation.
+- **code-review economics 下的 exact rubric wording per anchor**。ce-doc-review wording 可作为起点，但 code review 有 doc review 不具备的 unambiguous ground truth（compile errors、runtime bugs）。Anchor 100 应提及 "directly verifiable from the code without execution" 或类似内容；implementation pass 写最终文本。
+- **Validator subagent prompt design**。validator 的工作是 independent re-verification，不是 re-reasoning。Prompt 应给它 finding title、file、line range、`why_it_matters`、diff 和 surrounding code，并询问 "is this real, introduced by this diff, and not handled elsewhere?" 最终措辞在 implementation 期间决定；Anthropic 的 Step 5 prompt 是 reference material。
+- **Whether to validate findings about to be presented in interactive mode's walk-through**。walk-through 技术上是 interactive（human in the loop），但 user 可能 LFG-bulk-apply，这跨入 externalization。Decision-deferral candidate：在 LFG bulk-apply 前 validate；否则 skip。
+- **Persona files 是否需要除 float-reference sweep 以外的其他更新**。少数 personas 可能带有 domain-specific calibration text（例如 security："always flag SQL injection at high confidence"），需要改写为 anchors。逐文件判断。
 
-## Implementation Units
+## 实施单元
 
-- [ ] **Unit 1: Update findings schema with anchored confidence**
+- [ ] **Unit 1：用 anchored confidence 更新 findings schema**
 
-**Goal:** Replace continuous `confidence` with integer enum. Update `_meta.confidence_thresholds` to describe the anchor-based gates.
+**目标：** 将 continuous `confidence` 替换为 integer enum。更新 `_meta.confidence_thresholds`，描述 anchor-based gates。
 
-**Requirements:** R1
+**需求：** R1
 
-**Dependencies:** None — this unit establishes the contract every other unit consumes.
+**依赖：** None：本 unit 建立后续所有 units 消费的 contract。
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-code-review/references/findings-schema.json`
-- Test: `tests/review-skill-contract.test.ts` (schema-shape assertions)
+**文件：**
+- 修改：`plugins/compound-engineering/skills/ce-code-review/references/findings-schema.json`
+- 测试：`tests/review-skill-contract.test.ts`（schema-shape assertions）
 
-**Approach:**
-- Replace `confidence: { type: "number", minimum: 0.0, maximum: 1.0 }` with `confidence: { type: "integer", enum: [0, 25, 50, 75, 100] }`.
-- Rewrite `_meta.confidence_thresholds` table to describe anchors and the `>= 75` gate (with P0 exception at 50+).
-- No `validated` field — validation is process logic in Stage 5b. Surviving findings post-validation are validated by definition; rejected findings are dropped. See Key Technical Decisions for rationale.
+**方法：**
+- 将 `confidence: { type: "number", minimum: 0.0, maximum: 1.0 }` 替换为 `confidence: { type: "integer", enum: [0, 25, 50, 75, 100] }`。
+- 重写 `_meta.confidence_thresholds` table，描述 anchors 和 `>= 75` gate（with P0 exception at 50+）。
+- 不增加 `validated` field：validation 是 Stage 5b 中的 process logic。post-validation surviving findings 默认已 validated；rejected findings 被 drop。rationale 见 Key Technical Decisions。
 
-**Patterns to follow:**
-- `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json` — anchor enum precedent
+**遵循的模式：**
+- `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json`：anchor enum precedent
 
-**Test scenarios:**
-- Happy path — Schema validates a finding with `confidence: 75`.
-- Edge case — Schema rejects a finding with `confidence: 0.85` (float not in enum).
-- Edge case — Schema rejects a finding with `confidence: 80` (not in enum).
-- Edge case — `_meta` documents the threshold semantics in human-readable form (smoke test: assert key strings present).
+**测试场景：**
+- Happy path：Schema 可通过 `confidence: 75` 的 finding。
+- Edge case：Schema 拒绝 `confidence: 0.85` 的 finding（float not in enum）。
+- Edge case：Schema 拒绝 `confidence: 80` 的 finding（not in enum）。
+- Edge case：`_meta` 以 human-readable form 记录 threshold semantics（smoke test：assert key strings present）。
 
-**Verification:**
-- All schema assertions in `tests/review-skill-contract.test.ts` pass with the new shape.
-- `bun run release:validate` reports no parity drift.
-
----
-
-- [ ] **Unit 2: Rewrite subagent template with anchored rubric, expanded false-positive catalog, and mode-aware hints**
-
-**Goal:** Replace the float rubric with the verbatim 5-anchor behavioral rubric. Expand the false-positive catalog with lint-ignore suppression. Add a mode-aware suppression hint so personas know their findings will be filtered differently in headless/autofix.
-
-**Requirements:** R1, R4, R5
-
-**Dependencies:** Unit 1 (schema must accept anchor values).
-
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md`
-
-**Approach:**
-- Replace the "Confidence rubric (0.0-1.0 scale)" section (lines 41-49) with the 5-anchor rubric, each anchor named and tied to a behavioral criterion the persona can self-apply (e.g., "100: Verifiable from the code alone without running it").
-- Update the suppress-threshold sentence to "Suppress threshold: anchor 75. Do not emit findings below anchor 75 (except P0 at anchor 50)."
-- Expand the false-positive catalog (lines 75-81) to include the lint-ignore rule explicitly: "Code with an explicit lint disable comment for the rule you are about to flag — suppress unless the suppression itself violates a project-standards rule."
-
-**Patterns to follow:**
-- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md` — rubric and false-positive catalog structure
-
-**Test scenarios:**
-- Happy path — Template renders with all 5 anchors and behavioral definitions.
-- Integration — A test that spawns a persona against a fixture diff returns findings with anchor values.
-
-**Verification:**
-- The rubric appears in the template verbatim and matches the schema enum.
-- The false-positive catalog includes lint-ignore handling.
-- No persona sub-agent prompt references continuous floats after this unit lands.
+**验证：**
+- `tests/review-skill-contract.test.ts` 中所有 schema assertions 按新 shape 通过。
+- `bun run release:validate` 报告无 parity drift。
 
 ---
 
-- [ ] **Unit 3: Update synthesis Stage 5 with anchor gate, one-anchor promotion, and anchor-descending sort**
+- [ ] **Unit 2：用 anchored rubric、expanded false-positive catalog 和 mode-aware hints 重写 subagent template**
 
-**Goal:** Update the merge stage to consume integer anchors. Replace the `0.60` threshold with `>= 75` (P0 exception at 50+). Replace the `+0.10` cross-reviewer boost with one-anchor promotion. Update the sort to use anchor descending.
+**目标：** 用 verbatim 5-anchor behavioral rubric 替换 float rubric。扩展 false-positive catalog，加入 lint-ignore suppression。添加 mode-aware suppression hint，让 personas 知道它们的 findings 会在 headless/autofix 下被不同过滤。
 
-**Requirements:** R2
+**需求：** R1, R4, R5
 
-**Dependencies:** Units 1, 2.
+**依赖：** Unit 1（schema 必须接受 anchor values）。
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-code-review/SKILL.md` (Stage 5)
+**文件：**
+- 修改：`plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md`
 
-**Approach:**
-- In Stage 5 step 1 ("Validate"), update the `confidence` value constraint from `numeric, 0.0-1.0` to `integer in {0, 25, 50, 75, 100}`.
-- In Stage 5 step 2 ("Confidence gate"), change "Suppress findings below 0.60 confidence. Exception: P0 findings at 0.50+" to "Suppress findings below anchor 75. Exception: P0 findings at anchor 50+ survive."
-- In Stage 5 step 4 ("Cross-reviewer agreement"), replace "boost the merged confidence by 0.10 (capped at 1.0)" with "promote the merged finding by one anchor step (50 -> 75, 75 -> 100, 100 -> 100). Cross-reviewer corroboration is a stronger signal than any single reviewer's anchor; the promotion routes the finding from the soft tier into the actionable tier or strengthens its already-actionable position."
-- In Stage 5 step 9 ("Sort"), change "confidence (descending)" to "anchor (descending)".
-- Update the Stage 5 preamble to describe the new contract (integer anchors instead of floats).
+**方法：**
+- 将 "Confidence rubric (0.0-1.0 scale)" section（lines 41-49）替换为 5-anchor rubric，每个 anchor 命名并绑定一个 persona 可自我应用的 behavioral criterion（例如 "100: Verifiable from the code alone without running it"）。
+- 将 suppress-threshold sentence 更新为 "Suppress threshold: anchor 75. Do not emit findings below anchor 75 (except P0 at anchor 50)."
+- 扩展 false-positive catalog（lines 75-81），明确加入 lint-ignore rule："Code with an explicit lint disable comment for the rule you are about to flag — suppress unless the suppression itself violates a project-standards rule."
 
-**Test scenarios:**
-- Happy path — Two reviewers flag the same fingerprint at anchor 50; merged result is anchor 75 (one-anchor promotion).
-- Happy path — Two reviewers flag the same fingerprint at anchor 75; merged result is anchor 100.
-- Happy path — One reviewer flags at anchor 100; merged result remains anchor 100 (no over-promotion).
-- Edge case — A single reviewer flags at anchor 50, no other reviewer agrees; merged result is filtered out (below threshold).
-- Edge case — A P0 finding at anchor 50 survives the gate; a P1 finding at anchor 50 does not.
-- Edge case — Sort order: two findings at the same severity, one at anchor 100 and one at anchor 75; the anchor-100 finding sorts first.
+**遵循的模式：**
+- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md`：rubric 和 false-positive catalog structure
 
-**Verification:**
-- `tests/review-skill-contract.test.ts` synthesis assertions pass with the new gate, promotion, and sort.
-- A manual review run against a fixture diff produces expected anchor distributions and routing.
+**测试场景：**
+- Happy path：Template 渲染出全部 5 个 anchors 和 behavioral definitions。
+- Integration：spawn 一个 persona against a fixture diff，返回 findings with anchor values。
+
+**验证：**
+- rubric 出现在 template 中，且匹配 schema enum。
+- false-positive catalog 包含 lint-ignore handling。
+- 本 unit 落地后，无 persona sub-agent prompt 继续引用 continuous floats。
 
 ---
 
-- [ ] **Unit 4: Add Stage 5b validation pass for externalizing findings**
+- [ ] **Unit 3：用 anchor gate、one-anchor promotion 和 anchor-descending sort 更新 synthesis Stage 5**
 
-**Goal:** Insert a new synthesis stage that spawns a validator subagent per surviving finding when the run will externalize. Validator says yes -> finding survives; validator says no, times out, or returns malformed output -> finding is dropped. Pure process logic; no metadata change to surviving findings.
+**目标：** 更新 merge stage，使其消费 integer anchors。用 `>= 75`（P0 exception at 50+）替换 `0.60` threshold。用 one-anchor promotion 替换 `+0.10` cross-reviewer boost。将 sort 改为 anchor descending。
 
-**Requirements:** R3
+**需求：** R2
 
-**Dependencies:** Units 1, 3.
+**依赖：** Units 1, 2.
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-code-review/SKILL.md` (new Stage 5b between Stage 5 and Stage 6)
-- Create: `plugins/compound-engineering/skills/ce-code-review/references/validator-template.md` — the validator subagent's prompt template
+**文件：**
+- 修改：`plugins/compound-engineering/skills/ce-code-review/SKILL.md`（Stage 5）
 
-**Approach:**
-- After Stage 5 merge produces the deduplicated finding set, decide whether validation runs. Validation runs when:
-  - Mode is `headless` or `autofix`
-  - Mode is `interactive` and the routing path is LFG (option B) or File-tickets (option C)
-  - A future PR-comment mode (when added)
-- Validation does *not* run when:
-  - Mode is `report-only`
-  - Mode is `interactive` and the routing is walk-through (option A) per-finding (the user is the validator) or Report-only (option D)
-- For each surviving finding, spawn one validator subagent in parallel. Validator prompt (in `references/validator-template.md`) gives it: finding title, file, line, `why_it_matters`, the diff, and surrounding code via the platform's read tool. Validator returns `{ "validated": true | false, "reason": "..." }`.
-- Findings where validator returns `false` are dropped. Findings where validator returns `true` flow through unchanged into Stage 6 — no field is set on the finding (validation is process logic, not metadata).
-- Validator runs at mid-tier (sonnet) like the personas. Validator is read-only — same constraints as persona reviewers.
-- **Dispatch budget cap: max 15 parallel validators.** When more than 15 findings survive Stage 5, validate the highest-severity 15 (P0 first, then P1, then P2, then P3, breaking ties by anchor descending) and drop the remainder with a Coverage note. This is a safety bound; typical reviews surface < 10 findings post-gate and never hit the cap. The blunt "drop the rest" behavior is intentional — a review producing 15+ surviving findings is already in territory where a second wave wouldn't change the user's triage approach.
-- Record validation drop count and any over-budget drops in Coverage for Stage 6.
-- If the validator subagent fails, times out, or returns malformed JSON, treat as a no-vote and drop the finding. Unverified findings should not externalize. Conservative bias is correct.
-- **Future optimization (not implemented here):** per-file batching. Group surviving findings by file and dispatch one validator per file (validator reads the file once, evaluates all findings in that file). Real win when reviews cluster many findings in few files (large refactors). Skip until we see real-world data showing it matters; per-finding parallel dispatch is the correct default for typical reviews.
+**方法：**
+- 在 Stage 5 step 1（"Validate"）中，将 `confidence` value constraint 从 `numeric, 0.0-1.0` 更新为 `integer in {0, 25, 50, 75, 100}`。
+- 在 Stage 5 step 2（"Confidence gate"）中，将 "Suppress findings below 0.60 confidence. Exception: P0 findings at 0.50+" 改为 "Suppress findings below anchor 75. Exception: P0 findings at anchor 50+ survive."
+- 在 Stage 5 step 4（"Cross-reviewer agreement"）中，将 "boost the merged confidence by 0.10 (capped at 1.0)" 替换为 "promote the merged finding by one anchor step (50 -> 75, 75 -> 100, 100 -> 100). Cross-reviewer corroboration is a stronger signal than any single reviewer's anchor; the promotion routes the finding from the soft tier into the actionable tier or strengthens its already-actionable position."
+- 在 Stage 5 step 9（"Sort"）中，将 "confidence (descending)" 改为 "anchor (descending)"。
+- 更新 Stage 5 preamble，描述新 contract（integer anchors 而非 floats）。
 
-**Execution note:** Add a contract test for the validation stage before wiring it into the orchestrator, so we have a known-good harness for fixture-based verification.
+**测试场景：**
+- Happy path：两个 reviewers 以 anchor 50 flag 同一 fingerprint；merged result 为 anchor 75（one-anchor promotion）。
+- Happy path：两个 reviewers 以 anchor 75 flag 同一 fingerprint；merged result 为 anchor 100。
+- Happy path：一个 reviewer 以 anchor 100 flag；merged result 保持 anchor 100（不过度 promotion）。
+- Edge case：单个 reviewer 以 anchor 50 flag，无其他 reviewer 同意；merged result 被过滤（below threshold）。
+- Edge case：P0 finding at anchor 50 survives gate；P1 finding at anchor 50 不 survive。
+- Edge case：Sort order：两个 same severity findings，一个 anchor 100、一个 anchor 75；anchor-100 finding 排在前。
 
-**Patterns to follow:**
-- `plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md` — output contract structure for the validator template
-- Anthropic's Step 5 in `commands/code-review.md` — the validator's job is independent re-verification, not re-reasoning
+**验证：**
+- `tests/review-skill-contract.test.ts` synthesis assertions 在新 gate、promotion、sort 下通过。
+- 对 fixture diff 的 manual review run 产出 expected anchor distributions 和 routing。
 
-**Technical design:** *(directional guidance, not implementation specification)*
+---
+
+- [ ] **Unit 4：为 externalizing findings 添加 Stage 5b validation pass**
+
+**目标：** 插入新的 synthesis stage：当 run 将 externalize 时，对每个 surviving finding spawn 一个 validator subagent。Validator yes -> finding survives；validator no、timeout 或 malformed output -> finding dropped。纯 process logic；surviving findings 不新增 metadata。
+
+**需求：** R3
+
+**依赖：** Units 1, 3.
+
+**文件：**
+- 修改：`plugins/compound-engineering/skills/ce-code-review/SKILL.md`（Stage 5 和 Stage 6 之间的新 Stage 5b）
+- 新增：`plugins/compound-engineering/skills/ce-code-review/references/validator-template.md`：validator subagent 的 prompt template
+
+**方法：**
+- Stage 5 merge 产出 deduplicated finding set 后，决定是否运行 validation。Validation 在以下情况下运行：
+  - Mode 是 `headless` 或 `autofix`
+  - Mode 是 `interactive` 且 routing path 是 LFG（option B）或 File-tickets（option C）
+  - 未来 PR-comment mode（添加后）
+- Validation 在以下情况下不运行：
+  - Mode 是 `report-only`
+  - Mode 是 `interactive` 且 routing 是 walk-through（option A）per-finding（user 是 validator）或 Report-only（option D）
+- 对每个 surviving finding，parallel spawn 一个 validator subagent。Validator prompt（在 `references/validator-template.md` 中）给出：finding title、file、line、`why_it_matters`、diff，以及通过平台 read tool 获取 surrounding code。Validator 返回 `{ "validated": true | false, "reason": "..." }`。
+- validator 返回 `false` 的 findings 被 drop。validator 返回 `true` 的 findings unchanged 流入 Stage 6；不在 finding 上设置 field（validation 是 process logic，不是 metadata）。
+- Validator 与 personas 一样使用 mid-tier（sonnet）。Validator 是 read-only，与 persona reviewers 相同 constraints。
+- **Dispatch budget cap: max 15 parallel validators.** 当 Stage 5 后超过 15 个 findings survive，按 severity desc 排序取前 15 个进行 validate（P0 first，然后 P1/P2/P3，同级按 anchor descending 打破 ties），剩余全部 drop 并在 Coverage 中注明。这是 safety bound；typical reviews post-gate 后 < 10 findings，不会触发。直白的 "drop the rest" behavior 是刻意的：一场 review 产生 15+ surviving findings 时，已经进入 second wave 不会改变 user triage approach 的 territory。
+- 在 Coverage 中记录 validation drop count 和任何 over-budget drops。
+- 如果 validator subagent fail、timeout 或返回 malformed JSON，将其视为 no-vote 并 drop finding。未经验证的 findings 不应 externalize。保守偏置正确。
+- **Future optimization（not implemented here）：** per-file batching。按 file group surviving findings，每个 file dispatch 一个 validator（validator 读一次 file，评估该 file 中所有 findings）。当 reviews 在少数 files 中聚集大量 findings（large refactors）时才有真实收益。真实数据证明重要之前先不做；per-finding parallel dispatch 是 typical reviews 的正确 default。
+
+**Execution note：** 先为 validation stage 增加 contract test，再 wire into orchestrator，这样有 known-good harness 做 fixture-based verification。
+
+**遵循的模式：**
+- `plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md`：validator template 的 output contract structure
+- Anthropic `commands/code-review.md` 中的 Step 5：validator 的工作是 independent re-verification，不是 re-reasoning
+
+**Technical design：** *(方向性指导，不是 implementation specification)*
 
 ```
 Stage 5 -> merged findings
@@ -272,241 +272,241 @@ Stage 5b: Validation gate
 Stage 6 -> synthesize and present
 ```
 
-**Test scenarios:**
-- Happy path — Headless mode, validator confirms a finding; finding survives into Stage 6 unchanged.
-- Happy path — Headless mode, validator rejects a finding; finding is dropped and counted in Coverage with the validator's reason.
-- Happy path — Interactive mode, walk-through routing; validation stage is skipped entirely, all surviving findings pass through.
-- Edge case — Validator subagent times out; finding is dropped.
-- Edge case — Validator returns malformed JSON; finding is dropped, drop reason recorded.
-- Edge case — 20 findings survive Stage 5 in headless mode; first 15 (sorted by severity desc) validate in parallel, remaining 5 are dropped with Coverage note "5 findings exceeded validator budget cap and were not externalized."
-- Integration — Autofix mode applies only validator-approved `safe_auto` findings; a validator-rejected `safe_auto` finding does not enter the fixer queue.
+**测试场景：**
+- Happy path（正常路径）：Headless mode，validator confirms a finding；finding unchanged survive 到 Stage 6。
+- Happy path（正常路径）：Headless mode，validator rejects a finding；finding dropped，并在 Coverage 中计数且带 validator reason。
+- Happy path（正常路径）：Interactive mode，walk-through routing；validation stage 完全 skipped，所有 surviving findings pass through。
+- Edge case（边界情况）：Validator subagent timeout；finding dropped。
+- Edge case（边界情况）：Validator returns malformed JSON；finding dropped，记录 drop reason。
+- Edge case（边界情况）：Headless mode 中 20 个 findings survive Stage 5；前 15 个（按 severity desc 排序）parallel validate，剩余 5 个 dropped，并带 Coverage note "5 findings exceeded validator budget cap and were not externalized."
+- Integration（集成）：Autofix mode 只 apply validator-approved `safe_auto` findings；validator-rejected `safe_auto` finding 不进入 fixer queue。
 
-**Verification:**
-- `tests/review-skill-contract.test.ts` validation-stage assertions pass.
-- Coverage section reports validator drop count and any second-wave deferrals.
-- Autofix mode does not apply validator-rejected findings.
-
----
-
-- [ ] **Unit 5: Add PR-mode-only skip-condition pre-check in Stage 1**
-
-**Goal:** Before the standard Stage 1 scope-detection runs in PR mode (PR number or URL provided), perform a cheap skip-condition check. Skip cleanly without dispatching reviewers if the PR is closed, draft, marked trivial/automated, or already reviewed by a prior Claude run.
-
-**Requirements:** R6
-
-**Dependencies:** None — this is a pre-stage gate, independent of the schema and synthesis changes.
-
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-code-review/SKILL.md` (Stage 1 PR/URL path, before the existing checkout step)
-
-**Approach:**
-- Add a sub-step at the top of the "PR number or GitHub URL is provided" branch in Stage 1.
-- Run a single `gh pr view <number-or-url> --json state,isDraft,title,body,comments` call to fetch all skip-relevant data in one round trip.
-- Apply skip rules:
-  - `state` is `CLOSED` or `MERGED` -> skip with message "PR is closed/merged; not reviewing."
-  - `isDraft` is `true` -> skip with message "PR is a draft; not reviewing. Re-invoke once it's marked ready."
-  - `title` matches a trivial-PR pattern (e.g., `^(chore\\(deps\\)|build\\(deps\\)|chore: bump|chore: release)`) AND body is empty/template-only -> skip with message "PR appears to be a trivial automated PR; not reviewing. Pass `mode:headless` or another explicit invocation if review is intended."
-  - `comments` includes any comment whose body starts with the ce-code-review report header (e.g., `## Code Review` or the headless completion line) -> skip with message "PR already has a ce-code-review report. To re-review, run from the branch (no PR target) or pass `base:<ref>` against the current checkout."
-- Skip detection deliberately ignores commits-since-comment. Yes, this over-suppresses when new commits land after a prior review — the user's escape hatch is branch mode or `base:` mode, both of which bypass the PR-mode skip-check entirely. Simpler to detect and explain than commit-vs-comment timestamp logic, and the over-suppression cost is one extra command from the user.
-- Skip cleanly: emit the message and stop without dispatching any reviewers or running scope detection.
-- Standalone branch and `base:` modes are unaffected — they always run.
-
-**Patterns to follow:**
-- Anthropic's Step 1 in `commands/code-review.md` — same set of skip conditions
-- Existing Stage 1 "uncommitted changes" check — same shape: probe state, emit message, stop early if conditions don't allow proceeding
-
-**Test scenarios:**
-- Happy path — PR is open, draft is false, title is normal, no prior Claude comment; skip-check passes, scope detection runs.
-- Edge case — PR is closed; skip-check stops early with the closed message; no reviewers dispatched.
-- Edge case — PR is draft; skip-check stops early with the draft message.
-- Edge case — PR title is `chore(deps): bump foo from 1.0 to 1.1`; skip-check stops early with the trivial message.
-- Edge case — PR has a prior ce-code-review report comment; skip-check stops early with the already-reviewed message regardless of subsequent commits.
-- Negative — Standalone mode (no PR argument) does not run skip-check.
-- Negative — `base:` mode does not run skip-check.
-
-**Verification:**
-- `tests/review-skill-contract.test.ts` skip-check assertions pass.
-- A manual run against a closed PR exits cleanly without dispatching reviewers.
+**验证：**
+- `tests/review-skill-contract.test.ts` validation-stage assertions 通过。
+- Coverage section 报告 validator drop count 和任何 second-wave deferrals。
+- Autofix mode 不 apply validator-rejected findings。
 
 ---
 
-- [ ] **Unit 6: Add mode-aware false-positive demotion in Stage 5/6**
+- [ ] **Unit 5：在 Stage 1 添加 PR-mode-only skip-condition pre-check**
 
-**Goal:** In Stage 5 (after merge, before validation), demote weak general-quality findings to soft buckets in interactive mode and suppress them in headless/autofix mode. The point is to surface the same content the personas produce, but route weak signal to `residual_risks` / `testing_gaps` / `advisory` rather than primary findings in interactive, and suppress entirely in externalizing modes.
+**目标：** 在 PR mode（提供 PR number 或 URL）下，在标准 Stage 1 scope-detection 运行前做 cheap skip-condition check。如果 PR closed、draft、marked trivial/automated，或 already reviewed by a prior Claude run，则不 dispatch reviewers，干净 skip。
 
-**Requirements:** R4
+**需求：** R6
 
-**Dependencies:** Units 1, 3.
+**依赖：** None：这是 pre-stage gate，独立于 schema 和 synthesis changes。
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-code-review/SKILL.md` (Stage 5 step ordering and Stage 6 rendering)
+**文件：**
+- 修改：`plugins/compound-engineering/skills/ce-code-review/SKILL.md`（Stage 1 PR/URL path，existing checkout step 前）
 
-**Approach:**
-- Define "weak general-quality finding" precisely: a finding where `severity` is P2 or P3, `autofix_class` is `advisory`, and the persona is `testing` or `maintainability` (the always-on personas most prone to general-quality flagging). This is the conservative definition; it can expand if practice shows other patterns.
-- In Stage 5 (after merge, before partition), apply mode-aware demotion:
-  - **Interactive mode:** Move weak general-quality findings out of the primary findings list. If the finding is from `testing`, append the `title` + `why_it_matters` to `testing_gaps`. If from `maintainability`, append to `residual_risks`. The finding does not appear in the Stage 6 findings table.
-  - **Headless and autofix modes:** Suppress weak general-quality findings entirely. Record the suppressed count in Coverage.
-  - **Report-only mode:** Same as interactive — demote to soft buckets, do not suppress.
-- Stage 6 rendering already shows `residual_risks` and `testing_gaps`; no template change needed for the demoted destinations. Update the Coverage section to report mode-aware suppressions/demotions distinctly from the existing confidence-gate suppressions.
+**方法：**
+- 在 Stage 1 的 "PR number or GitHub URL is provided" branch 顶部增加 sub-step。
+- 运行单个 `gh pr view <number-or-url> --json state,isDraft,title,body,comments` call，一次 round trip 获取所有 skip-relevant data。
+- 应用 skip rules：
+  - `state` 是 `CLOSED` 或 `MERGED` -> skip，并提示 "PR is closed/merged; not reviewing."
+  - `isDraft` 是 `true` -> skip，并提示 "PR is a draft; not reviewing. Re-invoke once it's marked ready."
+  - `title` 匹配 trivial-PR pattern（例如 `^(chore\\(deps\\)|build\\(deps\\)|chore: bump|chore: release)`）且 body empty/template-only -> skip，并提示 "PR appears to be a trivial automated PR; not reviewing. Pass `mode:headless` or another explicit invocation if review is intended."
+  - `comments` 包含任何 body 以 ce-code-review report header 开头的 comment（例如 `## Code Review` 或 headless completion line）-> skip，并提示 "PR already has a ce-code-review report. To re-review, run from the branch (no PR target) or pass `base:<ref>` against the current checkout."
+- Skip detection 故意忽略 commits-since-comment。是的，如果 prior review 后有 new commits，这会 over-suppress；user 的 escape hatch 是 branch mode 或 `base:` mode，两者都完全绕过 PR-mode skip-check。相比 commit-vs-comment timestamp logic，这更容易检测和解释。
+- 干净 skip：emit message 后停止，不 dispatch reviewers，也不 run scope detection。
+- Standalone branch 和 `base:` modes 不受影响，始终运行。
 
-**Test scenarios:**
-- Happy path — Interactive mode, a `testing` persona produces a P3 advisory finding; after demotion it appears in `testing_gaps`, not the findings table.
-- Happy path — Headless mode, the same finding is suppressed and counted in Coverage.
-- Happy path — A `correctness` persona produces a P3 advisory finding; demotion does *not* apply (only `testing` and `maintainability` qualify under the conservative definition), and the finding appears in the findings table.
-- Edge case — A `testing` persona produces a P0 finding; demotion does not apply (severity exceeds threshold).
-- Edge case — A `maintainability` persona produces a P2 `safe_auto` finding; demotion does not apply (autofix_class is not `advisory`).
+**遵循的模式：**
+- Anthropic `commands/code-review.md` 的 Step 1：同一组 skip conditions
+- Existing Stage 1 "uncommitted changes" check：同样形状，probe state，如果 conditions 不允许继续则 emit message 并 early stop
 
-**Verification:**
-- `tests/review-skill-contract.test.ts` mode-demotion assertions pass.
-- Stage 6 output in interactive mode shows demoted findings in `testing_gaps`/`residual_risks`, not in the findings table.
+**测试场景：**
+- Happy path：PR open、draft false、title normal、无 prior Claude comment；skip-check 通过，scope detection 运行。
+- Edge case：PR closed；skip-check 以 closed message early stop；不 dispatch reviewers。
+- Edge case：PR draft；skip-check 以 draft message early stop。
+- Edge case：PR title 为 `chore(deps): bump foo from 1.0 to 1.1`；skip-check 以 trivial message early stop。
+- Edge case：PR 有 prior ce-code-review report comment；skip-check early stop，并且不管后续 commits。
+- Negative：Standalone mode（无 PR argument）不运行 skip-check。
+- Negative：`base:` mode 不运行 skip-check。
 
----
-
-- [ ] **Unit 7: Sweep persona files and update walkthrough/template/bulk-preview rendering**
-
-**Goal:** Update all reviewer persona files for hardcoded float references (e.g., a persona that says "always file SQL injection at 0.85+"). Update rendering surfaces to display anchors as integers consistently.
-
-**Requirements:** R7
-
-**Dependencies:** Units 1, 2.
-
-**Files:**
-- Modify: `plugins/compound-engineering/agents/ce-correctness-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-testing-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-maintainability-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-project-standards-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-security-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-performance-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-api-contract-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-data-migrations-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-reliability-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-adversarial-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-cli-readiness-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-previous-comments-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-dhh-rails-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-kieran-rails-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-kieran-python-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-kieran-typescript-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-julik-frontend-races-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/ce-swift-ios-reviewer.agent.md` — explicit float bands at lines 75/77/79 (`0.80+` -> anchor 75/100; `0.60-0.79` -> anchor 50; `below 0.60` -> anchor 0/25)
-- Modify: `plugins/compound-engineering/skills/ce-code-review/references/review-output-template.md`
-- Modify: `plugins/compound-engineering/skills/ce-code-review/references/walkthrough.md`
-- Modify: `plugins/compound-engineering/skills/ce-code-review/references/bulk-preview.md`
-- Modify: `plugins/compound-engineering/skills/ce-code-review/references/persona-catalog.md` (verify no float references remain; no behavioral changes needed)
-
-**Approach:**
-- For each persona file: grep for confidence references (`0.\\d`, "0.6", "0.7", etc.) and rewrite to use anchors. Most personas rely on the template and won't need changes; the sweep catches outliers.
-- For each rendering surface: update confidence-column rendering from float (`0.85`) to integer-anchor (`75` or `100`). Update walkthrough per-finding block to show anchor.
-- For `persona-catalog.md`: no behavioral changes needed; selection rules are unchanged. Verify no float references remain.
-- For `review-output-template.md`: update the Confidence column header/format if needed.
-
-**Test scenarios:**
-- Edge case — Grep for float-confidence references across `agents/` returns nothing after the sweep.
-- Happy path — Walkthrough rendering for a finding shows `Confidence: 75` (integer), not `Confidence: 0.85`.
-- Happy path — Bulk-preview rendering uses anchor format consistently with walkthrough.
-- Happy path — Findings table in `review-output-template.md` shows anchor as integer.
-
-**Verification:**
-- No hardcoded float confidence values remain in `plugins/compound-engineering/agents/` or `plugins/compound-engineering/skills/ce-code-review/references/`.
-- All rendering surfaces use anchor integers consistently.
+**验证：**
+- `tests/review-skill-contract.test.ts` skip-check assertions 通过。
+- 对 closed PR 的 manual run 干净退出，且不 dispatch reviewers。
 
 ---
 
-- [ ] **Unit 8: Update test fixtures and contract tests**
+- [ ] **Unit 6：在 Stage 5/6 添加 mode-aware false-positive demotion**
 
-**Goal:** Update `tests/review-skill-contract.test.ts` to assert the new schema, synthesis behavior, validation stage, skip-conditions, and mode-aware demotion. Update or add fixtures with anchor values.
+**目标：** 在 Stage 5（merge 后、validation 前）中，interactive mode 将弱 general-quality findings demote 到 soft buckets，headless/autofix mode 则 suppress。重点是保留 personas 产出的相同 content，但在 interactive 中将 weak signal route 到 `residual_risks` / `testing_gaps` / `advisory`，而不是 primary findings；在 externalizing modes 中完全 suppress。
 
-**Requirements:** R8
+**需求：** R4
 
-**Dependencies:** Units 1-6 (the behavior all units 1-6 produce must already be in code so the tests pass).
+**依赖：** Units 1, 3.
 
-**Files:**
-- Modify: `tests/review-skill-contract.test.ts`
-- Modify: `tests/fixtures/` (any seeded ce-code-review fixtures with embedded confidence values; check `tests/fixtures/ce-code-review/` if present, or `tests/fixtures/sample-plugin/` if shared)
+**文件：**
+- 修改：`plugins/compound-engineering/skills/ce-code-review/SKILL.md`（Stage 5 step ordering 和 Stage 6 rendering）
 
-**Execution note:** Mirror the test additions ce-doc-review's commit `6caf3303` made to `tests/pipeline-review-contract.test.ts` (73 lines added). The pattern is established; copy the structure.
+**方法：**
+- 精确定义 "weak general-quality finding"：finding 的 `severity` 是 P2 或 P3、`autofix_class` 是 `advisory`，且 persona 是 `testing` 或 `maintainability`（最容易产生 general-quality flagging 的 always-on personas）。这是保守定义；实践证明需要时再扩展。
+- 在 Stage 5（merge 后、partition 前）应用 mode-aware demotion：
+  - **Interactive mode:** 将 weak general-quality findings 移出 primary findings list。如果 finding 来自 `testing`，将 `title` + `why_it_matters` append 到 `testing_gaps`。如果来自 `maintainability`，append 到 `residual_risks`。finding 不出现在 Stage 6 findings table。
+  - **Headless and autofix modes:** 完全 suppress weak general-quality findings。在 Coverage 中记录 suppressed count。
+  - **Report-only mode:** 与 interactive 相同，demote 到 soft buckets，不 suppress。
+- Stage 6 rendering 已显示 `residual_risks` 和 `testing_gaps`；demoted destinations 不需要 template change。更新 Coverage section，分别报告 mode-aware suppressions/demotions 和现有 confidence-gate suppressions。
 
-**Approach:**
-- Add schema-shape assertions: `confidence` is integer enum, `_meta.confidence_thresholds` describes the new gates.
-- Add synthesis assertions: `>= 75` gate, P0 exception at 50, one-anchor promotion, anchor-descending sort.
-- Add validation-stage assertions: mode-conditional dispatch, finding survives on validator approval, finding drops on validator rejection or timeout, budget cap drops overflow with Coverage note.
-- Add skip-condition assertions: closed/draft/trivial/already-reviewed cases stop early; standalone and `base:` modes do not skip-check.
-- Add mode-aware demotion assertions: `testing` P3 advisory in interactive lands in `testing_gaps`; same finding in headless is suppressed.
-- Update fixtures with embedded confidence values from float to anchor integers. Convert by behavior: `0.85` -> `75` if "real, will hit in practice"; `0.92+` -> `100` if "verifiable from code."
+**测试场景：**
+- Happy path：Interactive mode，`testing` persona 产出 P3 advisory finding；demotion 后它出现在 `testing_gaps`，不在 findings table 中。
+- Happy path：Headless mode，同一 finding 被 suppressed 并在 Coverage 中计数。
+- Happy path：`correctness` persona 产出 P3 advisory finding；不适用 demotion（保守定义只包含 `testing` 和 `maintainability`），finding 出现在 findings table。
+- Edge case：`testing` persona 产出 P0 finding；不适用 demotion（severity 超出 threshold）。
+- Edge case：`maintainability` persona 产出 P2 `safe_auto` finding；不适用 demotion（autofix_class 不是 `advisory`）。
 
-**Test scenarios:**
-- (Implicit — this unit *is* the test scenarios for prior units.)
-
-**Verification:**
-- `bun test` passes with all new assertions.
-- `bun run release:validate` passes.
-- A targeted test run against a known-bad fixture (a finding the old gate would have surfaced and the new gate should suppress) demonstrates the behavior change.
+**验证：**
+- `tests/review-skill-contract.test.ts` mode-demotion assertions 通过。
+- Interactive mode 的 Stage 6 output 在 `testing_gaps`/`residual_risks` 中显示 demoted findings，而不是 findings table。
 
 ---
 
-- [ ] **Unit 9: Document the migration in `docs/solutions/`**
+- [ ] **Unit 7：扫描 persona files 并更新 walkthrough/template/bulk-preview rendering**
 
-**Goal:** Extend the existing ce-doc-review writeup with a ce-code-review section. Capture the threshold-divergence rationale (why `>= 75` for code review vs `>= 50` for doc review), the validation-stage rationale, and the mode-aware policy framing.
+**目标：** 更新所有 reviewer persona files 中的 hardcoded float references（例如某个 persona 写着 "always file SQL injection at 0.85+"）。更新 rendering surfaces，使 anchors 作为 integers 一致显示。
 
-**Requirements:** R9
+**需求：** R7
 
-**Dependencies:** Units 1-8 (document what was actually built).
+**依赖：** Units 1, 2.
 
-**Files:**
-- Modify: `docs/solutions/skill-design/confidence-anchored-scoring.md` (add ce-code-review section)
-- Optionally split if the file becomes too long: create `docs/solutions/skill-design/code-review-precision-and-validation-2026-04-2X.md` (use today's date)
+**文件：**
+- 修改：`plugins/compound-engineering/agents/ce-correctness-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-testing-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-maintainability-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-project-standards-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-security-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-performance-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-api-contract-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-data-migrations-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-reliability-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-adversarial-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-cli-readiness-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-previous-comments-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-dhh-rails-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-kieran-rails-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-kieran-python-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-kieran-typescript-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-julik-frontend-races-reviewer.agent.md`
+- 修改：`plugins/compound-engineering/agents/ce-swift-ios-reviewer.agent.md`：lines 75/77/79 的 explicit float bands（`0.80+` -> anchor 75/100；`0.60-0.79` -> anchor 50；`below 0.60` -> anchor 0/25）
+- 修改：`plugins/compound-engineering/skills/ce-code-review/references/review-output-template.md`
+- 修改：`plugins/compound-engineering/skills/ce-code-review/references/walkthrough.md`
+- 修改：`plugins/compound-engineering/skills/ce-code-review/references/bulk-preview.md`
+- 修改：`plugins/compound-engineering/skills/ce-code-review/references/persona-catalog.md`（确认无 float references 残留；无需 behavior changes）
 
-**Approach:**
-- Add a "ce-code-review migration" section after the existing ce-doc-review content.
-- Document:
-  - Threshold choice (`>= 75`) and why it differs from ce-doc-review's `>= 50`. Both pick the anchor as the threshold; doc review surfaces broadly because dismissal is cheap, code review surfaces narrowly because false positives erode trust.
-  - The validation stage and its scope (externalization only). Reference Anthropic's Step 5 as the design pattern; explain why the upstream's binary validated/not-validated gate is more important than the numeric score.
-  - Mode-aware false-positive policy and the "demote-not-suppress" rule for interactive mode.
-  - The lint-ignore suppression rule.
-  - Link to the ce-code-review SKILL.md and findings-schema.json.
-- Add a "When to apply this pattern to a new skill" section so future skill authors know when an anchored rubric + validation gate makes sense vs when continuous confidence is fine.
+**方法：**
+- 对每个 persona file：grep confidence references（`0.\\d`、"0.6"、"0.7" 等）并改写为 anchors。大多数 personas 依赖 template，不需要 changes；sweep 捕获 outliers。
+- 对每个 rendering surface：将 confidence-column rendering 从 float（`0.85`）更新为 integer-anchor（`75` 或 `100`）。更新 walkthrough per-finding block 以显示 anchor。
+- 对 `persona-catalog.md`：无需行为变化；selection rules 不变。确认无 float references 残留。
+- 对 `review-output-template.md`：如需要，更新 Confidence column header/format。
 
-**Test scenarios:**
-- Test expectation: none -- documentation update.
+**测试场景：**
+- Edge case：sweep 后，对 `agents/` grep float-confidence references 返回空。
+- Happy path：finding 的 Walkthrough rendering 显示 `Confidence: 75`（integer），不是 `Confidence: 0.85`。
+- Happy path：Bulk-preview rendering 使用与 walkthrough 一致的 anchor format。
+- Happy path：`review-output-template.md` 中 findings table 将 anchor 显示为 integer。
 
-**Verification:**
-- The doc reads coherently for someone who hasn't seen either codebase. A new contributor can use it to understand both ce-doc-review and ce-code-review's confidence handling.
-- The "when to apply" guidance is concrete enough to be actionable.
+**验证：**
+- `plugins/compound-engineering/agents/` 或 `plugins/compound-engineering/skills/ce-code-review/references/` 中不再有 hardcoded float confidence values。
+- 所有 rendering surfaces 一致使用 anchor integers。
 
-## System-Wide Impact
+---
 
-- **Interaction graph:** Stage 5b (new) sits between Stage 5 (merge) and Stage 6 (synthesis). Stage 1 PR-mode path gains a pre-stage skip-check that may exit early. Both interaction-graph changes are localized to ce-code-review; they do not affect callers (`ce-work`, `lfg`, `slfg`, `ce-polish-beta`).
-- **Error propagation:** Validator subagent failures (timeout, malformed output, dispatch error) drop the finding rather than abort the review. A failed validator does not block the review; it just means one finding doesn't externalize. Conservative bias is correct.
-- **State lifecycle risks:** None. The plan is in-memory orchestration changes; no persistent state migrations. Run-artifact JSON files on disk are unchanged in shape — no new fields. Validator drop count is reported in Coverage but does not appear in the artifact schema.
-- **API surface parity:** Headless output envelope is unchanged in shape. The validator's effect is that fewer findings appear in the envelope when validation runs (rejected ones drop out). No new markers; no schema change for downstream consumers.
-- **Integration coverage:** Cross-skill: `ce-polish-beta` reads ce-code-review run artifacts; the artifact format is unchanged so no compat work is needed. `ce-work` invokes ce-code-review in headless mode; verify the new validation stage doesn't break the headless contract (it shouldn't — the contract is the envelope shape, which is unchanged).
-- **Unchanged invariants:** Severity taxonomy (P0-P3), `autofix_class` enum (`safe_auto`/`gated_auto`/`manual`/`advisory`), `owner` enum (`review-fixer`/`downstream-resolver`/`human`/`release`), persona selection logic, scope-resolution paths, run-artifact directory layout and shape, mode definitions (interactive/autofix/report-only/headless), Stage 6 section ordering. The `pre_existing` field semantics are unchanged.
+- [ ] **Unit 8：更新 test fixtures 和 contract tests**
 
-## Risks & Dependencies
+**目标：** 更新 `tests/review-skill-contract.test.ts`，assert 新 schema、synthesis behavior、validation stage、skip-conditions 和 mode-aware demotion。更新或新增带 anchor values 的 fixtures。
 
-| Risk | Mitigation |
+**需求：** R8
+
+**依赖：** Units 1-6（units 1-6 产出的 behavior 必须已经在 code 中，这样 tests 才能通过）。
+
+**文件：**
+- 修改：`tests/review-skill-contract.test.ts`
+- 修改：`tests/fixtures/`（任何带 embedded confidence values 的 seeded ce-code-review fixtures；检查 `tests/fixtures/ce-code-review/`，或共享的 `tests/fixtures/sample-plugin/`）
+
+**Execution note：** 镜像 ce-doc-review commit `6caf3303` 对 `tests/pipeline-review-contract.test.ts` 添加的 tests（73 lines added）。已有模式，复制结构。
+
+**方法：**
+- 增加 schema-shape assertions：`confidence` 是 integer enum，`_meta.confidence_thresholds` 描述新 gates。
+- 增加 synthesis assertions：`>= 75` gate、P0 exception at 50、one-anchor promotion、anchor-descending sort。
+- 增加 validation-stage assertions：mode-conditional dispatch、validator approval 后 finding survives、validator rejection 或 timeout 后 finding drops、budget cap drops overflow with Coverage note。
+- 增加 skip-condition assertions：closed/draft/trivial/already-reviewed cases early stop；standalone 和 `base:` modes 不运行 skip-check。
+- 增加 mode-aware demotion assertions：interactive 中 `testing` P3 advisory 进入 `testing_gaps`；同 finding 在 headless 中 suppress。
+- 将 fixtures 中 embedded confidence values 从 float 转为 anchor integers。按 behavior 转换：`0.85` -> `75`（如果是 "real, will hit in practice"）；`0.92+` -> `100`（如果 "verifiable from code"）。
+
+**测试场景：**
+- （Implicit：本 unit 本身就是 prior units 的 test scenarios。）
+
+**验证：**
+- `bun test` 通过所有新 assertions。
+- `bun run release:validate` 通过。
+- 对 known-bad fixture 的 targeted test run（旧 gate 会 surface，新 gate 应 suppress 的 finding）展示 behavior change。
+
+---
+
+- [ ] **Unit 9：在 `docs/solutions/` 中记录 migration**
+
+**目标：** 扩展现有 ce-doc-review writeup，加入 ce-code-review section。记录 threshold-divergence rationale（为什么 code review 用 `>= 75`，而 doc review 用 `>= 50`）、validation-stage rationale，以及 mode-aware policy framing。
+
+**需求：** R9
+
+**依赖：** Units 1-8（记录实际 build 出来的内容）。
+
+**文件：**
+- 修改：`docs/solutions/skill-design/confidence-anchored-scoring.md`（增加 ce-code-review section）
+- 如果 file 变得太长，可选 split：create `docs/solutions/skill-design/code-review-precision-and-validation-2026-04-2X.md`（使用当天日期）
+
+**方法：**
+- 在 existing ce-doc-review content 后增加 "ce-code-review migration" section。
+- 记录：
+  - Threshold choice（threshold 选择，`>= 75`）以及它为何不同于 ce-doc-review 的 `>= 50`。两者都选择 anchor 作为 threshold；doc review 更宽 surface，因为 dismiss 成本低；code review 更窄 surface，因为 false positives 会侵蚀 trust。
+  - validation stage 和其 scope（externalization only）。引用 Anthropic Step 5 作为 design pattern；解释为什么 upstream 的 binary validated/not-validated gate 比 numeric score 更重要。
+  - Mode-aware false-positive policy 和 interactive mode 的 "demote-not-suppress" rule。
+  - lint-ignore suppression rule（lint-ignore 抑制规则）。
+  - 链接 ce-code-review SKILL.md 和 findings-schema.json。
+- 增加 "When to apply this pattern to a new skill" section，让 future skill authors 知道何时需要 anchored rubric + validation gate，何时 continuous confidence 足够。
+
+**测试场景：**
+- Test expectation：无，文档更新。
+
+**验证：**
+- 对没看过任一 codebase 的新 contributor 来说，该 doc 读起来 coherent，并能理解 ce-doc-review 和 ce-code-review 的 confidence handling。
+- "when to apply" guidance 足够具体，可执行。
+
+## 系统级影响
+
+- **Interaction graph:** Stage 5b（new）位于 Stage 5（merge）和 Stage 6（synthesis）之间。Stage 1 PR-mode path 增加 pre-stage skip-check，可能 early exit。两个 interaction-graph changes 都局限于 ce-code-review；不影响 callers（`ce-work`、`lfg`、`slfg`、`ce-polish-beta`）。
+- **Error propagation:** Validator subagent failures（timeout、malformed output、dispatch error）会 drop finding，而不是 abort review。failed validator 不 block review；它只意味着一个 finding 不 externalize。保守偏置正确。
+- **State lifecycle risks:** 无。该 plan 是 in-memory orchestration changes；没有 persistent state migrations。磁盘上的 run-artifact JSON files shape 不变，不新增 fields。Validator drop count 报告在 Coverage 中，但不进入 artifact schema。
+- **API surface parity:** Headless output envelope shape 不变。validator 的效果是当 validation 运行时 envelope 中 findings 更少（rejected ones drop out）。没有新 markers；downstream consumers 无 schema change。
+- **Integration coverage:** Cross-skill：`ce-polish-beta` 读取 ce-code-review run artifacts；artifact format 不变，所以无需 compat work。`ce-work` 以 headless mode invoke ce-code-review；验证 new validation stage 不破坏 headless contract（不应破坏，因为 contract 是 envelope shape，未改变）。
+- **Unchanged invariants:** Severity taxonomy（P0-P3）、`autofix_class` enum（`safe_auto`/`gated_auto`/`manual`/`advisory`）、`owner` enum（`review-fixer`/`downstream-resolver`/`human`/`release`）、persona selection logic、scope-resolution paths、run-artifact directory layout and shape、mode definitions（interactive/autofix/report-only/headless）、Stage 6 section ordering。`pre_existing` field semantics 不变。
+
+## 风险与依赖
+
+| 风险 | 缓解措施 |
 |------|------------|
-| Validation stage adds significant latency to externalizing modes | Validation runs in parallel across findings (one subagent per finding). Most reviews surface < 10 findings; parallel mid-tier dispatch is bounded. Headless/autofix users have already accepted the multi-agent latency cost; a few-second add for validation is proportionate. |
-| Validator subagent itself produces false negatives (rejects real findings) | Validator failure mode is "drop the finding" — same as our existing confidence-gate suppression. Conservative bias is correct for externalizing modes (better to miss a real finding than post a false one publicly). For interactive walk-through mode, validation is skipped, so per-finding human judgment can still surface borderline findings. |
-| Mode-aware demotion in Unit 6 is too narrow (only `testing` and `maintainability`) and lets weak findings from other personas pollute primary results | The conservative definition is intentional. Practice from real review runs will reveal which other personas overproduce weak findings; expand the definition incrementally with evidence rather than guessing. |
-| Skip-condition's "trivial PR pattern" misclassifies a non-trivial PR with a chore-style title | The pattern is conservative (`^(chore\\(deps\\)|build\\(deps\\)|chore: bump|chore: release)` requires a colon-prefixed convention). Hand-typed informal commits won't match. If a real PR is misclassified, the user can re-invoke from the branch (no PR target) or with `base:` to bypass the skip-check. Document this in the skip message. |
-| Threshold change from 0.60 to 75 is conceptually a stricter gate; some currently-surfaced findings will disappear | This is the desired behavior — stricter gates are the point. A safety net: P0 exception at anchor 50 ensures critical-but-uncertain issues still surface. Monitor real review runs for regressions in the first week and tune the gate or expand the P0 exception if needed. |
-| Validator dispatch budget cap (15) drops findings beyond the limit | Drop is loud, not silent: Coverage section reports the over-budget count so the user knows to follow up if a 15+ finding review surfaces. Cap is a worst-case safety bound; typical reviews never hit it. If real-world data shows reviews routinely exceed 15, raise the cap or re-evaluate as second-wave logic. |
-| Sequencing this plan against other in-flight ce-code-review work | Branch is `tmchow/review-skill-compare`. No other in-flight ce-code-review PRs noted. Coordinate with anyone working on `ce-polish-beta` (downstream consumer) before the artifact-format change lands. |
+| Validation stage 为 externalizing modes 增加显著 latency | Validation 按 findings 并行运行（每个 finding 一个 subagent）。大多数 reviews surface < 10 findings；parallel mid-tier dispatch 有界。Headless/autofix users 已接受 multi-agent latency cost；validation 增加几秒是成比例的。 |
+| Validator subagent 本身产生 false negatives（reject real findings） | Validator failure mode 是 "drop the finding"，与现有 confidence-gate suppression 类似。对 externalizing modes 来说保守偏置正确（漏掉真实 finding 比公开发布 false one 更好）。interactive walk-through mode 跳过 validation，因此 per-finding human judgment 仍能 surface borderline findings。 |
+| Unit 6 的 mode-aware demotion 过窄（只覆盖 `testing` 和 `maintainability`），导致其他 personas 的 weak findings 污染 primary results | 保守定义是刻意的。真实 review runs 会揭示哪些其他 personas 过度生产 weak findings；基于证据逐步扩展定义，而不是猜测。 |
+| Skip-condition 的 "trivial PR pattern" 误分类一个 chore-style title 但非 trivial 的 PR | pattern 保守（`^(chore\\(deps\\)|build\\(deps\\)|chore: bump|chore: release)` 要求 colon-prefixed convention）。手写的 informal commits 不会 match。如果真实 PR 被误分类，user 可从 branch 重新 invoke（无 PR target）或使用 `base:` bypass skip-check。在 skip message 中记录这一点。 |
+| Threshold 从 0.60 改为 75，本质上更严格；部分当前会 surfaced 的 findings 将消失 | 这是期望行为，stricter gates 正是目的。Safety net：P0 exception at anchor 50 确保 critical-but-uncertain issues 仍 surfaced。上线后一周观察真实 review runs，必要时调整 gate 或扩展 P0 exception。 |
+| Validator dispatch budget cap（15）drop 超限 findings | Drop 是 loud，不是 silent：Coverage section 报告 over-budget count，让 user 知道是否需要 follow up。Cap 是 worst-case safety bound；typical reviews 不会触发。如果真实数据表明 reviews 经常超过 15，则提高 cap 或重新评估 second-wave logic。 |
+| 与其他 in-flight ce-code-review work 的 sequencing | Branch 是 `tmchow/review-skill-compare`。未发现其他 in-flight ce-code-review PRs。落地 artifact-format change 前，与任何在 `ce-polish-beta`（downstream consumer）上工作的人协调。 |
 
-## Documentation / Operational Notes
+## 文档与运维说明
 
-- Update `plugins/compound-engineering/README.md` if the ce-code-review entry mentions confidence scoring specifics (likely not — most plugin READMEs don't cover internal scoring mechanics).
-- The `docs/solutions/skill-design/` writeup (Unit 9) is the primary documentation deliverable.
-- Run `bun run release:validate` after Unit 8 to confirm marketplace parity and counts.
-- No version bump in plugin manifests — release-please owns this. The work is a `refactor(ce-code-review):` commit (per repo convention).
-- After merge, watch the next few real ce-code-review runs in interactive and headless mode to confirm: (a) anchor distribution is sensible, (b) validation stage isn't dropping too many real findings, (c) skip-conditions don't misclassify legitimate PRs, (d) mode-aware demotion produces useful `testing_gaps`/`residual_risks` content.
+- 如果 `plugins/compound-engineering/README.md` 的 ce-code-review entry 提到 confidence scoring specifics，则更新它（大概率不提；大多数 plugin READMEs 不覆盖 internal scoring mechanics）。
+- `docs/solutions/skill-design/` writeup（Unit 9）是 primary documentation deliverable。
+- Unit 8 后运行 `bun run release:validate`，确认 marketplace parity 和 counts。
+- 不手动 bump plugin manifests version，release-please 负责。按 repo convention，该工作使用 `refactor(ce-code-review):` commit。
+- 合并后观察接下来几次真实 ce-code-review runs（interactive 和 headless mode），确认：(a) anchor distribution 合理，(b) validation stage 没 drop 太多真实 findings，(c) skip-conditions 不误分类 legitimate PRs，(d) mode-aware demotion 产出有用的 `testing_gaps`/`residual_risks` content。
 
-## Sources & References
+## 来源与参考
 
-- **Origin conversation:** Two-model comparative analysis of ce-code-review vs Anthropic's official `code-review` plugin (this conversation, 2026-04-21). No formal `docs/brainstorms/` document — the conversation itself is the requirements input.
-- **Prior plan (sister skill, established pattern):** `docs/plans/2026-04-21-001-refactor-ce-doc-review-anchored-confidence-scoring-plan.md` — explicit "Deferred to Separate Tasks" entry naming this work.
-- **Institutional learning:** `docs/solutions/skill-design/confidence-anchored-scoring.md` — canonical writeup of the anchored-rubric pattern.
-- **Reference commit:** `6caf3303 refactor(ce-doc-review): anchor-based confidence scoring (#622)` — the migration diff for the sister skill.
-- **External canonical reference:** `https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md` — Anthropic's command prompt is the authoritative source for skip-conditions, validation-stage design, and lint-ignore semantics. The README at `https://github.com/anthropics/claude-code/blob/main/plugins/code-review/README.md` is product description only — the command prompt is the real behavior.
-- **Files modified by this plan:** `plugins/compound-engineering/skills/ce-code-review/SKILL.md`, `plugins/compound-engineering/skills/ce-code-review/references/findings-schema.json`, `plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md`, `plugins/compound-engineering/skills/ce-code-review/references/persona-catalog.md`, `plugins/compound-engineering/skills/ce-code-review/references/review-output-template.md`, `plugins/compound-engineering/skills/ce-code-review/references/walkthrough.md`, `plugins/compound-engineering/skills/ce-code-review/references/bulk-preview.md`, `plugins/compound-engineering/skills/ce-code-review/references/validator-template.md` (new), all `plugins/compound-engineering/agents/ce-*-reviewer.agent.md` files (including the recently-added `ce-swift-ios-reviewer.agent.md`), `tests/review-skill-contract.test.ts`, `tests/fixtures/` (as needed), `docs/solutions/skill-design/confidence-anchored-scoring.md`.
+- **Origin conversation:** 对 ce-code-review 与 Anthropic 官方 `code-review` plugin 的 two-model comparative analysis（this conversation, 2026-04-21）。没有正式 `docs/brainstorms/` document；conversation 本身是 requirements input。
+- **Prior plan（sister skill, established pattern）：** `docs/plans/2026-04-21-001-refactor-ce-doc-review-anchored-confidence-scoring-plan.md`：explicit "Deferred to Separate Tasks" entry 点名本工作。
+- **Institutional learning（机构经验）:** `docs/solutions/skill-design/confidence-anchored-scoring.md`：anchored-rubric pattern 的 canonical writeup。
+- **Reference commit:** `6caf3303 refactor(ce-doc-review): anchor-based confidence scoring (#622)`：sister skill 的 migration diff。
+- **External canonical reference:** `https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md`：Anthropic 的 command prompt 是 skip-conditions、validation-stage design 和 lint-ignore semantics 的 authoritative source。`https://github.com/anthropics/claude-code/blob/main/plugins/code-review/README.md` 中的 README 只是 product description；command prompt 才是真实 behavior。
+- **Files modified by this plan:** `plugins/compound-engineering/skills/ce-code-review/SKILL.md`、`plugins/compound-engineering/skills/ce-code-review/references/findings-schema.json`、`plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md`、`plugins/compound-engineering/skills/ce-code-review/references/persona-catalog.md`、`plugins/compound-engineering/skills/ce-code-review/references/review-output-template.md`、`plugins/compound-engineering/skills/ce-code-review/references/walkthrough.md`、`plugins/compound-engineering/skills/ce-code-review/references/bulk-preview.md`、`plugins/compound-engineering/skills/ce-code-review/references/validator-template.md`（new）、all `plugins/compound-engineering/agents/ce-*-reviewer.agent.md` files（包括 recent-added `ce-swift-ios-reviewer.agent.md`）、`tests/review-skill-contract.test.ts`、`tests/fixtures/`（as needed）、`docs/solutions/skill-design/confidence-anchored-scoring.md`。

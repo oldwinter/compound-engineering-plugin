@@ -1,44 +1,44 @@
-# Review followup (LFG step 3–4)
+# Review followup（review 跟进，LFG step 3-4）
 
-`ce-code-review` is review-only. LFG applies eligible fixes itself, then commits.
+`ce-code-review` 只负责 review。LFG 自行应用 eligible fixes，然后 commit。
 
-## Step 3 — invoke review
+## Step 3 - invoke review（调用 review）
 
 ```
 ce-code-review mode:agent plan:<plan-path-from-step-1>
 ```
 
-Read the **Actionable Findings** summary and artifact path. Do not pass `mode:autofix`.
+读取 **Actionable Findings** summary 和 artifact path。不要传 `mode:autofix`。
 
-Capture parsed JSON (`status`, `actionable_findings`, `findings`, `artifact_path`, `run_id`) or the markdown Actionable Findings section. If `status` is `failed`, stop and surface `reason`.
+捕获 parsed JSON（`status`、`actionable_findings`、`findings`、`artifact_path`、`run_id`）或 markdown Actionable Findings section。如果 `status` 为 `failed`，停止并展示 `reason`。
 
-## Step 4 — apply and persist review fixes
+## Step 4 - apply and persist review fixes（应用并持久化 review 修复）
 
-### What to apply
+### 应用什么
 
-Apply a finding in the working tree only when **all** of the following hold:
+只有在**全部**条件满足时，才在 working tree 中应用 finding：
 
-1. **`suggested_fix` is present** — concrete change shape from the reviewer.
-2. **`confidence` is `100`, or `75` with cross-persona agreement noted in the report** — do not apply anchor-50 findings.
-3. **The fix is mechanical** — one coherent change, no contract/permission/security posture change, no new public API shape, no behavior change that needs product sign-off.
-4. **Evidence still matches the code** at the cited `file:line` before editing.
+1. **存在 `suggested_fix`**：reviewer 给出了具体 change shape。
+2. **`confidence` 为 `100`，或为 `75` 且 report 中注明 cross-persona agreement**：不要应用 anchor-50 findings。
+3. **修复是 mechanical 的**：一个 coherent change，不改变 contract/permission/security posture，不新增 public API shape，不做需要 product sign-off 的 behavior change。
+4. **Evidence 在编辑前仍匹配** cited `file:line` 的 code。
 
-Do not treat `autofix_class` as permission to auto-apply.
+不要把 `autofix_class` 当成 auto-apply permission。
 
-### What not to apply
+### 不应用什么
 
 - `autofix_class: manual` without a clear mechanical `suggested_fix`
-- `autofix_class: advisory` — report-only
+- `autofix_class: advisory`：仅报告
 - `gated_auto` findings that change behavior, contracts, auth, or permissions
-- Anything that needs a design conversation
+- Anything that needs a design conversation（任何需要 design conversation 的内容）
 
-### Execution
+### Execution（执行）
 
-1. Filter `actionable_findings` (or markdown Actionable Findings) with the bar above.
-2. Apply eligible fixes in the working tree in severity order (`#` stable from the review).
-3. Run targeted tests when `requires_verification: true` on any applied finding.
-4. If `git status --short` shows changes, stage only review-driven files, commit `fix(review): apply review findings`, and push before step 5. To push: if an upstream exists, run `git push`. If no upstream exists (common on a fresh feature branch, since step 7's `ce-commit-push-pr` has not run yet), resolve a writable remote dynamically: prefer `origin` when present, otherwise use `git remote` and choose the first configured remote. Then run `git push --set-upstream <remote> HEAD`. If no eligible fixes were applied, note explicitly and skip commit.
+1. 用上面的 bar 过滤 `actionable_findings`（或 markdown Actionable Findings）。
+2. 按 severity order（review 中稳定的 `#`）在 working tree 中应用 eligible fixes。
+3. 当任一已应用 finding 上有 `requires_verification: true` 时，运行 targeted tests。
+4. 如果 `git status --short` 显示 changes，只 stage review-driven files，commit `fix(review): apply review findings`，并在 step 5 前 push。Push 方式：如果存在 upstream，运行 `git push`。如果没有 upstream（fresh feature branch 上常见，因为 step 7 的 `ce-commit-push-pr` 尚未运行），动态解析 writable remote：存在 `origin` 时优先用 `origin`，否则用 `git remote` 并选择第一个已配置 remote。然后运行 `git push --set-upstream <remote> HEAD`。如果没有应用 eligible fixes，明确说明并跳过 commit。
 
-## Step 5 — residual handoff
+## Step 5 - residual handoff（剩余问题交接）
 
-Residuals are actionable findings **not** applied in step 4 — not leftovers from in-skill autofix. Use the Actionable Findings summary / artifact from step 3.
+Residuals 是 step 4 中**未**应用的 actionable findings，不是 in-skill autofix 剩下的内容。使用 step 3 的 Actionable Findings summary / artifact。

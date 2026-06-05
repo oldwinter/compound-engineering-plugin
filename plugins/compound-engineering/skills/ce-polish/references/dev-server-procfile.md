@@ -1,40 +1,40 @@
-# Procfile / Overmind dev-server recipe (auto-detect fallback)
+# Procfile / Overmind dev-server recipe（dev-server 配方，auto-detect fallback）
 
-Loaded when `detect-project-type.sh` returns `procfile` and there is no `.claude/launch.json` to consult. Rails apps with `bin/dev` take precedence over the bare Procfile path (see `dev-server-rails.md`).
+当 `detect-project-type.sh` 返回 `procfile`，且没有 `.claude/launch.json` 可查询时加载。带 `bin/dev` 的 Rails apps 优先于 bare Procfile path（见 `dev-server-rails.md`）。
 
-## Signature
+## Signature（识别特征）
 
-- `Procfile` or `Procfile.dev` exists at the repo root
-- `bin/dev` is **not** present (if it is, use the Rails recipe)
+- repo root 存在 `Procfile` 或 `Procfile.dev`
+- **不存在** `bin/dev`（如果存在，使用 Rails recipe）
 
-## Start command
+## Start command（启动命令）
 
-Prefer `overmind` when available — it handles socket files, supports hot-restart per process, and is the community default for multi-process dev:
+可用时优先使用 `overmind`：它处理 socket files，支持 per-process hot-restart，并且是 multi-process dev 的 community default：
 
 ```bash
 overmind start -f Procfile.dev
 ```
 
-Fallback to `foreman` when `overmind` is not installed:
+当未安装 `overmind` 时 fallback 到 `foreman`：
 
 ```bash
 foreman start -f Procfile.dev
 ```
 
-If both are missing, prompt the user for the start command rather than guessing.
+如果二者都缺失，询问用户 start command，而不是猜测。
 
-## Port
+## Port（端口）
 
-Default: `3000`. Procfile-based projects list their processes in `Procfile.dev`, so the authoritative port comes from the `web:` line:
+Default（默认）：`3000`。Procfile-based projects 会在 `Procfile.dev` 中列出 processes，因此 authoritative port 来自 `web:` line：
 
 ```
 web: bundle exec puma -p 3000 -C config/puma.rb
 worker: bundle exec sidekiq
 ```
 
-Parse the `web:` line for `-p <n>` or `--port <n>`. If neither is present, fall through to the cascade in `references/dev-server-detection.md`.
+解析 `web:` line 中的 `-p <n>` 或 `--port <n>`。如果二者都不存在，fall through 到 `references/dev-server-detection.md` 中的 cascade。
 
-## Stub generation
+## Stub generation（stub 生成）
 
 ```json
 {
@@ -50,10 +50,10 @@ Parse the `web:` line for `-p <n>` or `--port <n>`. If neither is present, fall 
 }
 ```
 
-Substitute `foreman` if `overmind` is unavailable on the user's machine — the stub represents what the user will run, not a canonical recipe.
+如果用户机器上没有 `overmind`，替换为 `foreman`；stub 表示用户将运行什么，而不是 canonical recipe。
 
-## Common gotchas
+## Common gotchas（常见陷阱）
 
-- **Socket files:** `overmind` writes a socket to `.overmind.sock` by default. Polish's kill-by-port logic reclaims the port but does not clean up the socket. If overmind is already running and polish restarts it, the new process may fail with "connection refused" until the stale socket is removed. The `OVERMIND_SOCKET` env var can redirect the socket to a per-run path if needed.
-- **Procfile vs Procfile.dev:** production and development Procfiles often differ. Always prefer `Procfile.dev` for polish.
-- **Multiple web processes:** some Procfiles split web traffic across multiple processes (API + frontend). Polish can only open one URL — users with multi-web setups should author `.claude/launch.json` explicitly to select which process is "the dev server" for polish.
+- **Socket files：** `overmind` 默认把 socket 写入 `.overmind.sock`。Polish 的 kill-by-port logic 会 reclaim port，但不会清理 socket。如果 overmind 已经运行，而 polish 重启它，新 process 可能会因 "connection refused" 失败，直到 stale socket 被移除。需要时，`OVERMIND_SOCKET` env var 可以把 socket redirect 到 per-run path。
+- **Procfile vs Procfile.dev：** production 和 development Procfiles 经常不同。Polish 始终优先使用 `Procfile.dev`。
+- **Multiple web processes：** 一些 Procfiles 会把 web traffic 拆到多个 processes（API + frontend）。Polish 只能打开一个 URL；使用 multi-web setups 的用户应明确 author `.claude/launch.json`，选择哪个 process 是 polish 的 "the dev server"。

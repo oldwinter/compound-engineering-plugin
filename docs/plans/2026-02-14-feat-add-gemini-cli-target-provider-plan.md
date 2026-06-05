@@ -1,55 +1,55 @@
 ---
-title: Add Gemini CLI as a Target Provider
+title: 将 Gemini CLI 添加为 Target Provider
 type: feat
 status: completed
 completed_date: 2026-02-14
 completed_by: "Claude Opus 4.6"
-actual_effort: "Completed in one session"
+actual_effort: "单次 session 完成"
 date: 2026-02-14
 ---
 
-# Add Gemini CLI as a Target Provider
+# 将 Gemini CLI 添加为 Target Provider
 
-## Overview
+## 概览
 
-Add `gemini` as a sixth target provider in the converter CLI, alongside `opencode`, `codex`, `droid`, `cursor`, and `pi`. This enables `--to gemini` for both `convert` and `install` commands, converting Claude Code plugins into Gemini CLI-compatible format.
+在 converter CLI 中添加 `gemini` 作为第六个 target provider，与 `opencode`、`codex`、`droid`、`cursor` 和 `pi` 并列。这样 `convert` 和 `install` 命令都可以使用 `--to gemini`，将 Claude Code plugins 转换为 Gemini CLI-compatible format。
 
-Gemini CLI ([google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)) is Google's open-source AI agent for the terminal. It supports GEMINI.md context files, custom commands (TOML format), agent skills (SKILL.md standard), MCP servers, and extensions -- making it a strong conversion target with good coverage of Claude Code plugin concepts.
+Gemini CLI（[google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)）是 Google 面向 terminal 的 open-source AI agent。它支持 GEMINI.md context files、custom commands（TOML format）、agent skills（SKILL.md standard）、MCP servers 和 extensions，因此是一个覆盖 Claude Code plugin concepts 很完整的 conversion target。
 
-## Component Mapping
+## 组件映射
 
-| Claude Code | Gemini Equivalent | Notes |
+| Claude Code | Gemini 对应项 | 说明 |
 |---|---|---|
-| `agents/*.md` | `.gemini/skills/*/SKILL.md` | Agents become skills -- Gemini activates them on demand via `activate_skill` tool based on description matching |
-| `commands/*.md` | `.gemini/commands/*.toml` | TOML format with `prompt` and `description` fields; namespaced via directory structure |
-| `skills/*/SKILL.md` | `.gemini/skills/*/SKILL.md` | **Identical standard** -- copy directly |
-| MCP servers | `settings.json` `mcpServers` | Same MCP protocol; different config location (`settings.json` vs `.mcp.json`) |
-| `hooks/` | `settings.json` hooks | Gemini has hooks (`BeforeTool`, `AfterTool`, `SessionStart`, etc.) but different format; emit `console.warn` and skip for now |
-| `.claude/` paths | `.gemini/` paths | Content rewriting needed |
+| `agents/*.md` | `.gemini/skills/*/SKILL.md` | Agents 变成 skills -- Gemini 会根据 description matching，通过 `activate_skill` tool 按需激活 |
+| `commands/*.md` | `.gemini/commands/*.toml` | TOML format，包含 `prompt` 和 `description` fields；通过 directory structure namespaced |
+| `skills/*/SKILL.md` | `.gemini/skills/*/SKILL.md` | **标准完全相同** -- 直接 copy |
+| MCP servers | `settings.json` `mcpServers` | 同一 MCP protocol；config location 不同（`settings.json` vs `.mcp.json`） |
+| `hooks/` | `settings.json` hooks | Gemini 有 hooks（`BeforeTool`, `AfterTool`, `SessionStart` 等），但 format 不同；暂时 emit `console.warn` 并 skip |
+| `.claude/` paths | `.gemini/` paths | 需要 content rewriting |
 
-### Key Design Decisions
+### 关键设计决策
 
-**1. Agents become skills (not GEMINI.md context)**
+**1. Agents become skills（不是 GEMINI.md context）**
 
-With 29 agents, dumping them into GEMINI.md would flood every session's context. Instead, agents convert to skills -- Gemini autonomously activates them based on the skill description when relevant. This matches how Claude Code agents are invoked on demand via the Task tool.
+如果把 29 个 agents dump 到 GEMINI.md，会淹没每个 session 的 context。因此 agents 转为 skills -- Gemini 会在相关时根据 skill description 自主激活它们。这匹配 Claude Code agents 通过 Task tool 按需调用的方式。
 
-**2. Commands use TOML format with directory-based namespacing**
+**2. Commands 使用带 directory-based namespacing 的 TOML format**
 
-Gemini CLI commands are `.toml` files where the path determines the command name: `.gemini/commands/git/commit.toml` becomes `/git:commit`. This maps cleanly from Claude Code's colon-namespaced commands (`workflows:plan` -> `.gemini/commands/workflows/plan.toml`).
+Gemini CLI commands 是 `.toml` files，path 决定 command name：`.gemini/commands/git/commit.toml` 变成 `/git:commit`。这能干净映射 Claude Code 的 colon-namespaced commands（`workflows:plan` -> `.gemini/commands/workflows/plan.toml`）。
 
-**3. Commands use `{{args}}` placeholder**
+**3. Commands 使用 `{{args}}` placeholder**
 
-Gemini's TOML commands support `{{args}}` for argument injection, mapping from Claude Code's `argument-hint` field. Commands with `argument-hint` get `{{args}}` appended to the prompt.
+Gemini 的 TOML commands 支持 `{{args}}` 做 argument injection，对应 Claude Code 的 `argument-hint` field。带 `argument-hint` 的 commands 会把 `{{args}}` append 到 prompt。
 
-**4. MCP servers go into project-level settings.json**
+**4. MCP servers 写入 project-level settings.json**
 
-Gemini CLI reads MCP config from `.gemini/settings.json` under the `mcpServers` key. The format is compatible -- same `command`, `args`, `env` fields, plus Gemini-specific `cwd`, `timeout`, `trust`, `includeTools`, `excludeTools`.
+Gemini CLI 从 `.gemini/settings.json` 的 `mcpServers` key 读取 MCP config。format compatible -- 同样的 `command`、`args`、`env` fields，外加 Gemini-specific `cwd`、`timeout`、`trust`、`includeTools`、`excludeTools`。
 
-**5. Skills pass through unchanged**
+**5. Skills 原样透传**
 
-Gemini adopted the same SKILL.md standard (YAML frontmatter with `name` and `description`, markdown body). Skills copy directly.
+Gemini 采用同一 SKILL.md standard（YAML frontmatter with `name` and `description`, markdown body）。Skills 直接 copy。
 
-### TOML Command Format
+### TOML Command Format（命令格式）
 
 ```toml
 description = "Brief description of the command"
@@ -60,15 +60,15 @@ User request: {{args}}
 """
 ```
 
-- `description` (string): One-line description shown in `/help`
-- `prompt` (string): The prompt sent to the model; supports `{{args}}`, `!{shell}`, `@{file}` placeholders
+- `description`（string）：`/help` 中展示的一行 description
+- `prompt`（string）：发送给 model 的 prompt；支持 `{{args}}`、`!{shell}`、`@{file}` placeholders
 
-### Skill (SKILL.md) Format
+### Skill（SKILL.md）Format（格式）
 
 ```yaml
 ---
 name: skill-name
-description: When and how Gemini should use this skill
+description: 说明 Gemini 应该何时以及如何使用此 skill
 ---
 
 # Skill Title
@@ -76,9 +76,9 @@ description: When and how Gemini should use this skill
 Detailed instructions...
 ```
 
-Identical to Claude Code's format. The `description` field is critical -- Gemini uses it to decide when to activate the skill.
+与 Claude Code format 完全相同。`description` field 很关键 -- Gemini 用它决定何时 activate the skill。
 
-### MCP Server Format (settings.json)
+### MCP Server Format（MCP server 格式，settings.json）
 
 ```json
 {
@@ -92,31 +92,31 @@ Identical to Claude Code's format. The `description` field is critical -- Gemini
 }
 ```
 
-## Acceptance Criteria
+## 验收标准
 
-- [x] `bun run src/index.ts convert --to gemini ./plugins/compound-engineering` produces valid Gemini config
-- [x] Agents convert to `.gemini/skills/*/SKILL.md` with populated `description` in frontmatter
-- [x] Commands convert to `.gemini/commands/*.toml` with `prompt` and `description` fields
-- [x] Namespaced commands create directory structure (`workflows:plan` -> `commands/workflows/plan.toml`)
-- [x] Commands with `argument-hint` include `{{args}}` placeholder in prompt
-- [x] Commands with `disable-model-invocation: true` are still included (TOML commands are prompts, not code)
-- [x] Skills copied to `.gemini/skills/` (identical format)
-- [x] MCP servers written to `.gemini/settings.json` under `mcpServers` key
-- [x] Existing `.gemini/settings.json` is backed up before overwrite, and MCP config is merged (not clobbered)
-- [x] Content transformation rewrites `.claude/` and `~/.claude/` paths to `.gemini/` and `~/.gemini/`
-- [x] `/workflows:plan` transformed to `/workflows:plan` (Gemini preserves colon namespacing via directories)
-- [x] `Task agent-name(args)` transformed to `Use the agent-name skill to: args`
-- [x] Plugins with hooks emit `console.warn` about format differences
-- [x] Writer does not double-nest `.gemini/.gemini/`
-- [x] `model` and `allowedTools` fields silently dropped (no Gemini equivalent in skills/commands)
-- [x] Converter and writer tests pass
-- [x] Existing tests still pass (`bun test`)
+- [x] `bun run src/index.ts convert --to gemini ./plugins/compound-engineering` 产生 valid Gemini config
+- [x] Agents 转换为 `.gemini/skills/*/SKILL.md`，frontmatter 中填充 `description`
+- [x] Commands 转换为 `.gemini/commands/*.toml`，包含 `prompt` 和 `description` fields
+- [x] Namespaced commands 创建 directory structure（`workflows:plan` -> `commands/workflows/plan.toml`）
+- [x] 带 `argument-hint` 的 commands 在 prompt 中包含 `{{args}}` placeholder
+- [x] 带 `disable-model-invocation: true` 的 commands 仍被包含（TOML commands 是 prompts，不是 code）
+- [x] Skills copy 到 `.gemini/skills/`（identical format）
+- [x] MCP servers 写入 `.gemini/settings.json` 的 `mcpServers` key
+- [x] Existing `.gemini/settings.json` 在 overwrite 前备份，且 MCP config 被 merged（not clobbered）
+- [x] Content transformation 将 `.claude/` 和 `~/.claude/` paths 重写为 `.gemini/` 和 `~/.gemini/`
+- [x] `/workflows:plan` 转换为 `/workflows:plan`（Gemini 通过 directories 保留 colon namespacing）
+- [x] `Task agent-name(args)` 转换为 `Use the agent-name skill to: args`
+- [x] 带 hooks 的 plugins emit `console.warn` 提醒 format differences
+- [x] Writer 不会 double-nest `.gemini/.gemini/`
+- [x] `model` 和 `allowedTools` fields 被静默丢弃（skills/commands 中没有 Gemini equivalent）
+- [x] Converter 和 writer tests pass
+- [x] Existing tests 仍 pass（`bun test`）
 
-## Implementation
+## 实施
 
-### Phase 1: Types
+### 阶段 1：Types
 
-**Create `src/types/gemini.ts`**
+**创建 `src/types/gemini.ts`**
 
 ```typescript
 export type GeminiSkill = {
@@ -148,55 +148,55 @@ export type GeminiBundle = {
 }
 ```
 
-### Phase 2: Converter
+### 阶段 2：Converter
 
-**Create `src/converters/claude-to-gemini.ts`**
+**创建 `src/converters/claude-to-gemini.ts`**
 
-Core functions:
+核心函数：
 
-1. **`convertClaudeToGemini(plugin, options)`** -- main entry point
-   - Convert each agent to a skill via `convertAgentToSkill()`
-   - Convert each command via `convertCommand()`
-   - Pass skills through as directory references
-   - Convert MCP servers to settings-compatible object
-   - Emit `console.warn` if `plugin.hooks` has entries
+1. **`convertClaudeToGemini(plugin, options)`** -- main entry point（主入口）
+   - 通过 `convertAgentToSkill()` 将每个 agent 转换为 skill
+   - 通过 `convertCommand()` 转换每个 command
+   - 将 skills 作为 directory references 透传
+   - 将 MCP servers 转换为 settings-compatible object
+   - 如果 `plugin.hooks` 有 entries，则 emit `console.warn`
 
-2. **`convertAgentToSkill(agent)`** -- agent -> SKILL.md
-   - Frontmatter: `name` (from agent name), `description` (from agent description, max ~300 chars)
-   - Body: agent body with content transformations applied
-   - Prepend capabilities section if present
-   - Silently drop `model` field (no Gemini equivalent)
-   - If description is empty, generate from agent name: `"Use this skill for ${agent.name} tasks"`
+2. **`convertAgentToSkill(agent)`** -- agent -> SKILL.md（agent 转 SKILL.md）
+   - Frontmatter：`name`（from agent name）、`description`（from agent description, max ~300 chars，最多约 300 chars）
+   - Body：应用 content transformations 后的 agent body
+   - 如果存在 capabilities section，则 prepend
+   - 静默丢弃 `model` field（no Gemini equivalent）
+   - 如果 description 为空，根据 agent name 生成：`"Use this skill for ${agent.name} tasks"`
 
-3. **`convertCommand(command, usedNames)`** -- command -> TOML file
-   - Preserve namespace structure: `workflows:plan` -> path `workflows/plan`
-   - `description` field from command description
-   - `prompt` field from command body with content transformations
-   - If command has `argument-hint`, append `\n\nUser request: {{args}}` to prompt
-   - Body: apply `transformContentForGemini()` transformations
-   - Silently drop `allowedTools` (no Gemini equivalent)
+3. **`convertCommand(command, usedNames)`** -- command -> TOML file（command 转 TOML file）
+   - 保留 namespace structure：`workflows:plan` -> path `workflows/plan`
+   - `description` field 来自 command description
+   - `prompt` field 来自经过 content transformations 的 command body
+   - 如果 command 有 `argument-hint`，将 `\n\nUser request: {{args}}` append 到 prompt
+   - Body：应用 `transformContentForGemini()` transformations
+   - 静默丢弃 `allowedTools`（no Gemini equivalent）
 
-4. **`transformContentForGemini(body)`** -- content rewriting
+4. **`transformContentForGemini(body)`** -- content rewriting（内容重写）
    - `.claude/` -> `.gemini/` and `~/.claude/` -> `~/.gemini/`
    - `Task agent-name(args)` -> `Use the agent-name skill to: args`
    - `@agent-name` references -> `the agent-name skill`
-   - Skip file paths (containing `/`) and common non-command patterns
+   - 跳过 file paths（containing `/`）和 common non-command patterns
 
-5. **`convertMcpServers(servers)`** -- MCP config
-   - Map each `ClaudeMcpServer` entry to Gemini-compatible JSON
-   - Pass through: `command`, `args`, `env`, `url`, `headers`
-   - Drop `type` field (Gemini infers transport)
+5. **`convertMcpServers(servers)`** -- MCP config（MCP config 转换）
+   - 将每个 `ClaudeMcpServer` entry map 到 Gemini-compatible JSON
+   - 透传：`command`、`args`、`env`、`url`、`headers`
+   - 丢弃 `type` field（Gemini infers transport）
 
-6. **`toToml(description, prompt)`** -- TOML serializer
-   - Escape TOML strings properly
-   - Use multi-line strings (`"""`) for prompt field
-   - Simple string for description
+6. **`toToml(description, prompt)`** -- TOML serializer（TOML 序列化器）
+   - 正确 escape TOML strings
+   - prompt field 使用 multi-line strings（`"""`）
+   - description 使用 simple string
 
-### Phase 3: Writer
+### 阶段 3：Writer
 
-**Create `src/targets/gemini.ts`**
+**创建 `src/targets/gemini.ts`**
 
-Output structure:
+Output structure（输出结构）：
 
 ```
 .gemini/
@@ -214,18 +214,18 @@ Output structure:
 └── settings.json          (only mcpServers key)
 ```
 
-Core function: `writeGeminiBundle(outputRoot, bundle)`
+核心函数：`writeGeminiBundle(outputRoot, bundle)`
 
-- `resolveGeminiPaths(outputRoot)` -- detect if path already ends in `.gemini` to avoid double-nesting (follow droid writer pattern)
-- Write generated skills to `skills/<name>/SKILL.md`
-- Copy original skill directories to `skills/` via `copyDir()`
-- Write commands to `commands/` as `.toml` files, creating subdirectories for namespaced commands
-- Write `settings.json` with `{ "mcpServers": {...} }` via `writeJson()` with `backupFile()` for existing files
-- If settings.json exists, read it first and merge `mcpServers` key (don't clobber other settings)
+- `resolveGeminiPaths(outputRoot)` -- detect if path already ends in `.gemini` to avoid double-nesting（follow droid writer pattern）
+- 将 generated skills 写入 `skills/<name>/SKILL.md`
+- 通过 `copyDir()` 将 original skill directories copy 到 `skills/`
+- 将 commands 作为 `.toml` files 写入 `commands/`，为 namespaced commands 创建 subdirectories
+- 通过 `writeJson()` 写入带 `{ "mcpServers": {...} }` 的 `settings.json`，并对 existing files 使用 `backupFile()`
+- 如果 settings.json 已存在，先读取并 merge `mcpServers` key（don't clobber other settings）
 
-### Phase 4: Wire into CLI
+### 阶段 4：接入 CLI
 
-**Modify `src/targets/index.ts`**
+**修改 `src/targets/index.ts`**
 
 ```typescript
 import { convertClaudeToGemini } from "../converters/claude-to-gemini"
@@ -241,130 +241,130 @@ gemini: {
 },
 ```
 
-**Modify `src/commands/convert.ts`**
+**修改 `src/commands/convert.ts`**
 
-- Update `--to` description: `"Target format (opencode | codex | droid | cursor | pi | gemini)"`
-- Add to `resolveTargetOutputRoot`: `if (targetName === "gemini") return path.join(outputRoot, ".gemini")`
+- 更新 `--to` description：`"Target format (opencode | codex | droid | cursor | pi | gemini)"`
+- 添加到 `resolveTargetOutputRoot`：`if (targetName === "gemini") return path.join(outputRoot, ".gemini")`
 
-**Modify `src/commands/install.ts`**
+**修改 `src/commands/install.ts`**
 
-- Same two changes as convert.ts
+- 与 convert.ts 相同的两处修改
 
-### Phase 5: Tests
+### 阶段 5：Tests（测试）
 
-**Create `tests/gemini-converter.test.ts`**
+**创建 `tests/gemini-converter.test.ts`**
 
-Test cases (use inline `ClaudePlugin` fixtures, following existing converter test patterns):
+测试场景（使用 inline `ClaudePlugin` fixtures，遵循 existing converter test patterns）：
 
-- Agent converts to skill with SKILL.md frontmatter (`name` and `description` populated)
-- Agent with empty description gets default description text
-- Agent with capabilities prepended to body
-- Agent `model` field silently dropped
-- Agent with empty body gets default body text
-- Command converts to TOML with `prompt` and `description` fields
-- Namespaced command creates correct path (`workflows:plan` -> `workflows/plan`)
-- Command with `disable-model-invocation` is still included
-- Command `allowedTools` silently dropped
-- Command with `argument-hint` gets `{{args}}` placeholder in prompt
-- Skills pass through as directory references
-- MCP servers convert to settings.json-compatible config
-- Content transformation: `.claude/` paths -> `.gemini/`
-- Content transformation: `~/.claude/` paths -> `~/.gemini/`
-- Content transformation: `Task agent(args)` -> natural language skill reference
-- Hooks present -> `console.warn` emitted
-- Plugin with zero agents produces empty generatedSkills array
-- Plugin with only skills works correctly
-- TOML output is valid (description and prompt properly escaped)
+- Agent 转换为带 SKILL.md frontmatter 的 skill（填充 `name` 和 `description`）
+- Empty description 的 agent 获得 default description text
+- 带 capabilities 的 agent 会将其 prepend 到 body
+- Agent `model` field 被静默丢弃
+- Empty body 的 agent 获得 default body text
+- Command 转换为带 `prompt` 和 `description` fields 的 TOML
+- Namespaced command 创建正确 path（`workflows:plan` -> `workflows/plan`）
+- 带 `disable-model-invocation` 的 command 仍被包含
+- Command `allowedTools` 被静默丢弃
+- 带 `argument-hint` 的 command 在 prompt 中获得 `{{args}}` placeholder
+- Skills 作为 directory references 透传
+- MCP servers 转换为 settings.json-compatible config
+- Content transformation（内容转换）：`.claude/` paths -> `.gemini/`
+- Content transformation（内容转换）：`~/.claude/` paths -> `~/.gemini/`
+- Content transformation（内容转换）：`Task agent(args)` -> natural language skill reference（自然语言 skill reference）
+- Hooks present -> emit `console.warn`（存在 hooks 时输出 `console.warn`）
+- Zero agents 的 plugin 产生 empty generatedSkills array
+- 只有 skills 的 plugin 正确工作
+- TOML output valid（TOML 输出有效，description and prompt properly escaped）
 
-**Create `tests/gemini-writer.test.ts`**
+**创建 `tests/gemini-writer.test.ts`**
 
-Test cases (use temp directories, following existing writer test patterns):
+测试场景（使用 temp directories，遵循 existing writer test patterns）：
 
-- Full bundle writes skills, commands, settings.json
-- Generated skills written as `skills/<name>/SKILL.md`
-- Original skills copied to `skills/` directory
-- Commands written as `.toml` files in `commands/` directory
-- Namespaced commands create subdirectories (`commands/workflows/plan.toml`)
-- MCP config written as valid JSON `settings.json` with `mcpServers` key
-- Existing `settings.json` is backed up before overwrite
-- Output root already ending in `.gemini` does NOT double-nest
-- Empty bundle produces no output
+- Full bundle 写入 skills、commands、settings.json
+- Generated skills 写入 `skills/<name>/SKILL.md`
+- Original skills copy 到 `skills/` directory
+- Commands 作为 `.toml` files 写入 `commands/` directory
+- Namespaced commands 创建 subdirectories（`commands/workflows/plan.toml`）
+- MCP config 作为带 `mcpServers` key 的 valid JSON `settings.json` 写入
+- Existing `settings.json` 在 overwrite 前备份
+- 已以 `.gemini` 结尾的 output root 不会 double-nest
+- Empty bundle 不产生 output
 
-### Phase 6: Documentation
+### 阶段 6：Documentation（文档）
 
-**Create `docs/specs/gemini.md`**
+**创建 `docs/specs/gemini.md`**
 
-Document the Gemini CLI spec as reference, following existing `docs/specs/codex.md` pattern:
+按照 existing `docs/specs/codex.md` pattern，将 Gemini CLI spec 记录为 reference：
 
-- GEMINI.md context file format
-- Custom commands format (TOML with `prompt`, `description`)
-- Skills format (identical SKILL.md standard)
-- MCP server configuration (`settings.json`)
-- Extensions system (for reference, not converted)
-- Hooks system (for reference, format differences noted)
-- Config file locations (user-level `~/.gemini/` vs project-level `.gemini/`)
-- Directory layout conventions
+- GEMINI.md context file format（GEMINI.md context file 格式）
+- Custom commands format（custom commands 格式，TOML with `prompt`, `description`）
+- Skills format（skills 格式，identical SKILL.md standard）
+- MCP server configuration（MCP server 配置，`settings.json`）
+- Extensions system（仅作参考，不转换）
+- Hooks system（仅作参考，记录 format differences）
+- Config file locations（config file 位置，user-level `~/.gemini/` vs project-level `.gemini/`）
+- Directory layout conventions（目录布局约定）
 
-**Update `README.md`**
+**更新 `README.md`**
 
-Add `gemini` to the supported targets in the CLI usage section.
+在 CLI usage section 中把 `gemini` 加入 supported targets。
 
-## What We're NOT Doing
+## 不做什么
 
-- Not converting hooks (Gemini has hooks but different format -- `BeforeTool`/`AfterTool` with matchers -- warn and skip)
-- Not generating full `settings.json` (only `mcpServers` key -- user-specific settings like `model`, `tools.sandbox` are out of scope)
-- Not creating extensions (extension format is for distributing packages, not for converted plugins)
-- Not using `@{file}` or `!{shell}` placeholders in converted commands (would require analyzing command intent)
-- Not transforming content inside copied SKILL.md files (known limitation -- skills may reference `.claude/` paths internally)
-- Not clearing old output before writing (matches existing target behavior)
-- Not merging into existing settings.json intelligently beyond `mcpServers` key (too risky to modify user config)
+- 不转换 hooks（Gemini 有 hooks 但 format 不同：`BeforeTool`/`AfterTool` with matchers；warn and skip）
+- 不生成 full `settings.json`（only `mcpServers` key；user-specific settings like `model`, `tools.sandbox` are out of scope）
+- 不创建 extensions（extension format 用于 distributing packages，不用于 converted plugins）
+- 不在 converted commands 中使用 `@{file}` 或 `!{shell}` placeholders（需要分析 command intent）
+- 不转换 copied SKILL.md files 内部内容（known limitation -- skills 可能内部引用 `.claude/` paths）
+- 不在写入前清理 old output（matches existing target behavior）
+- 除 `mcpServers` key 外，不 intelligent merge existing settings.json（修改 user config 风险太高）
 
-## Complexity Assessment
+## 复杂度评估
 
-This is a **medium change**. The converter architecture is well-established with five existing targets, so this is mostly pattern-following. The key novelties are:
+这是一个 **medium change**。converter architecture 已有五个 targets，因此主要是 pattern-following。关键新点是：
 
-1. The TOML command format (unique among all targets -- need simple TOML serializer)
-2. Agents map to skills rather than a direct 1:1 concept (but this is the same pattern as codex)
-3. Namespaced commands use directory structure (new approach vs flattening in cursor/codex)
-4. MCP config goes into a broader `settings.json` file (need to merge, not clobber)
+1. TOML command format（所有 targets 中独有 -- 需要 simple TOML serializer）
+2. Agents 映射为 skills，而不是 direct 1:1 concept（但这与 codex pattern 相同）
+3. Namespaced commands 使用 directory structure（不同于 cursor/codex 的 flattening）
+4. MCP config 写入 broader `settings.json` file（需要 merge, not clobber）
 
-Skills being identical across platforms simplifies things significantly. The TOML serialization is simple (only two fields: `description` string and `prompt` multi-line string).
+Skills 在各平台格式相同，显著简化工作。TOML serialization 也很简单（只有两个 fields：`description` string 和 `prompt` multi-line string）。
 
-## References
+## 参考
 
-- [Gemini CLI Repository](https://github.com/google-gemini/gemini-cli)
-- [Gemini CLI Configuration](https://geminicli.com/docs/get-started/configuration/)
-- [Custom Commands (TOML)](https://geminicli.com/docs/cli/custom-commands/)
-- [Agent Skills](https://geminicli.com/docs/cli/skills/)
-- [Creating Skills](https://geminicli.com/docs/cli/creating-skills/)
-- [Extensions](https://geminicli.com/docs/extensions/writing-extensions/)
-- [MCP Servers](https://google-gemini.github.io/gemini-cli/docs/tools/mcp-server.html)
-- Existing cursor plan: `docs/plans/2026-02-12-feat-add-cursor-cli-target-provider-plan.md`
-- Existing codex converter: `src/converters/claude-to-codex.ts` (has `uniqueName()` and skill generation patterns)
-- Existing droid writer: `src/targets/droid.ts` (has double-nesting guard pattern)
-- Target registry: `src/targets/index.ts`
+- [Gemini CLI Repository](https://github.com/google-gemini/gemini-cli)（Gemini CLI 仓库）
+- [Gemini CLI Configuration](https://geminicli.com/docs/get-started/configuration/)（Gemini CLI 配置）
+- [Custom Commands (TOML)](https://geminicli.com/docs/cli/custom-commands/)（Custom Commands，custom commands 文档）
+- [Agent Skills](https://geminicli.com/docs/cli/skills/)（Agent Skills，agent skills 文档）
+- [Creating Skills](https://geminicli.com/docs/cli/creating-skills/)（Creating Skills，创建 skills 文档）
+- [Extensions](https://geminicli.com/docs/extensions/writing-extensions/)（Extensions，extensions 文档）
+- [MCP Servers](https://google-gemini.github.io/gemini-cli/docs/tools/mcp-server.html)（MCP Servers，MCP servers 文档）
+- 现有 cursor plan：`docs/plans/2026-02-12-feat-add-cursor-cli-target-provider-plan.md`
+- 现有 codex converter：`src/converters/claude-to-codex.ts`（has `uniqueName()` and skill generation patterns）
+- 现有 droid writer：`src/targets/droid.ts`（has double-nesting guard pattern）
+- Target registry（target registry，target 注册表）：`src/targets/index.ts`
 
-## Completion Summary
+## 完成摘要
 
-### What Was Delivered
-- [x] Phase 1: Types (`src/types/gemini.ts`)
-- [x] Phase 2: Converter (`src/converters/claude-to-gemini.ts`)
-- [x] Phase 3: Writer (`src/targets/gemini.ts`)
-- [x] Phase 4: CLI wiring (`src/targets/index.ts`, `src/commands/convert.ts`, `src/commands/install.ts`)
-- [x] Phase 5: Tests (`tests/gemini-converter.test.ts`, `tests/gemini-writer.test.ts`)
-- [x] Phase 6: Documentation (`docs/specs/gemini.md`, `README.md`)
+### 已交付内容
+- [x] 阶段 1：Types（`src/types/gemini.ts`）
+- [x] 阶段 2：Converter（`src/converters/claude-to-gemini.ts`）
+- [x] 阶段 3：Writer（`src/targets/gemini.ts`）
+- [x] 阶段 4：CLI wiring（`src/targets/index.ts`, `src/commands/convert.ts`, `src/commands/install.ts`）
+- [x] 阶段 5：Tests（`tests/gemini-converter.test.ts`, `tests/gemini-writer.test.ts`）
+- [x] 阶段 6：Documentation（`docs/specs/gemini.md`, `README.md`）
 
-### Implementation Statistics
-- 10 files changed
-- 27 new tests added (129 total, all passing)
-- 148 output files generated from compound-engineering plugin conversion
-- 0 dependencies added
+### 实施统计
+- 10 个 files changed
+- 新增 27 个 tests（总计 129，全部 passing）
+- 从 compound-engineering plugin conversion 生成 148 个 output files
+- 新增 0 个 dependencies
 
-### Git Commits
+### Git Commits（Git 提交）
 - `201ad6d` feat(gemini): add Gemini CLI as sixth target provider
 - `8351851` docs: add Gemini CLI spec and update README with gemini target
 
-### Completion Details
-- **Completed By:** Claude Opus 4.6
-- **Date:** 2026-02-14
-- **Session:** Single session
+### 完成详情
+- **Completed By（完成人）：** Claude Opus 4.6
+- **Date（日期）：** 2026-02-14
+- **Session（会话）：** Single session

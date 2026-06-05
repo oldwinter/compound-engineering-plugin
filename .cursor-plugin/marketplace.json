@@ -6,7 +6,7 @@
     "url": "https://github.com/kieranklaassen"
   },
   "metadata": {
-    "description": "Cursor plugin marketplace for Every Inc plugins",
+    "description": "Every Inc plugins 的 Cursor plugin marketplace",
     "version": "1.0.1",
     "pluginRoot": "plugins"
   },
@@ -14,12 +14,12 @@
     {
       "name": "compound-engineering",
       "source": "compound-engineering",
-      "description": "AI-powered development tools that get smarter with every use. Make each unit of engineering work easier than the last."
+      "description": "由 AI 驱动的开发工具，会随着每次使用变得更聪明。让每个 engineering work 单元都比上一次更轻松。"
     },
     {
       "name": "coding-tutor",
       "source": "coding-tutor",
-      "description": "Personalized coding tutorials with spaced repetition quizzes using your real codebase."
+      "description": "使用你的真实 codebase 提供个性化 coding tutorials，并配合 spaced repetition quizzes。"
     }
   ]
 }

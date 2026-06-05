@@ -1,21 +1,21 @@
-# Next.js dev-server recipe (auto-detect fallback)
+# Next.js dev-server recipe（Next.js dev-server 配方，auto-detect fallback）
 
-Loaded when `detect-project-type.sh` returns `next` and there is no `.claude/launch.json` to consult.
+当 `detect-project-type.sh` 返回 `next`，且没有 `.claude/launch.json` 可查询时加载。
 
-## Signature
+## Signature（识别特征）
 
-- `next.config.js`, `next.config.mjs`, `next.config.ts`, or `next.config.cjs` exists
-- `package.json` contains a `next` dependency
+- 存在 `next.config.js`、`next.config.mjs`、`next.config.ts` 或 `next.config.cjs`
+- `package.json` 包含 `next` dependency
 
-## Start command
+## Start command（启动命令）
 
-Standard:
+Standard（标准）:
 
 ```bash
 npm run dev
 ```
 
-Also valid (read `package.json` scripts to confirm which the project uses):
+也有效（读取 `package.json` scripts，确认项目使用哪一个）：
 
 ```bash
 pnpm dev
@@ -23,21 +23,21 @@ yarn dev
 bun run dev
 ```
 
-Prefer the package manager indicated by the lockfile:
+优先使用 lockfile 指示的 package manager：
 - `pnpm-lock.yaml` -> `pnpm dev`
 - `yarn.lock` -> `yarn dev`
 - `bun.lock` / `bun.lockb` -> `bun run dev`
 - `package-lock.json` or none -> `npm run dev`
 
-## Port
+## Port（端口）
 
-Default: `3000`. Next.js respects `-p <port>` / `--port <port>` and the `PORT` env var. Overrides follow the cascade in `references/dev-server-detection.md`.
+Default（默认）：`3000`。Next.js respects `-p <port>` / `--port <port>` 和 `PORT` env var。Overrides 遵循 `references/dev-server-detection.md` 中的 cascade。
 
-## Turbopack
+## Turbopack（Turbopack）
 
-Next.js 14+ supports `--turbo` (and 15+ makes it default). If the `dev` script in `package.json` includes `--turbo`, preserve it. Turbopack changes reload behavior but not port or URL conventions.
+Next.js 14+ 支持 `--turbo`（15+ 将其设为默认）。如果 `package.json` 中的 `dev` script 包含 `--turbo`，保留它。Turbopack 会改变 reload behavior，但不会改变 port 或 URL conventions。
 
-## Stub generation
+## Stub generation（stub 生成）
 
 ```json
 {
@@ -53,10 +53,10 @@ Next.js 14+ supports `--turbo` (and 15+ makes it default). If the `dev` script i
 }
 ```
 
-Substitute the resolved package manager (`npm` / `pnpm` / `yarn` / `bun`) and port.
+替换为 resolved package manager（`npm` / `pnpm` / `yarn` / `bun`）和 port。
 
-## Common gotchas
+## Common gotchas（常见坑）
 
-- **App Router vs Pages Router:** dev-server behavior is the same; polish doesn't care. Checklist generation (Unit 5) does — pages in `app/` and `pages/` are different surfaces.
-- **Monorepo roots:** in a pnpm/Turborepo monorepo, `npm run dev` at the root typically fans out to multiple packages. Users should set `cwd` in `.claude/launch.json` to the specific Next app (`cwd: "apps/web"`).
-- **Env loading:** `.env.local` is loaded automatically by Next; polish does not need to export it.
+- **App Router vs Pages Router：** dev-server behavior 相同；polish 不关心。Checklist generation（Unit 5）会关心，因为 `app/` 和 `pages/` 中的 pages 是不同 surfaces。
+- **Monorepo roots：** 在 pnpm/Turborepo monorepo 中，root 处的 `npm run dev` 通常会 fan out 到多个 packages。用户应在 `.claude/launch.json` 中把 `cwd` 设置为具体 Next app（`cwd: "apps/web"`）。
+- **Env loading：** Next 会自动加载 `.env.local`；polish 不需要 export 它。

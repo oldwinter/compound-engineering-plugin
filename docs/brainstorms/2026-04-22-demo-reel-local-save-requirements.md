@@ -3,51 +3,51 @@ date: 2026-04-22
 topic: demo-reel-local-save
 ---
 
-# Demo Reel: Local Evidence Save
+# Demo Reel：本地保存 Evidence
 
-## Problem Frame
+## 问题框架
 
-When `ce-demo-reel` captures evidence (GIFs, screenshots, terminal recordings), the local artifacts are deleted after uploading to catbox.moe. Users who want to keep evidence locally — for offline access, committing to the repo, or archival — have no way to do so without manually copying files from the temp directory before cleanup runs.
-
----
-
-## Requirements
-
-**Destination choice**
-- R1. After capture completes, ask the user whether to upload to catbox (existing behavior) or save locally.
-- R2. The question must present the captured artifact(s) and clearly describe both options.
-
-**Local save behavior**
-- R3. When the user chooses local save, copy the final artifact(s) (GIF, PNG, or recording) to a stable OS-temp path (`$TMPDIR/compound-engineering/ce-demo-reel/`). Do not upload to catbox.
-- R4. Create the destination directory if it does not exist.
-- R5. Use a descriptive filename that includes the branch name or PR identifier and a timestamp to avoid collisions across runs.
-- R6. After saving, display the local file path(s) to the user for easy reference.
+当 `ce-demo-reel` 捕获 evidence（GIFs、screenshots、terminal recordings）时，local artifacts 会在上传到 catbox.moe 后被删除。想在本地保留 evidence 的用户——用于 offline access、提交到 repo 或 archival——只能在 cleanup 运行前从 temp directory 手动复制 files。
 
 ---
 
-## Success Criteria
+## 需求
 
-- A user running `ce-demo-reel` can keep captured evidence on disk without manual intervention.
-- The saved artifacts are discoverable in a predictable, stable OS-temp location.
+**Destination choice（目标选择）**
+- R1. capture 完成后，询问用户是上传到 catbox（existing behavior），还是保存到本地。
+- R2. 问题必须展示 captured artifact(s)，并清楚描述两个 options。
 
----
-
-## Scope Boundaries
-
-- Catbox upload logic itself is unchanged — only the routing (local vs. upload) is new.
-- No automatic git-add or commit of saved artifacts.
-- No configurable save path — `$TMPDIR/compound-engineering/ce-demo-reel/` is the fixed default for now.
-- No retroactive save of previously captured evidence.
+**Local save behavior（本地保存行为）**
+- R3. 当用户选择 local save 时，将 final artifact(s)（GIF、PNG 或 recording）复制到稳定的 OS-temp path（`$TMPDIR/compound-engineering/ce-demo-reel/`）。不要上传到 catbox。
+- R4. 如果 destination directory 不存在，则创建它。
+- R5. 使用 descriptive filename，包含 branch name 或 PR identifier 以及 timestamp，避免跨 runs 冲突。
+- R6. 保存后，向用户显示 local file path(s)，方便引用。
 
 ---
 
-## Key Decisions
+## 成功标准
 
-- **Local save as an alternative to upload, not an addition**: The user chooses one destination per capture — either catbox or local. This keeps the flow simple and avoids redundant artifacts.
-- **OS-temp as the local target**: Uses `$TMPDIR/compound-engineering/ce-demo-reel/` per the repo's cross-invocation scratch-space convention. Stable prefix makes files findable without polluting the repo tree.
+- 运行 `ce-demo-reel` 的用户无需手动介入，即可把 captured evidence 保留在磁盘上。
+- Saved artifacts 位于 predictable、stable OS-temp location，容易发现。
 
 ---
 
-## Next Steps
+## 范围边界
 
--> `/ce-plan` for structured implementation planning, or proceed directly to implementation given the small scope.
+- Catbox upload logic 本身不变——只新增 routing（local vs. upload）。
+- 不自动 git-add 或 commit saved artifacts。
+- 不提供 configurable save path——`$TMPDIR/compound-engineering/ce-demo-reel/` 暂时是 fixed default。
+- 不 retroactively save 之前捕获过的 evidence。
+
+---
+
+## 关键决策
+
+- **Local save as an alternative to upload, not an addition**：用户为每次 capture 选择一个 destination——要么 catbox，要么 local。这让 flow 保持简单，并避免 redundant artifacts。
+- **OS-temp as the local target**：按 repo 的 cross-invocation scratch-space convention 使用 `$TMPDIR/compound-engineering/ce-demo-reel/`。Stable prefix 让 files 可查找，同时不污染 repo tree。
+
+---
+
+## 下一步
+
+-> `/ce-plan` 进行 structured implementation planning；鉴于 scope 较小，也可以直接进入 implementation。

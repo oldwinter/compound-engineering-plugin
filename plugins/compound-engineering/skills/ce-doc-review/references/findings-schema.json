@@ -1,17 +1,17 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Document Review Findings",
-  "description": "Structured output schema for document review persona agents",
+  "title": "Document Review Findings（document review findings）",
+  "description": "用于 document review persona agents 的 structured output schema",
   "type": "object",
   "required": ["reviewer", "findings", "residual_risks", "deferred_questions"],
   "properties": {
     "reviewer": {
       "type": "string",
-      "description": "Persona name that produced this output (e.g., 'coherence', 'feasibility', 'product-lens')"
+      "description": "生成此 output 的 persona name（例如 'coherence'、'feasibility'、'product-lens'）"
     },
     "findings": {
       "type": "array",
-      "description": "List of document review findings. Empty array if no issues found.",
+      "description": "此字段包含 document review findings 的列表。未发现 issues 时为空数组。",
       "items": {
         "type": "object",
         "required": [
@@ -27,44 +27,44 @@
         "properties": {
           "title": {
             "type": "string",
-            "description": "Short, specific issue title. 10 words or fewer.",
+            "description": "简短、具体的 issue title。10 words or fewer。",
             "maxLength": 100
           },
           "severity": {
             "type": "string",
             "enum": ["P0", "P1", "P2", "P3"],
-            "description": "Issue severity level"
+            "description": "此 issue 的 severity level"
           },
           "section": {
             "type": "string",
-            "description": "Document section where the issue appears (e.g., 'Requirements Trace', 'Implementation Unit 3', 'Overview')"
+            "description": "此 issue 出现的 document section（例如 'Requirements Trace'、'Implementation Unit 3'、'Overview'）"
           },
           "why_it_matters": {
             "type": "string",
-            "description": "Impact statement -- not 'what is wrong' but 'what goes wrong if not addressed'"
+            "description": "影响说明 -- 不是 'what is wrong'，而是 'what goes wrong if not addressed'"
           },
           "autofix_class": {
             "type": "string",
             "enum": ["safe_auto", "gated_auto", "manual"],
-            "description": "How this issue should be handled. safe_auto = one clear correct fix applied silently (typo, wrong count, stale cross-reference, mechanically-implied addition, terminology drift). gated_auto = concrete fix exists but touches document meaning or scope and warrants user confirmation (substantive additions from codebase-pattern-resolved fixes, framework-native-API substitutions, missing standard controls). manual = requires user judgment; multiple valid approaches. Low-confidence manual findings surface in an FYI subsection at the presentation layer."
+            "description": "此 issue 应如何处理。safe_auto = 一个 clear correct fix，可 silently apply（typo、wrong count、stale cross-reference、mechanically-implied addition、terminology drift）。gated_auto = 存在 concrete fix，但会触及 document meaning 或 scope，需要 user confirmation（来自 codebase-pattern-resolved fixes 的 substantive additions、framework-native-API substitutions、missing standard controls）。manual = 需要 user judgment；存在多个 valid approaches。Low-confidence manual findings 会在 presentation layer 的 FYI subsection 中 surface。"
           },
           "finding_type": {
             "type": "string",
             "enum": ["error", "omission"],
-            "description": "Whether the finding is a mistake in what the document says (error) or something the document forgot to say (omission). Errors are design tensions, contradictions, or incorrect statements. Omissions are missing mechanical steps, forgotten list entries, or absent details."
+            "description": "说明 finding 是 document 所说内容中的 mistake（error），还是 document 忘记说明的内容（omission）。Errors 是 design tensions、contradictions 或 incorrect statements。Omissions 是 missing mechanical steps、forgotten list entries 或 absent details。"
           },
           "suggested_fix": {
             "type": ["string", "null"],
-            "description": "Concrete fix text. Omit or null if no good fix is obvious -- a bad suggestion is worse than none."
+            "description": "具体 fix text。如果没有明显 good fix，则 omit 或 null -- bad suggestion 比 none 更糟。"
           },
           "confidence": {
             "type": "integer",
             "enum": [0, 25, 50, 75, 100],
-            "description": "Anchored confidence score. Use exactly one of 0, 25, 50, 75, 100. Each anchor has a behavioral criterion the reviewer must honestly self-apply. 0: Not confident at all. This is a false positive that does not stand up to light scrutiny, or a pre-existing issue the document did not introduce. 25: Somewhat confident. Might be a real issue but could also be a false positive; the reviewer was not able to verify. 50: Moderately confident. The reviewer verified this is a real issue but it may be a nitpick or not meaningfully affect plan correctness. Relative to the rest of the document, it is not very important. Advisory observations (the honest answer to 'what breaks if we do not fix this?' is 'nothing breaks, but...') land here. 75: Highly confident. The reviewer double-checked and verified the issue will be hit in practice by implementers or readers of this document. The existing approach is insufficient. The issue is important and will directly impact plan correctness, implementer understanding, or downstream execution. 100: Absolutely certain. The reviewer double-checked and confirmed the issue. The evidence directly confirms it will happen frequently in practice. The document text, codebase, or cross-references leave no room for interpretation."
+            "description": "锚定式 confidence score。必须准确使用 0、25、50、75、100 之一。每个 anchor 都有 reviewer 必须诚实 self-apply 的 behavioral criterion。0：Not confident at all。这是 false positive，经不起轻度检查，或是 document 未引入的 pre-existing issue。25：Somewhat confident。可能是真 issue，也可能是 false positive；reviewer 无法 verify。50：Moderately confident。reviewer 已验证这是真 issue，但可能只是 nitpick，或不会 meaningful affect plan correctness。相对于 document 其余部分，它不太重要。Advisory observations（对 'what breaks if we do not fix this?' 的诚实答案是 'nothing breaks, but...'）属于这里。75：Highly confident。reviewer 已 double-check 并 verify 此 issue 会在实践中被 implementers 或 readers of this document hit。existing approach 不足。issue 重要，并会直接影响 plan correctness、implementer understanding 或 downstream execution。100：Absolutely certain。reviewer 已 double-check 并确认 issue。evidence 直接确认它会在实践中频繁发生。document text、codebase 或 cross-references 没有 interpretation 空间。"
           },
           "evidence": {
             "type": "array",
-            "description": "Quoted text from the document that supports this finding. At least 1 item.",
+            "description": "支持此 finding 的 quoted text from the document。至少 1 item。",
             "items": { "type": "string" },
             "minItems": 1
           }
@@ -73,12 +73,12 @@
     },
     "residual_risks": {
       "type": "array",
-      "description": "Risks the reviewer noticed but could not confirm as findings (below confidence threshold)",
+      "description": "这是 reviewer 注意到但无法确认成 findings 的 risks（below confidence threshold）",
       "items": { "type": "string" }
     },
     "deferred_questions": {
       "type": "array",
-      "description": "Questions that should be resolved in a later workflow stage (planning, implementation)",
+      "description": "应在 later workflow stage（planning、implementation）解决的问题",
       "items": { "type": "string" }
     }
   }

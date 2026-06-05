@@ -1,10 +1,10 @@
-# Validator Sub-agent Prompt Template
+# Validator Sub-agent Prompt Template（Validator Sub-agent Prompt 模板）
 
-This template is used by Stage 5b to spawn one validator sub-agent per surviving finding before externalization. The validator's job is **independent re-verification**, not re-reasoning. It is a fresh second opinion, not a critic of the original persona's analysis.
+此 template 由 Stage 5b 使用，在 externalization 前为每个 surviving finding spawn 一个 validator sub-agent。Validator 的工作是 **independent re-verification**，不是 re-reasoning。它是 fresh second opinion，不是对 original persona analysis 的批判者。
 
 ---
 
-## Template
+## Template（模板）
 
 ```
 You are an independent validator for a code review finding. Another reviewer flagged the issue described below. Your job is to verify whether the finding holds up under fresh inspection.
@@ -55,35 +55,35 @@ Return ONLY this JSON, no prose:
 ```json
 {
   "validated": true | false,
-  "reason": "<one sentence explaining the verdict>"
+  "reason": "<一句解释 verdict 的 sentence>"
 }
 ```
 
 Examples:
 
-- `{ "validated": true, "reason": "Cited line is new in this diff and lacks the ownership guard used by parallel controllers." }`
-- `{ "validated": false, "reason": "Line 87 already guards user.email with .present? check; the null deref the finding describes cannot occur." }`
-- `{ "validated": false, "reason": "Cited line dates to 2024-08 (pre-existing); diff does not modify or interact with it." }`
-- `{ "validated": false, "reason": "Framework handles the timeout case via Faraday default; no application-level retry needed." }`
+- `{ "validated": true, "reason": "cited line 是此 diff 新增的，且缺少 parallel controllers 使用的 ownership guard。" }`
+- `{ "validated": false, "reason": "Line 87 已用 .present? check guard user.email；finding 描述的 null deref 不会发生。" }`
+- `{ "validated": false, "reason": "cited line 可追溯到 2024-08（pre-existing）；diff 未修改它，也未与其交互。" }`
+- `{ "validated": false, "reason": "Framework 已通过 Faraday default 处理 timeout case；不需要 application-level retry。" }`
 
 Rules:
 - Be honest. If the original reviewer was right, validate. If they were wrong, reject. Conservative bias is preferred — when in doubt, reject.
 - Do not invent new findings. Your scope is this one finding; surface anything else as a no-vote with reason.
 - Do not edit, commit, push, or modify any files. You are operationally read-only.
-- If you cannot read the cited file, return `{ "validated": false, "reason": "Could not access file path to verify." }` rather than guessing.
+- 如果无法读取 cited file，返回 `{ "validated": false, "reason": "无法访问 file path 来 verify。" }`，不要猜测。
 - Return JSON only. No prose, no markdown, no explanation outside the JSON object.
 ```
 
-## Variable Reference
+## Variable Reference（变量参考）
 
 | Variable | Source | Description |
 |----------|--------|-------------|
-| `{finding_title}` | Stage 5 merged finding | The persona's title for the issue |
+| `{finding_title}` | Stage 5 merged finding | Persona 给该 issue 的 title |
 | `{finding_severity}` | Stage 5 merged finding | P0 / P1 / P2 / P3 |
 | `{finding_file}` | Stage 5 merged finding | Repo-relative file path |
 | `{finding_line}` | Stage 5 merged finding | Primary line number |
-| `{finding_why_it_matters}` | Per-agent artifact file (detail tier) | Loaded from disk for this validation; required for the validator to understand the finding |
-| `{finding_suggested_fix}` | Stage 5 merged finding (optional) | Pass empty string if not present |
-| `{finding_reviewer}` | Stage 5 merged finding | Original persona name (informational; helps validator interpret the framing) |
-| `{finding_confidence}` | Stage 5 merged finding | The persona's anchor (informational) |
+| `{finding_why_it_matters}` | Per-agent artifact file (detail tier) | 为此次 validation 从磁盘加载；validator 理解 finding 所必需 |
+| `{finding_suggested_fix}` | Stage 5 merged finding (optional) | 不存在时传 empty string |
+| `{finding_reviewer}` | Stage 5 merged finding | Original persona name（informational；帮助 validator 解读 framing） |
+| `{finding_confidence}` | Stage 5 merged finding | Persona 的 anchor（informational） |
 | `{diff}` | Stage 1 output | Full diff for context |

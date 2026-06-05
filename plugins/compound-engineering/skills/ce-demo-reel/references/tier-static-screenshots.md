@@ -1,19 +1,19 @@
-# Tier: Static Screenshots
+# Tier：Static Screenshots（静态截图）
 
-Capture individual PNG screenshots. No animation, no stitching.
+捕获单独的 PNG screenshots。不做 animation，不做 stitching。
 
-**Best for:** Fallback when other tools are unavailable, library demos, or features where animation doesn't add value.
-**Output:** PNG files
-**Label:** "Screenshots"
-**Required tools:** Varies (agent-browser for web, silicon for CLI, or native screenshot)
+**Best for（适用场景）：** 其他 tools 不可用时的 fallback、library demos，或 animation 没有额外价值的 features。
+**Output（输出）：** PNG files
+**Label（标签）：** "Screenshots"
+**Required tools（必需工具）：** Varies（web 使用 agent-browser，CLI 使用 silicon，或 native screenshot）
 
-**Secrets rule applies here too.** For browser captures, do not open DevTools, do not screenshot URLs carrying tokens, and avoid pages that display unmasked credentials. For CLI captures, render output that was already free of credentials — no env-var dumps, no `--api-key` flag values, no auth headers in error traces. Scan each PNG before uploading; if anything credential-like appears, discard and recapture.
+**Secrets rule 也适用。** 对 browser captures，不要打开 DevTools，不要截图带 tokens 的 URLs，并避免会显示 unmasked credentials 的页面。对 CLI captures，只渲染已确认没有 credentials 的 output：不要 env-var dumps，不要 `--api-key` flag values，不要 error traces 中的 auth headers。上传前扫描每个 PNG；如果出现任何 credential-like 内容，丢弃并重新 capture。
 
-## Capture by Project Type
+## 按 Project Type capture
 
-### Web app or desktop app (agent-browser available)
+### Web app 或 desktop app（agent-browser available）
 
-If `agent-browser` is not installed, inform the user: "`agent-browser` is not installed. Run `/ce-setup` to install required dependencies." Then skip to the CLI or fallback sections below.
+如果未安装 `agent-browser`，告知用户："`agent-browser` is not installed. Run `/ce-setup` to install required dependencies." 然后跳到下面的 CLI 或 fallback sections。
 
 ```bash
 agent-browser open [URL]
@@ -27,29 +27,29 @@ agent-browser wait 2000
 agent-browser screenshot [RUN_DIR]/screenshot-01.png
 ```
 
-Capture 1-3 screenshots: before state, feature in action, result state.
+捕获 1-3 张 screenshots：before state、feature in action、result state。
 
-### CLI tool (silicon available)
+### CLI tool（CLI tool，silicon 可用）
 
-Run the command, capture its output to a text file, then render with silicon:
+运行 command，将 output 捕获到 text file，然后用 silicon 渲染：
 
 ```bash
 silicon [RUN_DIR]/output.txt -o [RUN_DIR]/screenshot-01.png --theme Dracula -l bash --pad-horiz 20 --pad-vert 20
 ```
 
-### CLI tool (no silicon)
+### CLI tool（CLI tool，无 silicon）
 
-Run the command and capture the raw terminal output. Include the output as a code block in the PR description instead of an image. Label it as "Terminal output", never "Screenshot".
+运行 command 并捕获 raw terminal output。在 PR description 中以 code block 包含 output，而不是 image。Label 为 "Terminal output"，不要标为 "Screenshot"。
 
-### Library
+### Library（库）
 
-Run example code that exercises the new API. Capture the output as above (silicon if available, code block if not).
+运行能 exercise new API 的 example code。按上面方式捕获 output（有 silicon 用 silicon，否则用 code block）。
 
-## Upload
+## Upload（上传）
 
-Each PNG is uploaded individually. Proceed to `references/upload-and-approval.md` for each file, or upload all and present them together for approval.
+每个 PNG 单独上传。对每个文件进入 `references/upload-and-approval.md`，或全部上传后一起展示给用户 approval。
 
-For multiple screenshots, the markdown embed uses multiple image lines:
+多个 screenshots 时，markdown embed 使用多行 image：
 
 ```markdown
 ## Screenshots

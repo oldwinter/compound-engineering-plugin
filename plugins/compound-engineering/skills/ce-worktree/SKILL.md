@@ -1,41 +1,41 @@
 ---
 name: ce-worktree
-description: Create an isolated git worktree for parallel feature work or PR review. Use when starting work that should not disturb the current checkout, or when `ce-work` or `ce-code-review` offers a worktree option.
+description: 为 parallel feature work 或 PR review 创建 isolated git worktree。当开始不应扰动 current checkout 的工作，或 `ce-work` / `ce-code-review` 提供 worktree option 时使用。
 allowed-tools: Bash(bash *worktree-manager.sh)
 ---
 
-# Worktree Creation
+# Worktree Creation（创建 Worktree）
 
-Create a worktree under `.worktrees/<branch>` with branch-specific setup that `git worktree add` alone does not handle:
+在 `.worktrees/<branch>` 下创建 worktree，并完成 `git worktree add` 本身不会处理的 branch-specific setup：
 
-- Copies `.env`, `.env.local`, `.env.test`, etc. from the main repo (skips `.env.example`)
-- Trusts `mise`/`direnv` configs, with branch-aware safety rules so review branches do not auto-grant trust to untrusted `.envrc` content
-- Adds `.worktrees` to `.gitignore` if not already ignored
-- Does not modify the main repo checkout — `from-branch` is fetched, not checked out
+- 从 main repo 复制 `.env`、`.env.local`、`.env.test` 等（跳过 `.env.example`）
+- Trust `mise`/`direnv` configs，并带 branch-aware safety rules，确保 review branches 不会自动 trust untrusted `.envrc` content
+- 如果 `.worktrees` 尚未 ignored，则加入 `.gitignore`
+- 不修改 main repo checkout；`from-branch` 被 fetched，而不是 checked out
 
-## Creating a worktree
+## Creating a worktree（创建 worktree）
 
-Invoke the bundled script via the runtime Bash tool. On Claude Code, `${CLAUDE_SKILL_DIR}` resolves to the skill's own directory across both marketplace-cached installs and `claude --plugin-dir` local development; the runtime Bash tool's CWD is the user's project, not the skill directory, so a bare `bash scripts/worktree-manager.sh` fails. On other targets (Codex, Gemini, Pi, etc.) `${CLAUDE_SKILL_DIR}` is unset and the `:-.` fallback yields the bare relative path those harnesses expect.
+通过 runtime Bash tool 调用 bundled script。在 Claude Code 中，`${CLAUDE_SKILL_DIR}` 会在 marketplace-cached installs 和 `claude --plugin-dir` local development 中 resolve 到 skill 自身目录；runtime Bash tool 的 CWD 是用户 project，而不是 skill directory，所以裸 `bash scripts/worktree-manager.sh` 会失败。在其他 targets（Codex、Gemini、Pi 等）中，`${CLAUDE_SKILL_DIR}` 未设置，`:-.` fallback 会得到这些 harnesses 期待的裸 relative path。
 
 ```bash
 bash "${CLAUDE_SKILL_DIR:-.}/scripts/worktree-manager.sh" create <branch-name> [from-branch]
 ```
 
-Defaults:
-- `from-branch` defaults to origin's default branch (or `main` if that cannot be resolved)
-- The new branch is created at `origin/<from-branch>` (or the local ref if the remote is unavailable)
+Defaults（默认值）:
+- `from-branch` 默认为 origin 的 default branch（无法 resolve 时为 `main`）
+- New branch 基于 `origin/<from-branch>` 创建（remote 不可用时使用 local ref）
 
-Examples:
+Examples（示例）:
 ```bash
 bash "${CLAUDE_SKILL_DIR:-.}/scripts/worktree-manager.sh" create feat/login
 bash "${CLAUDE_SKILL_DIR:-.}/scripts/worktree-manager.sh" create fix/email-validation develop
 ```
 
-After creation, switch to the worktree with `cd .worktrees/<branch-name>`.
+创建后，用 `cd .worktrees/<branch-name>` 切到 worktree。
 
-## Other worktree operations
+## Other worktree operations（其他 worktree 操作）
 
-Use `git` directly — no wrapper is needed and none is provided:
+直接使用 `git`；不需要 wrapper，也没有提供 wrapper：
 
 ```bash
 git worktree list                          # list worktrees
@@ -44,37 +44,37 @@ cd .worktrees/<branch>                     # switch to a worktree
 cd "$(git rev-parse --show-toplevel)"      # return to main checkout
 ```
 
-To copy `.env*` files into an existing worktree created without them, run this from the main repo (not from inside the worktree, since branch names often contain slashes like `feat/login`):
+要把 `.env*` files 复制到此前创建但缺少它们的 existing worktree，请从 main repo 运行（不要在 worktree 内运行，因为 branch names 常含 `feat/login` 这类 slashes）：
 ```bash
 cp .env* .worktrees/<branch>/
 ```
 
-## Dev tool trust behavior
+## Dev tool trust behavior（开发工具 trust 行为）
 
-When mise or direnv configs are present, the script attempts to trust them so hooks and scripts do not block on interactive prompts. Trust is baseline-checked against a reference branch:
+当存在 mise 或 direnv configs 时，script 会尝试 trust 它们，避免 hooks 和 scripts 被 interactive prompts 阻塞。Trust 会 against reference branch 做 baseline-check：
 
-- **Trusted base branches** (`main`, `develop`, `dev`, `trunk`, `staging`, `release/*`): the new worktree's configs are compared against that branch; unchanged configs are auto-trusted. `direnv allow` is permitted.
-- **Other branches** (feature branches, PR review branches): configs are compared against the default branch; `direnv allow` is skipped regardless, because `.envrc` can source files that direnv does not validate.
+- **Trusted base branches**（`main`、`develop`、`dev`、`trunk`、`staging`、`release/*`）：new worktree 的 configs 会与该 branch 比较；unchanged configs 自动 trust。允许 `direnv allow`。
+- **Other branches**（feature branches、PR review branches）：configs 与 default branch 比较；无论如何跳过 `direnv allow`，因为 `.envrc` 可以 source direnv 不验证的 files。
 
-Modified configs are never auto-trusted. The script prints the manual trust command to run after review.
+Modified configs 永不 auto-trusted。Script 会打印 review 后可运行的 manual trust command。
 
-## When to create a worktree
+## When to create a worktree（何时创建 worktree）
 
-Create a worktree when:
-- Reviewing a PR while keeping the main checkout free for other work
-- Running multiple features in parallel without branch-switching overhead
-- Keeping the default branch free of in-progress state
+在以下情况创建 worktree：
+- Review PR，同时保持 main checkout 可用于其他工作
+- 并行运行多个 features，避免 branch-switching overhead
+- 保持 default branch 没有 in-progress state
 
-Do not create a worktree for single-task work that can happen on a branch in the main checkout.
+对于可以在 main checkout 的 branch 中完成的 single-task work，不要创建 worktree。
 
-## Integration
+## Integration（集成）
 
-`ce-work` and `ce-code-review` offer this skill as an option. When the user selects "worktree" in those flows, invoke `bash "${CLAUDE_SKILL_DIR:-.}/scripts/worktree-manager.sh" create <branch>` with a meaningful branch name derived from the work description (e.g., `feat/crowd-sniff`, `fix/email-validation`). Avoid auto-generated names like `worktree-jolly-beaming-raven` that obscure the work.
+`ce-work` 和 `ce-code-review` 会把此 skill 作为 option 提供。当用户在这些 flows 中选择 "worktree" 时，调用 `bash "${CLAUDE_SKILL_DIR:-.}/scripts/worktree-manager.sh" create <branch>`，并使用从 work description 派生的 meaningful branch name（例如 `feat/crowd-sniff`、`fix/email-validation`）。避免 `worktree-jolly-beaming-raven` 这类 obscure work 的 auto-generated names。
 
-## Troubleshooting
+## Troubleshooting（故障排除）
 
-**"Worktree already exists"**: the path is already in use. Either switch to it (`cd .worktrees/<branch>`) or remove it (`git worktree remove .worktrees/<branch>`) before recreating.
+**"Worktree already exists"**：path 已被使用。重新创建前，切到它（`cd .worktrees/<branch>`）或移除它（`git worktree remove .worktrees/<branch>`）。
 
-**"Cannot remove worktree: it is the current worktree"**: `cd` out of the worktree first, then `git worktree remove`.
+**"Cannot remove worktree: it is the current worktree"**：先 `cd` 离开 worktree，再运行 `git worktree remove`。
 
-**Dev tool trust was skipped**: the script prints the manual command. Review the config diff (`git diff <base-ref> -- .envrc`), then run the printed command from the worktree directory.
+**Dev tool trust was skipped**：script 会打印 manual command。先 review config diff（`git diff <base-ref> -- .envrc`），再从 worktree directory 运行打印的 command。

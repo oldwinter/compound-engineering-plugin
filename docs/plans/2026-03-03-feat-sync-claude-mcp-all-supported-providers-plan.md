@@ -1,163 +1,163 @@
 ---
-title: "feat: Sync Claude MCP servers to all supported providers"
+title: "feat: 将 Claude MCP servers 同步到所有 supported providers"
 type: feat
 date: 2026-03-03
 status: completed
 deepened: 2026-03-03
 ---
 
-# feat: Sync Claude MCP servers to all supported providers
+# feat: 将 Claude MCP servers 同步到全部 supported providers
 
-## Overview
+## 概览
 
-Expand the `sync` command so a user's local Claude Code MCP configuration can be propagated to every provider this CLI can reasonably support, instead of only the current partial set.
+扩展 `sync` command，让 user 的 local Claude Code MCP configuration 能传播到该 CLI 可以合理支持的每个 provider，而不是只支持当前 partial set。
 
-Today, `sync` already symlinks Claude skills and syncs MCP servers for a subset of targets. The gap is that install/convert support has grown much faster than sync support, so the product promise in `README.md` has drifted away from what `src/commands/sync.ts` can actually do.
+今天，`sync` 已经会 symlink Claude skills，并为一部分 targets sync MCP servers。缺口在于 install/convert support 的增长远快于 sync support，因此 `README.md` 中的 product promise 已 drift，无法匹配 `src/commands/sync.ts` 的实际行为。
 
-This feature should close that parity gap without changing the core sync contract:
+这个 feature 应关闭 parity gap，同时不改变 core sync contract：
 
-- Claude remains the source of truth for personal skills and MCP servers.
-- Skills stay symlinked, not copied.
-- Existing user config in the destination tool is preserved where possible.
-- Target-specific MCP formats stay target-specific.
+- Claude 仍是 personal skills 和 MCP servers 的 source of truth。
+- Skills 保持 symlinked，而不是 copied。
+- Destination tool 中 existing user config 尽可能保留。
+- Target-specific MCP formats 保持 target-specific。
 
-## Problem Statement
+## 问题陈述
 
-The current implementation has three concrete problems:
+当前 implementation 有三个具体问题：
 
-1. `sync` only knows about `opencode`, `codex`, `pi`, `droid`, `copilot`, and `gemini`, while install/convert now supports `kiro`, `windsurf`, `openclaw`, and `qwen` too.
-2. `sync --target all` relies on stale detection metadata that still includes `cursor`, but misses newer supported tools.
-3. Existing MCP sync support is incomplete even for some already-supported targets:
-   - `codex` only emits stdio servers and silently drops remote MCP servers.
-   - `droid` is still skills-only even though Factory now documents `mcp.json`.
+1. `sync` 只知道 `opencode`、`codex`、`pi`、`droid`、`copilot` 和 `gemini`，而 install/convert 现在也支持 `kiro`、`windsurf`、`openclaw` 和 `qwen`。
+2. `sync --target all` 依赖 stale detection metadata，其中仍包含 `cursor`，但漏掉 newer supported tools。
+3. 即使对于一些已 supported targets，现有 MCP sync support 也不完整：
+   - `codex` 只 emit stdio servers，并 silent drop remote MCP servers。
+   - `droid` 仍是 skills-only，虽然 Factory 现在已经 document `mcp.json`。
 
-User impact:
+用户影响：
 
-- A user can install the plugin to more providers than they can sync their personal Claude setup to.
-- `sync --target all` does not mean "all supported tools" anymore.
-- Users with remote MCP servers in Claude get partial results depending on target.
+- user 可以将 plugin install 到更多 providers，但不能将 personal Claude setup sync 到这些 providers。
+- `sync --target all` 不再意味着 "all supported tools"。
+- 在 Claude 中有 remote MCP servers 的 users 会根据 target 获得 partial results。
 
-## Research Summary
+## 调研摘要
 
-### No Relevant Brainstorm
+### 没有相关 Brainstorm
 
-I checked recent brainstorms in `docs/brainstorms/` and found no relevant document for this feature within the last 14 days.
+我检查了 `docs/brainstorms/` 中最近的 brainstorms，过去 14 天内没有发现与该 feature 相关的 document。
 
-### Internal Findings
+### 内部发现
 
-- `src/commands/sync.ts:15-125` hardcodes the sync target list, output roots, and per-target dispatch. It omits `windsurf`, `kiro`, `openclaw`, and `qwen`.
-- `src/utils/detect-tools.ts:15-22` still detects `cursor`, but not `windsurf`, `kiro`, `openclaw`, or `qwen`.
-- `src/parsers/claude-home.ts:11-19` already gives sync exactly the right inputs: personal skills plus `settings.json` `mcpServers`.
-- `src/sync/codex.ts:25-91` only serializes stdio MCP servers, even though Codex supports remote MCP config.
-- `src/sync/droid.ts:6-21` symlinks skills but ignores MCP entirely.
-- Target writers already encode several missing MCP formats and merge behaviors:
+- `src/commands/sync.ts:15-125` hardcode sync target list、output roots 和 per-target dispatch。它漏掉 `windsurf`、`kiro`、`openclaw` 和 `qwen`。
+- `src/utils/detect-tools.ts:15-22` 仍检测 `cursor`，但不检测 `windsurf`、`kiro`、`openclaw` 或 `qwen`。
+- `src/parsers/claude-home.ts:11-19` 已经为 sync 提供完全正确的 inputs：personal skills 加 `settings.json` `mcpServers`。
+- `src/sync/codex.ts:25-91` 只 serialize stdio MCP servers，虽然 Codex 支持 remote MCP config。
+- `src/sync/droid.ts:6-21` symlink skills，但完全忽略 MCP。
+- Target writers 已编码多个 missing MCP formats 和 merge behaviors：
   - `src/targets/windsurf.ts:65-92`
   - `src/targets/kiro.ts:68-91`
   - `src/targets/openclaw.ts:34-42`
   - `src/targets/qwen.ts:9-15`
-- `README.md:89-123` promises "Sync Personal Config" but only documents the old subset of targets.
+- `README.md:89-123` 承诺 "Sync Personal Config"，但只记录旧 target subset。
 
-### Institutional Learnings
+### 机构经验
 
-`docs/solutions/adding-converter-target-providers.md:20-32` and `docs/solutions/adding-converter-target-providers.md:208-214` reinforce the right pattern for this feature:
+`docs/solutions/adding-converter-target-providers.md:20-32` 和 `docs/solutions/adding-converter-target-providers.md:208-214` 强化了该 feature 的正确 pattern：
 
-- keep target mappings explicit,
-- treat MCP conversion as target-specific,
-- warn on unsupported features instead of forcing fake parity,
-- and add tests for each mapping.
+- 保持 target mappings 显式，
+- 将 MCP conversion 视为 target-specific，
+- 对 unsupported features 发出 warning，而不是强行制造 fake parity，
+- 并为每个 mapping 添加 tests。
 
-Note: `docs/solutions/patterns/critical-patterns.md` does not exist in this repository, so there was no critical-patterns file to apply.
+Note：本 repo 中不存在 `docs/solutions/patterns/critical-patterns.md`，所以没有 critical-patterns file 可应用。
 
-### External Findings
+### 外部发现
 
-Official docs confirm that the missing targets are not all equivalent, so this cannot be solved with a generic JSON pass-through.
+官方 docs 证实 missing targets 并不等价，因此不能用 generic JSON pass-through 解决。
 
-| Target | Official MCP / skills location | Key notes |
+| Target | 官方 MCP / skills 位置 | 关键备注 |
 | --- | --- | --- |
-| Factory Droid | `~/.factory/mcp.json`, `.factory/mcp.json`, `~/.factory/skills/` | Supports `stdio` and `http`; user config overrides project config. |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json`, `~/.codeium/windsurf/skills/` | Supports `stdio`, Streamable HTTP, and SSE; remote config uses `serverUrl` or `url`. |
-| Kiro | `~/.kiro/settings/mcp.json`, `.kiro/settings/mcp.json`, `~/.kiro/skills/` | Supports user and workspace config; remote MCP support was added after this repo's local Kiro spec was written. |
-| Qwen Code | `~/.qwen/settings.json`, `.qwen/settings.json`, `~/.qwen/skills/`, `.qwen/skills/` | Supports `stdio`, `http`, and `sse`; official docs say prefer `http`, with `sse` treated as legacy/deprecated. |
-| OpenClaw | `~/.openclaw/skills`, `<workspace>/skills`, `~/.openclaw/openclaw.json` | Skills are well-documented; a generic MCP server config surface is not clearly documented in official docs, so MCP sync needs validation before implementation is promised. |
+| Factory Droid | `~/.factory/mcp.json`, `.factory/mcp.json`, `~/.factory/skills/` | 支持 `stdio` 和 `http`；user config 会覆盖 project config。 |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json`, `~/.codeium/windsurf/skills/` | 支持 `stdio`、Streamable HTTP 和 SSE；remote config 使用 `serverUrl` 或 `url`。 |
+| Kiro | `~/.kiro/settings/mcp.json`, `.kiro/settings/mcp.json`, `~/.kiro/skills/` | 支持 user 和 workspace config；remote MCP support 是在本 repo 的 local Kiro spec 写成之后新增的。 |
+| Qwen Code | `~/.qwen/settings.json`, `.qwen/settings.json`, `~/.qwen/skills/`, `.qwen/skills/` | 支持 `stdio`、`http` 和 `sse`；official docs 表示优先使用 `http`，`sse` 被视为 legacy/deprecated。 |
+| OpenClaw | `~/.openclaw/skills`, `<workspace>/skills`, `~/.openclaw/openclaw.json` | Skills 已有清晰文档；generic MCP server config surface 在 official docs 中不够清晰，因此承诺 implementation 前需要验证 MCP sync。 |
 
-Additional important findings:
+其他重要 findings：
 
-- Kiro's current official behavior supersedes the local repo spec that says "workspace only" and "stdio only".
-- Qwen's current docs explicitly distinguish `httpUrl` from legacy SSE `url`; blindly copying Claude's `url` is too lossy.
-- Factory and Windsurf both support remote MCP, so `droid` should no longer be treated as skills-only.
+- Kiro 当前官方行为 supersedes local repo spec 中 "workspace only" 和 "stdio only" 的说法。
+- Qwen 当前 docs 明确区分 `httpUrl` 和 legacy SSE `url`；盲目复制 Claude 的 `url` 过于 lossy。
+- Factory 和 Windsurf 都支持 remote MCP，因此 `droid` 不应继续被视为 skills-only。
 
-## Proposed Solution
+## 方案提议
 
-### Product Decision
+### 产品决策
 
-Treat this as **sync parity for MCP-capable providers**, not as a one-off patch.
+将这项工作视为 **sync parity for MCP-capable providers**，而不是 one-off patch。
 
-That means this feature should:
+也就是说，本 feature 应：
 
-- add missing sync targets where the provider has a documented skills/MCP surface,
-- upgrade partial implementations where existing sync support drops valid Claude MCP data,
-- and replace stale detection metadata so `sync --target all` is truthful again.
+- 为 provider 有 documented skills/MCP surface 的 targets 添加 missing sync targets，
+- upgrade partial implementations，避免 existing sync support drop valid Claude MCP data，
+- 替换 stale detection metadata，让 `sync --target all` 再次 truthful。
 
-### Scope
+### 范围
 
-#### In Scope
+#### 范围内
 
-- Add MCP sync coverage for:
+- 为以下 targets 增加 MCP sync coverage：
   - `droid`
   - `windsurf`
   - `kiro`
   - `qwen`
-- Expand `codex` sync to support remote MCP servers.
-- Add provider detection for newly supported sync targets.
-- Keep skills syncing for all synced targets.
-- Update CLI help text, README sync docs, and tests.
+- 扩展 `codex` sync，支持 remote MCP servers。
+- 为 newly supported sync targets 添加 provider detection。
+- 为所有 synced targets 保持 skills syncing。
+- 更新 CLI help text、README sync docs 和 tests。
 
-#### Conditional / Validation Gate
+#### 有条件 / Validation Gate
 
-- `openclaw` skills sync is straightforward and should be included if the target is added to `sync`.
-- `openclaw` MCP sync should only be implemented if its config surface is validated against current upstream docs or current upstream source. If that validation fails, the feature should explicitly skip OpenClaw MCP sync with a warning rather than inventing a format.
+- `openclaw` skills sync 很直接；如果 target 加入 `sync`，应包含它。
+- `openclaw` MCP sync 只有在 config surface 已通过 current upstream docs 或 current upstream source 验证后才实现。如果验证失败，feature 应明确 skip OpenClaw MCP sync 并 warning，而不是 invent format。
 
-#### Out of Scope
+#### 范围外
 
-- Standardizing all existing sync targets onto user-level paths only.
-- Reworking install/convert output roots.
-- Hook sync.
-- A full rewrite of target writers.
+- 将所有 existing sync targets 标准化到 user-level paths。
+- 重做 install/convert output roots。
+- Hook sync（hook 同步）。
+- 完整 rewrite target writers（重写 target writers）。
 
-### Design Decisions
+### 设计决策
 
-#### 0. Keep existing sync roots stable unless this feature is explicitly adding a new target
+#### 0. 除非本 feature 明确新增 target，否则保持 existing sync roots 稳定
 
-Do not use this feature to migrate existing `copilot` and `gemini` sync behavior.
+不要借此 feature 迁移 existing `copilot` 和 `gemini` sync behavior。
 
-Backward-compatibility rule:
+向后兼容规则：
 
-- existing targets keep their current sync roots unless a correctness bug forces a change,
-- newly added sync targets use the provider's documented personal/global config surface,
-- and any future root migration belongs in a separate plan.
+- existing targets 保持 current sync roots，除非 correctness bug 强制改变，
+- newly added sync targets 使用 provider documented personal/global config surface，
+- future root migration 放到 separate plan。
 
-Planned sync roots after this feature:
+该 feature 完成后的 planned sync roots：
 
-| Target | Sync root | Notes |
+| Target | Sync root | 说明 |
 | --- | --- | --- |
-| `opencode` | `~/.config/opencode` | unchanged |
-| `codex` | `~/.codex` | unchanged |
-| `pi` | `~/.pi/agent` | unchanged |
-| `droid` | `~/.factory` | unchanged root, new MCP file |
-| `copilot` | `.github` | unchanged for backwards compatibility |
-| `gemini` | `.gemini` | unchanged for backwards compatibility |
-| `windsurf` | `~/.codeium/windsurf` | new |
-| `kiro` | `~/.kiro` | new |
-| `qwen` | `~/.qwen` | new |
-| `openclaw` | `~/.openclaw` | new, MCP still validation-gated |
+| `opencode` | `~/.config/opencode` | 不变 |
+| `codex` | `~/.codex` | 不变 |
+| `pi` | `~/.pi/agent` | 不变 |
+| `droid` | `~/.factory` | root 不变，新增 MCP file |
+| `copilot` | `.github` | 为 backward compatibility 保持不变 |
+| `gemini` | `.gemini` | 为 backward compatibility 保持不变 |
+| `windsurf` | `~/.codeium/windsurf` | 新增 |
+| `kiro` | `~/.kiro` | 新增 |
+| `qwen` | `~/.qwen` | 新增 |
+| `openclaw` | `~/.openclaw` | 新增，MCP 仍需 validation gate |
 
-#### 1. Add a dedicated sync target registry
+#### 1. 添加专用 sync target registry
 
-Do not keep growing `sync.ts` as a hand-maintained switch statement.
+不要继续把 `sync.ts` 扩展成 hand-maintained switch statement。
 
-Create a dedicated sync registry, for example:
+创建 dedicated sync registry，例如：
 
-### `src/sync/registry.ts`
+### `src/sync/registry.ts`（sync registry）
 
 ```ts
 import os from "os"
@@ -172,434 +172,434 @@ export type SyncTargetDefinition = {
 }
 ```
 
-This registry becomes the single source of truth for:
+该 registry 成为以下内容的 single source of truth：
 
-- valid `sync` targets,
-- `sync --target all` detection,
-- output root resolution,
-- and dispatch.
+- 有效的 `sync` targets，
+- `sync --target all` detection，
+- output root resolution（输出 root 解析），
+- dispatch（分发）。
 
-This avoids the current drift between:
+这样可以避免当前以下文件之间 drift：
 
 - `src/commands/sync.ts`
 - `src/utils/detect-tools.ts`
 - `README.md`
 
-#### 2. Preserve sync semantics, not writer semantics
+#### 2. 保留 sync semantics，而不是 writer semantics
 
-Do not directly reuse install target writers for sync.
+不要直接复用 install target writers 进行 sync。
 
-Reason:
+原因：
 
-- writers mostly copy skill directories,
-- sync intentionally symlinks skills,
-- writers often emit full plugin/install bundles,
-- sync only needs personal skills plus MCP config.
+- writers 多数 copy skill directories，
+- sync intentional 地 symlink skills，
+- writers 通常 emit full plugin/install bundles，
+- sync 只需要 personal skills 加 MCP config。
 
-However, provider-specific MCP conversion helpers should be extracted or reused where practical so sync and writer logic do not diverge again.
+不过，target-specific MCP conversion helpers 应在 practical 时抽取或复用，避免 sync 和 writer logic 再次 diverge。
 
-#### 3. Keep merge behavior additive, with Claude winning on same-name collisions
+#### 3. 保持 merge behavior additive，同名冲突时 Claude 胜出
 
-For JSON-based targets:
+对 JSON-based targets：
 
-- preserve unrelated user keys,
-- preserve unrelated user MCP servers,
-- but if the same server name exists in Claude and the target config, Claude's value should overwrite that server entry during sync.
+- 保留 unrelated user keys,
+- 保留 unrelated user MCP servers,
+- 但如果 Claude 和 target config 中存在 same server name，sync 时 Claude 的 value 应 overwrite 该 server entry。
 
-Codex remains the special case:
+Codex 保持 special case：
 
-- continue using the managed marker block,
-- remove the previous managed block,
-- rewrite the managed block from Claude,
-- leave the rest of `config.toml` untouched.
+- 继续使用 managed marker block，
+- 移除 previous managed block，
+- 从 Claude 重写 managed block，
+- 保持 `config.toml` 其余内容不变。
 
-#### 4. Secure config writes where secrets may exist
+#### 4. 对可能包含 secrets 的 config writes 做安全写入
 
-Any config file that may contain MCP headers or env vars should be written with restrictive permissions where the platform already supports that pattern.
+任何可能包含 MCP headers 或 env vars 的 config file 都应在平台已有 pattern 支持时用 restrictive permissions 写入。
 
-At minimum:
+至少：
 
 - `config.toml`
 - `mcp.json`
 - `mcp_config.json`
 - `settings.json`
 
-should follow the repo's existing "secure write" conventions where possible.
+应尽可能遵循 repo existing "secure write" conventions。
 
-#### 5. Do not silently coerce ambiguous remote transports
+#### 5. 不要静默转换 ambiguous remote transports
 
-Qwen and possibly future targets distinguish Streamable HTTP from legacy SSE.
+Qwen 和未来 targets 可能区分 Streamable HTTP 与 legacy SSE。
 
-Use this mapping rule:
+使用 mapping rule：
 
-- if Claude explicitly provides `type: "sse"` or an equivalent known signal, map to the target's SSE field,
-- otherwise prefer the target's HTTP form for remote URLs,
-- and log a warning when a target requires more specificity than Claude provides.
+- 如果 Claude 显式提供 `type: "sse"` 或 equivalent known signal，则 map 到 target 的 SSE field，
+- 否则对 remote URLs 优先使用 target 的 HTTP form，
+- 当 target 要求比 Claude 提供更多 specificity 时，log warning。
 
-## Provider Mapping Plan
+## Provider 映射计划
 
-### Existing Targets to Upgrade
+### 需要升级的现有 Targets
 
-#### Codex
+#### Codex（现有 target）
 
-Current issue:
+当前问题：
 
-- only stdio servers are synced.
+- 只 sync stdio servers。
 
-Implementation:
+实现：
 
-- extend `syncToCodex()` so remote MCP servers are serialized into the Codex TOML format, not dropped.
-- keep the existing marker-based idempotent section handling.
+- 扩展 `syncToCodex()`，使 remote MCP servers 被 serialize 到 Codex TOML format，而不是 dropped。
+- 保持 existing marker-based idempotent section handling。
 
-Notes:
+说明：
 
-- This is a correctness fix, not a new target.
+- 这是 correctness fix，不是 new target。
 
-#### Droid / Factory
+#### Droid / Factory（现有 target）
 
-Current issue:
+当前问题：
 
-- skills-only sync despite current official MCP support.
+- 尽管当前官方 MCP support 已存在，sync 仍是 skills-only。
 
-Implementation:
+实现：
 
-- add `src/sync/droid.ts` MCP config writing to `~/.factory/mcp.json`.
-- merge with existing `mcpServers`.
-- support both `stdio` and `http`.
+- 向 `src/sync/droid.ts` 添加 MCP config writing 到 `~/.factory/mcp.json`。
+- 与 existing `mcpServers` merge。
+- 支持 `stdio` 和 `http`。
 
-### New Sync Targets
+### 新 Sync Targets
 
-#### Windsurf
+#### Windsurf（新增 Sync Target）
 
-Add `src/sync/windsurf.ts`:
+添加 `src/sync/windsurf.ts`：
 
-- symlink Claude skills into `~/.codeium/windsurf/skills/`
-- merge MCP servers into `~/.codeium/windsurf/mcp_config.json`
-- support `stdio`, Streamable HTTP, and SSE
-- prefer `serverUrl` for remote HTTP config
-- preserve unrelated existing servers
-- write with secure permissions
+- 将 Claude skills symlink 到 `~/.codeium/windsurf/skills/`
+- 将 MCP servers merge 到 `~/.codeium/windsurf/mcp_config.json`
+- 支持 `stdio`、Streamable HTTP 和 SSE
+- remote HTTP config 优先使用 `serverUrl`
+- 保留 unrelated existing servers
+- 使用 secure permissions 写入
 
-Reference implementation:
+参考实现：
 
 - `src/targets/windsurf.ts:65-92`
 
-#### Kiro
+#### Kiro（新增 Sync Target）
 
-Add `src/sync/kiro.ts`:
+添加 `src/sync/kiro.ts`：
 
-- symlink Claude skills into `~/.kiro/skills/`
-- merge MCP servers into `~/.kiro/settings/mcp.json`
-- support both local and remote MCP servers
-- preserve user config already present in `mcp.json`
+- 将 Claude skills symlink 到 `~/.kiro/skills/`
+- 将 MCP servers merge 到 `~/.kiro/settings/mcp.json`
+- 同时支持 local 和 remote MCP servers
+- 保留 `mcp.json` 中已有的 user config
 
-Important:
+重要：
 
-- This feature must treat the repository's local Kiro spec as stale where it conflicts with official 2025-2026 Kiro docs/blog posts.
+- 当 repository local Kiro spec 与 official 2025-2026 Kiro docs/blog posts 冲突时，本 feature 必须将 local spec 视为 stale。
 
-Reference implementation:
+参考实现：
 
 - `src/targets/kiro.ts:68-91`
 
-#### Qwen
+#### Qwen（新增 Sync Target）
 
-Add `src/sync/qwen.ts`:
+添加 `src/sync/qwen.ts`：
 
-- symlink Claude skills into `~/.qwen/skills/`
-- merge MCP servers into `~/.qwen/settings.json`
-- map stdio directly
-- map remote URLs to `httpUrl` by default
-- only emit legacy SSE `url` when Claude transport clearly indicates SSE
+- 将 Claude skills symlink 到 `~/.qwen/skills/`
+- 将 MCP servers merge 到 `~/.qwen/settings.json`
+- 直接 map stdio
+- 默认将 remote URLs map 到 `httpUrl`
+- 仅当 Claude transport 明确表示 SSE 时 emit legacy SSE `url`
 
-Important:
+重要：
 
-- capture the deprecation note in docs/comments: SSE is legacy, so HTTP is the default remote mapping.
+- 在 docs/comments 中 capture deprecation note：SSE 是 legacy，所以 HTTP 是 default remote mapping。
 
-#### OpenClaw
+#### OpenClaw（新增 Sync Target）
 
-Add `src/sync/openclaw.ts` only if validated during implementation:
+只有在 implementation 期间验证通过时，才添加 `src/sync/openclaw.ts`：
 
-- symlink skills into `~/.openclaw/skills`
-- optionally merge MCP config into `~/.openclaw/openclaw.json` if the official/current upstream contract is confirmed
+- 将 skills symlink 到 `~/.openclaw/skills`
+- 如果 official/current upstream contract 已确认，则可选 merge MCP config into `~/.openclaw/openclaw.json`
 
-Fallback behavior if MCP config cannot be validated:
+如果 MCP config 无法验证，fallback behavior：
 
-- sync skills only,
-- emit a warning that OpenClaw MCP sync is skipped because the official config surface is not documented clearly enough.
+- 只 sync skills，
+- emit warning：OpenClaw MCP sync 被 skip，因为 official config surface 不够清晰。
 
-## Implementation Phases
+## 实施阶段
 
-### Phase 1: Registry and shared helpers
+### 阶段 1：Registry 和 shared helpers
 
-Files:
+文件：
 
 - `src/commands/sync.ts`
 - `src/utils/detect-tools.ts`
-- `src/sync/registry.ts` (new)
+- `src/sync/registry.ts`（new）
 - `src/sync/skills.ts` or `src/utils/symlink.ts` extension
-- optional `src/sync/mcp-merge.ts`
+- 可选 `src/sync/mcp-merge.ts`
 
-Tasks:
+任务：
 
-- move sync target metadata into a single registry
-- make `validTargets` derive from the registry
-- make `sync --target all` use the registry
-- update detection to include supported sync targets instead of stale `cursor`
-- extract a shared helper for validated skill symlinking
+- 将 sync target metadata 移入单一 registry
+- 让 `validTargets` derive from registry
+- 让 `sync --target all` 使用 registry
+- 更新 detection，使其包含 supported sync targets，而不是 stale `cursor`
+- 为 validated skill symlinking 抽取 shared helper
 
-### Phase 2: Upgrade existing partial targets
+### 阶段 2：升级 existing partial targets
 
-Files:
+文件：
 
 - `src/sync/codex.ts`
 - `src/sync/droid.ts`
 - `tests/sync-droid.test.ts`
-- new or expanded `tests/sync-codex.test.ts`
+- 新增或扩展 `tests/sync-codex.test.ts`
 
-Tasks:
+任务：
 
-- add remote MCP support to Codex sync
-- add MCP config writing to Droid sync
-- preserve current skill symlink behavior
+- 为 Codex sync 添加 remote MCP support
+- 为 Droid sync 添加 MCP config writing
+- 保留 current skill symlink behavior
 
-### Phase 3: Add missing sync targets
+### 阶段 3：添加 missing sync targets
 
-Files:
+文件：
 
 - `src/sync/windsurf.ts`
 - `src/sync/kiro.ts`
 - `src/sync/qwen.ts`
-- optionally `src/sync/openclaw.ts`
+- 可选 `src/sync/openclaw.ts`
 - `tests/sync-windsurf.test.ts`
 - `tests/sync-kiro.test.ts`
 - `tests/sync-qwen.test.ts`
-- optionally `tests/sync-openclaw.test.ts`
+- 可选 `tests/sync-openclaw.test.ts`
 
-Tasks:
+任务：
 
-- implement skill symlink + MCP merge for each target
-- align output paths with the target's documented personal config surface
-- secure writes and corrupted-config fallbacks
+- 为每个 target 实现 skill symlink + MCP merge
+- 将 output paths 对齐到 target documented personal config surface
+- secure writes 和 corrupted-config fallbacks
 
-### Phase 4: CLI, docs, and detection parity
+### 阶段 4：CLI、docs 和 detection parity
 
-Files:
+文件：
 
 - `src/commands/sync.ts`
 - `src/utils/detect-tools.ts`
 - `tests/detect-tools.test.ts`
 - `tests/cli.test.ts`
 - `README.md`
-- optionally `docs/specs/kiro.md`
+- 可选 `docs/specs/kiro.md`
 
-Tasks:
+任务：
 
-- update `sync` help text and summary output
-- ensure `sync --target all` only reports real sync-capable tools
-- document newly supported sync targets
-- fix stale Kiro assumptions if repository docs are updated in the same change
+- 更新 `sync` help text 和 summary output
+- 确保 `sync --target all` 只 report real sync-capable tools
+- 记录 newly supported sync targets
+- 如果同一 change 中更新 repository docs，修正 stale Kiro assumptions
 
-## SpecFlow Analysis
+## SpecFlow 分析
 
-### Primary user flows
+### 主要用户流程
 
-#### Flow 1: Explicit sync to one target
+#### Flow 1：显式同步到一个 target
 
-1. User runs `bunx @every-env/compound-plugin sync --target <provider>`
-2. CLI loads `~/.claude/skills` and `~/.claude/settings.json`
-3. CLI resolves that provider's sync root
-4. Skills are symlinked
-5. MCP config is merged
-6. CLI prints the destination path and completion summary
+1. User 运行 `bunx @every-env/compound-plugin sync --target <provider>`
+2. CLI 加载 `~/.claude/skills` 和 `~/.claude/settings.json`
+3. CLI resolve provider 的 sync root
+4. Skills 被 symlinked
+5. MCP config 被 merged
+6. CLI 打印 destination path 和 completion summary
 
-#### Flow 2: Sync to all detected tools
+#### Flow 2：同步到全部检测到的 tools
 
-1. User runs `bunx @every-env/compound-plugin sync`
-2. CLI detects installed/supported tools
-3. CLI prints which tools were found and which were skipped
-4. CLI syncs each detected target in sequence
-5. CLI prints per-target success lines
+1. User 运行 `bunx @every-env/compound-plugin sync`
+2. CLI 检测 installed/supported tools
+3. CLI 打印发现了哪些 tools、跳过了哪些
+4. CLI 按顺序 sync 每个 detected target
+5. CLI 打印 per-target success lines
 
-#### Flow 3: Existing config already present
+#### Flow 3：已存在 config
 
-1. User already has destination config file(s)
-2. Sync reads and parses the existing file
-3. Existing unrelated keys are preserved
-4. Claude MCP entries are merged in
-5. Corrupt config produces a warning and replacement behavior
+1. User 已有 destination config file(s)
+2. Sync 读取并 parse existing file
+3. Existing unrelated keys 被 preserved
+4. Claude MCP entries merge in（合并 Claude MCP entries）
+5. Corrupt config 产生 warning，并触发 replacement behavior
 
-### Edge cases to account for
+### 需要考虑的边界情况
 
-- Claude has zero MCP servers: skills still sync, no config file is written.
-- Claude has remote MCP servers: targets that support remote config receive them; unsupported transports warn, not crash.
-- Existing target config is invalid JSON/TOML: warn and replace the managed portion.
-- Skill name contains path traversal characters: skip with warning, same as current behavior.
-- Real directory already exists where a symlink would go: skip safely, do not delete user data.
-- `sync --target all` detects a tool with skills support but unclear MCP support: sync only the documented subset and warn explicitly.
+- Claude 有零 MCP servers：skills 仍 sync，不写 config file。
+- Claude 有 remote MCP servers：支持 remote config 的 targets 接收它们；unsupported transports 会 warn，不 crash。
+- Existing target config 是 invalid JSON/TOML：warn 并替换 managed portion。
+- Skill name 包含 path traversal characters：skip with warning，与 current behavior 相同。
+- symlink 目标位置已存在 real directory：safe skip，不删除 user data。
+- `sync --target all` 检测到有 skills support 但 MCP support 不清楚的 tool：只 sync documented subset，并 explicit warn。
 
-### Critical product decisions already assumed
+### 已经假设的关键产品决策
 
-- `sync` remains additive and non-destructive.
-- Sync roots may differ from install roots when the provider has a documented personal config location.
-- OpenClaw MCP support is validation-gated rather than assumed.
+- `sync` 保持 additive and non-destructive。
+- 当 provider 有 documented personal config location 时，sync roots 可以不同于 install roots。
+- OpenClaw MCP support 是 validation-gated，而不是 assumed。
 
-## Acceptance Criteria
+## 验收标准
 
-### Functional Requirements
+### 功能需求
 
-- [x] `sync --target` accepts `windsurf`, `kiro`, and `qwen`, in addition to the existing targets.
-- [x] `sync --target droid` writes MCP servers to Factory's documented `mcp.json` format instead of remaining skills-only.
-- [x] `sync --target codex` syncs both stdio and remote MCP servers.
-- [x] `sync --target all` detects only sync-capable supported tools and includes the new targets.
-- [x] Claude personal skills continue to be symlinked, not copied.
-- [x] Existing destination config keys unrelated to MCP are preserved during merge.
-- [x] Existing same-named MCP entries are refreshed from Claude for sync-managed targets.
-- [x] Unsafe skill names are skipped without deleting user content.
-- [x] If OpenClaw MCP sync is not validated, the CLI warns and skips MCP sync for OpenClaw instead of writing an invented format.
+- [x] `sync --target` 接受 `windsurf`、`kiro` 和 `qwen`，以及 existing targets。
+- [x] `sync --target droid` 将 MCP servers 写入 Factory documented `mcp.json` format，而不是保持 skills-only。
+- [x] `sync --target codex` 同步 stdio 和 remote MCP servers。
+- [x] `sync --target all` 只检测 sync-capable supported tools，并包含 new targets。
+- [x] Claude personal skills 继续 symlinked，而不是 copied。
+- [x] Merge 期间保留 existing destination config keys 中与 MCP 无关的内容。
+- [x] Existing same-named MCP entries 对 sync-managed targets 从 Claude refresh。
+- [x] Unsafe skill names 被 skipped，不删除 user content。
+- [x] 如果 OpenClaw MCP sync 未验证，CLI warn 并 skip OpenClaw MCP sync，而不是写 invented format。
 
-### Non-Functional Requirements
+### 非功能需求
 
-- [x] MCP config files that may contain secrets are written with restrictive permissions where supported.
-- [x] Corrupt destination config files warn and recover cleanly.
-- [x] New sync code does not duplicate target detection metadata in multiple places.
-- [x] Remote transport mapping is explicit and tested, especially for Qwen and Codex.
+- [x] 可能包含 secrets 的 MCP config files 在 supported 时以 restrictive permissions 写入。
+- [x] Corrupt destination config files 会 warn 并 cleanly recover。
+- [x] New sync code 不在多个位置 duplicate target detection metadata。
+- [x] Remote transport mapping explicit and tested，尤其是 Qwen 和 Codex。
 
-### Quality Gates
+### Quality gates（质量门）
 
-- [x] Add target-level sync tests for every new or upgraded provider.
-- [x] Update `tests/detect-tools.test.ts` for new detection rules and remove stale cursor expectations.
-- [x] Add or expand CLI coverage for `sync --target all`.
-- [x] `bun test` passes.
+- [x] 为每个 new or upgraded provider 添加 target-level sync tests。
+- [x] 更新 `tests/detect-tools.test.ts`，覆盖 new detection rules 并移除 stale cursor expectations。
+- [x] 添加或扩展 `sync --target all` 的 CLI coverage。
+- [x] `bun test` passes（通过）。
 
-## Testing Plan
+## 测试计划
 
-### Unit / integration tests
+### Unit / integration tests（单元 / 集成测试）
 
-Add or expand:
+新增或扩展：
 
 - `tests/sync-codex.test.ts`
-  - remote URL server is emitted
-  - existing non-managed TOML content is preserved
+  - remote URL server 被 emitted（输出 remote URL server）
+  - existing non-managed TOML content 被 preserved（保留现有非 managed TOML 内容）
 - `tests/sync-droid.test.ts`
-  - writes `mcp.json`
-  - merges with existing file
+  - 写入 `mcp.json`
+  - 与 existing file merge
 - `tests/sync-windsurf.test.ts`
-  - writes `mcp_config.json`
-  - merges existing servers
-  - preserves HTTP/SSE fields
+  - 写入 `mcp_config.json`
+- merge existing servers（合并已有 servers）
+- preserve HTTP/SSE fields（保留 HTTP/SSE fields）
 - `tests/sync-kiro.test.ts`
-  - writes `settings/mcp.json`
-  - supports user-scope root
-  - preserves remote servers
+  - 写入 `settings/mcp.json`
+  - 支持 user-scope root
+- preserve remote servers（保留 remote servers）
 - `tests/sync-qwen.test.ts`
-  - writes `settings.json`
-  - maps remote servers to `httpUrl`
-  - emits legacy SSE only when explicitly indicated
-- `tests/sync-openclaw.test.ts` if implemented
-  - skills path
-  - MCP behavior or explicit skip warning
+  - 写入 `settings.json`
+  - 将 remote servers map 到 `httpUrl`
+  - 仅在明确指示时 emit legacy SSE
+- 如果实现，则添加 `tests/sync-openclaw.test.ts`
+- skills path（skills 路径）
+  - MCP behavior 或 explicit skip warning
 
-### CLI tests
+### CLI tests（CLI 测试）
 
-Expand `tests/cli.test.ts` or add focused sync CLI coverage for:
+扩展 `tests/cli.test.ts`，或添加 focused sync CLI coverage：
 
 - `sync --target windsurf`
 - `sync --target kiro`
 - `sync --target qwen`
-- `sync --target all` with detected new tool homes
-- `sync --target all` no longer surfacing unsupported `cursor`
+- `sync --target all` 搭配 detected new tool homes
+- `sync --target all` 不再 surface unsupported `cursor`
 
-## Risks and Mitigations
+## 风险与缓解
 
-### Risk: local specs are stale relative to current provider docs
+### 风险：local specs 相比 current provider docs 已过期
 
-Impact:
+影响：
 
-- implementing from local docs alone would produce incorrect paths and transport support.
+- 只按 local docs implementation 会产出错误 paths 和 transport support。
 
-Mitigation:
+缓解：
 
-- treat official 2025-2026 docs/blog posts as source of truth where they supersede local specs
-- update any obviously stale repo docs touched by this feature
+- 当 official 2025-2026 docs/blog posts supersede local specs 时，以 official docs 为 source of truth
+- 更新该 feature 触及的明显 stale repo docs
 
-### Risk: transport ambiguity for remote MCP servers
+### 风险：remote MCP servers 的 transport ambiguity
 
-Impact:
+影响：
 
-- a Claude `url` may map incorrectly for targets that distinguish HTTP vs SSE.
+- Claude `url` 可能在区分 HTTP vs SSE 的 targets 上 map 错。
 
-Mitigation:
+缓解：
 
-- prefer HTTP where the target recommends it
-- only emit legacy SSE when Claude transport is explicit
-- warn when mapping is lossy
+- target 推荐时优先 HTTP
+- 只有 Claude transport 显式时 emit legacy SSE
+- lossy mapping 时 warn
 
-### Risk: OpenClaw MCP surface is not sufficiently documented
+### 风险：OpenClaw MCP surface 文档不足
 
-Impact:
+影响：
 
-- writing a guessed MCP config could create a broken or misleading feature.
+- 写 guessed MCP config 会创建 broken 或 misleading feature。
 
-Mitigation:
+缓解：
 
-- validation gate during implementation
-- if validation fails, ship OpenClaw skills sync only and document MCP as a follow-up
+- implementation 期间 validation gate
+- 若 validation fails，则 ship OpenClaw skills sync only，并将 MCP 记录为 follow-up
 
-### Risk: `sync --target all` remains easy to drift out of sync again
+### 风险：`sync --target all` 仍容易再次 drift
 
-Impact:
+影响：
 
-- future providers get added to install/convert but missed by sync.
+- future providers 被加进 install/convert，但 sync 继续漏掉。
 
-Mitigation:
+缓解：
 
-- derive sync valid targets and detection from a shared registry
-- add tests that assert detection and sync target lists match expected supported names
+- 从 shared registry derive sync valid targets 和 detection
+- 添加 tests，assert detection 和 sync target lists match expected supported names
 
-## Alternative Approaches Considered
+## 考虑过的替代方案
 
-### 1. Just add more cases to `sync.ts`
+### 1. 只向 `sync.ts` 添加更多 cases
 
-Rejected:
+拒绝原因：
 
-- this is exactly how the current drift happened.
+- 当前 drift 正是这样发生的。
 
-### 2. Reuse target writers directly
+### 2. 直接复用 target writers
 
-Rejected:
+拒绝原因：
 
-- writers copy directories and emit install bundles;
-- sync must symlink skills and only manage personal config subsets.
+- writers copy directories and emit install bundles（writers 会复制目录并输出 install bundles）；
+- sync 必须 symlink skills，并且只 manage personal config subsets（管理 personal config 子集）。
 
-### 3. Standardize every sync target on user-level output now
+### 3. 现在就将每个 sync target 标准化到 user-level output
 
-Rejected for this feature:
+本 feature 拒绝原因：
 
-- it would change existing `gemini` and `copilot` behavior and broaden scope into a migration project.
+- 这会改变 existing `gemini` 和 `copilot` behavior，并将 scope 扩大成 migration project。
 
-## Documentation Plan
+## 文档计划
 
-- Update `README.md` sync section to list all supported sync targets and call out any exceptions.
-- Update sync examples for `windsurf`, `kiro`, and `qwen`.
-- If OpenClaw MCP is skipped, document that explicitly.
-- If repository specs are corrected during implementation, update `docs/specs/kiro.md` to match official current behavior.
+- 更新 `README.md` sync section，列出所有 supported sync targets，并 call out exceptions。
+- 更新 `windsurf`、`kiro` 和 `qwen` 的 sync examples。
+- 如果 OpenClaw MCP 被 skipped，明确记录。
+- 如果 implementation 期间修正 repository specs，更新 `docs/specs/kiro.md` 以匹配 official current behavior。
 
-## Success Metrics
+## 成功指标
 
-- `sync --target all` covers the same provider surface users reasonably expect from the current CLI, excluding only targets that lack a validated MCP config contract.
-- A Claude config with one stdio server and one remote server syncs correctly to every documented MCP-capable provider.
-- No user data is deleted during sync.
-- Documentation and CLI help no longer over-promise relative to actual behavior.
+- `sync --target all` 覆盖 users 从 current CLI 中合理期待的 provider surface，只排除缺少 validated MCP config contract 的 targets。
+- 包含一个 stdio server 和一个 remote server 的 Claude config 可以正确 sync 到每个 documented MCP-capable provider。
+- Sync 期间不删除 user data。
+- Documentation 和 CLI help 不再相对实际 behavior over-promise。
 
-## AI Pairing Notes
+## AI pairing notes（AI pairing 备注）
 
-- Treat official provider docs as authoritative over older local notes, especially for Kiro and Qwen transport handling.
-- Have a human review any AI-generated MCP mapping code before merge because these config files may contain secrets and lossy transport assumptions are easy to miss.
-- When using an implementation agent, keep the work split by target so each provider's config contract can be tested independently.
+- 将 official provider docs 视为比 older local notes 更 authoritative，尤其是 Kiro 和 Qwen transport handling。
+- AI-generated MCP mapping code merge 前应由 human review，因为这些 config files 可能包含 secrets，lossy transport assumptions 很容易漏掉。
+- 使用 implementation agent 时，按 target split work，让每个 provider 的 config contract 可独立测试。
 
-## References & Research
+## 参考与调研
 
-### Internal References
+### 内部参考
 
 - `src/commands/sync.ts:15-125`
 - `src/utils/detect-tools.ts:11-46`
@@ -614,26 +614,26 @@ Rejected for this feature:
 - `docs/solutions/adding-converter-target-providers.md:208-214`
 - `README.md:89-123`
 
-### External References
+### 外部参考
 
-- Factory MCP docs: https://docs.factory.ai/factory-cli/configuration/mcp
-- Factory skills docs: https://docs.factory.ai/cli/configuration/skills
-- Windsurf MCP docs: https://docs.windsurf.com/windsurf/cascade/mcp
-- Kiro MCP overview: https://kiro.dev/blog/unlock-your-development-productivity-with-kiro-and-mcp/
-- Kiro remote MCP support: https://kiro.dev/blog/introducing-remote-mcp/
-- Kiro skills announcement: https://kiro.dev/blog/custom-subagents-skills-and-enterprise-controls/
-- Qwen settings docs: https://qwenlm.github.io/qwen-code-docs/en/users/configuration/settings/
-- Qwen MCP docs: https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp/
-- Qwen skills docs: https://qwenlm.github.io/qwen-code-docs/zh/users/features/skills/
-- OpenClaw setup/config docs: https://docs.openclaw.ai/start/setup
-- OpenClaw skills docs: https://docs.openclaw.ai/skills
+- Factory MCP docs（Factory MCP 文档）：https://docs.factory.ai/factory-cli/configuration/mcp
+- Factory skills docs（Factory skills 文档）：https://docs.factory.ai/cli/configuration/skills
+- Windsurf MCP docs（Windsurf MCP 文档）：https://docs.windsurf.com/windsurf/cascade/mcp
+- Kiro MCP overview（Kiro MCP 概览）：https://kiro.dev/blog/unlock-your-development-productivity-with-kiro-and-mcp/
+- Kiro remote MCP support（Kiro remote MCP 支持）：https://kiro.dev/blog/introducing-remote-mcp/
+- Kiro skills announcement（Kiro skills 公告）：https://kiro.dev/blog/custom-subagents-skills-and-enterprise-controls/
+- Qwen settings docs（Qwen settings 文档）：https://qwenlm.github.io/qwen-code-docs/en/users/configuration/settings/
+- Qwen MCP docs（Qwen MCP 文档）：https://qwenlm.github.io/qwen-code-docs/en/users/features/mcp/
+- Qwen skills docs（Qwen skills 文档）：https://qwenlm.github.io/qwen-code-docs/zh/users/features/skills/
+- OpenClaw setup/config docs（OpenClaw setup/config 文档）：https://docs.openclaw.ai/start/setup
+- OpenClaw skills docs（OpenClaw skills 文档）：https://docs.openclaw.ai/skills
 
-## Implementation Notes for the Follow-Up `/workflows-work` Step
+## 后续 `/workflows-work` Step 的实施说明
 
-Suggested implementation order:
+建议 implementation order（实施顺序）：
 
-1. registry + detection cleanup
-2. codex remote MCP + droid MCP
-3. windsurf + kiro + qwen sync modules
-4. openclaw validation and implementation or explicit warning path
-5. docs + tests
+1. registry + detection cleanup（registry 与 detection 清理）
+2. Codex remote MCP + Droid MCP（Codex remote MCP 与 Droid MCP）
+3. Windsurf + Kiro + Qwen sync modules（Windsurf、Kiro、Qwen sync modules）
+4. OpenClaw validation and implementation or explicit warning path（OpenClaw 验证后实现，或走明确 warning 路径）
+5. docs + tests（文档与测试）

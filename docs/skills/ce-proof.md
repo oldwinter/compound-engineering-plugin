@@ -1,138 +1,139 @@
 # `ce-proof`
 
-> Create, share, view, comment on, and run human-in-the-loop review loops over markdown documents via [Proof](https://www.proofeditor.ai), Every's collaborative markdown editor.
+> 通过 [Proof](https://www.proofeditor.ai) 创建、分享、查看、评论 markdown documents，并运行 human-in-the-loop review loops。Proof 是 Every 的 collaborative markdown editor。
 
-`ce-proof` is the **collaborative-doc** skill. Proof is a real-time markdown editor where humans and agents both work on the same document — the user annotates with comments and suggestions in their browser; the agent ingests those threads, applies agreed edits, and replies in place. The skill exposes both Proof's web API (no install; create, read, edit shared docs via HTTP) and the local bridge (drives the macOS Proof app at `localhost:9847`). Most chain skills use it for HITL review handoffs.
+`ce-proof` 是 **collaborative-doc** skill。Proof 是实时 markdown editor，humans 和 agents 在同一 document 上协作：用户在浏览器中用 comments 和 suggestions annotation；agent ingest 这些 threads，应用 agreed edits，并原地 reply。Skill 暴露 Proof 的 web API（无需安装；通过 HTTP create、read、edit shared docs）和 local bridge（驱动 `localhost:9847` 上的 macOS Proof app）。大多数 chain skills 用它做 HITL review handoffs。
 
-The most common use is **HITL review mode**: upload a local markdown file (a brainstorm, a plan, a learning), let the user annotate in Proof's UI, ingest each comment thread, apply agreed edits, then sync the reviewed doc back to disk atomically.
+最常见用法是 **HITL review mode**：上传 local markdown file（brainstorm、plan、learning），让用户在 Proof UI 中 annotate，ingest 每个 comment thread，应用 agreed edits，然后把 reviewed doc atomically sync 回磁盘。
 
 ---
 
 ## TL;DR
 
-| Question | Answer |
+| 问题 | 回答 |
 |----------|--------|
-| What does it do? | Uploads markdown to Proof, lets the user comment / suggest in the web UI, ingests feedback as in-thread replies and agreed edits, syncs the reviewed doc back to local |
-| When to use it | "Share to Proof", "view this in Proof", "HITL this doc with me", "iterate with Proof on this draft"; auto-invoked on `ce-brainstorm` / `ce-plan` / `ce-ideate` HITL handoffs |
-| What it produces | A shareable Proof URL, an iterative review loop, and (when the source is a local file) a synced markdown file with the user's edits |
-| Two layers | Web API (HTTP, no install) and Local Bridge (drives macOS Proof app) |
+| 它做什么？ | 上传 markdown 到 Proof，让用户在 web UI comment / suggest，ingest feedback 作为 in-thread replies 和 agreed edits，并把 reviewed doc sync 回 local |
+| 何时使用 | "Share to Proof"、"view this in Proof"、"HITL this doc with me"、"iterate with Proof on this draft"；`ce-brainstorm` / `ce-plan` / `ce-ideate` HITL handoffs 会 auto-invoke |
+| 产出什么 | Shareable Proof URL、iterative review loop，以及（source 是 local file 时）带用户 edits 的 synced markdown file |
+| 两层能力 | Web API（HTTP，无需安装）和 Local Bridge（驱动 macOS Proof app） |
 
 ---
 
-## The Problem
+## 问题
 
-Reviewing markdown drafts collaboratively is harder than it looks:
+Collaboratively review markdown drafts 比看起来更难：
 
-- **Chat is the wrong surface** — pasting a 2,000-line plan into chat for "feedback" loses the structure
-- **Pasting comments is lossy** — "see the bullet on line 47" doesn't anchor; a week later nobody remembers what bullet
-- **Tracked changes need infrastructure** — "suggest this edit" is meaningful only when there's a real accept/reject affordance
-- **Identity drifts** — when an agent edits, who edited? Without consistent attribution, comment authorship in the rendered doc is wrong
-- **State management is fragile** — concurrent edits collide; mutations need base tokens; retry logic is full of footguns
-- **PII / secrets in transit** — uploading content to a third-party editor is a real concern; the user needs to know what's leaving local
+- **Chat is the wrong surface**：把 2,000 行 plan 粘进 chat 要 "feedback" 会丢掉 structure
+- **Pasting comments is lossy**："see the bullet on line 47" 不 anchor；一周后没人记得是哪条 bullet
+- **Tracked changes need infrastructure**："suggest this edit" 只有在真实 accept/reject affordance 存在时才有意义
+- **Identity drifts**：agent edit 时是谁改的？没有 consistent attribution，rendered doc 中的 comment authorship 会错
+- **State management is fragile**：concurrent edits 会 collide；mutations 需要 base tokens；retry logic 充满 footguns
+- **PII / secrets in transit**：上传内容到 third-party editor 是真实 concern；用户需要知道什么离开 local
 
-## The Solution
+## 方案
 
-`ce-proof` runs collaboration through Proof's structured API:
+`ce-proof` 通过 Proof 的 structured API 运行 collaboration：
 
-- **Web API** for shared docs — no install needed; create, read, edit via HTTP; user gets a shareable URL with an access token
-- **Direct shared-link reads** — agents can fetch Proof URLs with `Accept: application/json` or `Accept: text/markdown`, no browser automation needed
-- **Local Bridge** when the macOS Proof app is running — drives the open document directly via `localhost:9847`
-- **HITL review mode** as the primary chain integration — atomic upload + iterative ingest + atomic end-sync to disk
-- **Consistent identity** — `by: "ai:compound-engineering"` on every op; `name: "Compound Engineering"` bound once via `/presence`
-- **Efficient ingest passes** — filtered comment reads, one block-edit batch for content changes, one comment batch for replies/resolutions
-- **Rewrite-last edit strategy** — exact replacements and block edits first; whole-doc replacement only when truly unavoidable
-- **`baseToken` discipline** — seed from a read, chain the next token from mutation responses; on `STALE_BASE` re-read and retry once; verify before retry on potentially-applied mutations
-- **Idempotency keys** for safe exact-request retries without duplicate writes
+- **Web API** 用于 shared docs：无需安装；通过 HTTP create、read、edit；用户获得带 access token 的 shareable URL
+- **Direct shared-link reads**：agents 可用 `Accept: application/json` 或 `Accept: text/markdown` fetch Proof URLs，无需 browser automation
+- **Local Bridge** 用于 macOS Proof app 正在运行时：通过 `localhost:9847` 直接驱动 open document
+- **HITL review mode** 作为 primary chain integration：atomic upload + iterative ingest + atomic end-sync to disk
+- **Consistent identity**：每个 op 都使用 `by: "ai:compound-engineering"`；通过 `/presence` 一次性绑定 `name: "Compound Engineering"`
+- **Efficient ingest passes**：filtered comment reads，一个 block-edit batch 处理 content changes，一个 comment batch 处理 replies/resolutions
+- **Rewrite-last edit strategy**：先用 exact replacements 和 block edits；只有真正无法避免时才 whole-doc replacement
+- **`baseToken` discipline**：从 read seed token，从 mutation responses chain next token；遇到 `STALE_BASE` 时 re-read 并 retry once；对 potentially-applied mutations retry 前先 verify
+- **Idempotency keys**：安全重试 exact requests，避免 duplicate writes
 
 ---
 
-## What Makes It Novel
+## 独特之处
 
-### 1. Web API + Local Bridge — both supported, same identity model
+### 1. Web API + Local Bridge：同时支持，identity model 一致
 
-Proof exposes two surfaces:
+Proof 暴露两个 surfaces：
 
-- **Web API** at `proofeditor.ai` — anyone with the share URL can read/edit; great for shared review
-- **Local Bridge** at `localhost:9847` — drives the open Proof.app on macOS directly; great for one-machine workflows
+- **Web API**（位于 `proofeditor.ai`）：拥有 share URL 的任何人都可 read/edit；适合 shared review
+- **Local Bridge**（位于 `localhost:9847`）：直接驱动 macOS 上打开的 Proof.app；适合 one-machine workflows
 
-The skill documents both. Identity stays consistent: `ai:compound-engineering` machine ID, `Compound Engineering` display name. Callers running HITL review in different sub-agent contexts can override the identity pair if a distinct sub-agent should own the doc.
+Skill 两者都记录。Identity 保持一致：`ai:compound-engineering` machine ID，`Compound Engineering` display name。运行 HITL review 的 callers 如果在不同 sub-agent contexts 中，可 override identity pair，让 distinct sub-agent own 该 doc。
 
-### 2. HITL review as a structured mode
+### 2. HITL review as a structured mode（结构化 HITL review）
 
-The Human-in-the-Loop Review path (loaded from `references/hitl-review.md`) is the chain's primary use case:
+Human-in-the-Loop Review path（从 `references/hitl-review.md` 加载）是 chain 的 primary use case：
 
-- Upload a local markdown file to Proof; user gets a URL
-- User annotates in Proof's web UI (comments, suggested edits)
-- Skill ingests the threads — reads filtered comment state, applies agreed edits with `/edit/v2`, replies in-thread, and resolves handled threads in a batched comment mutation
-- On end-sync, syncs the final markdown back to the local file **atomically** (write to temp sibling, then `mv`)
+- 上传 local markdown file 到 Proof；用户获得 URL
+- 用户在 Proof web UI 中 annotate（comments、suggested edits）
+- Skill ingest threads：读取 filtered comment state，用 `/edit/v2` 应用 agreed edits，in-thread reply，并通过 batched comment mutation resolve handled threads
+- End-sync 时，将 final markdown **atomically** sync 回 local file（写入 temp sibling，再 `mv`）
 
-Two entry points, identical mechanics:
-- **Direct user request** — bare phrase like "share this to proof so we can iterate" or "HITL this doc"
-- **Upstream skill handoff** — `ce-brainstorm` / `ce-ideate` / `ce-plan` finishes a draft and passes it for review
+两个 entry points，机制相同：
 
-### 3. Mutation discipline — token chaining + verify-before-retry
+- **Direct user request**：例如 "share this to proof so we can iterate" 或 "HITL this doc"
+- **Upstream skill handoff**：`ce-brainstorm` / `ce-ideate` / `ce-plan` 完成 draft 后传给它 review
 
-Every Proof mutation requires a `baseToken`. The skill teaches the right pattern:
+### 3. Mutation discipline：token chaining 与 retry 前验证
 
-- **Read once, chain tokens** — seed from `/state` or `/snapshot`, then reuse the next `mutationBase.token` returned by successful mutations
-- **On `STALE_BASE` / `BASE_TOKEN_REQUIRED` / `MISSING_BASE` / `INVALID_BASE_TOKEN`** — re-read `/state`, rebuild the body with a fresh token, retry once with a new idempotency key
-- **On `INVALID_OPERATIONS` / `INVALID_REQUEST` / 422 errors** — fix the payload first, don't retry blindly
-- **On `COLLAB_SYNC_FAILED` / 5xx / network timeout / `202 with collab.status: "pending"`** — the canonical doc *may* have been written; re-read `/state` and check whether the intended mark/edit is already present **before retrying**
-- **`Idempotency-Key`** is recommended on every mutation; required when contract demands it. Reuse the same key only for an exact same-body resend; if the body changes (including a fresh `baseToken`), mint a new key
+每个 Proof mutation 都需要 `baseToken`。Skill 教授正确 pattern：
 
-> Duplicate-mark incidents usually come from retrying a `comment.add` or `suggestion.add` after a timeout without verifying. When in doubt: re-read, diff, then decide.
+- **Read once, chain tokens**：从 `/state` 或 `/snapshot` seed，然后复用 successful mutations 返回的 next `mutationBase.token`
+- **遇到 `STALE_BASE` / `BASE_TOKEN_REQUIRED` / `MISSING_BASE` / `INVALID_BASE_TOKEN`**：re-read `/state`，用 fresh token 重建 body，mint new idempotency key 后 retry once
+- **遇到 `INVALID_OPERATIONS` / `INVALID_REQUEST` / 422 errors**：先修 payload，不要 blind retry
+- **遇到 `COLLAB_SYNC_FAILED` / 5xx / network timeout / `202 with collab.status: "pending"`**：canonical doc *可能* 已写入；retry 前 re-read `/state`，检查 intended mark/edit 是否已存在
+- **`Idempotency-Key`** 推荐用于每个 mutation；contract 要求时必须使用。只有 exact same-body resend 才复用同一个 key；如果 body 改变（包括 fresh `baseToken`），就 mint new key
 
-### 4. Two endpoint shapes — `/ops` and `/edit/v2`
+> Duplicate-mark incidents 通常来自 timeout 后未 verify 就 retry `comment.add` 或 `suggestion.add`。不确定时：re-read、diff，然后再决定。
 
-Proof has two write surfaces with **load-bearing differences** the skill teaches:
+### 4. 两种 endpoint shape：`/ops` 和 `/edit/v2`
 
-- **`/api/agent/{slug}/ops`** — top-level `type` for one mark op, or top-level `operations` for batched comment thread mutations. Best for comments, suggestions, replies, and resolves.
-- **`/api/agent/{slug}/edit/v2`** — `operations` array where each entry has `op`. Atomic batch — every op lands or none. Best for block-level edits and bulk sweeps (`replace_block`, `insert_after`, `find_replace_in_doc`, etc.)
+Proof 有两个 write surfaces，且 **差异很关键**：
 
-Sending an `op`-shaped operation to `/ops` returns 422; the wire format isn't interchangeable. The skill documents both.
+- **`/api/agent/{slug}/ops`**：top-level `type` 用于单个 mark op，或 top-level `operations` 用于 batched comment thread mutations。最适合 comments、suggestions、replies 和 resolves。
+- **`/api/agent/{slug}/edit/v2`**：`operations` array，其中每项有 `op`。Atomic batch：全部落地或全部不落地。最适合 block-level edits 和 bulk sweeps（`replace_block`、`insert_after`、`find_replace_in_doc` 等）。
 
-### 5. Fast HITL passes — edit batch, then comment batch
+把 `op` shape operation 发给 `/ops` 会返回 422；wire format 不可互换。Skill 明确记录两者。
 
-For normal HITL feedback, the comment thread is the audit trail. The efficient pass shape is:
+### 5. 快速 HITL passes：先 edit batch，再 comment batch
 
-- Read `GET /state?kinds=comment` so provenance/authorship marks never pollute the needs-reply list
-- Apply agreed content edits with one `/edit/v2` batch where possible
-- Use `find_replace_in_doc` for literal doc-wide replacements such as terminology or punctuation sweeps
-- Reply to and resolve handled threads in one `/ops` batch using `comment.reply` with `resolve: true`
+对普通 HITL feedback，comment thread 是 audit trail。高效 pass shape 是：
 
-This turns an 8-comment review from dozens of sequential reply/resolve/state-read requests into a small number of authoritative mutations.
+- 读取 `GET /state?kinds=comment`，让 provenance/authorship marks 不污染 needs-reply list
+- 尽可能用一个 `/edit/v2` batch 应用 agreed content edits
+- 对 terminology 或 punctuation sweeps 等 literal doc-wide replacements 使用 `find_replace_in_doc`
+- 用一个 `/ops` batch 通过 `comment.reply` + `resolve: true` reply 并 resolve handled threads
 
-### 6. Rewrite Is The Last Resort
+这样 8-comment review 可从 dozens of sequential reply/resolve/state-read requests 变成少量 authoritative mutations。
 
-Agents should not start by replacing the full document. The preferred edit ladder is:
+### 6. Rewrite 是最后手段
 
-- `find_replace_in_doc` for exact repeated substitutions
-- `/edit/v2` block operations for known paragraphs, list items, sections, insertions, and deletions
-- `suggestion.add` when visible track changes are the desired review surface
-- `rewrite.apply` only when the user explicitly wants a whole-doc replacement or the change cannot be expressed safely with narrower operations
+Agents 不应从 replacing full document 开始。推荐 edit ladder：
 
-That keeps human comments stable, avoids clobbering live collaborators, and makes retries easier to reason about.
+- `find_replace_in_doc` 用于 exact repeated substitutions
+- `/edit/v2` block operations 用于 known paragraphs、list items、sections、insertions 和 deletions
+- 当 visible track changes 是 desired review surface 时使用 `suggestion.add`
+- 只有用户明确要求 whole-doc replacement，或 change 无法用更窄 operations 安全表达时，才用 `rewrite.apply`
 
-### 7. Tracked suggestion with `status: "accepted"`
+这能保持 human comments 稳定，避免 clobber live collaborators，并让 retries 更容易推理。
 
-`suggestion.add` defaults to creating a pending suggestion the user must accept/reject. The skill also exposes `status: "accepted"` — creates the suggestion mark **and** commits the change in one call. The mark persists as audit trail with per-edit attribution; the user can still reject to revert. Useful when the agent is confident and the user wants to see what landed without an explicit accept step.
+### 7. 使用 `status: "accepted"` 的 tracked suggestion
 
-The HITL default is now `/edit/v2` plus an in-thread reply; use accepted suggestions when a visible track-change mark is itself part of the desired review experience.
+`suggestion.add` 默认创建 pending suggestion，需要用户 accept/reject。Skill 也暴露 `status: "accepted"`：一次调用同时创建 suggestion mark **并** commit change。Mark 作为 audit trail 保留，带 per-edit attribution；用户仍可 reject 来 revert。当 agent 自信且用户想看到 landed 内容而不做 explicit accept step 时很有用。
 
-### 8. `LIVE_CLIENTS_PRESENT` awareness
+HITL default 现在是 `/edit/v2` 加 in-thread reply；当 visible track-change mark 本身是 desired review experience 的一部分时，使用 accepted suggestions。
 
-While a client is connected to a Proof doc, the skill knows what's safe:
+### 8. `LIVE_CLIENTS_PRESENT` 感知
 
-- **`/edit/v2`** — works during active collab
-- **`suggestion.add`** (including `status: "accepted"`) — works during active collab
-- **All comment ops** — work during active collab
-- **`rewrite.apply`** — blocked by `LIVE_CLIENTS_PRESENT`; would clobber in-flight Yjs edits
+当 client 连接到 Proof doc 时，skill 知道哪些安全：
 
-The skill tells callers to reserve `rewrite.apply` for no-client scenarios and use the granular ops or `/edit/v2` during active sessions.
+- **`/edit/v2`**：active collab 时可用
+- **`suggestion.add`**（包括 `status: "accepted"`）：active collab 时可用
+- **All comment ops**：active collab 时可用
+- **`rewrite.apply`**：被 `LIVE_CLIENTS_PRESENT` 阻止，因为会 clobber in-flight Yjs edits
 
-### 9. Atomic end-sync to local file
+Skill 告诉 callers 把 `rewrite.apply` 留给 no-client scenarios；active sessions 中使用 granular ops 或 `/edit/v2`。
 
-When the source was a local markdown file, end-sync writes the reviewed Proof state back to disk **atomically**:
+### 9. 原子 end-sync 回 local file
+
+当 source 是 local markdown file 时，end-sync 会把 reviewed Proof state **atomically** 写回磁盘：
 
 ```bash
 # Stream .markdown bytes directly to a temp sibling, then rename.
@@ -140,131 +141,133 @@ TMP="${LOCAL}.proof-sync.$$"
 jq -jr '.markdown' "$STATE_TMP" > "$TMP" && mv "$TMP" "$LOCAL"
 ```
 
-`jq -jr` (no trailing newline, raw string) preserves byte-for-byte content including trailing newlines. `mv` within the same filesystem is atomic — a crashed write leaves the original untouched, never half-written.
+`jq -jr`（无 trailing newline，raw string）保留 byte-for-byte content，包括 trailing newlines。同一 filesystem 内 `mv` 是 atomic：crashed write 会留下 original untouched，绝不会 half-written。
 
-The skill also asks the user to confirm before writing when the pull isn't directly asked for (e.g., as a side-effect of HITL completion) — silent overwrites are surprising.
+当 pull 不是用户直接要求时（例如 HITL completion 的 side-effect），skill 会在写入前请用户 confirm；silent overwrites 令人意外。
 
-### 10. Consistent agent identity
+### 10. Consistent agent identity（一致的 agent identity）
 
-The skill enforces `by: "ai:compound-engineering"` on every op and `X-Agent-Id: ai:compound-engineering` in headers. Display name `Compound Engineering` is bound once per session via `/presence`. **Don't use `ai:compound` or other ad-hoc variants** — identity stays uniform unless a caller explicitly overrides for a sub-agent context.
-
----
-
-## Quick Example
-
-`/ce-plan` finishes a notification-mute plan and the user picks "Open in Proof" at the Phase 5.4 menu. Plan invokes `ce-proof` in HITL-review mode with the plan path and title.
-
-The skill creates a Proof doc via `POST /share/markdown` with the plan content. Returns a URL with token. Binds the display name via `POST /presence`. Surfaces the URL to the user.
-
-User opens the URL in their browser. Adds 4 inline comments and 2 suggested edits over 10 minutes. Says "ready" in chat.
-
-The skill reads `/state`, finds 6 new marks. For each comment thread:
-- Reads the thread fresh
-- Applies agreed content edits through `/edit/v2` in a small batch
-- Posts thread replies and resolves handled comments with one `/ops` comment batch
-
-After all threads are processed, the skill asks the user to confirm the end-sync. User confirms. The skill atomically writes the reviewed markdown back to `docs/plans/2026-05-04-001-feat-notification-mute-plan.md`. Returns control to `ce-plan` Phase 5.4 with `status: proceeded` and `localSynced: true`.
+Skill 强制每个 op 使用 `by: "ai:compound-engineering"`，headers 中使用 `X-Agent-Id: ai:compound-engineering`。Display name `Compound Engineering` 每 session 通过 `/presence` 绑定一次。**不要使用 `ai:compound` 或其他 ad-hoc variants**；除非 caller 为 sub-agent context 明确 override，identity 保持统一。
 
 ---
 
-## When to Reach For It
+## 快速示例
 
-Reach for `ce-proof` when:
+`/ce-plan` 完成 notification-mute plan，用户在 Phase 5.4 menu 选择 "Open in Proof"。Plan 以 HITL-review mode 调用 `ce-proof`，传入 plan path 和 title。
 
-- You want a shareable URL for a markdown doc (brainstorm, plan, learning, draft)
-- You want HITL review with comment threads, agent-applied edits, and atomic disk sync at the end
-- A chain skill (`ce-brainstorm`, `ce-plan`, `ce-ideate`) handed off for human review
-- You're working from a Proof URL and want the agent to participate
+Skill 通过 `POST /share/markdown` 创建 Proof doc，内容为 plan。返回带 token 的 URL。通过 `POST /presence` 绑定 display name。把 URL 展示给用户。
 
-Skip `ce-proof` when:
+用户在浏览器中打开 URL。10 分钟内添加 4 个 inline comments 和 2 个 suggested edits。然后在 chat 中说 "ready"。
 
-- The doc is small enough that chat-paste-and-discuss works fine
-- You don't have network access (web API needs `proofeditor.ai`); the local bridge is macOS-only
-- The content is too sensitive to upload to a third-party editor — keep it local
+Skill 读取 `/state`，找到 6 个 new marks。对每个 comment thread：
 
----
+- Fresh read thread（重新读取 thread）
+- 通过 `/edit/v2` small batch 应用 agreed content edits
+- 用一个 `/ops` comment batch post thread replies 并 resolve handled comments
 
-## Use as Part of the Workflow
-
-`ce-proof` integrates with the chain at multiple HITL touchpoints:
-
-- **`/ce-brainstorm` Phase 4** — "Open in Proof" handoff for collaborative iteration on the requirements doc
-- **`/ce-plan` Phase 5.4** — "Open in Proof" handoff for HITL review of the plan
-- **`/ce-ideate` Phase 6** — "Open and iterate in Proof" option (default save destination for non-software topics)
-- **`/ce-compound`** — for sharing a learning before committing to `docs/solutions/`
-
-After HITL review completes, the originating skill regains control with one of four statuses:
-- `proceeded` with `localSynced: true` — disk was synced; continue
-- `proceeded` with `localSynced: false` — Proof has the new version, local is stale; offer to pull
-- `done_for_now` — user paused; offer to pull current Proof state
-- `aborted` — fall back to the menu without changes
+所有 threads 处理后，skill 请求用户确认 end-sync。用户确认。Skill atomically 将 reviewed markdown 写回 `docs/plans/2026-05-04-001-feat-notification-mute-plan.md`。返回 `ce-plan` Phase 5.4，状态为 `status: proceeded` 和 `localSynced: true`。
 
 ---
 
-## Use Standalone
+## 何时使用
 
-Direct invocation for ad-hoc Proof work:
+在以下情况使用 `ce-proof`：
 
-- **Upload local markdown** — `/ce-proof "share docs/plans/foo.md to Proof for iteration"`
-- **From a Proof URL** — `/ce-proof https://www.proofeditor.ai/d/abc123?token=xxx` (read state, add comments, suggest edits)
-- **HITL on the just-edited file** — "share this to proof so we can iterate" picks up whichever markdown was just touched
-- **Pull a Proof doc to local** — sync current Proof state to a markdown file (atomic write)
+- 想为 markdown doc（brainstorm、plan、learning、draft）获得 shareable URL
+- 想进行 HITL review：comment threads、agent-applied edits、最后 atomic disk sync
+- Chain skill（`ce-brainstorm`、`ce-plan`、`ce-ideate`）handoff 到 human review
+- 正从 Proof URL 工作，想让 agent 参与
+
+以下情况跳过 `ce-proof`：
+
+- Doc 很小，chat-paste-and-discuss 就足够
+- 没有 network access（web API 需要 `proofeditor.ai`）；local bridge 只支持 macOS
+- 内容过于敏感，不应上传到 third-party editor；保持 local
 
 ---
 
-## Reference
+## 作为 Workflow 的一部分使用
 
-| API surface | When |
+`ce-proof` 在多个 HITL touchpoints 与 chain 集成：
+
+- **`/ce-brainstorm` Phase 4**："Open in Proof" handoff，用于 collaborative iteration requirements doc
+- **`/ce-plan` Phase 5.4**："Open in Proof" handoff，用于 plan 的 HITL review
+- **`/ce-ideate` Phase 6**："Open and iterate in Proof" option（non-software topics 的 default save destination）
+- **`/ce-compound`**：commit 到 `docs/solutions/` 前分享 learning
+
+HITL review 完成后，originating skill 会以四种 statuses 之一恢复控制：
+
+- `proceeded` with `localSynced: true`：disk 已 sync；继续
+- `proceeded` with `localSynced: false`：Proof 有新版本，local stale；提供 pull
+- `done_for_now`：用户 pause；提供 pull current Proof state
+- `aborted`：无 changes，fallback 到 menu
+
+---
+
+## 单独使用
+
+Ad-hoc Proof work 可直接调用：
+
+- **Upload local markdown（上传本地 markdown）**：`/ce-proof "share docs/plans/foo.md to Proof for iteration"`
+- **From a Proof URL（从 Proof URL 开始）**：`/ce-proof https://www.proofeditor.ai/d/abc123?token=xxx`（read state、add comments、suggest edits）
+- **HITL on the just-edited file（对刚编辑的文件做 HITL）**："share this to proof so we can iterate" 会拾取刚刚 touched 的 markdown
+- **Pull a Proof doc to local（拉取 Proof doc 到本地）**：sync current Proof state 到 markdown file（atomic write）
+
+---
+
+## 参考
+
+| API surface（API 表面） | When（何时使用） |
 |-------------|------|
-| Web API at `proofeditor.ai` | Default; no install; shareable URLs |
-| Local Bridge at `localhost:9847` | macOS Proof.app running; one-machine workflow |
+| Web API at `proofeditor.ai` | Default；无需安装；shareable URLs |
+| Local Bridge at `localhost:9847` | macOS Proof.app running；one-machine workflow |
 
 | Op (Web API `/ops`) | Purpose |
 |---------------------|---------|
 | `comment.add` | Comment on a quote |
-| `comment.reply` | Reply within a thread; `resolve: true` replies and closes in one mutation |
+| `comment.reply` | Reply within a thread；`resolve: true` replies and closes in one mutation |
 | `comment.resolve` / `comment.unresolve` | Toggle thread resolution |
-| `suggestion.add` | Tracked edit (pending or `status: "accepted"`) |
+| `suggestion.add` | Tracked edit（pending 或 `status: "accepted"`） |
 | `suggestion.accept` / `suggestion.reject` | Resolve a suggestion |
-| `rewrite.apply` | Last-resort whole-doc replacement (blocked by `LIVE_CLIENTS_PRESENT`) |
+| `rewrite.apply` | Last-resort whole-doc replacement（被 `LIVE_CLIENTS_PRESENT` 阻止） |
 
 | Endpoint | Wire format | Best for |
 |----------|-------------|----------|
-| `/api/agent/{slug}/ops` | Top-level `type` or comment `operations` batch | Marks, batched replies/resolves |
-| `/api/agent/{slug}/edit/v2` | `operations: [{op, ...}, ...]` | Atomic block batches and `find_replace_in_doc` sweeps |
+| `/api/agent/{slug}/ops` | Top-level `type` 或 comment `operations` batch | Marks、batched replies/resolves |
+| `/api/agent/{slug}/edit/v2` | `operations: [{op, ...}, ...]` | Atomic block batches 和 `find_replace_in_doc` sweeps |
 
-Identity defaults: `by: "ai:compound-engineering"`, `X-Agent-Id: ai:compound-engineering`, `name: "Compound Engineering"`. `Idempotency-Key` recommended on every mutation and required when the contract says so.
-
----
-
-## FAQ
-
-**Why two endpoint shapes?**
-Different concerns. `/ops` handles mark mutations, including batched existing-thread comment replies/resolves. `/edit/v2` handles atomic batches of block-level edits and document-wide literal replacement. The wire formats differ — sending `op` shape to `/ops` returns 422.
-
-**Should I rewrite the whole doc?**
-Almost never as a first move. Use `find_replace_in_doc` for literal sweeps and block-level `/edit/v2` for scoped edits. Use `rewrite.apply` only when the user asked for full replacement or the change cannot be represented with narrower operations.
-
-**What's the right mutation pattern?**
-Read `/state?kinds=comment` for comment ingest or `/snapshot` for block refs, capture `mutationBase.token`, then update your cached token from successful mutation responses. On `STALE_BASE`, re-read and retry once with fresh token. On potentially-applied errors (5xx, timeout, `202 pending`), re-read and check whether the change is already present before retrying — duplicate marks come from retrying without verifying.
-
-**Why the `ai:compound-engineering` identity?**
-For consistent attribution. Mark authorship in the rendered doc shows who edited; if the agent uses `ai:compound` one day and `ai:compound-engineering` the next, the audit trail looks fragmented. The skill enforces one identity unless a caller explicitly overrides.
-
-**What does HITL review mode do?**
-Upload a local markdown file to Proof, let the user annotate via comments and suggestions in the web UI, ingest each thread with filtered comment reads, apply agreed edits through Proof's edit APIs, reply/resolve in-thread, then sync the reviewed markdown back to the local file atomically. The full loop spec is in `references/hitl-review.md`.
-
-**Can I edit a doc while a user is connected?**
-Yes for `/edit/v2`, `suggestion.add` (including `status: "accepted"`), and all comment ops. No for `rewrite.apply` — it's blocked by `LIVE_CLIENTS_PRESENT` because it would clobber in-flight Yjs edits.
-
-**What if the upload fails?**
-The skill retries once. If it still fails, callers get a clear error and can decide what to do (often: stay in the chain skill's menu without the Proof handoff, or fall back to local-only). Persistent failures get reported to Proof via `POST /api/bridge/report_bug` for diagnosis.
+Identity defaults：`by: "ai:compound-engineering"`、`X-Agent-Id: ai:compound-engineering`、`name: "Compound Engineering"`。每个 mutation 推荐使用 `Idempotency-Key`；contract 要求时必须使用。
 
 ---
 
-## See Also
+## 常见问题
 
-- [`/ce-brainstorm`](./ce-brainstorm.md) — Phase 4 "Open in Proof" handoff
-- [`/ce-plan`](./ce-plan.md) — Phase 5.4 "Open in Proof" handoff
-- [`/ce-ideate`](./ce-ideate.md) — Phase 6 "Open and iterate in Proof" option
-- [Proof](https://www.proofeditor.ai) — the editor itself; this skill is the agent client
+**为什么有两种 endpoint shapes？**
+不同 concerns。`/ops` 处理 mark mutations，包括 batched existing-thread comment replies/resolves。`/edit/v2` 处理 atomic batches of block-level edits 和 document-wide literal replacement。Wire formats 不同：把 `op` shape 发到 `/ops` 会返回 422。
+
+**我应该 rewrite whole doc 吗？**
+几乎永远不要作为第一步。Literal sweeps 用 `find_replace_in_doc`，scoped edits 用 block-level `/edit/v2`。只有用户要求 full replacement，或 change 无法用更窄 operations 表达时，才用 `rewrite.apply`。
+
+**正确 mutation pattern 是什么？**
+Comment ingest 读取 `/state?kinds=comment`，或为 block refs 读取 `/snapshot`，捕获 `mutationBase.token`，然后从 successful mutation responses 更新 cached token。遇到 `STALE_BASE` 时 re-read，并用 fresh token retry once。遇到 potentially-applied errors（5xx、timeout、`202 pending`）时，re-read 并检查 change 是否已存在，再 retry；duplicate marks 来自未 verify 的 retry。
+
+**为什么使用 `ai:compound-engineering` identity？**
+为了 consistent attribution。Rendered doc 中的 mark authorship 会显示是谁编辑；如果 agent 今天用 `ai:compound`，明天用 `ai:compound-engineering`，audit trail 会 fragmented。Skill 强制单一 identity，除非 caller 明确 override。
+
+**HITL review mode 做什么？**
+上传 local markdown file 到 Proof，让用户在 web UI 中用 comments 和 suggestions annotate；用 filtered comment reads ingest 每个 thread；通过 Proof edit APIs 应用 agreed edits；in-thread reply/resolve；然后 atomically sync reviewed markdown 回 local file。完整 loop spec 在 `references/hitl-review.md`。
+
+**用户连接时我能 edit doc 吗？**
+`/edit/v2`、`suggestion.add`（包括 `status: "accepted"`）和所有 comment ops 都可以。`rewrite.apply` 不行：它被 `LIVE_CLIENTS_PRESENT` 阻止，因为会 clobber in-flight Yjs edits。
+
+**Upload fails 怎么办？**
+Skill retry once。仍失败时，callers 得到清晰 error 并决定后续（通常：停留在 chain skill menu，不做 Proof handoff，或 fallback 到 local-only）。Persistent failures 会通过 `POST /api/bridge/report_bug` 报给 Proof 做 diagnosis。
+
+---
+
+## 另见
+
+- [`/ce-brainstorm`](./ce-brainstorm.md) - Phase 4 "Open in Proof" handoff（在 Proof 中打开的 handoff）
+- [`/ce-plan`](./ce-plan.md) - Phase 5.4 "Open in Proof" handoff（在 Proof 中打开的 handoff）
+- [`/ce-ideate`](./ce-ideate.md) - Phase 6 "Open and iterate in Proof" option（在 Proof 中打开并迭代的选项）
+- [Proof](https://www.proofeditor.ai) - editor itself（编辑器本体）；此 skill 是 agent client

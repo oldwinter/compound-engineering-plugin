@@ -1,248 +1,251 @@
-# `ce-frontend-design`
+# `ce-frontend-design`（前端设计）
 
-> Build web interfaces with genuine design quality, not AI slop. Detect existing design systems, plan with intention, build, then verify visually.
+> 构建真正有设计质量的 web interfaces，而不是 AI slop。检测 existing design systems，有意图地 plan、build，然后 visually verify。
 
-`ce-frontend-design` is the **design-quality** skill. AI tends toward generic SaaS aesthetics — purple-on-white, Inter font, card-grid hero, decorative gradients, copy that sounds like prompt-language leaking into the UI. This skill counteracts that with explicit defaults that the user (or an existing design system) can override, structured pre-build planning that forces a visual thesis, and visual verification before declaring done. It works for greenfield builds and modifications to existing apps; it auto-detects an existing design system and yields to it when one is present.
+`ce-frontend-design` 是 **design-quality** skill。AI 容易滑向 generic SaaS aesthetics：purple-on-white、Inter font、card-grid hero、decorative gradients，以及听起来像 prompt-language 泄漏到 UI 的 copy。此 skill 用 explicit defaults 抵消这种倾向；用户（或 existing design system）可以 override。它用 structured pre-build planning 强制形成 visual thesis，并在宣称 done 前做 visual verification。它适用于 greenfield builds 和 existing apps 的修改；存在 design system 时会 auto-detect 并让位。
 
 ---
 
 ## TL;DR
 
-| Question | Answer |
+| 问题 | 回答 |
 |----------|--------|
-| What does it do? | Detects existing design system, plans the design with a visual thesis, builds with intentional defaults, verifies visually |
-| When to use it | Any frontend work — landing pages, web apps, dashboards, admin panels, components, interactive experiences |
-| What it produces | Frontend code matching either an existing design system (Module C) or distinctive greenfield aesthetics (Module A or B) |
-| Authority hierarchy | Existing system > user instructions > skill defaults |
+| 它做什么？ | 检测 existing design system，带 visual thesis 做 design plan，按 intentional defaults build，并 visually verify |
+| 何时使用 | 任何 frontend work：landing pages、web apps、dashboards、admin panels、components、interactive experiences |
+| 产出什么 | 匹配 existing design system（Module C）或 distinctive greenfield aesthetics（Module A 或 B）的 frontend code |
+| 权威层级 | Existing system > user instructions > skill defaults |
 
 ---
 
-## The Problem
+## 问题
 
-AI-generated frontend collapses into a recognizable shape:
+AI-generated frontend 会塌缩成一种可识别形状：
 
-- **Generic SaaS aesthetic** — purple-on-white, Inter font, card-grid hero, every dashboard looking like the same tutorial template
-- **Cards everywhere** even when the layout doesn't need them — mistaken default for "structure"
-- **Hero sections cluttered** with stats, schedules, pill clusters, logo clouds — too many things screaming for attention
-- **Decorative gradients** standing in for real visual content
-- **Prompt language** leaking into the UI — "Experience the seamless integration"
-- **Mode bias** — purple-on-white default; dark-mode default; never variant
-- **Yields to nothing** — agents either ignore the existing design system or bulldoze through it
-- **No verification** — builds the page, declares done, never checks if it looks right
+- **Generic SaaS aesthetic**：purple-on-white、Inter font、card-grid hero，每个 dashboard 都像同一个 tutorial template
+- **Cards everywhere**：即使 layout 不需要，也误把 cards 当作 "structure" 的默认
+- **Hero sections cluttered**：stats、schedules、pill clusters、logo clouds 同时抢 attention
+- **Decorative gradients** 替代真实 visual content
+- **Prompt language** 泄漏到 UI：例如 "Experience the seamless integration"
+- **Mode bias**：purple-on-white default、dark-mode default，从不变化
+- **Yields to nothing**：agents 要么忽略 existing design system，要么 bulldoze through it
+- **No verification**：build 页面后宣称 done，却从不检查实际观感
 
-## The Solution
+## 方案
 
-`ce-frontend-design` runs frontend work as a structured pass with explicit defaults and verification:
+`ce-frontend-design` 把 frontend work 作为带 explicit defaults 和 verification 的 structured pass：
 
-- **Layer 0: Context Detection** — scans for existing design tokens, component libraries, CSS frameworks, typography, color palettes, animation libraries; classifies as Existing system, Partial system, Greenfield, or Ambiguous
-- **Layer 1: Pre-Build Planning** — three short statements (visual thesis, content plan, interaction plan) before any code; the user can redirect before code is written
-- **Layer 2: Design Guidance Core** — opinionated defaults for typography, color, composition, motion, accessibility, imagery; each yields to the existing system
-- **Context Modules** — Module A (Landing pages), Module B (Apps & dashboards), Module C (Components in existing apps; default for existing-app work)
-- **Hard Rules & Anti-Patterns** — overridable defaults plus genuine quality floor (broken contrast, missing focus states, semantic div soup)
-- **Visual Verification** — one pass with the project's existing browser tooling or `agent-browser` to assess against the visual thesis
+- **Layer 0: Context Detection**：扫描 existing design tokens、component libraries、CSS frameworks、typography、color palettes、animation libraries；分类为 Existing system、Partial system、Greenfield 或 Ambiguous
+- **Layer 1: Pre-Build Planning**：任何 code 前写三个短 statements（visual thesis、content plan、interaction plan）；用户可在写 code 前 redirect
+- **Layer 2: Design Guidance Core**：typography、color、composition、motion、accessibility、imagery 的 opinionated defaults；每项都让位于 existing system
+- **Context Modules**：Module A（Landing pages）、Module B（Apps & dashboards）、Module C（Components in existing apps；existing-app work 的 default）
+- **Hard Rules & Anti-Patterns**：可 override defaults 加真正 quality floor（broken contrast、missing focus states、semantic div soup）
+- **Visual Verification**：用 project existing browser tooling 或 `agent-browser` 做一轮 against visual thesis 的 assessment
 
 ---
 
-## What Makes It Novel
+## 独特之处
 
-### 1. Authority hierarchy — yields to existing systems
+### 1. Authority hierarchy：让位于 existing systems
 
-Every rule in the skill is a default, not a mandate. Priority:
+Skill 中每条 rule 都是 default，不是 mandate。优先级：
 
-1. **Existing design system / codebase patterns** — highest priority, always respected
-2. **User's explicit instructions** — override skill defaults
-3. **Skill defaults** — apply in greenfield work or when the user asks for guidance
+1. **Existing design system / codebase patterns**：最高优先级，始终尊重
+2. **用户的 explicit instructions**：override skill defaults
+3. **Skill defaults**：用于 greenfield work，或用户请求 guidance 时
 
-When working in an existing codebase with established patterns, follow those patterns. When the user specifies a contradicting direction, follow the user. The skill's opinions only apply when nothing else does.
+在有 established patterns 的 existing codebase 中工作时，遵循这些 patterns。当用户指定矛盾方向时，遵循用户。Skill 的 opinions 只在没有其他依据时应用。
 
-### 2. Layer 0: Context Detection — explicit signals
+### 2. Layer 0: Context Detection（上下文检测）：explicit signals（显式信号）
 
-Before any design work, the skill scans the codebase for design signals:
+任何 design work 前，skill 扫描 codebase 中的 design signals：
 
-- Design tokens / CSS variables (`--color-*`, `--spacing-*`, `--font-*`)
-- Component libraries (shadcn, MUI, Chakra, Radix, Ant Design, project-specific dirs)
-- CSS frameworks (`tailwind.config.*`, styled-components themes, CSS modules)
-- Typography (`@font-face`, Google Fonts links)
-- Color palettes (defined scales, brand color files, design token exports)
-- Animation libraries (Framer Motion, GSAP, anime.js, Motion One, Vue Transition)
-- Spacing/layout patterns (consistent scale usage, grid systems)
+- Design tokens / CSS variables（设计 tokens / CSS variables；`--color-*`、`--spacing-*`、`--font-*`）
+- Component libraries（组件库；shadcn、MUI、Chakra、Radix、Ant Design、project-specific dirs）
+- CSS frameworks（CSS frameworks / CSS 框架；`tailwind.config.*`、styled-components themes、CSS modules）
+- Typography（字体与排版；`@font-face`、Google Fonts links）
+- Color palettes（色板；defined scales、brand color files、design token exports）
+- Animation libraries（动画库；Framer Motion、GSAP、anime.js、Motion One、Vue Transition）
+- Spacing/layout patterns（间距 / 布局模式；consistent scale usage、grid systems）
 
-Based on signals, classifies as **Existing system** (4+ signals; defer to it; aesthetic opinions yield), **Partial system** (1-3 signals; follow what exists, apply defaults to gaps), **Greenfield** (no signals; full guidance applies), or **Ambiguous** (asks the user).
+基于 signals 分类为 **Existing system**（4+ signals；defer to it；aesthetic opinions yield）、**Partial system**（1-3 signals；follow what exists，defaults fill gaps）、**Greenfield**（no signals；full guidance applies）或 **Ambiguous**（询问用户）。
 
-### 3. Layer 1: Pre-Build Planning — visual thesis required
+### 3. Layer 1: Pre-Build Planning：需要 visual thesis
 
-Before writing code, the skill writes three short statements:
+写 code 前，skill 写三个短 statements：
 
-- **Visual thesis** — one sentence describing mood, material, and energy ("Clean editorial feel, lots of whitespace, serif headlines, muted earth tones")
-- **Content plan** — what goes on the page and in what order (hero / support / detail / CTA for landing; primary workspace / nav / inspector for apps; states for components)
-- **Interaction plan** — 2-3 specific motion ideas ("staggered fade-in on hero load, parallax on scroll between sections, scale-up on card hover" — not vague "add animations")
+- **Visual thesis**：一句话描述 mood、material 和 energy（"Clean editorial feel, lots of whitespace, serif headlines, muted earth tones"）
+- **Content plan**：页面放什么、顺序如何（landing：hero / support / detail / CTA；apps：primary workspace / nav / inspector；components：states）
+- **Interaction plan**：2-3 个具体 motion ideas（"staggered fade-in on hero load, parallax on scroll between sections, scale-up on card hover"，不是 vague "add animations"）
 
-These give the user a checkpoint to redirect *before* code is written, when correction is cheap. Skipping this step is how AI ends up shipping the generic SaaS template.
+这些给用户一个在 code 写入前 redirect 的 checkpoint；此时纠正成本很低。跳过这步正是 AI ship generic SaaS template 的原因。
 
-### 4. Three context modules — different patterns for different surfaces
+### 4. Three context modules：不同 surfaces 用不同 patterns
 
 | Module | When | Defaults |
 |--------|------|----------|
-| **A: Landing & Marketing** | Greenfield landing page | Hero (one composition, not a dashboard), support, detail, final CTA. Brand first, headline second. ≤6 sections. Copy: let the headline carry; one short supporting sentence. |
-| **B: Apps & Dashboards** | Greenfield app/dashboard | Calm surface hierarchy, strong typography & spacing, few colors, dense but readable, minimal chrome. Cards only when the card *is* the interaction. Copy: utility, not marketing. |
-| **C: Components & Features** | Existing app (default) | Match existing visual language. Inherit spacing, radius, color tokens, typography. Focus on interaction quality (clear states, smooth transitions, obvious affordances). Don't introduce a new design system from one component. |
+| **A: Landing & Marketing** | Greenfield landing page | Hero（one composition，不是 dashboard）、support、detail、final CTA。Brand first、headline second。<=6 sections。Copy：让 headline 承载；一个短 supporting sentence。 |
+| **B: Apps & Dashboards** | Greenfield app/dashboard | Calm surface hierarchy、strong typography & spacing、few colors、dense but readable、minimal chrome。只有 card *本身就是 interaction* 时才用 cards。Copy：utility，不是 marketing。 |
+| **C: Components & Features** | Existing app（default） | 匹配 existing visual language。继承 spacing、radius、color tokens、typography。关注 interaction quality（clear states、smooth transitions、obvious affordances）。不要因为一个 component 引入新 design system。 |
 
-When working inside an existing application, default to Module C regardless of the feature. The point isn't to stand out — it's to fit in.
+在 existing application 内工作时，无论 feature 是什么都默认 Module C。目标不是 stand out，而是 fit in。
 
-### 5. Default-against (overridable) vs Always-avoid (quality floor)
+### 5. Default-against（可 override）vs Always-avoid（quality floor）
 
-The skill separates opinions from quality failures:
+Skill 区分 opinions 和 quality failures：
 
-**Default against (overridable):**
-- Generic SaaS card grid as first impression
-- Purple-on-white, dark-mode bias
-- Overused fonts (Inter, Roboto, Arial, Space Grotesk, system defaults) in greenfield
-- Hero sections cluttered with stats/pills/logos
-- Carousels with no narrative purpose
-- Multiple competing accent colors
-- Decorative gradients standing in for real visual content
-- Copy sounding like design commentary ("Experience the seamless integration")
-- Split-screen heroes with text on the busy side of the image
+**Default against（可 override）：**
 
-**Always avoid (quality floor):**
-- Prompt language or AI commentary leaking into the UI
-- Broken contrast — text unreadable over images or backgrounds
-- Interactive elements without visible focus states
-- Semantic div soup when proper HTML elements exist
+- Generic SaaS card grid 作为 first impression
+- Purple-on-white、dark-mode bias（紫白配色 / dark-mode 偏置）
+- Greenfield 中过度使用 fonts（Inter、Roboto、Arial、Space Grotesk、system defaults）
+- Hero sections 被 stats/pills/logos 塞满
+- 没有 narrative purpose 的 carousels
+- 多个 competing accent colors
+- Decorative gradients 替代真实 visual content
+- 听起来像 design commentary 的 copy（"Experience the seamless integration"）
+- Text 放在 busy side of image 的 split-screen heroes
 
-The user can override the first list. The second list is non-negotiable — those are quality failures no user wants.
+**Always avoid（quality floor，质量底线）：**
 
-### 6. Litmus checks before visual verification
+- Prompt language 或 AI commentary 泄漏到 UI
+- Broken contrast：text 在 images 或 backgrounds 上不可读
+- Interactive elements 没有 visible focus states
+- 有 proper HTML elements 时仍使用 semantic div soup
 
-Before launching the visual verification, the skill asks itself a quick self-review:
+用户可以 override 第一组。第二组 non-negotiable：这些是没人想要的 quality failures。
 
-- Is the brand or product unmistakable in the first screen?
-- Is there one strong visual anchor?
-- Can the page be understood by scanning headlines only?
-- Does each section have one job?
-- Are cards actually necessary where they're used?
-- Does motion improve hierarchy or atmosphere, or is it just there?
-- Would the design feel premium if all decorative shadows were removed?
-- Does the copy sound like the product, not like a prompt?
+### 6. Visual verification 前的 litmus checks（快速判断）
 
-These are gates against shipping work that fails the basic legibility and intent tests.
+启动 visual verification 前，skill 做快速 self-review：
 
-### 7. Visual verification with tool preference cascade
+- Brand 或 product 是否在 first screen unmistakable？
+- 是否有一个 strong visual anchor？
+- 只扫 headlines 能否理解页面？
+- 每个 section 是否只有一个 job？
+- Cards 被使用的位置是否真的必要？
+- Motion 是否改善 hierarchy 或 atmosphere，还是只是存在？
+- 如果移除所有 decorative shadows，design 是否仍 premium？
+- Copy 是否像 product，而不是 prompt？
 
-After implementing, the skill verifies visually — a sanity check, not a pixel-perfect review. Tool preference:
+这些 gates 防止 ship 通过不了 basic legibility 和 intent tests 的 work。
 
-1. **Existing project browser tooling** — Playwright, Puppeteer, Cypress already in deps; use it
-2. **Browser MCP tools** — when available
-3. **`agent-browser` CLI** — fallback; if not installed, says "run `/ce-setup`"
-4. **Mental review** — when no browser access is possible, apply litmus checks as self-review and note that visual verification was skipped
+### 7. Visual verification with tool preference cascade（按工具优先级做视觉验证）
 
-One iteration. Take a screenshot, assess against the litmus checks, fix glaring issues, move on. For multi-round iterative refinement, the `ce-design-iterator` agent handles that.
+实现后，skill 会 visually verify：sanity check，不是 pixel-perfect review。Tool preference：
 
-### 8. Creative energy — bold direction over formula
+1. **Existing project browser tooling**：deps 中已有 Playwright、Puppeteer、Cypress；使用它
+2. **Browser MCP tools**：可用时使用
+3. **`agent-browser` CLI**：fallback；未安装时提示 "run `/ce-setup`"
+4. **Mental review**：无法 browser access 时，用 litmus checks 做 self-review，并说明 visual verification skipped
 
-For greenfield work, the skill explicitly encourages committing to a bold aesthetic direction. Possible tones: brutally minimal, maximalist, retro-futuristic, organic/natural, luxury/refined, playful, editorial, brutalist, art deco, soft/pastel, industrial — or invent something. The point isn't to be weird; it's to avoid the formula that produces undifferentiated AI output.
+一轮 iteration。截图，against litmus checks 评估，修复 glaring issues，然后继续。Multi-round iterative refinement 由 `ce-design-iterator` agent 处理。
 
-> Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations. Minimalist designs need restraint, precision, and careful attention to spacing, typography, and subtle details.
+### 8. Creative energy：bold direction over formula（大胆方向优先于公式化）
 
----
+对 greenfield work，skill 明确鼓励 commit 到 bold aesthetic direction。可能 tones：brutally minimal、maximalist、retro-futuristic、organic/natural、luxury/refined、playful、editorial、brutalist、art deco、soft/pastel、industrial，或 invent something。重点不是 weird，而是避免产生 undifferentiated AI output 的 formula。
 
-## Quick Example
-
-You're building a landing page for a new product, no existing repo conventions. You invoke `/ce-frontend-design "build a landing page for a notion-style note-taking app"`.
-
-Layer 0: scans the empty repo. Greenfield. No existing system to yield to; full guidance applies.
-
-Layer 1: writes the three statements:
-- **Visual thesis**: "Quiet, thoughtful, almost paper-like — warm cream background with deep ink black, serif headline, soft fade-in transitions. Material: paper, not glass."
-- **Content plan**: hero with the product name + one-line promise + soft visual; one feature deep-dive; one quote from a user; final CTA
-- **Interaction plan**: staggered fade-in on hero text load, gentle parallax between sections, hover-lift on the CTA button
-
-You confirm or redirect. Once approved, the skill builds. Module A (Landing & Marketing) for the patterns. Picks a serif display font (not Inter), uses a constrained palette (cream, ink, one accent), keeps the hero a single composition.
-
-After implementing, the skill runs through litmus checks, then verifies visually with `agent-browser`. Screenshot looks coherent. One sentence in the hero supporting copy reads like prompt-language ("Experience effortless thought capture") — quality-floor violation. Fixes to "A note-taking app that stays out of your way." Re-screenshots. Done.
+> Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations. Minimalist designs need restraint, precision, and careful attention to spacing, typography, and subtle details.（实现复杂度要匹配 aesthetic vision；maximalist designs 需要更丰富的代码和动画，minimalist designs 需要克制、精确，并仔细处理 spacing、typography 与 subtle details。）
 
 ---
 
-## When to Reach For It
+## 快速示例
 
-Reach for `ce-frontend-design` when:
+你正在为一个 new product 构建 landing page，repo 没有 existing conventions。调用 `/ce-frontend-design "build a landing page for a notion-style note-taking app"`。
 
-- You're building a landing page, app, dashboard, or component and want the result to look distinctive (not AI-generic)
-- You want existing design system detection — yield to what exists, apply defaults only to gaps
-- You want a structured visual-thesis-first plan rather than diving into code
-- You want the litmus checks and visual verification step
+Layer 0：扫描 empty repo。Greenfield。没有 existing system 可让位；full guidance applies。
 
-Skip `ce-frontend-design` when:
+Layer 1 写出三个 statements：
 
-- The work is non-frontend (API, backend, scripts) — wrong scope
-- You have a fixed Figma spec and want exact translation — `ce-design-iterator` or a design-sync agent fits better
-- The change is mechanical (typo in copy, single-line CSS tweak) — overkill
+- **Visual thesis（视觉论点）**："Quiet, thoughtful, almost paper-like — warm cream background with deep ink black, serif headline, soft fade-in transitions. Material: paper, not glass."
+- **Content plan（内容计划）**：hero with product name + one-line promise + soft visual；one feature deep-dive；one quote from a user；final CTA
+- **Interaction plan（交互计划）**：staggered fade-in on hero text load、gentle parallax between sections、hover-lift on CTA button
 
----
+你 confirm 或 redirect。批准后，skill 开始 build。Module A（Landing & Marketing）提供 patterns。它选择 serif display font（不是 Inter），使用 constrained palette（cream、ink、one accent），并让 hero 成为 single composition。
 
-## Use as Part of the Workflow
-
-`ce-frontend-design` is mostly invoked directly when frontend work begins, but interlocks with:
-
-- **`/ce-work` Phase 2** — when implementing a frontend feature, this skill provides the design pass
-- **`/ce-polish`** — for late-stage UX refinement after the feature is functional; complementary, not a substitute
-- **`ce-design-iterator` agent** — for multi-round iterative refinement beyond a single visual-verification pass
-- **`ce-design-implementation-reviewer` agent** — for verifying UI against a Figma design
-
-The skill's output is frontend code; downstream skills handle commit, PR, polish, and review.
+实现后，skill 跑 litmus checks，再用 `agent-browser` visually verify。Screenshot coherent。Hero supporting copy 有一句像 prompt-language（"Experience effortless thought capture"），违反 quality-floor。改成 "A note-taking app that stays out of your way." 重新 screenshot。完成。
 
 ---
 
-## Use Standalone
+## 何时使用
 
-Direct invocation:
+在以下情况使用 `ce-frontend-design`：
 
-- **Greenfield landing** — `/ce-frontend-design "build a landing page for X"`
-- **App / dashboard** — `/ce-frontend-design "build a settings dashboard"`
-- **Component** — `/ce-frontend-design "build a NotificationToggle component"`
-- **Modification** — `/ce-frontend-design "redesign the pricing page"` (existing app; auto-detects)
+- 正在构建 landing page、app、dashboard 或 component，并希望结果 distinctive（不是 AI-generic）
+- 想要 existing design system detection：让位于已有系统，只填补 gaps
+- 想先有 structured visual-thesis-first plan，而不是直接写 code
+- 想要 litmus checks 和 visual verification step
 
-The skill auto-detects context. Pre-build planning (Layer 1) is the user's checkpoint to redirect before code commits to a direction.
+以下情况跳过 `ce-frontend-design`：
+
+- Work 非 frontend（API、backend、scripts）：scope 错
+- 有 fixed Figma spec，需要 exact translation：`ce-design-iterator` 或 design-sync agent 更合适
+- Change mechanical（机械变更，例如 copy typo、single-line CSS tweak）：overkill
 
 ---
 
-## Reference
+## 作为 Workflow 的一部分使用
+
+`ce-frontend-design` 多数直接在 frontend work 开始时调用，但也与以下流程互锁：
+
+- **`/ce-work` Phase 2**：实现 frontend feature 时，此 skill 提供 design pass
+- **`/ce-polish`**：feature functional 后做 late-stage UX refinement；complementary，不是 substitute
+- **`ce-design-iterator` agent**：超过单轮 visual-verification pass 的 multi-round iterative refinement
+- **`ce-design-implementation-reviewer` agent**：验证 UI 是否匹配 Figma design
+
+Skill output 是 frontend code；downstream skills 处理 commit、PR、polish 和 review。
+
+---
+
+## 单独使用
+
+直接调用：
+
+- **Greenfield landing（全新 landing page）**：`/ce-frontend-design "build a landing page for X"`
+- **App / dashboard（应用 / dashboard）**：`/ce-frontend-design "build a settings dashboard"`
+- **Component（组件）**：`/ce-frontend-design "build a NotificationToggle component"`
+- **Modification（修改）**：`/ce-frontend-design "redesign the pricing page"`（existing app；auto-detects）
+
+Skill 会 auto-detect context。Pre-build planning（Layer 1）是用户在 code commit 到某方向前 redirect 的 checkpoint。
+
+---
+
+## 参考
 
 | Layer | Purpose |
 |-------|---------|
-| 0 | Context Detection — scan for design signals; classify as Existing / Partial / Greenfield / Ambiguous |
-| 1 | Pre-Build Planning — visual thesis, content plan, interaction plan; checkpoint for user redirect |
-| 2 | Design Guidance Core — typography, color, composition, motion, accessibility, imagery defaults |
-| Modules | A (Landing), B (Apps/Dashboards), C (Components in existing apps — default for existing-app work) |
-| Verification | Litmus checks → visual verification with browser tool cascade |
+| 0 | Context Detection：扫描 design signals；分类 Existing / Partial / Greenfield / Ambiguous |
+| 1 | Pre-Build Planning：visual thesis、content plan、interaction plan；用户 redirect checkpoint |
+| 2 | Design Guidance Core：typography、color、composition、motion、accessibility、imagery defaults |
+| Modules | A（Landing）、B（Apps/Dashboards）、C（Components in existing apps；existing-app work default） |
+| Verification | Litmus checks -> browser tool cascade 做 visual verification |
 
 ---
 
-## FAQ
+## 常见问题
 
-**Why does it yield to existing design systems?**
-Because the existing system was a deliberate choice and matching it produces work that fits — better than the most beautiful greenfield design that breaks consistency. The skill's opinions are for greenfield or gap-filling, never for overriding established patterns.
+**为什么它要让位于 existing design systems？**
+因为 existing system 是 deliberate choice，匹配它会产生 fits 的 work；比打破一致性的 beautiful greenfield design 更好。Skill opinions 用于 greenfield 或 gap-filling，绝不用于 override established patterns。
 
-**Why three pre-build statements?**
-Because catching a wrong direction *before* writing code is far cheaper than after. The three statements (thesis, content, interaction) are short — written in 2 minutes, redirectable in seconds. Skipping them is how AI ends up shipping generic templates.
+**为什么需要三个 pre-build statements？**
+因为在写 code 前捕捉错误方向，比写完后便宜得多。三个 statements（thesis、content、interaction）很短，2 分钟写完、几秒即可 redirect。跳过它们就是 AI ship generic templates 的原因。
 
-**Why "Default against" vs "Always avoid"?**
-Defaults the user can override (purple-on-white isn't a quality bug, just a default the skill resists in greenfield). Always-avoid is the quality floor (broken contrast IS a bug, no user wants it). The split makes user override clean: the user can ask for purple-on-white, but they can't ask for broken contrast.
+**为什么分 "Default against" 和 "Always avoid"？**
+Defaults 可由用户 override（purple-on-white 不是 quality bug，只是 skill 在 greenfield 中抵制的 default）。Always-avoid 是 quality floor（broken contrast 就是 bug，没人想要）。这个 split 让用户 override 清晰：用户可以要求 purple-on-white，但不能要求 broken contrast。
 
-**What about Figma-pixel-perfect work?**
-Different scope. This skill aims for distinctive, production-grade design with self-verification. For pixel-perfect Figma matching, the `ce-design-implementation-reviewer` agent or `ce-figma-design-sync` agent is the right tool.
+**Figma-pixel-perfect work 怎么办？**
+这是不同 scope。此 skill 目标是 distinctive、production-grade design with self-verification。Pixel-perfect Figma matching 应使用 `ce-design-implementation-reviewer` agent 或 `ce-figma-design-sync` agent。
 
-**Can I do multi-round iteration?**
-The skill does one visual-verification pass. For multi-round refinement, the `ce-design-iterator` agent handles that — `/ce-frontend-design` provides the foundation, the iterator polishes.
+**可以 multi-round iteration 吗？**
+此 skill 做一轮 visual-verification pass。Multi-round refinement 由 `ce-design-iterator` agent 处理；`/ce-frontend-design` 提供 foundation，iterator 负责 polish。
 
-**What if the project has 1-3 design signals (Partial)?**
-Follow what exists; apply skill defaults only for areas where no convention was detected. E.g., Tailwind is configured (follow it for spacing/colors) but no component library exists — apply skill component-structure guidance.
+**如果 project 有 1-3 个 design signals（Partial）怎么办？**
+遵循已有内容；只在未检测到 convention 的 areas 使用 skill defaults。例如 Tailwind 已配置（spacing/colors 遵循它），但没有 component library；那就应用 skill 的 component-structure guidance。
 
 ---
 
-## See Also
+## 另见
 
-- [`/ce-work`](./ce-work.md) — invokes this skill during frontend implementation
-- [`/ce-polish`](./ce-polish.md) — late-stage UX refinement after the feature is functional
-- [`/ce-test-browser`](./ce-test-browser.md) — verifies the implementation works after the design pass
-- [`/ce-demo-reel`](./ce-demo-reel.md) — captures visual evidence for PR descriptions
+- [`/ce-work`](./ce-work.md) - frontend implementation 期间调用此 skill
+- [`/ce-polish`](./ce-polish.md) - feature functional 后的 late-stage UX refinement
+- [`/ce-test-browser`](./ce-test-browser.md) - design pass 后验证 implementation works
+- [`/ce-demo-reel`](./ce-demo-reel.md) - 捕获 PR descriptions 的 visual evidence

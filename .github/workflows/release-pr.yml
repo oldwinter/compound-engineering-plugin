@@ -1,4 +1,4 @@
-name: Release PR
+name: Release PR（发布 PR）
 
 on:
   push:
@@ -26,15 +26,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Bun
+      - name: 设置 Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Install dependencies
+      - name: 安装依赖
         run: bun install --frozen-lockfile
 
-      - name: Detect release PR merge
+      - name: 检测 release PR merge
         id: detect
         run: |
           MSG=$(git log -1 --format=%s)
@@ -44,11 +44,11 @@ jobs:
             echo "is_release_merge=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Validate release metadata scripts
+      - name: 验证 release metadata scripts
         if: steps.detect.outputs.is_release_merge == 'false'
         run: bun run release:validate
 
-      - name: Maintain release PR
+      - name: 维护 release PR
         id: release
         uses: googleapis/release-please-action@v4.4.0
         with:
@@ -75,24 +75,24 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.release-pr.outputs.cli_tag_name }}
 
-      - name: Setup Bun
+      - name: 设置 Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Install dependencies
+      - name: 安装依赖
         run: bun install --frozen-lockfile
 
-      - name: Run tests
+      - name: 运行 tests
         run: bun test
 
-      - name: Setup Node.js for release
+      - name: 设置用于 release 的 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24"
           registry-url: https://registry.npmjs.org
 
-      - name: Publish package
+      - name: 发布 package
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

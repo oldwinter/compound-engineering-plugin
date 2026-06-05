@@ -1,212 +1,211 @@
 ---
 name: ce-compound
-description: Document a recently solved problem to compound your team's knowledge or CONCEPTS.md, the project's shared domain vocabulary.
-argument-hint: "[optional: brief context] [mode:headless] "
+description: 记录最近解决的问题，用于 compound 团队知识，或维护项目共享领域词汇表 CONCEPTS.md。
+argument-hint: "[optional: 简短 context] [mode:headless] "
 ---
 
 # /ce-compound
 
-Coordinate multiple subagents working in parallel to document a recently solved problem.
+协调多个并行 subagents，记录最近解决的问题。
 
-## Purpose
+## Purpose（目的）
 
-Captures problem solutions while context is fresh, creating structured documentation in `docs/solutions/` with YAML frontmatter for searchability and future reference. Uses parallel subagents for maximum efficiency.
+在 context 仍新鲜时捕获 problem solutions，在 `docs/solutions/` 中创建带 YAML frontmatter 的结构化文档，便于搜索和未来引用。使用 parallel subagents 以获得最高效率。
 
-**Why "compound"?** Each documented solution compounds your team's knowledge. The first time you solve a problem takes research. Document it, and the next occurrence takes minutes. Knowledge compounds.
+**为什么叫 "compound"？** 每个被记录的 solution 都会 compound 团队知识。第一次解决问题需要 research。记录下来，下一次类似问题只需几分钟。Knowledge compounds。
 
-## Usage
+## Usage（用法）
 
 ```bash
-/ce-compound                            # Document the most recent fix
-/ce-compound [brief context]            # Provide additional context hint
-/ce-compound mode:headless              # Non-interactive run for automations
-/ce-compound mode:headless [context]    # Non-interactive run with context hint
+/ce-compound                            # 记录最近的 fix
+/ce-compound [brief context]            # 提供额外 context hint
+/ce-compound mode:headless              # automation 使用的非交互 run
+/ce-compound mode:headless [context]    # 带 context hint 的非交互 run
 ```
 
-## CONCEPTS.md bootstrap requests
+## CONCEPTS.md Bootstrap Requests（引导请求）
 
-If invoked specifically to create or bootstrap `CONCEPTS.md` from scratch rather than to document a solved problem, do not run the normal phases — `ce-compound` populates `CONCEPTS.md` only as a side effect of documenting a real learning (it seeds the *learning's area*, not the whole repo; see Phase 2.4). Repo-wide concept-map creation is `ce-compound-refresh`'s job. Redirect a standalone bootstrap request to `ce-compound-refresh` (which asks whether to build the concept map or run a refresh cycle), then exit.
+如果 invocation 明确是从零创建或 bootstrap `CONCEPTS.md`，而不是记录一个 solved problem，不要运行 normal phases：`ce-compound` 只会作为记录真实 learning 的 side effect 填充 `CONCEPTS.md`（它 seed 的是 *learning's area*，不是 whole repo；见 Phase 2.4）。Repo-wide concept-map creation 是 `ce-compound-refresh` 的职责。将 standalone bootstrap request 重定向到 `ce-compound-refresh`（它会询问是 build concept map 还是 run refresh cycle），然后退出。
 
-## Mode Detection
+## Mode Detection（模式检测）
 
-Check `$ARGUMENTS` for a `mode:headless` token. Tokens starting with `mode:` are flags, not context — strip `mode:headless` from arguments before treating the remainder as the brief context hint.
+检查 `$ARGUMENTS` 中是否有 `mode:headless` token。以 `mode:` 开头的 tokens 是 flags，不是 context：在将剩余内容作为 brief context hint 前，先从 arguments 中移除 `mode:headless`。
 
-| Mode | When | Behavior |
+| Mode（模式） | When（何时） | Behavior（行为） |
 |------|------|----------|
-| **Interactive** (default) | No mode token present | Ask Full vs Lightweight, ask about session history (Full only), prompt for Discoverability Check consent, end with "What's next?" |
-| **Headless** | `mode:headless` in arguments | No blocking questions. Run **Full mode without session history**. Apply the Discoverability Check edit silently if a gap exists. Skip Phase 3 specialized reviews. End with a structured terminal report — no "What's next?" menu. |
+| **Interactive**（default） | 没有 mode token | 询问 Full vs Lightweight，询问 session history（仅 Full），为 Discoverability Check consent 提示，最后显示 "What's next?" |
+| **Headless** | arguments 中有 `mode:headless` | 没有 blocking questions。运行 **Full mode without session history**。如果存在 gap，静默应用 Discoverability Check edit。跳过 Phase 3 specialized reviews。以 structured terminal report 结束：没有 "What's next?" menu。 |
 
-Headless mode is intended for automations and skill-to-skill invocation where no human is present to answer questions. The doc itself is identical to what an interactive Full run would produce — classification work (track, category, overlap) follows the same rules and writes nothing extra into the artifact. Once detected, headless mode applies for the entire run.
+Headless mode 用于 automations 和无人回答问题的 skill-to-skill invocation。Doc 本身与 interactive Full run 产物相同：classification work（track、category、overlap）遵循相同规则，且不会向 artifact 写入额外内容。一旦检测到，headless mode 适用于整个 run。
 
-## Pre-resolved context
+## Pre-resolved Context（预解析 Context）
 
-**Git branch (pre-resolved):** !`git rev-parse --abbrev-ref HEAD 2>/dev/null || true`
+**Git branch（pre-resolved）：** !`git rev-parse --abbrev-ref HEAD 2>/dev/null || true`
 
-If the line above resolved to a plain branch name (like `feat/my-branch`), include it in the `ce-sessions` invocation payload in Phase 1 so the orchestrator does not waste a turn deriving it. If it still contains a backtick command string or is empty, omit it and let `ce-sessions` derive it at runtime.
+如果上方 line 解析为 plain branch name（如 `feat/my-branch`），在 Phase 1 的 `ce-sessions` invocation payload 中包含它，这样 orchestrator 不会浪费一轮去推导。如果它仍包含 backtick command string 或为空，省略它并让 `ce-sessions` 在 runtime 推导。
 
-## Support Files
+## Support Files（支持文件）
 
-These files are the durable contract for the workflow. Read them on-demand at the step that needs them — do not bulk-load at skill start.
+这些 files 是 workflow 的 durable contract。在需要它们的 step 按需读取；不要在 skill start 时 bulk-load。
 
-- `references/schema.yaml` — canonical frontmatter fields and enum values (read when validating YAML)
-- `references/yaml-schema.md` — category mapping from problem_type to directory (read when classifying)
-- `references/concepts-vocabulary.md` — CONCEPTS.md format and inclusion rules (read in Phase 2.4 when domain terms surface)
-- `assets/resolution-template.md` — section structure for new docs (read when assembling)
+- `references/schema.yaml`：canonical frontmatter fields 和 enum values（validating YAML 时读取）
+- `references/yaml-schema.md`：从 problem_type 到 directory 的 category mapping（classifying 时读取）
+- `references/concepts-vocabulary.md`：CONCEPTS.md format 和 inclusion rules（Phase 2.4 中 domain terms surface 时读取）
+- `assets/resolution-template.md`：new docs 的 section structure（assembling 时读取）
 
-When spawning subagents, pass the relevant file contents into the task prompt so they have the contract without needing cross-skill paths.
+Spawning subagents 时，将 relevant file contents 放进 task prompt，让它们无需 cross-skill paths 也拥有 contract。
 
-## Execution Strategy
+## Execution Strategy（执行策略）
 
-**In headless mode**, skip both questions below and go directly to **Full Mode** with session history disabled. Phase 1's session-history step (step 4) is omitted. Proceed straight to research.
+**在 headless mode 中**，跳过下面两个问题，直接进入 **Full Mode**，且 session history disabled。Phase 1 的 session-history step（step 4）省略。直接进入 research。
 
-**In interactive mode**, present the user with two options before proceeding, using the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
-
-```
-1. Full (recommended) — the complete compound workflow. Researches,
-   cross-references, and reviews your solution to produce documentation
-   that compounds your team's knowledge.
-
-2. Lightweight — same documentation, single pass. Faster and uses
-   fewer tokens, but won't detect duplicates or cross-reference
-   existing docs. Best for simple fixes or long sessions nearing
-   context limits.
-```
-
-In interactive mode, do NOT pre-select a mode, do NOT skip this prompt, and wait for the user's choice before proceeding. (Headless mode bypasses this prompt per the "**In headless mode**" rule above and runs Full directly — these "do not skip" directives do not apply to headless.)
-
-**If the user chooses Full** (interactive mode only), ask one follow-up question before proceeding. Detect which harness is running (Claude Code, Codex, or Cursor) and ask:
+**在 interactive mode 中**，继续前使用平台 blocking question tool 向用户呈现两个 options：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
 
 ```
-Would you also like to search your [harness name] session history
-for relevant knowledge to help the Compound process? This adds
-time and token usage.
+1. Full (recommended) — 完整 compound workflow。Research、
+   cross-reference 并 review 你的 solution，产出能够 compound
+   团队知识的 documentation。
+
+2. Lightweight — 相同 documentation，single pass。更快且使用
+   更少 tokens，但不会 detect duplicates，也不会 cross-reference
+   existing docs。最适合 simple fixes 或接近 context limits 的 long sessions。
 ```
 
-If the user says yes, invoke `ce-sessions` in Phase 1 (see step 4). If no, skip it. Do not ask this in lightweight mode or headless mode.
+在 interactive mode 中，不要 pre-select mode，不要跳过此 prompt，继续前等待用户选择。（Headless mode 按上方 "**In headless mode**" 规则绕过此 prompt 并直接运行 Full：这些 "do not skip" directives 不适用于 headless。）
+
+**如果用户选择 Full**（仅 interactive mode），继续前询问一个 follow-up question。检测当前运行的 harness（Claude Code、Codex 或 Cursor）并询问：
+
+```
+是否还要搜索你的 [harness name] session history，
+寻找有助于 Compound process 的相关 knowledge？这会增加
+时间和 token 用量。
+```
+
+如果用户回答 yes，在 Phase 1 中调用 `ce-sessions`（见 step 4）。如果 no，则跳过。不要在 lightweight mode 或 headless mode 中询问。
 
 ---
 
-### Full Mode
+### Full Mode（完整模式）
 
 <critical_requirement>
-**The primary deliverable is ONE file - the final documentation.**
+**Primary deliverable 是 ONE file：最终 documentation。**
 
-Phase 1 subagents return TEXT DATA to the orchestrator. They must NOT use Write, Edit, or create any files. Only the orchestrator writes files. Beyond the Phase 2 solution doc, its other writes are maintenance side effects — not additional deliverables, and creating one when absent is expected, not a violation of this rule:
-- **`CONCEPTS.md`** — create or update in Phase 2.4 (Vocabulary Capture) when a qualifying domain term surfaces.
-- **A project instruction file** (AGENTS.md or CLAUDE.md) — a small edit when the Discoverability Check finds a gap.
+Phase 1 subagents 向 orchestrator 返回 TEXT DATA。它们不得使用 Write、Edit 或创建任何 files。只有 orchestrator 写 files。除 Phase 2 solution doc 外，其它 writes 是 maintenance side effects，而不是 additional deliverables；缺失时创建也是预期行为，不违反此规则：
+- **`CONCEPTS.md`**：Phase 2.4（Vocabulary Capture）中 qualifying domain term surface 时创建或更新。
+- **A project instruction file**（AGENTS.md 或 CLAUDE.md）：Discoverability Check 发现 gap 时进行 small edit。
 
-Both ensure future agents can discover and ground in the knowledge store; neither makes the documentation any less the single deliverable.
+两者都确保 future agents 能 discover 并 ground in knowledge store；二者都不改变 documentation 是 single deliverable 的事实。
 </critical_requirement>
 
-### Phase 0.5: Auto Memory Scan
+### Phase 0.5: Auto Memory Scan（自动 Memory 扫描）
 
-Before launching Phase 1 subagents, check the auto-memory block injected into your system prompt for notes relevant to the problem being documented.
+启动 Phase 1 subagents 前，检查注入 system prompt 的 auto-memory block 中是否有与正在记录的问题相关的 notes。
 
-1. Look for a block labeled "user's auto-memory" (Claude Code only) already present in your system prompt context — MEMORY.md's entries are inlined there
-2. If the block is absent, empty, or this is a non-Claude-Code platform, skip this step and proceed to Phase 1 unchanged
-3. Scan the entries for anything related to the problem being documented -- use semantic judgment, not keyword matching
-4. If relevant entries are found, prepare a labeled excerpt block:
+1. 查找 system prompt context 中已存在、标记为 "user's auto-memory" 的 block（仅 Claude Code）：MEMORY.md entries 会内联在那里
+2. 如果 block 缺失、为空，或当前不是 Claude-Code platform，跳过此 step 并原样进入 Phase 1
+3. 扫描 entries，寻找与正在记录的问题相关的内容：使用 semantic judgment，而不是 keyword matching
+4. 如果找到 relevant entries，准备一个带 label 的 excerpt block：
 
 ```
-## Supplementary notes from auto memory
-Treat as additional context, not primary evidence. Conversation history
-and codebase findings take priority over these notes.
+## 来自 auto memory 的补充 notes
+将其作为 additional context，而不是 primary evidence。Conversation history
+和 codebase findings 优先于这些 notes。
 
 [relevant entries here]
 ```
 
-5. Pass this block as additional context to the Context Analyzer and Solution Extractor task prompts in Phase 1. If any memory notes end up in the final documentation (e.g., as part of the investigation steps or root cause analysis), tag them with "(auto memory [claude])" so their origin is clear to future readers.
+5. 将此 block 作为 additional context 传给 Phase 1 中 Context Analyzer 和 Solution Extractor 的 task prompts。如果任何 memory notes 最终进入 final documentation（例如作为 investigation steps 或 root cause analysis 的一部分），用 "(auto memory [claude])" 标记，让 future readers 清楚其来源。
 
-If no relevant entries are found, proceed to Phase 1 without passing memory context.
+如果没有找到 relevant entries，不传递 memory context，继续 Phase 1。
 
-### Phase 1: Research
+### Phase 1: Research（研究）
 
-Launch research subagents. Each returns text data to the orchestrator.
+启动 research subagents。每个 subagent 向 orchestrator 返回 text data。
 
-**Dispatch order:**
-- Launch `Context Analyzer`, `Solution Extractor`, and `Related Docs Finder` in parallel (background)
-- **Then** invoke the `ce-sessions` skill via the platform's skill-invocation primitive (see step 4 below) — only if the user opted in to session history. The skill call is synchronous from this orchestrator's main-context turn, but the already-dispatched background subagents continue running in parallel underneath, so the wall-clock benefit is preserved (`max(ce-sessions, slowest background subagent)`, not their sum). Issuing the skill call before the parallel block would serialize ce-sessions in front of the research subagents and regress wall-clock time.
+**Dispatch order（派发顺序）：**
+- 并行启动 `Context Analyzer`、`Solution Extractor` 和 `Related Docs Finder`（background）
+- **然后** 通过平台的 skill-invocation primitive 调用 `ce-sessions` skill（见下方 step 4）：仅当用户 opt in session history 时。该 skill call 从 orchestrator 的 main-context turn 看是 synchronous，但已 dispatch 的 background subagents 仍在底层 parallel 运行，所以保留 wall-clock benefit（`max(ce-sessions, slowest background subagent)`，而不是二者相加）。如果在 parallel block 前发起 skill call，会把 ce-sessions 串行放在 research subagents 前面，导致 wall-clock time 回退。
 
 <parallel_tasks>
 
-#### 1. **Context Analyzer**
-   - Extracts conversation history
-   - Reads `references/schema.yaml` for enum validation and **track classification**
-   - Determines the track (bug or knowledge) from the problem_type
-   - Identifies problem type, component, and track-appropriate fields:
-     - **Bug track**: symptoms, root_cause, resolution_type
-     - **Knowledge track**: applies_when (symptoms/root_cause/resolution_type optional)
-   - Incorporates auto memory excerpts (if provided by the orchestrator) as supplementary evidence
-   - Reads `references/yaml-schema.md` for category mapping into `docs/solutions/`
-   - Suggests a filename using the pattern `[sanitized-problem-slug].md` — no date suffix, even if existing files in the target directory have one; the `date:` frontmatter field is the canonical creation date
-   - Returns: YAML frontmatter skeleton (must include `category:` field mapped from problem_type), category directory path, suggested filename, and which track applies
-   - Does not invent enum values, categories, or frontmatter fields from memory; reads the schema and mapping files above
-   - Does not force bug-track fields onto knowledge-track learnings or vice versa
+#### 1. **Context Analyzer（上下文分析器）**
+   - 提取 conversation history
+   - 读取 `references/schema.yaml` 进行 enum validation 和 **track classification**
+   - 从 problem_type 判断 track（bug 或 knowledge）
+   - 识别 problem type、component 和 track-appropriate fields：
+- **Bug track（bug 轨道）**：symptoms、root_cause、resolution_type
+- **Knowledge track（knowledge 轨道）**：applies_when（symptoms/root_cause/resolution_type optional）
+   - 将 auto memory excerpts（如果 orchestrator 提供）作为 supplementary evidence 纳入
+   - 读取 `references/yaml-schema.md`，用于映射 category 到 `docs/solutions/`
+   - 使用 `[sanitized-problem-slug].md` pattern 建议 filename：不加 date suffix，即使 target directory 中已有 files 使用 date suffix；`date:` frontmatter field 才是 canonical creation date
+   - 返回：YAML frontmatter skeleton（必须包含从 problem_type 映射出的 `category:` field）、category directory path、suggested filename，以及适用的 track
+   - 不要从 memory 发明 enum values、categories 或 frontmatter fields；读取上方 schema 和 mapping files
+   - 不要将 bug-track fields 强行套到 knowledge-track learnings，反之亦然
 
-#### 2. **Solution Extractor**
-   - Reads `references/schema.yaml` for track classification (bug vs knowledge)
-   - Adapts output structure based on the problem_type track
-   - Incorporates auto memory excerpts (if provided by the orchestrator) as supplementary evidence -- conversation history and the verified fix take priority; if memory notes contradict the conversation, note the contradiction as cautionary context
+#### 2. **Solution Extractor（Solution 提取器）**
+   - 读取 `references/schema.yaml` 进行 track classification（bug vs knowledge）
+   - 基于 problem_type track 调整 output structure
+   - 将 auto memory excerpts（如果 orchestrator 提供）作为 supplementary evidence 纳入：conversation history 和 verified fix 优先；如果 memory notes 与 conversation 矛盾，将该矛盾标记为 cautionary context
 
-   **Bug track output sections:**
+   **Bug track output sections（bug 轨道输出 sections）：**
 
-   - **Problem**: 1-2 sentence description of the issue
-   - **Symptoms**: Observable symptoms (error messages, behavior)
-   - **What Didn't Work**: Failed investigation attempts and why they failed
-   - **Solution**: The actual fix with code examples (before/after when applicable)
-   - **Why This Works**: Root cause explanation and why the solution addresses it
-   - **Prevention**: Strategies to avoid recurrence, best practices, and test cases. Include concrete code examples where applicable (e.g., gem configurations, test assertions, linting rules)
+   - **Problem**：用 1-2 句话描述 issue
+   - **Symptoms（症状）**：observable symptoms（error messages、behavior）
+   - **What Didn't Work**：failed investigation attempts 及其失败原因
+   - **Solution**：actual fix，包含 code examples（适用时包含 before/after）
+   - **Why This Works**：root cause explanation，以及 solution 为什么能解决它
+   - **Prevention**：避免 recurrence 的 strategies、best practices 和 test cases。适用时包含 concrete code examples（例如 gem configurations、test assertions、linting rules）
 
-   **Knowledge track output sections:**
+   **Knowledge track output sections（knowledge 轨道输出 sections）：**
 
-   - **Context**: What situation, gap, or friction prompted this guidance
-   - **Guidance**: The practice, pattern, or recommendation with code examples when useful
-   - **Why This Matters**: Rationale and impact of following or not following this guidance
-   - **When to Apply**: Conditions or situations where this applies
-   - **Examples**: Concrete before/after or usage examples showing the practice in action
+   - **Context**：是什么 situation、gap 或 friction 触发此 guidance
+   - **Guidance**：practice、pattern 或 recommendation；有用时带 code examples
+   - **Why This Matters**：遵循或不遵循此 guidance 的 rationale 和 impact
+   - **When to Apply**：此 guidance 适用的 conditions 或 situations
+   - **Examples**：展示该 practice in action 的 concrete before/after 或 usage examples
 
-#### 3. **Related Docs Finder**
-   - Searches `docs/solutions/` for related documentation
-   - Identifies cross-references and links
-   - Finds related GitHub issues
-   - Flags any related learning or pattern docs that may now be stale, contradicted, or overly broad
-   - **Assesses overlap** with the new doc being created across five dimensions: problem statement, root cause, solution approach, referenced files, and prevention rules. Score as:
-     - **High**: 4-5 dimensions match — essentially the same problem solved again
-     - **Moderate**: 2-3 dimensions match — same area but different angle or solution
-     - **Low**: 0-1 dimensions match — related but distinct
-   - Returns: Links, relationships, refresh candidates, and overlap assessment (score + which dimensions matched)
+#### 3. **Related Docs Finder（相关 Docs 查找器）**
+   - 搜索 `docs/solutions/` 中的 related documentation
+   - 识别 cross-references 和 links
+   - 查找 related GitHub issues
+   - 标记任何现在可能 stale、contradicted 或 overly broad 的 related learning 或 pattern docs
+   - **评估 overlap**：与即将创建的新 doc 在五个维度上比较：problem statement、root cause、solution approach、referenced files 和 prevention rules。Score：
+     - **High**：4-5 个 dimensions match：本质上是同一个问题再次被解决
+     - **Moderate**：2-3 个 dimensions match：同一 area，但角度或 solution 不同
+     - **Low**：0-1 个 dimensions match：相关但不同
+   - 返回：Links、relationships、refresh candidates 和 overlap assessment（score + matched dimensions）
 
-   **Search strategy (grep-first filtering for efficiency):**
+   **Search strategy（搜索策略，grep-first filtering for efficiency）：**
 
-   1. Extract keywords from the problem context: module names, technical terms, error messages, component types
-   2. If the problem category is clear, narrow search to the matching `docs/solutions/<category>/` directory
-   3. Use the native content-search tool (e.g., Grep in Claude Code) to pre-filter candidate files BEFORE reading any content. Run multiple searches in parallel, case-insensitive, targeting frontmatter fields. These are template patterns -- substitute actual keywords:
+   1. 从 problem context 提取 keywords：module names、technical terms、error messages、component types
+   2. 如果 problem category 清晰，将 search 缩小到匹配的 `docs/solutions/<category>/` directory
+   3. 读取任何 content 前，使用 native content-search tool（例如 Claude Code 中的 Grep）预筛 candidate files。并行运行多个 case-insensitive searches，目标是 frontmatter fields。下面是 template patterns：替换成实际 keywords：
       - `title:.*<keyword>`
       - `tags:.*(<keyword1>|<keyword2>)`
       - `module:.*<module name>`
       - `component:.*<component>`
-   4. If search returns >25 candidates, re-run with more specific patterns. If <3, broaden to full content search
-   5. Read only frontmatter (first 30 lines) of candidate files to score relevance
-   6. Fully read only strong/moderate matches
-   7. Return distilled links and relationships, not raw file contents
+   4. 如果 search 返回 >25 candidates，用更 specific patterns 重跑。如果 <3，扩大到 full content search
+   5. 只读取 candidate files 的 frontmatter（前 30 行）来评分 relevance
+   6. 只完整读取 strong/moderate matches
+   7. 返回 distilled links 和 relationships，而不是 raw file contents
 
-   **GitHub issue search:**
+   **GitHub issue search（GitHub issue 搜索）：**
 
-   Prefer the `gh` CLI for searching related issues: `gh issue list --search "<keywords>" --state all --limit 5`. If `gh` is not installed, fall back to the GitHub MCP tools (e.g., `unblocked` data_retrieval) if available. If neither is available, skip GitHub issue search and note it was skipped in the output.
+   优先使用 `gh` CLI 搜索 related issues：`gh issue list --search "<keywords>" --state all --limit 5`。如果未安装 `gh`，且 GitHub MCP tools（例如 `unblocked` data_retrieval）可用，则 fallback 到它们。如果两者都不可用，跳过 GitHub issue search，并在 output 中说明已跳过。
 
 </parallel_tasks>
 
-#### 4. **Session History via `ce-sessions`** (synchronous skill call, after launching the parallel block — only if the user opted in)
-   - **Skip entirely** if the user declined session history in the follow-up question, if running in lightweight mode, or if running in headless mode.
-   - Invoke the `ce-sessions` skill via the platform's skill-invocation primitive (`Skill` in Claude Code, `Skill` in Codex, the equivalent on Gemini/Pi). Pass the dispatch payload below as the skill argument string. `ce-sessions` runs in main context — it owns discovery, branch/keyword filtering, scan-window selection, the deep-dive cap, per-session extraction to a `mktemp` scratch dir, and dispatch of the synthesis-only `ce-session-historian` subagent. The compound orchestrator only needs to pass the topic and time window and read back the findings text.
+#### 4. **Session History via `ce-sessions`**（synchronous skill call，在启动 parallel block 后，仅当用户 opt in）
+   - 如果用户在 follow-up question 中拒绝 session history、正在 lightweight mode 运行，或正在 headless mode 运行，则 **完全跳过**。
+   - 通过平台的 skill-invocation primitive 调用 `ce-sessions` skill（Claude Code 中的 `Skill`、Codex 中的 `Skill`、Gemini/Pi 上的等价工具）。将下方 dispatch payload 作为 skill argument string 传入。`ce-sessions` 在 main context 中运行：它负责 discovery、branch/keyword filtering、scan-window selection、deep-dive cap、per-session extraction 到 `mktemp` scratch dir，以及 dispatch synthesis-only `ce-session-historian` subagent。compound orchestrator 只需传递 topic 和 time window，并读回 findings text。
 
-   **Dispatch payload — keep tight.** A long, keyword-rich payload licenses ce-sessions to keep widening. Use this shape:
+   **Dispatch payload：保持 tight。** 冗长、keyword-rich 的 payload 会让 ce-sessions 继续扩大范围。使用此形状：
 
-   - **Pre-resolved context** (only if values resolved cleanly above; otherwise omit): repo name, current git branch.
-   - **Time window**: explicit `7 days` unless the documented problem clearly spans a longer arc.
-   - **Problem topic**: one sentence naming the concrete issue — error message, module name, what broke and how it was fixed. Not a paragraph; not a bullet list of related topics.
-   - **Filter rule (one line)**: "Only surface findings directly relevant to this specific problem. Ignore unrelated work from the same sessions or branches."
-   - **Output schema**:
+   - **Pre-resolved context**（仅当上方 values cleanly resolved；否则省略）：repo name、current git branch。
+   - **Time window**：明确 `7 days`，除非正在记录的问题明显跨越更长 arc。
+   - **Problem topic**：一句话命名 concrete issue：error message、module name、什么坏了以及如何修复。不要写 paragraph；不要写 related topics 的 bullet list。
+   - **Filter rule（一行）**："Only surface findings directly relevant to this specific problem. Ignore unrelated work from the same sessions or branches."
+   - **Output schema（输出 schema）**：
 
      ```
      Structure your response with these sections (omit any with no findings):
@@ -216,198 +215,198 @@ Launch research subagents. Each returns text data to the orchestrator.
      - Related context
      ```
 
-   Do not append additional context blocks, exclusion lists, or topic-keyword bullets — verbose payloads give ce-sessions license to keep widening the search and rapidly compound wall time. If keyword search is needed, ce-sessions owns that decision internally based on the topic.
-   - Returns: structured digest of findings from prior sessions, or "no relevant prior sessions" if none found.
-   - **ce-sessions is the final Phase 1 input, not a workflow stop.** When it returns, proceed directly to Phase 2 with its output as the last input — do not emit a summary and do not pause for the user. A "no relevant prior sessions" return is still a valid input; the documentation gets written without session context.
+   不要追加 additional context blocks、exclusion lists 或 topic-keyword bullets：verbose payloads 会授权 ce-sessions 继续扩大 search，并快速 compound wall time。如果需要 keyword search，ce-sessions 会基于 topic 内部决定。
+   - 返回：prior sessions 的 findings structured digest，或未找到时返回 "no relevant prior sessions"。
+   - **ce-sessions 是最终 Phase 1 input，不是 workflow stop。** 它返回后，将其 output 作为最后一个 input，直接进入 Phase 2：不要 emit summary，也不要暂停等待用户。"no relevant prior sessions" 返回仍是 valid input；documentation 会在没有 session context 的情况下写入。
 
-### Phase 2: Assembly & Write
+### Phase 2：Assembly & Write（组装与写入）
 
 <sequential_tasks>
 
-**WAIT for all Phase 1 inputs to complete before proceeding** — the three parallel subagents and, when the user opted in, the synchronous `ce-sessions` skill call. ce-sessions is a Phase 1 input even though it is a skill rather than a subagent.
+**继续前等待所有 Phase 1 inputs 完成**：三个 parallel subagents，以及用户 opt in 时的 synchronous `ce-sessions` skill call。ce-sessions 虽然是 skill 而不是 subagent，但仍是 Phase 1 input。
 
-The orchestrating agent (main conversation) performs these steps:
+Orchestrating agent（main conversation）执行以下 steps：
 
-1. Collect all text results from Phase 1 subagents
-2. **Check the overlap assessment** from the Related Docs Finder before deciding what to write:
+1. 收集 Phase 1 subagents 的所有 text results
+2. 决定写什么前，**检查 Related Docs Finder 的 overlap assessment**：
 
    | Overlap | Action |
    |---------|--------|
-   | **High** — existing doc covers the same problem, root cause, and solution | **Update the existing doc** with fresher context (new code examples, updated references, additional prevention tips) rather than creating a duplicate. The existing doc's path and structure stay the same. |
-   | **Moderate** — same problem area but different angle, root cause, or solution | **Create the new doc** normally. Flag the overlap for Phase 2.5 to recommend consolidation review. |
-   | **Low or none** | **Create the new doc** normally. |
+   | **High**：existing doc 覆盖相同 problem、root cause 和 solution | **Update existing doc**，加入 fresher context（new code examples、updated references、additional prevention tips），而不是创建 duplicate。Existing doc 的 path 和 structure 保持不变。 |
+   | **Moderate**：相同 problem area，但 angle、root cause 或 solution 不同 | 正常 **Create new doc**。为 Phase 2.5 标记 overlap，以推荐 consolidation review。 |
+   | **Low or none** | 正常 **Create new doc**。 |
 
-   The reason to update rather than create: two docs describing the same problem and solution will inevitably drift apart. The newer context is fresher and more trustworthy, so fold it into the existing doc rather than creating a second one that immediately needs consolidation.
+   选择 update 而不是 create 的原因：两个描述同一 problem 和 solution 的 docs 必然 drift apart。Newer context 更 fresh、更可信，因此将其 fold into existing doc，而不是创建一个立刻需要 consolidation 的第二份 doc。
 
-   When updating an existing doc, preserve its file path and frontmatter structure. Update the solution, code examples, prevention tips, and any stale references. Add a `last_updated: YYYY-MM-DD` field to the frontmatter. Do not change the title unless the problem framing has materially shifted.
+   Updating existing doc 时，保留其 file path 和 frontmatter structure。更新 solution、code examples、prevention tips 和任何 stale references。向 frontmatter 添加 `last_updated: YYYY-MM-DD` field。除非 problem framing 发生 material shift，否则不要更改 title。
 
-3. **Incorporate session history findings** (if available). When `ce-sessions` returned relevant prior-session context:
-   - Fold investigation dead ends and failed approaches into the **What Didn't Work** section (bug track) or **Context** section (knowledge track)
-   - Use cross-session patterns to enrich the **Prevention** or **Why This Matters** sections
-   - Tag session-sourced content with "(session history)" so its origin is clear to future readers
-   - If findings are thin or "no relevant prior sessions," proceed without session context
-4. Assemble complete markdown file from the collected pieces, reading `assets/resolution-template.md` for the section structure of new docs
-5. Validate YAML frontmatter against `references/schema.yaml`, including the YAML-safety quoting rule for array items (see `references/yaml-schema.md` > YAML Safety Rules)
-6. Create directory if needed: `mkdir -p docs/solutions/[category]/`
-7. Write the file: either the updated existing doc or the new `docs/solutions/[category]/[filename].md`
-8. **Run `python3 scripts/validate-frontmatter.py <output-path>`** to catch silent-corruption parser-safety issues that the prose rules miss: malformed `---` delimiter lines, unquoted ` #` in scalar values (silent comment truncation), and unquoted `: ` in scalar values (silent mapping confusion). Exit 0 means the doc is parser-safe; exit 1 means the script's stderr names the offending field(s) and what to fix — quote the value(s), re-write the doc, and re-run until exit 0. Do not declare success while validation fails. The script does not enforce schema rules and does not flag YAML reserved-indicator characters (those produce loud parser errors downstream rather than silent corruption — out of scope). Uses Python 3 stdlib only (no PyYAML or other deps).
+3. **纳入 session history findings**（如果可用）。当 `ce-sessions` 返回 relevant prior-session context 时：
+   - 将 investigation dead ends 和 failed approaches 放入 **What Didn't Work** section（bug track）或 **Context** section（knowledge track）
+   - 使用 cross-session patterns 丰富 **Prevention** 或 **Why This Matters** sections
+   - 用 "(session history)" 标记 session-sourced content，让 future readers 清楚其来源
+   - 如果 findings 很薄或为 "no relevant prior sessions"，不使用 session context 继续
+4. 从收集到的 pieces 组装完整 markdown file；为 new docs 读取 `assets/resolution-template.md` 获取 section structure
+5. 根据 `references/schema.yaml` validate YAML frontmatter，包括 array items 的 YAML-safety quoting rule（见 `references/yaml-schema.md` > YAML Safety Rules）
+6. 需要时创建 directory：`mkdir -p docs/solutions/[category]/`
+7. 写入 file：updated existing doc，或新的 `docs/solutions/[category]/[filename].md`
+8. **运行 `python3 scripts/validate-frontmatter.py <output-path>`**，捕获 prose rules 漏掉的 silent-corruption parser-safety issues：malformed `---` delimiter lines、scalar values 中未 quote 的 ` #`（silent comment truncation），以及 scalar values 中未 quote 的 `: `（silent mapping confusion）。Exit 0 表示 doc parser-safe；exit 1 表示 script 的 stderr 会指出 offending field(s) 以及修复方式：quote value(s)、重写 doc，并重跑直到 exit 0。Validation 失败时不要宣称 success。该 script 不 enforce schema rules，也不 flag YAML reserved-indicator characters（这些会在 downstream 产生 loud parser errors，而非 silent corruption：out of scope）。仅使用 Python 3 stdlib（无 PyYAML 或其他 deps）。
 
-When creating a new doc, preserve the section order from `assets/resolution-template.md` unless the user explicitly asks for a different structure.
+Creating new doc 时，除非用户明确要求不同 structure，否则保留 `assets/resolution-template.md` 中的 section order。
 
 </sequential_tasks>
 
-### Phase 2.4: Vocabulary Capture
+### Phase 2.4：Vocabulary Capture（词汇捕获）
 
-**First, read `references/concepts-vocabulary.md`.** This is unconditional. Do not pre-judge from memory that nothing qualifies — the reference's criteria are non-obvious and qualifying terms often live in the surrounding conversation rather than the new doc itself. Reading the reference is what makes the rest of the phase possible.
+**首先，读取 `references/concepts-vocabulary.md`。** 这是 unconditional。不要凭 memory 预判没有任何 term qualifies：reference 的 criteria 并不显然，qualifying terms 常常存在于 surrounding conversation，而不是 new doc 本身。读取 reference 是此 phase 后续步骤成立的前提。
 
-Then, applying those criteria, scan the new doc **and** the surrounding conversation for qualifying domain terms. If `CONCEPTS.md` exists at repo root, add missing qualifying terms and refine existing entries when new precision surfaced. If it does not exist and at least one qualifying term surfaced, create it.
+然后，应用这些 criteria，扫描 new doc **以及** surrounding conversation，寻找 qualifying domain terms。如果 repo root 存在 `CONCEPTS.md`，添加 missing qualifying terms，并在出现 new precision 时 refine existing entries。如果不存在且至少一个 qualifying term surfaced，则创建它。
 
-**Seed the learning's area at creation — don't write a lone term.** When `CONCEPTS.md` does not yet exist, alongside the surfaced term also seed the core domain nouns of the area this learning touched, following the **Seed goal** and **Scope of a seed** rules in `references/concepts-vocabulary.md`. The seed is scoped to the learning's area (the modules and domain the fix touched) and defines only terms investigated here — it does not reach for repo-wide nouns. This anchors the surfaced term so it does not dangle against undefined siblings. A repo-wide concept map is `ce-compound-refresh`'s bootstrap path, not this one.
+**创建时 seed learning's area：不要只写一个孤立 term。** 当 `CONCEPTS.md` 尚不存在时，除了 surfaced term，也要按照 `references/concepts-vocabulary.md` 中的 **Seed goal** 和 **Scope of a seed** rules，seed 此 learning 触及 area 的 core domain nouns。Seed scoped to learning's area（fix 触及的 modules 和 domain），只定义这里调查过的 terms；不要延伸到 repo-wide nouns。这会锚定 surfaced term，避免它悬在 undefined siblings 旁边。Repo-wide concept map 是 `ce-compound-refresh` 的 bootstrap path，不是这个 workflow 的职责。
 
-**At creation, hold the qualifying bar conservatively for borderline terms.** A borderline term, or a class/table/file name dressed up as an entity, defers to a later run — clear core nouns are seeded, borderline ones wait. The conservatism is about quality, not count; updates to an existing file follow the normal criteria.
+**创建时，对 borderline terms 保持 conservative qualifying bar。** Borderline term，或伪装成 entity 的 class/table/file name，推迟到后续 run：clear core nouns 会被 seeded，borderline ones 等待。Conservatism 关注 quality，而不是 count；对 existing file 的 updates 遵循 normal criteria。
 
-**When bootstrapping the file, start with this preamble under the `# Concepts` heading**, then add the qualifying entries below it:
+**Bootstrapping file 时，在 `# Concepts` heading 下以此 preamble 开头**，然后在下方添加 qualifying entries：
 
-> Shared domain vocabulary for this project — entities, named processes, and status concepts with project-specific meaning. Seeded with core domain vocabulary, then accretes as ce-compound and ce-compound-refresh process learnings; direct edits are fine. Glossary only, not a spec or catch-all.
+> 本项目的 shared domain vocabulary：具有项目特定含义的 entities、named processes 和 status concepts。先用 core domain vocabulary seed，随后随着 ce-compound 和 ce-compound-refresh 处理 learnings 而积累；可以直接编辑。这里只是 glossary，不是 spec，也不是 catch-all。
 
-**Refresh the coherence neighborhood of any entry you touch.** When adding or editing an entry, also inspect its *coherence neighborhood* — its cluster siblings and the terms it cross-references or that reference it. Within that neighborhood, do two things: fix glossary violations (implementation specifics — file paths, class names, function signatures, current-config values), and refresh entries the learning's own evidence shows have drifted. Bounds: neighborhood only, never a full-file audit; refresh only on evidence already in hand; if judging a neighbor would require investigation this learning did not do, flag it for `ce-compound-refresh` rather than editing on a guess. The test: after the edit, would a reader find the touched entry's siblings or referenced terms inconsistent with it? Broader audit is `ce-compound-refresh`'s job.
+**Refresh 你触及的任何 entry 的 coherence neighborhood。** 添加或编辑 entry 时，也要 inspect 其 *coherence neighborhood*：它的 cluster siblings，以及它 cross-reference 或 reference 它的 terms。在该 neighborhood 内做两件事：修复 glossary violations（implementation specifics：file paths、class names、function signatures、current-config values），并 refresh 由该 learning 自身 evidence 显示已 drift 的 entries。边界：只限 neighborhood，绝不做 full-file audit；只基于手头已有 evidence refresh；如果判断某个 neighbor 需要此 learning 未做的 investigation，将其标记给 `ce-compound-refresh`，不要猜测编辑。测试标准：编辑后，读者是否会发现 touched entry 的 siblings 或 referenced terms 与它不一致？Broader audit 是 `ce-compound-refresh` 的职责。
 
-If no terms qualified after applying the reference's criteria, record that outcome explicitly in the success output (e.g., "Vocabulary capture: scanned, no qualifying terms"). Do not silently skip — the visible scan-and-no-result record is the audit signal that the reference was consulted.
+如果应用 reference criteria 后没有 terms qualified，在 success output 中明确记录该结果（例如 "Vocabulary capture: scanned, no qualifying terms"）。不要静默跳过：可见的 scan-and-no-result record 是 reference 已被 consult 的 audit signal。
 
-**Apply edits silently in every mode — no user prompt in interactive, lightweight, or headless.** Vocabulary capture is a side effect of compounding, not a decision the user makes per run. Lightweight mode reaches this through its own single-pass step (see Lightweight Mode), and runs an **update-only** version — it refines an existing `CONCEPTS.md` but defers creation/seeding to a Full run.
+**所有 mode 都静默 apply edits：interactive、lightweight 或 headless 中都不提示用户。** Vocabulary capture 是 compounding 的 side effect，不是用户每次 run 要做的 decision。Lightweight mode 通过自己的 single-pass step 触达这里（见 Lightweight Mode），并运行 **update-only** version：它 refine existing `CONCEPTS.md`，但将 creation/seeding 推迟到 Full run。
 
-### Phase 2.5: Selective Refresh Check
+### Phase 2.5：Selective Refresh Check（选择性刷新检查）
 
-After writing the new learning, decide whether this new solution is evidence that older docs should be refreshed.
+写入 new learning 后，判断这个 new solution 是否构成 older docs 应 refresh 的 evidence。
 
-`ce-compound-refresh` is **not** a default follow-up. Use it selectively when the new learning suggests an older learning or pattern doc may now be inaccurate.
+`ce-compound-refresh` **不是** default follow-up。仅当 new learning 暗示某个 older learning 或 pattern doc 现在可能 inaccurate 时，选择性使用。
 
-It makes sense to invoke `ce-compound-refresh` when one or more of these are true:
+当以下一个或多个条件为 true 时，invoke `ce-compound-refresh` 是合理的：
 
-1. A related learning or pattern doc recommends an approach that the new fix now contradicts
-2. The new fix clearly supersedes an older documented solution
-3. The current work involved a refactor, migration, rename, or dependency upgrade that likely invalidated references in older docs
-4. A pattern doc now looks overly broad, outdated, or no longer supported by the refreshed reality
-5. The Related Docs Finder surfaced high-confidence refresh candidates in the same problem space
-6. The Related Docs Finder reported **moderate overlap** with an existing doc — there may be consolidation opportunities that benefit from a focused review
+1. Related learning 或 pattern doc 推荐的 approach 已被 new fix 反驳
+2. New fix 明确 supersedes older documented solution
+3. 当前 work 包含 refactor、migration、rename 或 dependency upgrade，可能使 older docs 中的 references invalid
+4. Pattern doc 现在看起来 overly broad、outdated，或不再受 refreshed reality 支持
+5. Related Docs Finder 在同一 problem space 中浮现 high-confidence refresh candidates
+6. Related Docs Finder 报告与 existing doc 有 **moderate overlap**：可能存在值得 focused review 的 consolidation opportunities
 
-It does **not** make sense to invoke `ce-compound-refresh` when:
+当以下情况出现时，invoke `ce-compound-refresh` **不**合理：
 
-1. No related docs were found
-2. Related docs still appear consistent with the new learning
-3. The overlap is superficial and does not change prior guidance
-4. Refresh would require a broad historical review with weak evidence
+1. 没有找到 related docs
+2. Related docs 仍看起来与 new learning 一致
+3. Overlap 很 superficial，且不改变 prior guidance
+4. Refresh 需要 broad historical review，但 evidence 很弱
 
-Use these rules:
+使用以下 rules：
 
-- If there is **one obvious stale candidate**, invoke `ce-compound-refresh` with a narrow scope hint after the new learning is written
-- If there are **multiple candidates in the same area**, ask the user whether to run a targeted refresh for that module, category, or pattern set
-- If context is already tight or you are in lightweight mode, do not expand into a broad refresh automatically; instead recommend `ce-compound-refresh` as the next step with a scope hint
-- **In headless mode**, never invoke `ce-compound-refresh` and never ask the user. Surface the recommended scope hint in the terminal report's "Refresh recommendation" line and let the caller decide
+- 如果有 **one obvious stale candidate**，在 new learning 写入后用 narrow scope hint invoke `ce-compound-refresh`
+- 如果有 **multiple candidates in the same area**，询问用户是否为该 module、category 或 pattern set 运行 targeted refresh
+- 如果 context 已经 tight，或你在 lightweight mode，不要自动扩展到 broad refresh；改为推荐将 `ce-compound-refresh` 作为下一步，并提供 scope hint
+- **在 headless mode 中**，绝不 invoke `ce-compound-refresh`，也不询问用户。在 terminal report 的 "Refresh recommendation" line 中浮现 recommended scope hint，让 caller 决定
 
-When invoking or recommending `ce-compound-refresh`, be explicit about the argument to pass. Prefer the narrowest useful scope:
+Invoking 或 recommending `ce-compound-refresh` 时，明确要传入的 argument。优先选择最窄的有用 scope：
 
-- **Specific file** when one learning or pattern doc is the likely stale artifact
-- **Module or component name** when several related docs may need review
-- **Category name** when the drift is concentrated in one solutions area
-- **Pattern filename or pattern topic** when the stale guidance lives in `docs/solutions/patterns/`
+- 当一个 learning 或 pattern doc 很可能是 stale artifact 时，用 **specific file**
+- 当多个 related docs 可能需要 review 时，用 **module or component name**
+- 当 drift 集中在一个 solutions area 时，用 **category name**
+- 当 stale guidance 位于 `docs/solutions/patterns/` 时，用 **pattern filename or pattern topic**
 
-Examples:
+Examples（示例）:
 
 - `/ce-compound-refresh plugin-versioning-requirements`
 - `/ce-compound-refresh payments`
 - `/ce-compound-refresh performance-issues`
 - `/ce-compound-refresh critical-patterns`
 
-A single scope hint may still expand to multiple related docs when the change is cross-cutting within one domain, category, or pattern area.
+当 change 在一个 domain、category 或 pattern area 内 cross-cutting 时，单个 scope hint 仍可能扩展到多个 related docs。
 
-Do not invoke `ce-compound-refresh` without an argument unless the user explicitly wants a broad sweep.
+除非用户明确想要 broad sweep，否则不要无 argument invoke `ce-compound-refresh`。
 
-Always capture the new learning first. Refresh is a targeted maintenance follow-up, not a prerequisite for documentation.
+始终先 capture new learning。Refresh 是 targeted maintenance follow-up，不是 documentation 的 prerequisite。
 
-### Discoverability Check
+### Discoverability Check（可发现性检查）
 
-After the learning is written and the refresh decision is made, check whether the project's instruction files would lead an agent to discover and search `docs/solutions/` before starting work in a documented area. This runs every time — the knowledge store only compounds value when agents can find it.
+Learning 写入且 refresh decision 做出后，检查 project instruction files 是否会引导 agent 在 documented area 开始 work 前 discover 并 search `docs/solutions/`。这每次都运行：只有 agents 能找到 knowledge store 时，它才会 compound value。
 
-1. Identify which root-level instruction files exist (AGENTS.md, CLAUDE.md, or both). Read the file(s) and determine which holds the substantive content — one file may just be a shim that `@`-includes the other (e.g., `CLAUDE.md` containing only `@AGENTS.md`, or vice versa). The substantive file is the assessment and edit target; ignore shims. If neither file exists, skip this check entirely.
-2. Assess whether an agent reading the instruction files would learn three things:
-   - That a searchable knowledge store of documented solutions exists
-   - Enough about its structure to search effectively (category organization, YAML frontmatter fields like `module`, `tags`, `problem_type`)
-   - When to search it (before implementing features, debugging issues, or making decisions in documented areas — learnings may cover bugs, best practices, workflow patterns, or other institutional knowledge)
+1. 识别哪些 root-level instruction files 存在（AGENTS.md、CLAUDE.md 或二者）。读取 file(s)，判断哪个持有 substantive content：一个 file 可能只是 `@`-includes 另一个的 shim（例如 `CLAUDE.md` 只包含 `@AGENTS.md`，或反之）。Substantive file 是 assessment 和 edit target；忽略 shims。如果二者都不存在，完全跳过此 check。
+2. 评估阅读 instruction files 的 agent 是否会学到三件事：
+   - 存在一个可搜索的 documented solutions knowledge store
+   - 足够理解其 structure 以有效 search（category organization、YAML frontmatter fields 如 `module`、`tags`、`problem_type`）
+   - 何时 search 它（在 documented areas 中 implementing features、debugging issues 或 making decisions 前；learnings 可能涵盖 bugs、best practices、workflow patterns 或其他 institutional knowledge）
 
-   This is a semantic assessment, not a string match. The information could be a line in an architecture section, a bullet in a gotchas section, spread across multiple places, or expressed without ever using the exact path `docs/solutions/`. Use judgment — if an agent would reasonably discover and use the knowledge store after reading the file, the check passes.
+   这是 semantic assessment，不是 string match。信息可以是 architecture section 中的一行、gotchas section 中的 bullet、分散在多处，或完全不使用精确 path `docs/solutions/`。使用 judgment：如果 agent 读完 file 后会合理 discover 并使用 knowledge store，则 check passes。
 
-3. If the spirit is already met, no action needed — move on.
-4. If not:
-   a. Based on the file's existing structure, tone, and density, identify where a mention fits naturally. Before creating a new section, check whether the information could be a single line in the closest related section — an architecture tree, a directory listing, a documentation section, or a conventions block. A line added to an existing section is almost always better than a new headed section. Only add a new section as a last resort when the file has clear sectioned structure and nothing is even remotely related.
-   b. Draft the smallest addition that communicates the three things. Match the file's existing style and density. The addition should describe the knowledge store itself, not the plugin — an agent without the plugin should still find value in it.
+3. 如果 spirit 已经满足，无需 action，继续。
+4. 如果不满足：
+   a. 基于 file 的 existing structure、tone 和 density，识别 mention 自然适合的位置。创建 new section 前，检查信息是否可以作为 closest related section 中的一行：architecture tree、directory listing、documentation section 或 conventions block。向 existing section 添加一行几乎总是优于 new headed section。只有当 file 有明确 sectioned structure 且没有任何 remotely related 内容时，才把 new section 作为 last resort。
+   b. Draft 能传达三件事的 smallest addition。匹配 file 的 existing style 和 density。Addition 应描述 knowledge store 本身，而不是 plugin：没有 plugin 的 agent 也应能从中受益。
 
-      Keep the tone informational, not imperative. Express timing as description, not instruction — "relevant when implementing or debugging in documented areas" rather than "check before implementing or debugging." Imperative directives like "always search before implementing" cause redundant reads when a workflow already includes a dedicated search step. The goal is awareness: agents learn the folder exists and what's in it, then use their own judgment about when to consult it.
+      Tone 保持 informational，而不是 imperative。将 timing 表达为 description，而不是 instruction：使用 "relevant when implementing or debugging in documented areas"，而不是 "check before implementing or debugging."。像 "always search before implementing" 这样的 imperative directives 会在 workflow 已有 dedicated search step 时造成 redundant reads。目标是 awareness：agents 知道 folder 存在、里面有什么，然后自行判断何时 consult。
 
-      Examples of calibration (not templates — adapt to the file):
+      Calibration examples（不是 templates：按 file 调整）：
 
-      When there's an existing directory listing or architecture section — add a line:
+      When there's an existing directory listing or architecture section（当已有 directory listing 或 architecture section 时）— add a line:
       ```
       docs/solutions/  # documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (module, tags, problem_type)
       ```
 
-      When nothing in the file is a natural fit — a small headed section is appropriate:
+      When nothing in the file is a natural fit（当文件中没有自然位置时）— a small headed section is appropriate:
       ```
       ## Documented Solutions
 
       `docs/solutions/` — documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
       ```
-   c. In full interactive mode, explain to the user why this matters — agents working in this repo (including fresh sessions, other tools, or collaborators without the plugin) won't know to check `docs/solutions/` unless the instruction file surfaces it. Show the proposed change and where it would go, then use the platform's blocking question tool to get consent before making the edit: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting the proposal in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question. In lightweight mode, output a one-liner note and move on. In headless mode, apply the edit directly without prompting and surface it in the terminal report under "Instruction-file edit"
+   c. 在 full interactive mode 中，向用户解释其重要性：在此 repo 中工作的 agents（包括 fresh sessions、other tools，或没有 plugin 的 collaborators）如果 instruction file 没有浮现 `docs/solutions/`，就不会知道要检查它。展示 proposed change 及其位置，然后使用平台 blocking question tool 获取 consent 后再 edit：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 proposal；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。Lightweight mode 中输出 one-liner note 并继续。Headless mode 中不提示，直接 apply edit，并在 terminal report 的 "Instruction-file edit" 下浮现。
 
-5. **If `CONCEPTS.md` exists at repo root, run a parallel discoverability check for it.** Assess whether the instruction file would lead an agent to discover the project's shared domain vocabulary. Use the same workflow as the `docs/solutions/` check above: same target file, same edit-placement judgment, same consent-then-edit interaction shape per mode. A line in an existing section is almost always better than a new headed section. Example calibration when nothing else fits:
+5. **如果 repo root 存在 `CONCEPTS.md`，为它运行 parallel discoverability check。** 评估 instruction file 是否会引导 agent discover 项目的 shared domain vocabulary。使用与上方 `docs/solutions/` check 相同的 workflow：相同 target file、相同 edit-placement judgment、相同 per-mode consent-then-edit interaction shape。向 existing section 添加一行几乎总是优于 new headed section。当没有其它位置适合时的 calibration example：
 
    ```
    CONCEPTS.md  # shared domain vocabulary (entities, named processes, status concepts) — relevant when orienting to the codebase or discussing domain concepts
    ```
 
-   **Skip this step entirely if `CONCEPTS.md` does not exist** — never nag for an artifact the project has not adopted. When skipped, this step produces no output and no edit.
+   **如果 `CONCEPTS.md` 不存在，完全跳过此 step**：绝不要为项目尚未采用的 artifact nag。跳过时，此 step 不产生 output，也不 edit。
 
-### Phase 3: Optional Enhancement
+### Phase 3：Optional Enhancement（可选增强）
 
-**WAIT for Phase 2 to complete before proceeding.**
+**继续前等待 Phase 2 完成。**
 
-**Skip Phase 3 entirely in headless mode** to bound token usage — the caller does not have a human-in-the-loop to act on reviewer findings, and downstream automations can run specialized reviewers themselves if they want that pass.
+**在 headless mode 中完全跳过 Phase 3**，以 bound token usage：caller 没有 human-in-the-loop 去处理 reviewer findings；如果 downstream automations 想要这轮 pass，它们可以自行运行 specialized reviewers。
 
 <parallel_tasks>
 
-Based on problem type, optionally invoke specialized agents to review the documentation:
+根据 problem type，可选 invoke specialized agents review documentation：
 
-- **performance_issue** → `ce-performance-oracle`
-- **security_issue** → `ce-security-sentinel`
-- **database_issue** → `ce-data-integrity-guardian`
-- Any code-heavy issue → always run `ce-code-simplicity-reviewer` for minimal, clear examples. Structural concerns in the diff are already covered when the same work goes through `/ce-code-review` (maintainability persona).
+- **performance_issue（性能问题）** → `ce-performance-oracle`
+- **security_issue（安全问题）** → `ce-security-sentinel`
+- **database_issue（数据库问题）** → `ce-data-integrity-guardian`
+- 任何 code-heavy issue → 始终运行 `ce-code-simplicity-reviewer`，确保 examples minimal 且清晰。Diff 中的 structural concerns 在同一 work 经过 `/ce-code-review`（maintainability persona）时已经覆盖。
 
 </parallel_tasks>
 
 ---
 
-### Lightweight Mode
+### Lightweight Mode（轻量模式）
 
 <critical_requirement>
-**Single-pass alternative — same documentation, fewer tokens.**
+**Single-pass alternative：相同 documentation，更少 tokens。**
 
-This mode skips parallel subagents entirely. The orchestrator performs all work in a single pass, producing the same solution document without cross-referencing or duplicate detection.
+此 mode 完全跳过 parallel subagents。Orchestrator 用 single pass 执行所有 work，产出相同 solution document，但不进行 cross-referencing 或 duplicate detection。
 
-Headless mode forces Full and does not enter Lightweight — automations get the cross-reference and overlap detection benefits without the interactive overhead.
+Headless mode 强制 Full，不进入 Lightweight：automations 获得 cross-reference 和 overlap detection benefits，同时没有 interactive overhead。
 </critical_requirement>
 
-The orchestrator (main conversation) performs ALL of the following in one sequential pass:
+Orchestrator（main conversation）在一个 sequential pass 中执行以下全部内容：
 
-1. **Extract from conversation**: Identify the problem and solution from conversation history. Also scan the "user's auto-memory" block injected into your system prompt, if present (Claude Code only) -- use any relevant notes as supplementary context alongside conversation history. Tag any memory-sourced content incorporated into the final doc with "(auto memory [claude])"
-2. **Classify**: Read `references/schema.yaml` and `references/yaml-schema.md`, then determine track (bug vs knowledge), category, and filename
-3. **Write minimal doc**: Create `docs/solutions/[category]/[filename].md` using the appropriate track template from `assets/resolution-template.md`, with:
-   - YAML frontmatter with track-appropriate fields, applying the YAML-safety quoting rule for array items (see `references/yaml-schema.md` > YAML Safety Rules)
-   - Bug track: Problem, root cause, solution with key code snippets, one prevention tip
-   - Knowledge track: Context, guidance with key examples, one applicability note
-4. **Vocabulary capture (update-only)**: if `CONCEPTS.md` exists at repo root, read `references/concepts-vocabulary.md`, then scan the new doc and the conversation for qualifying terms and add/refine entries silently (same criteria as Phase 2.4). Do **not** bootstrap or seed in lightweight mode — if `CONCEPTS.md` does not exist, defer creation to a Full run, which owns seeding. Record the outcome in the output (e.g., "Vocabulary: 1 entry refined" or "scanned, no qualifying terms"). If you refined `CONCEPTS.md` and a quick read of `AGENTS.md`/`CLAUDE.md` shows it isn't surfaced there, add the discoverability tip to the output below — lightweight **tips**, it does not edit instruction files (a Full run owns that edit).
-5. **Skip specialized agent reviews** (Phase 3) to conserve context
+1. **Extract from conversation**：从 conversation history 识别 problem 和 solution。同时扫描注入 system prompt 的 "user's auto-memory" block（如果存在，仅 Claude Code）：将任何 relevant notes 作为 conversation history 旁的 supplementary context。将任何纳入 final doc 的 memory-sourced content 标记为 "(auto memory [claude])"
+2. **Classify**：读取 `references/schema.yaml` 和 `references/yaml-schema.md`，然后判断 track（bug vs knowledge）、category 和 filename
+3. **Write minimal doc**：使用 `assets/resolution-template.md` 中适合 track 的 template 创建 `docs/solutions/[category]/[filename].md`，包含：
+   - 带 track-appropriate fields 的 YAML frontmatter，并应用 array items 的 YAML-safety quoting rule（见 `references/yaml-schema.md` > YAML Safety Rules）
+   - Bug track：Problem、root cause、带 key code snippets 的 solution、一个 prevention tip
+   - Knowledge track：Context、带 key examples 的 guidance、一个 applicability note
+4. **Vocabulary capture（update-only）**：如果 repo root 存在 `CONCEPTS.md`，读取 `references/concepts-vocabulary.md`，然后扫描 new doc 和 conversation，寻找 qualifying terms，并静默 add/refine entries（criteria 同 Phase 2.4）。Lightweight mode 中 **不要** bootstrap 或 seed：如果 `CONCEPTS.md` 不存在，将 creation 推迟到拥有 seeding 责任的 Full run。在 output 中记录 outcome（例如 "Vocabulary: 1 entry refined" 或 "scanned, no qualifying terms"）。如果你 refined 了 `CONCEPTS.md`，且快速读取 `AGENTS.md`/`CLAUDE.md` 后发现其中没有 surfaced 它，在下方 output 中添加 discoverability tip：lightweight 只给 **tips**，不编辑 instruction files（该 edit 属于 Full run）。
+5. **跳过 specialized agent reviews**（Phase 3），以 conserve context
 
-**Lightweight output:**
+   **Lightweight output（轻量模式输出）：**
 ```
 ✓ Documentation complete (lightweight mode)
 
@@ -427,78 +426,78 @@ Note: This was created in lightweight mode. For richer documentation
 re-run /ce-compound in a fresh session.
 ```
 
-**No subagents are launched. No parallel tasks. The solution doc is the one deliverable** (Phase 2.4's update-only vocabulary capture may also refine an existing `CONCEPTS.md`).
+**不启动 subagents。不运行 parallel tasks。Solution doc 是 one deliverable**（Phase 2.4 的 update-only vocabulary capture 也可能 refine existing `CONCEPTS.md`）。
 
-In lightweight mode, the overlap check is skipped (no Related Docs Finder subagent). This means lightweight mode may create a doc that overlaps with an existing one. That is acceptable — `ce-compound-refresh` will catch it later. Only suggest `ce-compound-refresh` if there is an obvious narrow refresh target. Do not broaden into a large refresh sweep from a lightweight session.
+Lightweight mode 中会跳过 overlap check（无 Related Docs Finder subagent）。这意味着 lightweight mode 可能创建与 existing doc overlap 的 doc。这可以接受：`ce-compound-refresh` 会在后续捕获。只有存在 obvious narrow refresh target 时才建议 `ce-compound-refresh`。不要从 lightweight session 扩展到 large refresh sweep。
 
 ---
 
-## What It Captures
+## What It Captures（捕获内容）
 
-- **Problem symptom**: Exact error messages, observable behavior
-- **Investigation steps tried**: What didn't work and why
-- **Root cause analysis**: Technical explanation
-- **Working solution**: Step-by-step fix with code examples
-- **Prevention strategies**: How to avoid in future
-- **Cross-references**: Links to related issues and docs
+- **Problem symptom（问题症状）**：精确 error messages、observable behavior
+- **Investigation steps tried（尝试过的调查步骤）**：what didn't work 以及 why
+- **Root cause analysis（根因分析）**：technical explanation
+- **Working solution（有效 solution）**：带 code examples 的 step-by-step fix
+- **Prevention strategies（预防策略）**：未来如何避免
+- **Cross-references（交叉引用）**：related issues 和 docs 的 links
 
-## Preconditions
+## Preconditions（前置条件）
 
 <preconditions enforcement="advisory">
   <check condition="problem_solved">
-    Problem has been solved (not in-progress)
+    Problem has been solved (not in-progress)（问题已解决，不是进行中）
   </check>
   <check condition="solution_verified">
-    Solution has been verified working
+    Solution has been verified working（solution 已验证可用）
   </check>
   <check condition="non_trivial">
-    Non-trivial problem (not simple typo or obvious error)
+    Non-trivial problem (not simple typo or obvious error)（非平凡问题，不是简单 typo 或明显错误）
   </check>
 </preconditions>
 
-## What It Creates
+## What It Creates（产物）
 
-**Organized documentation:**
+**Organized documentation（组织化 documentation）：**
 
-- File: `docs/solutions/[category]/[filename].md`
+- File（文件）: `docs/solutions/[category]/[filename].md`
 
-**Categories auto-detected from problem:**
+**Categories auto-detected from problem（从 problem 自动检测出的 categories）：**
 
-Bug track:
-- build-errors/
-- test-failures/
-- runtime-errors/
-- performance-issues/
-- database-issues/
-- security-issues/
-- ui-bugs/
-- integration-issues/
-- logic-errors/
+Bug track（bug 轨道）:
+- build-errors/：build 错误
+- test-failures/：test 失败
+- runtime-errors/：runtime 错误
+- performance-issues/：performance 问题
+- database-issues/：database 问题
+- security-issues/：security 问题
+- ui-bugs/：UI bugs
+- integration-issues/：integration 问题
+- logic-errors/：logic 错误
 
-Knowledge track:
-- architecture-patterns/ — architectural or structural patterns (agent/skill/pipeline/workflow shape decisions)
-- design-patterns/ — reusable non-architectural design approaches (content generation, interaction patterns, prompt shapes)
-- tooling-decisions/ — language, library, or tool choices with durable rationale
-- conventions/ — team-agreed way of doing something, captured so it survives turnover
-- workflow-issues/
-- developer-experience/
-- documentation-gaps/
-- best-practices/ — fallback only, use when no narrower knowledge-track value applies
+Knowledge track（knowledge 轨道）:
+- architecture-patterns/：architectural 或 structural patterns（agent/skill/pipeline/workflow shape decisions）
+- design-patterns/：可复用的 non-architectural design approaches（content generation、interaction patterns、prompt shapes）
+- tooling-decisions/：带 durable rationale 的 language、library 或 tool choices
+- conventions/：team-agreed way of doing something，被记录下来以便跨人员流动存续
+- workflow-issues/：workflow 问题
+- developer-experience/：developer experience 问题
+- documentation-gaps/：documentation 缺口
+- best-practices/：仅 fallback；当没有更窄的 knowledge-track value 适用时使用
 
-## Common Mistakes to Avoid
+## Common Mistakes to Avoid（常见错误）
 
 | ❌ Wrong | ✅ Correct |
 |----------|-----------|
-| Subagents write files like `context-analysis.md`, `solution-draft.md` | Subagents return text data; orchestrator writes one final file |
-| Research and assembly run in parallel | Research completes → then assembly runs |
-| Multiple files created during workflow | One solution doc written or updated: `docs/solutions/[category]/[filename].md` (plus optional maintenance writes: a `CONCEPTS.md` create/update from Phase 2.4 and a small instruction-file edit for discoverability) |
-| Creating a new doc when an existing doc covers the same problem | Check overlap assessment; update the existing doc when overlap is high |
+| Subagents 写入 `context-analysis.md`、`solution-draft.md` 这类 files | Subagents 返回 text data；orchestrator 写入一个 final file |
+| Research 和 assembly 并行运行 | Research completes → then assembly runs |
+| Workflow 期间创建多个 files | 写入或更新一个 solution doc：`docs/solutions/[category]/[filename].md`（外加 optional maintenance writes：Phase 2.4 创建/更新 `CONCEPTS.md`，以及为 discoverability 做 small instruction-file edit） |
+| Existing doc 已覆盖相同 problem 时仍创建 new doc | 检查 overlap assessment；overlap high 时 update existing doc |
 
-## Success Output
+## Success Output（成功输出）
 
-### Headless mode
+### Headless mode（Headless 模式）
 
-Emit a structured terminal report and end the turn. No "What's next?" question, no blocking prompt. End with `Documentation complete` as the terminal signal so callers can detect completion.
+Emit structured terminal report 并结束 turn。没有 "What's next?" question，没有 blocking prompt。以 `Documentation complete` 作为 terminal signal 结束，让 callers 可检测 completion。
 
 ```
 ✓ Documentation complete (headless mode)
@@ -514,18 +513,17 @@ Refresh recommendation: <none | scope hint for /ce-compound-refresh>
 Documentation complete
 ```
 
-When no doc was written (e.g., headless invoked on a session where the problem is not yet solved), emit a structured failure instead and end with `Documentation skipped` so callers can distinguish success from no-op:
+当没有 doc 被写入时（例如 headless 在 problem 尚未 solved 的 session 中被 invoke），emit structured failure，并以 `Documentation skipped` 结束，让 callers 能区分 success 与 no-op：
 
 ```
 ✗ Documentation skipped (headless mode)
 
-Reason: <one-sentence explanation — e.g., "no solved problem detected in
-conversation history" or "solution not yet verified">
+Reason: <一句话解释 — 例如 "conversation history 中未检测到已解决问题" 或 "solution 尚未验证">
 
 Documentation skipped
 ```
 
-### Interactive mode
+### Interactive Mode（交互模式）
 
 ```
 ✓ Documentation complete
@@ -549,7 +547,7 @@ Files written:
 This documentation will be searchable for future reference when similar
 issues occur in the Email Processing or Brief System modules.
 
-What's next?
+下一步？
 1. Continue workflow (recommended)
 2. Link related documentation
 3. Update other references
@@ -557,9 +555,9 @@ What's next?
 5. Other
 ```
 
-**After displaying the interactive success output above, present the "What's next?" options using the platform's blocking question tool:** `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question. Do not continue the workflow or end the turn without the user's selection. (Interactive mode only — headless skips this per the headless block above.)
+**显示上方 interactive success output 后，使用平台 blocking question tool 呈现 "What's next?" options：** Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。没有用户选择前，不要继续 workflow 或结束 turn。（仅 interactive mode：headless 按上方 headless block 跳过。）
 
-**Alternate interactive output (when updating an existing doc due to high overlap):** in headless mode, this case is communicated via the `Overlap: high — existing doc updated` line of the headless terminal report above, not as a separate output block.
+**Alternate interactive output（因 high overlap 更新 existing doc 时）：** 在 headless mode 中，此情况通过上方 headless terminal report 的 `Overlap: high — existing doc updated` line 表达，而不是单独 output block。
 
 ```
 ✓ Documentation updated (existing doc refreshed with current context)
@@ -572,16 +570,16 @@ File updated:
 - docs/solutions/performance-issues/n-plus-one-queries.md (added last_updated: 2026-03-24)
 ```
 
-## The Compounding Philosophy
+## The Compounding Philosophy（复利理念）
 
-This creates a compounding knowledge system:
+这会创建 compounding knowledge system：
 
-1. First time you solve "N+1 query in brief generation" → Research (30 min)
-2. Document the solution → docs/solutions/performance-issues/n-plus-one-briefs.md (5 min)
-3. Next time similar issue occurs → Quick lookup (2 min)
-4. Knowledge compounds → Team gets smarter
+1. 第一次解决 "N+1 query in brief generation" → Research（30 min）
+2. 记录 solution → docs/solutions/performance-issues/n-plus-one-briefs.md（5 min）
+3. 下次出现类似 issue → Quick lookup（2 min）
+4. Knowledge compounds → Team gets smarter（knowledge 复利，团队变得更聪明）
 
-The feedback loop:
+Feedback loop（反馈循环）：
 
 ```
 Build → Test → Find Issue → Research → Improve → Document → Validate → Deploy
@@ -589,40 +587,40 @@ Build → Test → Find Issue → Research → Improve → Document → Validate
     └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**Each unit of engineering work should make subsequent units of work easier—not harder.**
+**每个 engineering work unit 都应该让后续 work 更容易，而不是更难。**
 
-## Auto-Invoke
+## Auto-Invoke（自动触发）
 
 <auto_invoke> <trigger_phrases> - "that worked" - "it's fixed" - "working now" - "problem solved" </trigger_phrases>
 
-<manual_override> Use /ce-compound [context] to document immediately without waiting for auto-detection. </manual_override> </auto_invoke>
+<manual_override> 使用 /ce-compound [context] 立即记录，无需等待 auto-detection。 </manual_override> </auto_invoke>
 
-## Output
+## Output（输出）
 
-Writes the final learning directly into `docs/solutions/`.
+将 final learning 直接写入 `docs/solutions/`。
 
-## Applicable Specialized Agents
+## Applicable Specialized Agents（适用的 Specialized Agents）
 
-Based on problem type, these agents can enhance documentation:
+基于 problem type，这些 agents 可增强 documentation：
 
-### Code Quality & Review
-- **ce-code-simplicity-reviewer**: Ensures solution code is minimal and clear
-- **ce-pattern-recognition-specialist**: Identifies anti-patterns or repeating issues
+### Code Quality & Review（代码质量与 Review）
+- **ce-code-simplicity-reviewer**：确保 solution code minimal 且清晰
+- **ce-pattern-recognition-specialist**：识别 anti-patterns 或 repeating issues
 
-### Specific Domain Experts
-- **ce-performance-oracle**: Analyzes performance_issue category solutions
-- **ce-security-sentinel**: Reviews security_issue solutions for vulnerabilities
-- **ce-data-integrity-guardian**: Reviews database_issue migrations and queries
+### Specific Domain Experts（特定领域专家）
+- **ce-performance-oracle**：分析 performance_issue category solutions
+- **ce-security-sentinel**：review security_issue solutions 中的 vulnerabilities
+- **ce-data-integrity-guardian**：review database_issue migrations 和 queries
 
-### Enhancement & Research
-- **ce-best-practices-researcher**: Enriches solution with industry best practices
-- **ce-framework-docs-researcher**: Links to framework/library documentation references
+### Enhancement & Research（增强与研究）
+- **ce-best-practices-researcher**：用 industry best practices 丰富 solution
+- **ce-framework-docs-researcher**：链接 framework/library documentation references
 
-### When to Invoke
-- **Auto-triggered** (optional): Agents can run post-documentation for enhancement
-- **Manual trigger**: User can invoke agents after /ce-compound completes for deeper review
+### When to Invoke（何时调用）
+- **Auto-triggered（自动触发）** (optional): Agents can run post-documentation for enhancement
+- **Manual trigger（手动触发）**: User can invoke agents after /ce-compound completes for deeper review
 
-## Related Commands
+## Related Commands（相关命令）
 
-- `/research [topic]` - Deep investigation (searches docs/solutions/ for patterns)
-- `/ce-plan` - Planning workflow (references documented solutions)
+- `/research [topic]` - Deep investigation（深度调查；searches docs/solutions/ for patterns）
+- `/ce-plan` - Planning workflow（规划 workflow；references documented solutions）

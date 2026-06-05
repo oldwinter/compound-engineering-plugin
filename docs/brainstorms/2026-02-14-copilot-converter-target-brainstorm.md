@@ -3,29 +3,29 @@ date: 2026-02-14
 topic: copilot-converter-target
 ---
 
-# Add GitHub Copilot Converter Target
+# 添加 GitHub Copilot Converter Target
 
-## What We're Building
+## 我们要构建什么
 
-A new converter target that transforms the compound-engineering Claude Code plugin into GitHub Copilot's native format. This follows the same established pattern as the existing converters (Cursor, Codex, OpenCode, Droid, Pi) and outputs files that Copilot can consume directly from `.github/` (repo-level) or `~/.copilot/` (user-wide).
+一个新的 converter target，用于将 compound-engineering Claude Code plugin 转换为 GitHub Copilot 的 native format。它遵循现有 converters（Cursor、Codex、OpenCode、Droid、Pi）已经建立的同一 pattern，并输出 Copilot 可直接从 `.github/`（repo-level）或 `~/.copilot/`（user-wide）消费的文件。
 
-Copilot's customization system (as of early 2026) supports: custom agents (`.agent.md`), agent skills (`SKILL.md`), prompt files (`.prompt.md`), custom instructions (`copilot-instructions.md`), and MCP servers (via repo settings).
+Copilot 的 customization system（截至 2026 年初）支持：custom agents（`.agent.md`）、agent skills（`SKILL.md`）、prompt files（`.prompt.md`）、custom instructions（`copilot-instructions.md`）和 MCP servers（通过 repo settings）。
 
-## Why This Approach
+## 为什么采用这种方式
 
-The repository already has a robust multi-target converter infrastructure with a consistent `TargetHandler` pattern. Adding Copilot as a new target follows this proven pattern rather than inventing something new. Copilot's format is close enough to Claude Code's that the conversion is straightforward, and the SKILL.md format is already cross-compatible.
+该 repository 已经有稳健的 multi-target converter infrastructure，并采用一致的 `TargetHandler` pattern。将 Copilot 作为新 target 添加，沿用这个已验证 pattern，而不是发明新体系。Copilot 的 format 与 Claude Code 足够接近，转换很直接，而且 SKILL.md format 已经 cross-compatible。
 
-### Approaches Considered
+### 考虑过的方案
 
-1. **Full converter target (chosen)** — Follow the existing pattern with types, converter, writer, and target registration. Most consistent with codebase conventions.
-2. **Minimal agent-only converter** — Only convert agents, skip commands/skills. Too limited; users would lose most of the plugin's value.
-3. **Documentation-only approach** — Just document how to manually set up Copilot. Doesn't compound — every user would repeat the work.
+1. **Full converter target（已选）** — 遵循现有 pattern，包含 types、converter、writer 和 target registration。最符合 codebase conventions。
+2. **Minimal agent-only converter** — 只转换 agents，跳过 commands/skills。过于有限；用户会失去 plugin 的大部分价值。
+3. **Documentation-only approach** — 只记录如何手动设置 Copilot。无法 compound，每个用户都会重复这项工作。
 
-## Key Decisions
+## 关键决策
 
-### Component Mapping
+### Component Mapping（组件映射）
 
-| Claude Code Component | Copilot Equivalent | Notes |
+| Claude Code Component（Claude Code 组件） | Copilot Equivalent（Copilot 对应项） | Notes（说明） |
 |----------------------|-------------------|-------|
 | **Agents** (`.md`) | **Custom Agents** (`.agent.md`) | Full frontmatter mapping: description, tools, target, infer |
 | **Commands** (`.md`) | **Agent Skills** (`SKILL.md`) | Commands become skills since Copilot has no direct command equivalent. `allowed-tools` dropped silently. |
@@ -33,9 +33,9 @@ The repository already has a robust multi-target converter infrastructure with a
 | **MCP Servers** | **Repo settings JSON** | Generate a `copilot-mcp-config.json` users paste into GitHub repo settings |
 | **Hooks** | **Skipped with warning** | Copilot doesn't have a hooks equivalent |
 
-### Agent Frontmatter Mapping
+### Agent Frontmatter Mapping（Agent Frontmatter 映射）
 
-| Claude Field | Copilot Field | Mapping |
+| Claude Field（Claude 字段） | Copilot Field（Copilot 字段） | Mapping（映射） |
 |-------------|--------------|---------|
 | `name` | `name` | Direct pass-through |
 | `description` | `description` (required) | Direct pass-through, generate fallback if missing |
@@ -45,23 +45,23 @@ The repository already has a robust multi-target converter infrastructure with a
 | — | `target` | Omit (defaults to `both` — IDE + github.com) |
 | — | `infer` | Set to `true` (auto-selection enabled) |
 
-### Output Directories
+### Output Directories（输出目录）
 
-- **Repository-level (default):** `.github/agents/`, `.github/skills/`
-- **User-wide (with --personal flag):** `~/.copilot/skills/` (only skills supported at this level)
+- **Repository-level（默认）：** `.github/agents/`、`.github/skills/`
+- **User-wide（带 --personal flag）：** `~/.copilot/skills/`（该层级只支持 skills）
 
-### Content Transformation
+### Content Transformation（内容转换）
 
-Apply transformations similar to Cursor converter:
+应用类似 Cursor converter 的 transformations：
 
-1. **Task agent calls:** `Task agent-name(args)` → `Use the agent-name skill to: args`
-2. **Slash commands:** `/workflows:plan` → `/plan` (flatten namespace)
-3. **Path rewriting:** `.claude/` → `.github/` (Copilot's repo-level config path)
-4. **Agent references:** `@agent-name` → `the agent-name agent`
+1. **Task agent calls（Task agent 调用）:** `Task agent-name(args)` → `Use the agent-name skill to: args`
+2. **Slash commands（slash commands）:** `/workflows:plan` → `/plan`（flatten namespace）
+3. **Path rewriting（路径重写）:** `.claude/` → `.github/`（Copilot 的 repo-level config path）
+4. **Agent references（agent 引用）:** `@agent-name` → `the agent-name agent`
 
-### MCP Server Handling
+### MCP Server Handling（MCP server 处理）
 
-Generate a `copilot-mcp-config.json` file with the structure Copilot expects:
+生成 Copilot 期望结构的 `copilot-mcp-config.json` 文件：
 
 ```json
 {
@@ -79,39 +79,39 @@ Generate a `copilot-mcp-config.json` file with the structure Copilot expects:
 }
 ```
 
-Note: Copilot requires env vars to use the `COPILOT_MCP_` prefix. The converter should transform env var names accordingly and include a comment/note about this.
+注意：Copilot 要求 env vars 使用 `COPILOT_MCP_` 前缀。converter 应相应转换 env var names，并包含相关 comment/note。
 
-## Files to Create/Modify
+## 待创建/修改文件
 
-### New Files
+### 新文件
 
-- `src/types/copilot.ts` — Type definitions (CopilotAgent, CopilotSkill, CopilotBundle, etc.)
-- `src/converters/claude-to-copilot.ts` — Converter with `transformContentForCopilot()`
-- `src/targets/copilot.ts` — Writer with `writeCopilotBundle()`
-- `docs/specs/copilot.md` — Format specification document
+- `src/types/copilot.ts` — Type definitions（CopilotAgent、CopilotSkill、CopilotBundle 等）
+- `src/converters/claude-to-copilot.ts` — 带 `transformContentForCopilot()` 的 Converter
+- `src/targets/copilot.ts` — 带 `writeCopilotBundle()` 的 Writer
+- `docs/specs/copilot.md` — Format specification document（格式规范文档）
 
-### Modified Files
+### 修改文件
 
-- `src/targets/index.ts` — Register copilot target handler
-- `src/commands/sync.ts` — Add "copilot" to valid sync targets
+- `src/targets/index.ts` — 注册 copilot target handler
+- `src/commands/sync.ts` — 将 "copilot" 添加到 valid sync targets
 
-### Test Files
+### 测试文件
 
-- `tests/copilot-converter.test.ts` — Converter tests following existing patterns
+- `tests/copilot-converter.test.ts` — 遵循 existing patterns 的 Converter tests
 
-### Character Limit
+### Character Limit（字符限制）
 
-Copilot imposes a 30,000 character limit on agent body content. If an agent body exceeds this after folding in capabilities, the converter should truncate with a warning to stderr.
+Copilot 对 agent body content 施加 30,000 字符限制。如果 agent body 在 folding in capabilities 后超过该限制，converter 应截断并向 stderr 输出 warning。
 
-### Agent File Extension
+### Agent File Extension（Agent 文件扩展名）
 
-Use `.agent.md` (not plain `.md`). This is the canonical Copilot convention and makes agent files immediately identifiable.
+使用 `.agent.md`（不是普通 `.md`）。这是 canonical Copilot convention，并让 agent files 可立即识别。
 
-## Open Questions
+## 未决问题
 
-- Should the converter generate a `copilot-setup-steps.yml` workflow file for MCP servers that need special dependencies (e.g., `uv`, `pipx`)?
-- Should `.github/copilot-instructions.md` be generated with any base instructions from the plugin?
+- converter 是否应为需要特殊 dependencies（例如 `uv`、`pipx`）的 MCP servers 生成 `copilot-setup-steps.yml` workflow file？
+- 是否应生成带有 plugin base instructions 的 `.github/copilot-instructions.md`？
 
-## Next Steps
+## 下一步
 
-→ `/workflows:plan` for implementation details
+→ `/workflows:plan` for implementation details（查看实现细节）

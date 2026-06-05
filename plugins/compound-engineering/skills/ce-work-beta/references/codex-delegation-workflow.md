@@ -1,44 +1,44 @@
-# Codex Delegation Workflow
+# Codex Delegation Workflow（Codex 委托工作流）
 
-When `delegation_active` is true, code implementation is delegated to the Codex CLI (`codex exec`) instead of being implemented directly. The orchestrating Claude Code agent retains control of planning, review, git operations, and orchestration.
+当 `delegation_active` 为 true 时，code implementation 会委托给 Codex CLI（`codex exec`），而不是由当前 agent 直接实现。负责 orchestration 的 Claude Code agent 仍保留 planning、review、git operations 和 orchestration 的控制权。
 
-## Delegation Decision
+## Delegation Decision（委托决策）
 
-If `work_delegate_decision` is `ask`, present the recommendation and wait for the user's choice before proceeding.
+如果 `work_delegate_decision` 是 `ask`，先展示 recommendation，并等待用户选择后再继续。
 
-**When recommending Codex delegation:**
+**推荐 Codex delegation 时：**
 
-> "Codex delegation active. [N] implementation units -- delegating in one batch."
-> 1. Delegate to Codex *(recommended)*
-> 2. Execute with Claude Code instead
+> "Codex delegation 已激活。[N] 个 implementation units -- 将作为一个 batch 委托。"
+> 1. 委托给 Codex *(recommended)*
+> 2. 改由 Claude Code 执行
 
-**When recommending Codex delegation, multiple batches:**
+**推荐 Codex delegation 且有 multiple batches 时：**
 
-> "Codex delegation active. [N] implementation units -- delegating in [X] batches."
-> 1. Delegate to Codex *(recommended)*
-> 2. Execute with Claude Code instead
+> "Codex delegation 已激活。[N] 个 implementation units -- 将分 [X] 个 batches 委托。"
+> 1. 委托给 Codex *(recommended)*
+> 2. 改由 Claude Code 执行
 
-**When recommending Claude Code (all units are trivial):**
+**推荐 Claude Code 时（所有 units 都是 trivial）：**
 
-> "Codex delegation active, but these are small changes where the cost of delegating outweighs having Claude Code do them."
-> 1. Execute with Claude Code *(recommended)*
-> 2. Delegate to Codex anyway
+> "Codex delegation 已激活，但这些都是 small changes，delegation 成本高于直接让 Claude Code 完成。"
+> 1. 使用 Claude Code 执行 *(recommended)*
+> 2. 仍然委托给 Codex
 
-If the user chooses the delegation option, proceed to Pre-Delegation Checks below. If the user chooses the Claude Code option, set `delegation_active` to false and return to standard execution in the parent skill.
+如果用户选择 delegation option，继续到下方 Pre-Delegation Checks。如果用户选择 Claude Code option，将 `delegation_active` 设为 false，并返回 parent skill 中的标准执行。
 
-If `work_delegate_decision` is `auto` (the default), state the execution plan in one line and proceed without waiting: "Codex delegation active. Delegating [N] units in [X] batch(es)." If all units are trivial, set `delegation_active` to false and proceed: "Codex delegation active. All units are trivial -- executing with Claude Code."
+如果 `work_delegate_decision` 是 `auto`（默认），用一行说明 execution plan，然后不等待直接继续："Codex delegation 已激活。将 [N] 个 units 分 [X] 个 batch(es) 委托。" 如果所有 units 都是 trivial，将 `delegation_active` 设为 false，并继续："Codex delegation 已激活。所有 units 都是 trivial -- 改由 Claude Code 执行。"
 
-## Pre-Delegation Checks
+## Pre-Delegation Checks（委托前检查）
 
-Run these checks **once before the first batch**. If any check fails, fall back to standard mode for the remainder of the plan execution. Do not re-run on subsequent batches.
+这些 checks 在 first batch 前**只运行一次**。如果任何 check 失败，对剩余 plan execution fallback 到 standard mode。不要在后续 batches 中重新运行。
 
-**0. Platform Gate**
+**0. Platform Gate（平台关口）**
 
-Codex delegation is only supported when the orchestrating agent is running in Claude Code. If the current session is Codex, Gemini CLI, OpenCode, or any other platform, set `delegation_active` to false and proceed in standard mode.
+Codex delegation 只在 orchestrating agent 运行于 Claude Code 时支持。如果当前 session 是 Codex、Gemini CLI、OpenCode 或任何其他平台，将 `delegation_active` 设为 false，并以 standard mode 继续。
 
-**1. Environment Guard**
+**1. Environment Guard（环境保护）**
 
-Check whether the current agent is already running inside a Codex sandbox:
+检查当前 agent 是否已经运行在 Codex sandbox 内：
 
 ```bash
 if [ -n "$CODEX_SANDBOX" ] || [ -n "$CODEX_SESSION_ID" ]; then
@@ -48,99 +48,99 @@ else
 fi
 ```
 
-If `inside_sandbox` is true, delegation would recurse or fail.
+如果 `inside_sandbox` 为 true，delegation 会递归或失败。
 
-- If `delegation_source` is `argument`: emit "Already inside Codex sandbox -- using standard mode." and set `delegation_active` to false.
-- If `delegation_source` is `config` or `default`: set `delegation_active` to false silently.
+- 如果 `delegation_source` 是 `argument`：输出 "Already inside Codex sandbox -- using standard mode."，并将 `delegation_active` 设为 false。
+- 如果 `delegation_source` 是 `config` 或 `default`：静默将 `delegation_active` 设为 false。
 
-**2. Availability Check**
+**2. Availability Check（可用性检查）**
 
-**Codex CLI path (pre-resolved):**
+**Codex CLI path（pre-resolved）：**
 !`command -v codex 2>/dev/null || true`
 
-If the line above shows an absolute path (starts with `/`, e.g., `/opt/homebrew/bin/codex`), the Codex CLI is available — proceed to the next check.
-Otherwise — empty, an unresolved command string like `command -v codex 2>/dev/null` left in place by a non-Claude harness that doesn't process `!` pre-resolution, or any other non-path value — run `command -v codex` via the shell/Bash tool to verify at runtime. If that prints an absolute path, the Codex CLI is available; proceed. If it fails or prints nothing, emit "Codex CLI not found (install via `npm install -g @openai/codex` or `brew install codex`) -- using standard mode." and set `delegation_active` to false.
+如果上方行显示 absolute path（以 `/` 开头，例如 `/opt/homebrew/bin/codex`），说明 Codex CLI 可用——继续下一个 check。
+否则——空值、未处理的 command string（例如由不处理 `!` pre-resolution 的 non-Claude harness 留下的 `command -v codex 2>/dev/null`），或任何其他 non-path value——通过 shell/Bash tool 运行 `command -v codex` 在 runtime 验证。如果打印 absolute path，说明 Codex CLI 可用；继续。如果失败或没有输出，输出 "找不到 Codex CLI（通过 `npm install -g @openai/codex` 或 `brew install codex` 安装）-- 将使用 standard mode."，并将 `delegation_active` 设为 false。
 
-**3. Consent Flow**
+**3. Consent Flow（授权流程）**
 
-If `consent_granted` is not true (from config `work_delegate_consent`):
+如果 `consent_granted` 不为 true（来自 config `work_delegate_consent`）：
 
-Present a one-time consent warning using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension)). The consent warning explains:
-- Delegation sends implementation units to `codex exec` as a structured prompt
-- **yolo mode** (`--dangerously-bypass-approvals-and-sandbox`): Full system access including network. Required for verification steps that run tests or install dependencies. **Recommended.**
-- **full-auto mode** (`-s workspace-write`): Workspace-write sandbox, no network access by default. Network can be re-enabled by setting `network_access = true` under `[sandbox_workspace_write]` in `~/.codex/config.toml`.
+使用平台阻塞式问题工具展示一次性 consent warning（Claude Code 中为 `AskUserQuestion`，Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`，需 `pi-ask-user` extension）。consent warning 说明：
+- Delegation 会把 implementation units 作为 structured prompt 发送给 `codex exec`
+- **yolo mode**（`--dangerously-bypass-approvals-and-sandbox`）：Full system access，包括 network。运行 tests 或安装 dependencies 等 verification steps 需要它。**Recommended.**
+- **full-auto mode**（`-s workspace-write`）：Workspace-write sandbox，默认无 network access。可通过在 `~/.codex/config.toml` 的 `[sandbox_workspace_write]` 下设置 `network_access = true` 重新启用 network。
 
-Present the sandbox mode choice: (1) yolo (recommended), (2) full-auto.
+展示 sandbox mode choice：（1）yolo（recommended），（2）full-auto。
 
-On acceptance:
-- Resolve the repo root: `git rev-parse --show-toplevel`. Write `work_delegate_consent: true` and `work_delegate_sandbox: <chosen-mode>` to `<repo-root>/.compound-engineering/config.local.yaml`
-- To write: (1) if file or directory does not exist, create `<repo-root>/.compound-engineering/` and write the YAML file; (2) if file exists, merge new keys preserving existing keys
-- Update `consent_granted` and `sandbox_mode` in the resolved state
+接受后：
+- 解析 repo root：`git rev-parse --show-toplevel`。把 `work_delegate_consent: true` 和 `work_delegate_sandbox: <chosen-mode>` 写入 `<repo-root>/.compound-engineering/config.local.yaml`
+- 写入方式：（1）如果 file 或 directory 不存在，创建 `<repo-root>/.compound-engineering/` 并写入 YAML file；（2）如果 file 已存在，merge new keys 并保留 existing keys
+- 在 resolved state 中更新 `consent_granted` 和 `sandbox_mode`
 
-On decline:
-- Ask whether to disable delegation entirely for this project
-- If yes: write `work_delegate: false` to `<repo-root>/.compound-engineering/config.local.yaml` (using the same repo root resolved above). To write: (1) if file or directory does not exist, create `<repo-root>/.compound-engineering/` and write the YAML file; (2) if file exists, merge new keys preserving existing keys. Set `delegation_active` to false, proceed in standard mode
-- If no: set `delegation_active` to false for this invocation only, proceed in standard mode
+拒绝后：
+- 询问是否为此 project 完全 disable delegation
+- 如果是：把 `work_delegate: false` 写入 `<repo-root>/.compound-engineering/config.local.yaml`（使用上方解析的同一 repo root）。写入方式：（1）如果 file 或 directory 不存在，创建 `<repo-root>/.compound-engineering/` 并写入 YAML file；（2）如果 file 已存在，merge new keys 并保留 existing keys。将 `delegation_active` 设为 false，以 standard mode 继续
+- 如果否：只为本次 invocation 将 `delegation_active` 设为 false，以 standard mode 继续
 
-**Headless consent:** If running in a headless or non-interactive context, delegation proceeds only if `work_delegate_consent` is already `true` in the config file. If consent is not recorded, set `delegation_active` to false silently.
+**Headless consent:** 如果运行在 headless 或 non-interactive context，只有当 config file 中已有 `work_delegate_consent` 为 `true` 时才继续 delegation。如果没有 recorded consent，静默将 `delegation_active` 设为 false。
 
-## Batching
+## Batching（批处理）
 
-Delegate all units in one batch. If the plan exceeds 5 units, split into batches at the plan's own phase boundaries, or in groups of roughly 5 -- never splitting units that share files. Skip delegation entirely if every unit is trivial.
+尽量把所有 units 委托为一个 batch。如果 plan 超过 5 个 units，按 plan 自身 phase boundaries 切分，或大约每 5 个一组——绝不拆开共享 files 的 units。如果每个 unit 都是 trivial，完全跳过 delegation。
 
-## Per-Batch Effort
+## Per-Batch Effort（每批推理力度）
 
-Each batch picks an effort level proportional to its complexity, then resolves against the config floor before invocation.
+每个 batch 根据复杂度选择 effort level，然后与 config floor 合并后再调用。
 
-**Effort levels — guidelines, not predicates**
+**Effort levels — guidelines, not predicates（指导信号，不是谓词）**
 
-Pick the level that best fits the batch. These are signals to weigh, not boxes to tick — use judgment.
+选择最适合 batch 的 level。这些是需要权衡的 signals，不是勾选框——使用 judgment。
 
-- **default (no flag)** — trivial work with no behavioral change: a one-line config tweak, a rename, a typo or comment-only fix, a pure documentation update. Defers to the user's `~/.codex/config.toml` default (which is `medium` on a stock Codex install).
-- **`medium`** — small, well-scoped behavioral changes that stay clear of high-risk areas. A handful of files, a single concern, no novel architecture.
-- **`high`** — work that touches a high-risk area (auth/session logic, payments, database migrations, external API contracts, error handling with retries/fallbacks), or work spanning enough surface area that one mistake could cascade.
-- **`xhigh`** — architectural work: cross-cutting refactors, multiple high-risk areas in the same batch, changes that propagate broadly, or anywhere a wrong call meaningfully degrades the project.
+- **default（no flag）** —— trivial work，且没有 behavioral change：一行 config tweak、rename、typo 或 comment-only fix、纯 documentation update。延用用户 `~/.codex/config.toml` 的 default（stock Codex install 中为 `medium`）。
+- **`medium`** —— small、well-scoped behavioral changes，且避开 high-risk areas。少量 files、单一 concern、无 novel architecture。
+- **`high`** —— 触及 high-risk area（auth/session logic、payments、database migrations、external API contracts、带 retries/fallbacks 的 error handling），或影响面足够大以至一个错误可能 cascade。
+- **`xhigh`** —— architectural work：cross-cutting refactors、同一 batch 中多个 high-risk areas、广泛传播的 changes，或任何错误判断会显著损害 project 的位置。
 
-When in doubt, lean up one level — under-resourcing risky work costs more than over-resourcing routine work. Briefly note the picked level and the signal that drove it (e.g., "`high` — touches db/migrations") so the choice is auditable.
+不确定时，上调一个 level：对 risky work 低配的成本高于 routine work 高配。简要注明选择的 level 和驱动 signal（例如 "`high` — touches db/migrations"），让 choice 可审计。
 
-A few edge cases worth handling explicitly:
-- **Test-only batches:** classify by what the tests *exercise*, not by file paths. Tests for auth flows, payment logic, or migrations get the same level the equivalent implementation work would get.
-- **Mixed-complexity batches:** the batch picks one level. If a single batch combines a typo unit and a payments rewrite, pick the higher level. If the spread feels wasteful, prefer splitting at the batching step (see Batching above) over averaging it out.
-- **Deletion-only batches:** classify by the risk of what is being removed, not by counts of remaining content. Removing an auth module is `high` even if the batch produces zero `Modify` content.
-- **Documentation- or comment-only batches:** `default`.
+几个需要显式处理的 edge cases：
+- **Test-only batches:** 按 tests *exercise* 的内容分类，而不是按 file paths。auth flows、payment logic 或 migrations 的 tests 与等效 implementation work 使用相同 level。
+- **Mixed-complexity batches:** batch 选择一个 level。如果单个 batch 同时包含 typo unit 和 payments rewrite，选择较高 level。如果差异大到浪费，优先在 batching step 拆分（见上方 Batching），不要取平均。
+- **Deletion-only batches:** 按被移除内容的风险分类，而不是按剩余内容数量。移除 auth module 即使 batch 产生零 `Modify` content，也是 `high`。
+- **Documentation 或 comment-only batches:** `default`。
 
-**Floor and resolution — hard rules**
+**Floor and resolution — hard rules（下限与解析硬规则）**
 
-Effort levels are ordered: `minimal < low < medium < high < xhigh`.
+Effort levels 顺序为：`minimal < low < medium < high < xhigh`。
 
-Compute `effective_effort`:
+计算 `effective_effort`：
 
-- If `delegate_effort` is unset: `effective_effort = picked_level`.
-- If `delegate_effort` is set: substitute `default` → `medium` in `picked_level`, then `effective_effort = max(picked_level, delegate_effort)`.
+- 如果 `delegate_effort` 未设置：`effective_effort = picked_level`。
+- 如果 `delegate_effort` 已设置：将 `picked_level` 中的 `default` 替换为 `medium`，然后 `effective_effort = max(picked_level, delegate_effort)`。
 
-Emit based on `effective_effort`:
+根据 `effective_effort` 输出：
 
-- `medium`, `high`, or `xhigh` → emit `-c 'model_reasoning_effort="<value>"'`.
-- `default` → omit the flag (defer to `~/.codex/config.toml`). Reachable only when `delegate_effort` is unset and the pick is `default`.
+- `medium`、`high` 或 `xhigh` → 输出 `-c 'model_reasoning_effort="<value>"'`。
+- `default` → 省略 flag（延用 `~/.codex/config.toml`）。只有当 `delegate_effort` 未设置且 pick 为 `default` 时才可达。
 
-Never pass the literal string `"default"` to `codex exec`.
+绝不要把 literal string `"default"` 传给 `codex exec`。
 
-Store `effective_effort` as a per-batch derived state value (alongside the session-level `delegate_effort`) and use it in place of `delegate_effort` throughout the Execution Loop.
+把 `effective_effort` 存为 per-batch derived state value（与 session-level `delegate_effort` 并列），并在整个 Execution Loop 中用它替代 `delegate_effort`。
 
-## Prompt Template
+## Prompt Template（Prompt 模板）
 
-At the start of delegated execution, create a per-run OS-temp scratch directory via `mktemp -d` and capture its **absolute path** for all downstream use. All scratch files for this invocation live under that directory. Do not use `.context/` — these scratch files are per-run throwaway that get cleaned up when delegated execution ends (see Cleanup below), matching the repo Scratch Space convention for one-shot artifacts. Do not pass unresolved shell-variable strings to non-shell tools (Write, Read); use the absolute path returned by `mktemp -d`.
+开始 delegated execution 时，通过 `mktemp -d` 创建一个 per-run OS-temp scratch directory，并捕获其**绝对路径**供下游使用。本次 invocation 的所有 scratch files 都位于该目录下。不要使用 `.context/`——这些 scratch files 是 per-run throwaway，delegated execution 结束后由系统清理（见 Cleanup below），符合 repo Scratch Space convention。不要把 unresolved shell-variable strings 传给 non-shell tools（Write、Read）；使用 `mktemp -d` 返回的 absolute path。
 
 ```bash
 SCRATCH_DIR="$(mktemp -d -t ce-work-codex-XXXXXX)"
 echo "$SCRATCH_DIR"
 ```
 
-Refer to the echoed absolute path as `<scratch-dir>` throughout the rest of this workflow.
+在 workflow 剩余部分，把回显的 absolute path 称为 `<scratch-dir>`。
 
-Before each batch, write a prompt file to `<scratch-dir>/prompt-batch-<batch-num>.md`.
+每个 batch 前，将 prompt file 写到 `<scratch-dir>/prompt-batch-<batch-num>.md`。
 
-Build the prompt from the batch's implementation units using these XML-tagged sections:
+使用这些 XML-tagged sections，根据 batch 的 implementation units 构建 prompt：
 
 ```xml
 <task>
@@ -212,9 +212,9 @@ Report your result via the --output-schema mechanism. Fill in every field:
 </output_contract>
 ```
 
-## Result Schema
+## Result Schema（结果 Schema）
 
-Write the result schema to `<scratch-dir>/result-schema.json` (using the absolute path captured at the start) once at the start of delegated execution:
+在 delegated execution 开始时，把 result schema 写到 `<scratch-dir>/result-schema.json`（使用开头捕获的 absolute path）：
 
 ```json
 {
@@ -231,31 +231,31 @@ Write the result schema to `<scratch-dir>/result-schema.json` (using the absolut
 }
 ```
 
-Each batch's result is written to `<scratch-dir>/result-batch-<batch-num>.json` via the `-o` flag. On plan failure, files are left in place for debugging.
+每个 batch 的 result 通过 `-o` flag 写到 `<scratch-dir>/result-batch-<batch-num>.json`。如果 plan failure，files 保留在原处以便 debugging。
 
-If the result JSON is absent or malformed after a successful exit code, classify as task failure.
+如果 successful exit code 后 result JSON 缺失或 malformed，分类为 task failure。
 
-## Execution Loop
+## Execution Loop（执行循环）
 
-Initialize a `consecutive_failures` counter at 0 before the first batch.
+first batch 前，将 `consecutive_failures` counter 初始化为 0。
 
-**Clean-baseline preflight:** Before the first batch, verify there are no uncommitted changes to tracked files:
+**Clean-baseline preflight（干净基线预检）：** first batch 前，确认 tracked files 没有 uncommitted changes：
 
 ```bash
 git diff --quiet HEAD
 ```
 
-This intentionally ignores untracked files. Only staged or unstaged modifications to tracked files make rollback unsafe. However, if untracked files exist at paths in the batch's planned Files list, rollback (`git clean -fd -- <paths>`) would delete them. If such overlaps are detected, warn the user and recommend committing or stashing those files before proceeding.
+这会故意忽略 untracked files。只有 tracked files 上的 staged 或 unstaged modifications 会让 rollback unsafe。不过，如果 untracked files 出现在 batch planned Files list 的路径上，rollback（`git clean -fd -- <paths>`）会删除它们。若检测到此类 overlap，警告用户，并建议在继续前 commit 或 stash 这些 files。
 
-If tracked files are dirty, stop and present options: (1) commit current changes, (2) stash explicitly (`git stash push -m "pre-delegation"`), (3) continue in standard mode (sets `delegation_active` to false). Do not auto-stash user changes.
+如果 tracked files dirty，停止并展示 options：（1）commit current changes，（2）显式 stash（`git stash push -m "pre-delegation"`），（3）continue in standard mode（将 `delegation_active` 设为 false）。不要 auto-stash user changes。
 
-**Delegation invocation:** For each batch, execute these as **separate Bash tool calls** (not combined into one):
+**Delegation invocation（委托调用）：** 对每个 batch，将以下步骤作为**独立 Bash tool calls**执行（不要合并成一个）：
 
-**Step A — Launch (background, separate Bash call):**
+**Step A — Launch（启动；background，separate Bash call）：**
 
-Write the prompt file, then make a single Bash tool call with `run_in_background: true` set on the tool parameter. This call returns immediately and has no timeout ceiling.
+写入 prompt file，然后使用 `run_in_background: true` 设置在 tool parameter 上做一次 Bash tool call。该 call 立即返回，没有 timeout ceiling。
 
-Substitute the literal absolute path captured at setup for every `<scratch-dir>` below. Each Bash tool call starts a fresh shell, so the `$SCRATCH_DIR` variable from the setup snippet is not preserved — an unresolved `$SCRATCH_DIR` would expand empty and break result detection.
+把 setup 时捕获的 literal absolute path 替换到下方每个 `<scratch-dir>` 中。每个 Bash tool call 都启动 fresh shell，因此 setup snippet 中的 `$SCRATCH_DIR` variable 不会保留；未解析的 `$SCRATCH_DIR` 会展开为空并破坏 result detection。
 
 ```bash
 # Substitute the resolved sandbox_mode value (yolo or full-auto) from the skill state
@@ -275,24 +275,24 @@ codex exec \
   - < "<scratch-dir>/prompt-batch-<batch-num>.md"
 ```
 
-**Conditional flags** — only include each line when the corresponding skill-state value is set:
+**Conditional flags（条件 flags）** —— 只有当对应 skill-state value 已设置时，才包含每一行：
 
-- If `delegate_model` is set, insert `  -m "<delegate_model>" \` as a line before `$SANDBOX_FLAG`.
-- If `effective_effort` is `medium`, `high`, or `xhigh` (resolved via Per-Batch Effort above), insert `  -c 'model_reasoning_effort="<effective_effort>"' \` as a line before `$SANDBOX_FLAG`. When `effective_effort` is `default` (only possible when `delegate_effort` is unset and the pick is `default`), omit the line — never pass the literal string `"default"`.
+- 如果 `delegate_model` 已设置，在 `$SANDBOX_FLAG` 前插入一行 `  -m "<delegate_model>" \`。
+- 如果 `effective_effort` 是 `medium`、`high` 或 `xhigh`（按上文 Per-Batch Effort 解析），在 `$SANDBOX_FLAG` 前插入一行 `  -c 'model_reasoning_effort="<effective_effort>"' \`。当 `effective_effort` 为 `default`（只有在 `delegate_effort` 未设置且 pick 为 `default` 时可能），省略该行——绝不要传 literal string `"default"`。
 
-When either value is unset, omit its line entirely — Codex resolves the default from the user's `~/.codex/config.toml` (and ultimately the CLI's own built-in default). Do not substitute a placeholder string for unset values.
+当任一 value 未设置时，完全省略其行——Codex 从用户的 `~/.codex/config.toml`（最终从 CLI 自身 built-in default）解析 default。不要用 placeholder string 替代 unset values。
 
-Critical: `run_in_background: true` must be set as a **Bash tool parameter**, not as a shell `&` suffix. The tool parameter is what removes the timeout ceiling. A shell `&` inside a foreground Bash call still hits the 2-minute default timeout.
+Critical（关键）：`run_in_background: true` 必须作为 **Bash tool parameter** 设置，而不是 shell `&` suffix。tool parameter 才会移除 timeout ceiling。foreground Bash call 内的 shell `&` 仍会命中 2-minute default timeout。
 
-Quoting is critical for the `-c` flag when present: use single quotes around the entire key=value and double quotes around the TOML string value inside. Example: `-c 'model_reasoning_effort="high"'`.
+当存在 `-c` flag 时，quoting 很关键：整个 key=value 使用 single quotes，TOML string value 内部使用 double quotes。示例：`-c 'model_reasoning_effort="high"'`。
 
-Do not improvise CLI flags or modify this invocation template beyond the documented conditional insertions.
+不要临时发挥 CLI flags，也不要修改此 invocation template，除非是记录过的 conditional insertions。
 
-**Step B — Poll (foreground, separate Bash calls):**
+**Step B — Poll（轮询；foreground，separate Bash calls）：**
 
-After the launch call returns, make a **new, separate** foreground Bash tool call that polls for the result file. This keeps the agent's turn active so the user cannot interfere with the working tree.
+launch call 返回后，发起一个**新的、独立的** foreground Bash tool call，poll result file。这保持 agent turn active，避免用户干扰 working tree。
 
-Substitute the literal absolute path captured at setup for `<scratch-dir>`. The shell variable from Step A does not survive across separate Bash tool calls.
+把 setup 时捕获的 literal absolute path 替换为 `<scratch-dir>`。Step A 的 shell variable 不会在 separate Bash tool calls 之间保留。
 
 ```bash
 RESULT_FILE="<scratch-dir>/result-batch-<batch-num>.json"
@@ -303,63 +303,63 @@ done
 echo "Waiting for Codex..."
 ```
 
-If the output is "Waiting for Codex...", issue the same polling command again as another separate Bash call. Repeat until the output is "DONE", then read the result file and proceed to classification.
+如果输出是 "Waiting for Codex..."，再发起同一个 polling command 作为另一个 separate Bash call。重复直到输出 "DONE"，然后读取 result file 并进入 classification。
 
-**Polling termination conditions:** Stop polling when any of these conditions is met:
+**Polling termination conditions（轮询终止条件）：** 满足以下任一条件时停止 polling：
 
-- **Result file appears** (output is "DONE") -- proceed to result classification normally.
-- **Background process exits with non-zero code** -- classify as CLI failure (row 1). Rollback and fall back to standard mode.
-- **Background process exits with zero code but result file is absent** -- classify as task failure (row 2: exit 0, result JSON missing). Rollback and increment `consecutive_failures`.
-- **5 polling rounds** elapse (~5 minutes) without the result file appearing and without a background process notification -- treat as a hung process. Classify as CLI failure (row 1). Rollback and fall back to standard mode.
+- **Result file appears（result file 出现）**（输出 "DONE"）-- 正常进入 result classification。
+- **Background process exits with non-zero code（background process 以非零 code 退出）** -- 分类为 CLI failure（row 1）。Rollback，并对所有剩余 work fallback 到 standard mode。
+- **Background process exits with zero code but result file is absent（background process 以零 code 退出但 result file 缺失）** -- 分类为 task failure（row 2：exit 0，result JSON missing）。Rollback，并递增 `consecutive_failures`。
+- **5 polling rounds** 经过（约 5 分钟）仍未出现 result file 且没有 background process notification -- 视为 hung process。分类为 CLI failure（row 1）。Rollback，并 fallback 到 standard mode。
 
-**Result classification:** Codex is responsible for running verification internally and fixing failures before reporting -- the orchestrator does not re-run verification independently.
+**Result classification（结果分类）：** Codex 负责在内部运行 verification，并在报告前修复 failures；orchestrator 不独立重新运行 verification。
 
-| # | Signal | Classification | Action |
+| # | Signal（信号） | Classification（分类） | Action（动作） |
 |---|--------|---------------|--------|
-| 1 | Exit code != 0 | CLI failure | Rollback to HEAD. Fall back to standard mode for ALL remaining work. |
-| 2 | Exit code 0, result JSON missing or malformed | Task failure | Rollback to HEAD. Increment `consecutive_failures`. |
-| 3 | Exit code 0, `status: "failed"` | Task failure | Rollback to HEAD. Increment `consecutive_failures`. |
-| 4 | Exit code 0, `status: "partial"` | Partial success | Keep the diff. Complete remaining work locally, verify, and commit. Increment `consecutive_failures`. |
-| 5 | Exit code 0, `status: "completed"` | Success | Commit changes. Reset `consecutive_failures` to 0. |
+| 1 | Exit code != 0 | CLI failure | Rollback 到 HEAD。对所有剩余 work fallback 到 standard mode。 |
+| 2 | Exit code 0，result JSON missing 或 malformed | Task failure | Rollback 到 HEAD。递增 `consecutive_failures`。 |
+| 3 | Exit code 0，`status: "failed"` | Task failure | Rollback 到 HEAD。递增 `consecutive_failures`。 |
+| 4 | Exit code 0，`status: "partial"` | Partial success | 保留 diff。本地完成剩余 work、verify 并 commit。递增 `consecutive_failures`。 |
+| 5 | Exit code 0，`status: "completed"` | Success | Commit changes。将 `consecutive_failures` 重置为 0。 |
 
-**Result handoff — surface to user:** After reading the result JSON and before committing or rolling back, display a summary so the user sees what happened. Format:
+**Result handoff — surface to user（结果交接并展示给用户）：** 读取 result JSON 后，在 commit 或 rollback 前，展示 summary，让用户看到发生了什么。格式：
 
-> **Codex batch <batch-num> — <classification>**
-> <summary from result JSON>
+> **Codex batch <batch-num> — <classification>**（Codex batch 与分类）
+> <summary from result JSON>（result JSON 中的 summary）
 >
-> **Files:** <comma-separated list from files_modified>
-> **Verification:** <verification_summary from result JSON>
-> **Issues:** <issues list, or "None">
+> **Files:** <comma-separated list from files_modified>（files_modified 中的文件列表）
+> **Verification:** <verification_summary from result JSON>（result JSON 中的 verification_summary）
+> **Issues:** <issues list, or "None">（issues 列表，或 "None"）
 
-On failure or partial results, include the classification reason (e.g., "status: failed", "result JSON missing") so the user understands why the orchestrator is rolling back or completing locally.
+对 failure 或 partial results，包含 classification reason（例如 “status: failed”、“result JSON missing”），这样用户理解为什么 orchestrator 要 rollback 或在本地补完。
 
-Keep this brief — the goal is transparency, not a wall of text. One short block per batch.
+保持简短——目标是 transparency，不是大段文字。每个 batch 一个短 block。
 
-**Rollback procedure:**
+**Rollback procedure（回滚流程）：**
 
 ```bash
 git checkout -- .
 git clean -fd -- <paths from the batch's combined Files list>
 ```
 
-Do NOT use bare `git clean -fd` without path arguments.
+不要使用不带 path arguments 的 bare `git clean -fd`。
 
-**Commit on success:**
+**Commit on success（成功后提交）：**
 
 ```bash
 git add $(git diff --name-only HEAD; git ls-files --others --exclude-standard)
 git commit -m "feat(<scope>): <batch summary>"
 ```
 
-**Between batches** (plans split into multiple batches): Report what completed, test results, and what's next. Continue immediately unless the user intervenes -- the checkpoint exists so the user *can* steer, not so they *must*.
+**Between batches（批次之间）**（plans 被拆成 multiple batches 时）：报告已完成内容、test results 和下一步。除非用户介入，否则立即继续——checkpoint 的存在是为了让用户 *可以* steer，而不是必须输入。
 
-**Circuit breaker:** After 3 consecutive failures, set `delegation_active` to false and emit: "Codex delegation disabled after 3 consecutive failures -- completing remaining units in standard mode."
+**Circuit breaker（熔断器）：** 连续 3 次 failures 后，将 `delegation_active` 设为 false，并输出："Codex delegation 已在连续 3 次 failures 后停用 -- 剩余 units 将用 standard mode 完成。"
 
-**Scratch cleanup:** No explicit cleanup needed — OS temp handles eventual cleanup (macOS `$TMPDIR` periodic purge; Linux/WSL `/tmp` reboot or periodic cleanup). Leaving `<scratch-dir>` in place after the run also preserves intermediate artifacts for debugging if anything went wrong.
+**Scratch cleanup（scratch 清理）：** 不需要显式 cleanup——OS temp 会最终处理（macOS `$TMPDIR` periodic purge；Linux/WSL `/tmp` reboot 或 periodic cleanup）。run 后保留 `<scratch-dir>` 也有助于在出错时保留 intermediate artifacts 供 debugging。
 
-## Mixed-Model Attribution
+## Mixed-Model Attribution（混合模型归因）
 
-When some units are executed by Codex and others locally:
-- If all units used delegation: attribute to the Codex model
-- If all units used standard mode: attribute to the current agent's model
-- If mixed: note which units were delegated in the PR description and credit both models
+当部分 units 由 Codex 执行、其他 units 在本地执行：
+- 如果所有 units 都用了 delegation：归因给 Codex model
+- 如果所有 units 都用了 standard mode：归因给 current agent 的 model
+- 如果混合：在 PR description 中说明哪些 units delegated，并 credit both models

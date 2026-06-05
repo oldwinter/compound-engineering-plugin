@@ -1,8 +1,8 @@
-# GitHub Copilot Spec (Agents, Skills, MCP)
+# GitHub Copilot Spec（Agents、Skills、MCP 规格）
 
-Last verified: 2026-04-18
+最后验证：2026-04-18
 
-## Primary sources
+## 主要来源
 
 ```
 https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/create-custom-agents-for-cli
@@ -14,110 +14,110 @@ https://docs.github.com/en/copilot/concepts/agents/about-agent-skills
 https://docs.github.com/en/copilot/concepts/agents/coding-agent/mcp-and-coding-agent
 ```
 
-## Config locations
+## Config locations（配置位置）
 
 | Scope | Path |
 |-------|------|
 | Project agents | `.github/agents/*.agent.md` |
-| Project agents (Claude-compatible) | `.claude/agents/*.md` |
+| Project agents（Claude-compatible） | `.claude/agents/*.md` |
 | Personal agents | `~/.copilot/agents/*.agent.md` |
-| Personal agents (Claude-compatible) | `~/.claude/agents/*.md` |
-| Plugin agents | `agents/` by default, overridable in plugin manifest |
+| Personal agents（Claude-compatible） | `~/.claude/agents/*.md` |
+| Plugin agents | 默认 `agents/`，可在 plugin manifest 中覆盖 |
 | Project skills | `.github/skills/*/SKILL.md` |
-| Project skills (auto-discovery) | `.agents/skills/*/SKILL.md` |
+| Project skills（auto-discovery） | `.agents/skills/*/SKILL.md` |
 | Project instructions | `.github/copilot-instructions.md` |
 | Path-specific instructions | `.github/instructions/*.instructions.md` |
 | Project prompts | `.github/prompts/*.prompt.md` |
 | Org/enterprise agents | `.github-private/agents/*.agent.md` |
 | Personal skills | `~/.copilot/skills/*/SKILL.md` |
-| Personal skills (auto-discovery) | `~/.agents/skills/*/SKILL.md` |
-| Directory instructions | `AGENTS.md` (nearest ancestor wins) |
+| Personal skills（auto-discovery） | `~/.agents/skills/*/SKILL.md` |
+| Directory instructions | `AGENTS.md`（nearest ancestor wins） |
 
-## Agents (.agent.md files)
+## Agents (.agent.md files，agent 文件)
 
-- Custom agents are Markdown files with YAML frontmatter stored in `.github/agents/`.
-- File extension is `.agent.md` (or `.md`). Filenames may only contain: `.`, `-`, `_`, `a-z`, `A-Z`, `0-9`.
-- The documented custom-agent extension is singular `.agent.md`, not `.agents.md`.
-- `description` is the only required frontmatter field.
-- Current Copilot CLI docs do not list `.agents/agents` or `~/.agents/agents` as custom-agent discovery paths. The `.agents/*` convention is documented for skills (`.agents/skills`, `~/.agents/skills`), not agents.
-- Copilot CLI also loads Claude-compatible agent directories (`.claude/agents`, `~/.claude/agents`) after native Copilot agent directories and before plugin agents.
-- `AGENTS.md` files are supported as custom instruction/context files, not as custom-agent profile files.
+- Custom agents 是带 YAML frontmatter 的 Markdown files，存储在 `.github/agents/`。
+- File extension 是 `.agent.md`（或 `.md`）。Filenames 只能包含：`.`、`-`、`_`、`a-z`、`A-Z`、`0-9`。
+- documented custom-agent extension 是 singular `.agent.md`，不是 `.agents.md`。
+- `description` 是唯一 required frontmatter field。
+- 当前 Copilot CLI docs 没有把 `.agents/agents` 或 `~/.agents/agents` 列为 custom-agent discovery paths。`.agents/*` convention 记录用于 skills（`.agents/skills`、`~/.agents/skills`），不是 agents。
+- Copilot CLI 还会在 native Copilot agent directories 之后、plugin agents 之前加载 Claude-compatible agent directories（`.claude/agents`、`~/.claude/agents`）。
+- `AGENTS.md` files 被支持为 custom instruction/context files，而不是 custom-agent profile files。
 
-## Plugins
+## Plugins（插件）
 
-- Copilot CLI plugins bundle reusable agents, skills, hooks, MCP servers, and related configuration.
-- Install from a registered marketplace with:
+- Copilot CLI plugins 会 bundle reusable agents、skills、hooks、MCP servers 和相关 configuration。
+- 从 registered marketplace 安装：
 
 ```text
 /plugin marketplace add EveryInc/compound-engineering-plugin
 /plugin install compound-engineering@compound-engineering-plugin
 ```
 
-- The terminal equivalents are:
+- terminal 等价命令为：
 
 ```bash
 copilot plugin marketplace add EveryInc/compound-engineering-plugin
 copilot plugin install compound-engineering@compound-engineering-plugin
 ```
 
-- Copilot CLI looks for plugin manifests at `.plugin/plugin.json`, `plugin.json`, `.github/plugin/plugin.json`, or `.claude-plugin/plugin.json`.
-- Copilot CLI looks for marketplace manifests at `marketplace.json`, `.plugin/marketplace.json`, `.github/plugin/marketplace.json`, or `.claude-plugin/marketplace.json`.
-- Therefore the existing repository-level `.claude-plugin/marketplace.json` and plugin-level `plugins/compound-engineering/.claude-plugin/plugin.json` are expected to be sufficient for Copilot native plugin install. Do not add a parallel `.github/plugin` surface unless Copilot requires a Copilot-only manifest field in the future.
+- Copilot CLI 会在 `.plugin/plugin.json`、`plugin.json`、`.github/plugin/plugin.json` 或 `.claude-plugin/plugin.json` 查找 plugin manifests。
+- Copilot CLI 会在 `marketplace.json`、`.plugin/marketplace.json`、`.github/plugin/marketplace.json` 或 `.claude-plugin/marketplace.json` 查找 marketplace manifests。
+- 因此，现有 repository-level `.claude-plugin/marketplace.json` 和 plugin-level `plugins/compound-engineering/.claude-plugin/plugin.json` 应足以支持 Copilot native plugin install。除非未来 Copilot 要求 Copilot-only manifest field，否则不要添加平行 `.github/plugin` surface。
 
-### Frontmatter fields
+### Frontmatter fields（frontmatter 字段）
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `name` | No | Derived from filename | Display name |
-| `description` | **Yes** | — | What the agent does |
-| `tools` | No | `["*"]` | Tool access list. `[]` disables all tools. |
-| `target` | No | both | `vscode`, `github-copilot`, or omit for both |
-| `infer` | No | `true` | Auto-select based on task context |
-| `model` | No | Platform default | AI model (works in IDE, may be ignored on github.com) |
-| `mcp-servers` | No | — | MCP config (org/enterprise agents only) |
-| `metadata` | No | — | Arbitrary key-value annotations |
+| `description` | **Yes** | — | agent 的用途 |
+| `tools` | No | `["*"]` | Tool access list；`[]` 会禁用所有 tools |
+| `target` | No | both | `vscode`、`github-copilot`，或省略表示两者都适用 |
+| `infer` | No | `true` | 根据 task context 自动选择 |
+| `model` | No | Platform default | AI model（在 IDE 中有效，在 github.com 上可能被忽略） |
+| `mcp-servers` | No | — | MCP config（仅 org/enterprise agents） |
+| `metadata` | No | — | 任意 key-value annotations |
 
-### Character limit
+### Character limit（字符限制）
 
-Agent body content is limited to **30,000 characters**.
+Agent body content 限制为 **30,000 characters**。
 
-### Tool names
+### Tool names（tool 名称）
 
 | Name | Aliases | Purpose |
 |------|---------|---------|
-| `execute` | `shell`, `Bash` | Run shell commands |
-| `read` | `Read` | Read files |
-| `edit` | `Edit`, `Write` | Modify files |
-| `search` | `Grep`, `Glob` | Search files |
-| `agent` | `Task` | Invoke other agents |
+| `execute` | `shell`, `Bash` | 运行 shell commands |
+| `read` | `Read` | 读取 files |
+| `edit` | `Edit`, `Write` | 修改 files |
+| `search` | `Grep`, `Glob` | 搜索 files |
+| `agent` | `Task` | 调用其他 agents |
 | `web` | `WebSearch`, `WebFetch` | Web access |
 
-## Skills (SKILL.md)
+## Skills (SKILL.md，skill 文件)
 
-- Skills follow the open SKILL.md standard (same format as Claude Code and Cursor).
-- A skill is a directory containing `SKILL.md` plus optional `scripts/`, `references/`, and `assets/`.
-- YAML frontmatter requires `name` and `description` fields.
-- Skills are loaded on-demand when Copilot determines relevance.
+- Skills 遵循 open SKILL.md standard（与 Claude Code 和 Cursor 相同 format）。
+- skill 是包含 `SKILL.md` 以及 optional `scripts/`、`references/` 和 `assets/` 的 directory。
+- YAML frontmatter 要求 `name` 和 `description` fields。
+- Copilot 判断相关性后按需加载 skills。
 
-### Discovery locations
+### Discovery locations（发现位置）
 
 | Scope | Path |
 |-------|------|
 | Project | `.github/skills/*/SKILL.md` |
-| Project (Claude-compatible) | `.claude/skills/*/SKILL.md` |
-| Project (auto-discovery) | `.agents/skills/*/SKILL.md` |
+| Project（Claude-compatible） | `.claude/skills/*/SKILL.md` |
+| Project（auto-discovery） | `.agents/skills/*/SKILL.md` |
 | Personal | `~/.copilot/skills/*/SKILL.md` |
-| Personal (auto-discovery) | `~/.agents/skills/*/SKILL.md` |
+| Personal（auto-discovery） | `~/.agents/skills/*/SKILL.md` |
 
-## MCP (Model Context Protocol)
+## MCP (Model Context Protocol，模型上下文协议)
 
-- MCP configuration is set via **Repository Settings > Copilot > Coding agent > MCP configuration** on GitHub.
-- Repository-level agents **cannot** define MCP servers inline; use repository settings instead.
-- Org/enterprise agents can embed MCP server definitions in frontmatter.
-- All env var names must use the `COPILOT_MCP_` prefix.
-- Only MCP tools are supported (not resources or prompts).
+- MCP configuration 通过 GitHub 上的 **Repository Settings > Copilot > Coding agent > MCP configuration** 设置。
+- Repository-level agents **不能** inline 定义 MCP servers；应使用 repository settings。
+- Org/enterprise agents 可以在 frontmatter 中嵌入 MCP server definitions。
+- 所有 env var names 必须使用 `COPILOT_MCP_` prefix。
+- 只支持 MCP tools（不支持 resources 或 prompts）。
 
-### Config structure
+### Config structure（配置结构）
 
 ```json
 {
@@ -135,36 +135,36 @@ Agent body content is limited to **30,000 characters**.
 }
 ```
 
-### Server types
+### Server types（server 类型）
 
-| Type | Fields |
+| Type（类型） | Fields（字段） |
 |------|--------|
-| Local/stdio | `type: "local"`, `command`, `args`, `tools`, `env` |
-| Remote/SSE | `type: "sse"`, `url`, `tools`, `headers` |
+| Local/stdio（本地/stdio） | `type: "local"`, `command`, `args`, `tools`, `env` |
+| Remote/SSE（远程/SSE） | `type: "sse"`, `url`, `tools`, `headers` |
 
-## Prompts (.prompt.md)
+## Prompts (.prompt.md，prompt 文件)
 
-- Reusable prompt files stored in `.github/prompts/`.
-- Available in VS Code, Visual Studio, and JetBrains IDEs only (not on github.com).
-- Invoked via `/promptname` in chat.
-- Support variable syntax: `${input:name}`, `${file}`, `${selection}`.
+- Reusable prompt files 存储在 `.github/prompts/`。
+- 仅在 VS Code、Visual Studio 和 JetBrains IDEs 中可用（不在 github.com 上可用）。
+- 在 chat 中通过 `/promptname` 调用。
+- 支持 variable syntax：`${input:name}`、`${file}`、`${selection}`。
 
-## Precedence
+## Precedence（优先级）
 
-1. Built-in agents
+1. Built-in agents（内置 agents）
 2. `~/.copilot/agents`
 3. `<project>/.github/agents`
 4. `<parents>/.github/agents`
 5. `~/.claude/agents`
 6. `<project>/.claude/agents`
 7. `<parents>/.claude/agents`
-8. Plugin `agents/` directories
-9. Remote organization/enterprise agents
+8. Plugin `agents/` directories（plugin 的 `agents/` directories）
+9. Remote organization/enterprise agents（远程 organization/enterprise agents）
 
-Within a repo, `AGENTS.md` files in directories provide nearest-ancestor-wins instructions.
+在 repo 内，directories 中的 `AGENTS.md` files 提供 nearest-ancestor-wins instructions。
 
-Skills use separate first-found-wins precedence. Current docs list project `.github/skills`, `.agents/skills`, `.claude/skills`, inherited project skills, personal `~/.copilot/skills`, personal `~/.agents/skills`, personal `~/.claude/skills`, then plugin skill directories.
+Skills 使用独立的 first-found-wins precedence。当前 docs 列出的顺序是 project `.github/skills`、`.agents/skills`、`.claude/skills`、inherited project skills、personal `~/.copilot/skills`、personal `~/.agents/skills`、personal `~/.claude/skills`，然后 plugin skill directories。
 
-Skills are deduplicated by the `name` field inside `SKILL.md`, not by directory name. If a personal or project skill has the same `name` as a plugin skill, Copilot uses the first-loaded personal/project skill and silently ignores the plugin skill. For example, a stale `~/.agents/skills/ce-plan/SKILL.md` with `name: ce-plan` would shadow the native plugin's `ce-plan`; it should not show as two separate skills in Copilot CLI. Use `/skills info ce-plan` to confirm which location won.
+Skills 按 `SKILL.md` 内的 `name` field deduplicated，而不是按 directory name。如果 personal 或 project skill 与 plugin skill 拥有相同 `name`，Copilot 使用 first-loaded personal/project skill，并静默忽略 plugin skill。例如，带 `name: ce-plan` 的 stale `~/.agents/skills/ce-plan/SKILL.md` 会 shadow native plugin 的 `ce-plan`；它不应在 Copilot CLI 中显示为两个 separate skills。使用 `/skills info ce-plan` 确认哪一个 location 获胜。
 
-This makes Copilot cleanup different from Codex duplicate cleanup: stale CE skills in `~/.agents/skills`, `~/.copilot/skills`, `.agents/skills`, or `.github/skills` may not create visible duplicates, but they can silently override newer plugin-provided CE skills.
+这让 Copilot cleanup 不同于 Codex duplicate cleanup：`~/.agents/skills`、`~/.copilot/skills`、`.agents/skills` 或 `.github/skills` 中的 stale CE skills 可能不会产生 visible duplicates，但会静默覆盖更新的 plugin-provided CE skills。

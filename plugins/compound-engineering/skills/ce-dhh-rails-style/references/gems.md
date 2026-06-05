@@ -1,51 +1,51 @@
-# Gems - DHH Rails Style
+# Gems - DHH Rails Style（DHH Rails 风格 Gems）
 
 <what_they_use>
-## What 37signals Uses
+## 37signals 使用什么
 
-**Core Rails stack:**
+**核心 Rails stack：**
 - turbo-rails, stimulus-rails, importmap-rails
-- propshaft (asset pipeline)
+- propshaft (asset pipeline，资产 pipeline)
 
-**Database-backed services (Solid suite):**
-- solid_queue - background jobs
-- solid_cache - caching
+**Database-backed services（数据库后端 services，Solid suite）：**
+- solid_queue - background jobs（后台 jobs）
+- solid_cache - caching（缓存）
 - solid_cable - WebSockets/Action Cable
 
-**Authentication & Security:**
-- bcrypt (for any password hashing needed)
+**Authentication & Security（认证与安全）：**
+- bcrypt（用于任何需要的 password hashing）
 
-**Their own gems:**
-- geared_pagination (cursor-based pagination)
-- lexxy (rich text editor)
-- mittens (mailer utilities)
+**他们自己的 gems：**
+- geared_pagination（cursor-based pagination，基于 cursor 的分页）
+- lexxy（rich text editor，富文本编辑器）
+- mittens（mailer utilities，mailer 工具）
 
-**Utilities:**
-- rqrcode (QR code generation)
-- redcarpet + rouge (Markdown rendering)
-- web-push (push notifications)
+**Utilities（工具）：**
+- rqrcode（QR code generation，二维码生成）
+- redcarpet + rouge（Markdown rendering，Markdown 渲染）
+- web-push（push notifications，push 通知）
 
-**Deployment & Operations:**
-- kamal (Docker deployment)
-- thruster (HTTP/2 proxy)
-- mission_control-jobs (job monitoring)
-- autotuner (GC tuning)
+**Deployment & Operations（部署与运维）：**
+- kamal（Docker deployment，Docker 部署）
+- thruster（HTTP/2 proxy，HTTP/2 代理）
+- mission_control-jobs（job monitoring，job 监控）
+- autotuner（GC tuning，GC 调优）
 </what_they_use>
 
 <what_they_avoid>
-## What They Deliberately Avoid
+## 他们有意避免什么
 
-**Authentication:**
+**Authentication（认证）：**
 ```
 devise → Custom ~150-line auth
 ```
-Why: Full control, no password liability with magic links, simpler.
+原因：完全控制；使用 magic links 时没有 password liability；更简单。
 
-**Authorization:**
+**Authorization（授权）：**
 ```
 pundit/cancancan → Simple role checks in models
 ```
-Why: Most apps don't need policy objects. A method on the model suffices:
+原因：大多数 apps 不需要 policy objects。model 上一个方法就够了：
 ```ruby
 class Board < ApplicationRecord
   def editable_by?(user)
@@ -54,83 +54,83 @@ class Board < ApplicationRecord
 end
 ```
 
-**Background Jobs:**
+**Background Jobs（后台 Jobs）：**
 ```
 sidekiq → Solid Queue
 ```
-Why: Database-backed means no Redis, same transactional guarantees.
+原因：Database-backed 意味着不需要 Redis，同时保留相同 transactional guarantees。
 
-**Caching:**
+**Caching（缓存）：**
 ```
 redis → Solid Cache
 ```
-Why: Database is already there, simpler infrastructure.
+原因：Database 已经存在，infrastructure 更简单。
 
-**Search:**
+**Search（搜索）：**
 ```
 elasticsearch → Custom sharded search
 ```
-Why: Built exactly what they need, no external service dependency.
+原因：只构建他们真正需要的东西，没有 external service dependency。
 
-**View Layer:**
+**View Layer（视图层）：**
 ```
 view_component → Standard partials
 ```
-Why: Partials work fine. ViewComponents add complexity without clear benefit for their use case.
+原因：Partials 已经很好用。ViewComponents 对他们的 use case 增加 complexity，却没有明确收益。
 
-**API:**
+**API：**
 ```
 GraphQL → REST with Turbo
 ```
-Why: REST is sufficient when you control both ends. GraphQL complexity not justified.
+原因：当你控制两端时，REST 已经足够。GraphQL complexity 不值得。
 
-**Factories:**
+**Factories（Fixtures 替代 factories）：**
 ```
 factory_bot → Fixtures
 ```
-Why: Fixtures are simpler, faster, and encourage thinking about data relationships upfront.
+原因：Fixtures 更简单、更快，并鼓励 upfront 思考 data relationships。
 
-**Service Objects:**
+**Service Objects（避免 service objects）：**
 ```
 Interactor, Trailblazer → Fat models
 ```
-Why: Business logic stays in models. Methods like `card.close` instead of `CardCloser.call(card)`.
+原因：Business logic 留在 models 中。使用 `card.close` 这样的方法，而不是 `CardCloser.call(card)`。
 
-**Form Objects:**
+**Form Objects（表单对象）：**
 ```
 Reform, dry-validation → params.expect + model validations
 ```
-Why: Rails 7.1's `params.expect` is clean enough. Contextual validations on model.
+原因：Rails 7.1 的 `params.expect` 已足够 clean。在 model 上做 contextual validations。
 
-**Decorators:**
+**Decorators（装饰器）：**
 ```
 Draper → View helpers + partials
 ```
-Why: Helpers and partials are simpler. No decorator indirection.
+原因：Helpers 和 partials 更简单。没有 decorator indirection。
 
-**CSS:**
+**CSS：**
 ```
 Tailwind, Sass → Native CSS
 ```
-Why: Modern CSS has nesting, variables, layers. No build step needed.
+原因：Modern CSS 已有 nesting、variables、layers。不需要 build step。
 
-**Frontend:**
+**Frontend（前端）：**
 ```
 React, Vue, SPAs → Turbo + Stimulus
 ```
-Why: Server-rendered HTML with sprinkles of JS. SPA complexity not justified.
+原因：Server-rendered HTML 加少量 JS 点缀。SPA complexity 不值得。
 
-**Testing:**
+**Testing（测试）：**
 ```
 RSpec → Minitest
 ```
-Why: Simpler, faster boot, less DSL magic, ships with Rails.
+原因：更简单、boot 更快、DSL magic 更少，并随 Rails 一起提供。
 </what_they_avoid>
 
 <testing_philosophy>
-## Testing Philosophy
+## Testing Philosophy（测试理念）
 
-**Minitest** - simpler, faster:
+**Minitest** - 更简单、更快：
 ```ruby
 class CardTest < ActiveSupport::TestCase
   test "closing creates closure" do
@@ -143,7 +143,7 @@ class CardTest < ActiveSupport::TestCase
 end
 ```
 
-**Fixtures** - loaded once, deterministic:
+**Fixtures** - 加载一次，deterministic：
 ```yaml
 # test/fixtures/cards.yml
 open_card:
@@ -157,7 +157,7 @@ closed_card:
   creator: bob
 ```
 
-**Dynamic timestamps** with ERB:
+使用 ERB 的 **dynamic timestamps**：
 ```yaml
 recent:
   title: Recent
@@ -168,7 +168,7 @@ old:
   created_at: <%= 1.month.ago %>
 ```
 
-**Time travel** for time-dependent tests:
+用于 time-dependent tests 的 **time travel**：
 ```ruby
 test "expires after 15 minutes" do
   magic_link = MagicLink.create!(user: users(:alice))
@@ -179,7 +179,7 @@ test "expires after 15 minutes" do
 end
 ```
 
-**VCR** for external APIs:
+用于 external APIs 的 **VCR**：
 ```ruby
 VCR.use_cassette("stripe/charge") do
   charge = Stripe::Charge.create(amount: 1000)
@@ -187,44 +187,44 @@ VCR.use_cassette("stripe/charge") do
 end
 ```
 
-**Tests ship with features** - same commit, not before or after.
+**Tests 与 features 一起 ship** - 同一个 commit，不早不晚。
 </testing_philosophy>
 
 <decision_framework>
-## Decision Framework
+## Decision Framework（决策框架）
 
-Before adding a gem, ask:
+添加 gem 前，先问：
 
-1. **Can vanilla Rails do this?**
-   - ActiveRecord can do most things Sequel can
-   - ActionMailer handles email fine
-   - ActiveJob works for most job needs
+1. **vanilla Rails 能做到吗？**
+   - ActiveRecord 能做 Sequel 能做的大多数事
+   - ActionMailer 处理 email 没问题
+   - ActiveJob 能满足大多数 job needs
 
-2. **Is the complexity worth it?**
-   - 150 lines of custom code vs. 10,000-line gem
-   - You'll understand your code better
-   - Fewer upgrade headaches
+2. **这份 complexity 值得吗？**
+   - 150 行 custom code vs. 10,000 行 gem
+   - 你会更理解自己的 code
+   - 更少 upgrade headaches
 
-3. **Does it add infrastructure?**
-   - Redis? Consider database-backed alternatives
-   - External service? Consider building in-house
-   - Simpler infrastructure = fewer failure modes
+3. **它会增加 infrastructure 吗？**
+   - Redis？考虑 database-backed alternatives
+   - External service？考虑 in-house 构建
+   - 更简单的 infrastructure = 更少 failure modes
 
-4. **Is it from someone you trust?**
-   - 37signals gems: battle-tested at scale
-   - Well-maintained, focused gems: usually fine
-   - Kitchen-sink gems: probably overkill
+4. **它来自你信任的人吗？**
+   - 37signals gems：在 scale 下 battle-tested
+   - Well-maintained、focused gems：通常可以
+   - Kitchen-sink gems：大概率 overkill
 
-**The philosophy:**
-> "Build solutions before reaching for gems."
+**The philosophy（核心理念）：**
+> "Build solutions before reaching for gems."（先构建解决方案，再考虑引入 gems。）
 
-Not anti-gem, but pro-understanding. Use gems when they genuinely solve a problem you have, not a problem you might have.
+不是 anti-gem，而是 pro-understanding。只有当 gems 真正解决你已经有的问题时才使用它们，而不是为可能会有的问题提前引入。
 </decision_framework>
 
 <gem_patterns>
-## Gem Usage Patterns
+## Gem Usage Patterns（Gem 使用模式）
 
-**Pagination:**
+**Pagination（分页）：**
 ```ruby
 # geared_pagination - cursor-based
 class CardsController < ApplicationController
@@ -234,7 +234,7 @@ class CardsController < ApplicationController
 end
 ```
 
-**Markdown:**
+**Markdown（Markdown 渲染）：**
 ```ruby
 # redcarpet + rouge
 class MarkdownRenderer
@@ -248,7 +248,7 @@ class MarkdownRenderer
 end
 ```
 
-**Background jobs:**
+**Background jobs（后台 jobs）：**
 ```ruby
 # solid_queue - no Redis
 class ApplicationJob < ActiveJob::Base
@@ -257,7 +257,7 @@ class ApplicationJob < ActiveJob::Base
 end
 ```
 
-**Caching:**
+**Caching（缓存）：**
 ```ruby
 # solid_cache - no Redis
 # config/environments/production.rb

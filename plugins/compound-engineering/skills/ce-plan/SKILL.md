@@ -1,236 +1,236 @@
 ---
 name: ce-plan
-description: "Create structured plans for multi-step tasks -- software features, research workflows, events, study plans, or any goal that benefits from breakdown. Also deepens existing plans with interactive sub-agent review. Use when the user says 'plan this', 'create a plan', 'how should we build', 'break this down', or when a brainstorm doc is ready for planning. Use 'deepen the plan' or 'deepening pass' for the deepening flow. For exploratory requests, prefer ce-brainstorm first."
-argument-hint: "[optional: feature description, requirements doc path, plan path to deepen, or any task to plan] [output:html]"
+description: "为 multi-step tasks 创建 structured plans：software features、research workflows、events、study plans，或任何受益于 breakdown 的 goal。也可通过 interactive sub-agent review deepen existing plans。当用户说 'plan this'、'create a plan'、'how should we build'、'break this down'，或 brainstorm doc 已 ready for planning 时使用。使用 'deepen the plan' 或 'deepening pass' 进入 deepening flow。Exploratory requests 优先使用 ce-brainstorm。"
+argument-hint: "[optional: feature description、requirements doc path、要 deepen 的 plan path，或任何待 plan task] [output:html]"
 ---
 
-# Create Technical Plan
+# 创建技术计划
 
-**Note: The current year is 2026.** Use this when dating plans and searching for recent documentation.
+**说明：当前年份是 2026。** 为 plans 标日期和搜索 recent documentation 时使用。
 
-`ce-brainstorm` defines **WHAT** to build. `ce-plan` defines **HOW** to build it. `ce-work` executes the plan. A prior brainstorm is useful context but never required — `ce-plan` works from any input: a requirements doc, a bug report, a feature idea, or a rough description.
+`ce-brainstorm` 定义要 build 的 **WHAT**。`ce-plan` 定义如何 build 的 **HOW**。`ce-work` 执行 plan。Prior brainstorm 是有用 context，但从不是 required：`ce-plan` 可从任何 input 工作：requirements doc、bug report、feature idea 或 rough description。
 
-**When directly invoked, always plan.** Never classify a direct invocation as "not a planning task" and abandon the workflow. If the input is unclear, ask clarifying questions or use the planning bootstrap (Phase 0.4) to establish enough context — but always stay in the planning workflow.
+**Directly invoked 时，始终 plan。** 绝不要将 direct invocation classify 为 "not a planning task" 并 abandon workflow。如果 input 不清晰，询问 clarifying questions，或使用 planning bootstrap（Phase 0.4）建立足够 context：但始终留在 planning workflow。
 
-This workflow produces a durable implementation plan. It does **not** implement code, run tests, or learn from execution-time results. If the answer depends on changing code and seeing what happens, that belongs in `ce-work`, not here.
+此 workflow 产出 durable implementation plan。它 **不** implement code、run tests，或从 execution-time results 中学习。如果 answer 依赖 changing code 并观察结果，那属于 `ce-work`，不是这里。
 
-## Interaction Method
+## 交互方法
 
-When asking the user a question, use the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
+询问用户问题时，使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
 
-Ask one question at a time. Prefer a concise single-select choice when natural options exist.
+一次只问一个问题。当存在 natural options 时，优先 concise single-select choice。
 
-## Feature Description
+## 功能描述
 
 <feature_description> #$ARGUMENTS </feature_description>
 
-**If the feature description above is empty, ask the user:** "What would you like to plan? Describe the task, goal, or project you have in mind." Then wait for their response before continuing.
+**如果上方 feature description 为空，询问用户：** "What would you like to plan? Describe the task, goal, or project you have in mind." 然后等待回复再继续。
 
-If the input is present but unclear or underspecified, do not abandon — ask one or two clarifying questions, or proceed to Phase 0.4's planning bootstrap to establish enough context. The goal is always to help the user plan, never to exit the workflow.
+如果 input 存在但 unclear 或 underspecified，不要 abandon：询问一两个 clarifying questions，或进入 Phase 0.4 的 planning bootstrap 建立足够 context。目标始终是帮助用户 plan，绝不是退出 workflow。
 
-**IMPORTANT: All file references in the plan document must use repo-relative paths (e.g., `src/models/user.rb`), never absolute paths (e.g., `/Users/name/Code/project/src/models/user.rb`). This applies everywhere — implementation unit file lists, pattern references, origin document links, and prose mentions. Absolute paths break portability across machines, worktrees, and teammates.**
+**重要：Plan document 中所有 file references 必须使用 repo-relative paths（例如 `src/models/user.rb`），绝不要使用 absolute paths（例如 `/Users/name/Code/project/src/models/user.rb`）。这适用于所有位置：implementation unit file lists、pattern references、origin document links 和 prose mentions。Absolute paths 会破坏跨 machines、worktrees 和 teammates 的 portability。**
 
-## Core Principles
+## 核心原则
 
-1. **Use requirements as the source of truth** - If `ce-brainstorm` produced a requirements document, planning should build from it rather than re-inventing behavior.
-2. **Decisions, not code** - Capture approach, boundaries, files, dependencies, risks, and test scenarios. Do not pre-write implementation code or shell command choreography. Pseudo-code sketches or DSL grammars that communicate high-level technical design are welcome when they help a reviewer validate direction — but they must be explicitly framed as directional guidance, not implementation specification.
-3. **Research before structuring** - Explore the codebase, institutional learnings, and external guidance when warranted before finalizing the plan.
-4. **Right-size the artifact** - Small work gets a compact plan. Large work gets more structure. The philosophy stays the same at every depth.
-5. **Separate planning from execution discovery** - Resolve planning-time questions here. Explicitly defer execution-time unknowns to implementation.
-6. **Keep the plan portable** - The plan should work as a living document, review artifact, or issue body without embedding tool-specific executor instructions.
-7. **Carry execution posture lightly when it matters** - If the request, origin document, or repo context clearly implies test-first, characterization-first, or another non-default execution posture, reflect that in the plan as a lightweight signal. Do not turn the plan into step-by-step execution choreography.
-8. **Honor user-named resources** - When the user names a specific resource — a CLI, MCP server, URL, file, doc link, or prior artifact — treat it as authoritative input, not a suggestion. Discover it if unknown (`command -v`, fetch, read) before assuming it's unavailable. Use it in place of generic alternatives. If it fails or doesn't exist, say so explicitly rather than silently substituting.
+1. **以 requirements 作为真源**：如果 `ce-brainstorm` 产出了 requirements document，planning 应从它 build，而不是 re-invent behavior。
+2. **记录 decisions，而不是 code**：Capture approach、boundaries、files、dependencies、risks 和 test scenarios。不要预写 implementation code 或 shell command choreography。当 pseudo-code sketches 或 DSL grammars 有助于 reviewer validate direction 时可以使用，但必须明确 framing 为 directional guidance，而不是 implementation specification。
+3. **先 research，再 structuring**：Finalizing plan 前，在 warranted 时 explore codebase、institutional learnings 和 external guidance。
+4. **按工作大小调整 artifact**：Small work 得到 compact plan。Large work 得到更多 structure。Philosophy 在每个 depth 保持一致。
+5. **区分 planning 和 execution discovery**：在这里 resolve planning-time questions。明确将 execution-time unknowns defer 给 implementation。
+6. **保持 plan portable**：Plan 应可作为 living document、review artifact 或 issue body 使用，不嵌入 tool-specific executor instructions。
+7. **必要时轻量携带 execution posture**：如果 request、origin document 或 repo context 明确暗示 test-first、characterization-first 或其它 non-default execution posture，在 plan 中以 lightweight signal 反映它。不要将 plan 变成 step-by-step execution choreography。
+8. **尊重用户命名的 resources**：当用户命名 specific resource：CLI、MCP server、URL、file、doc link 或 prior artifact，将其视为 authoritative input，而不是 suggestion。未知时先 discover（`command -v`、fetch、read），再假设 unavailable。用它替代 generic alternatives。如果失败或不存在，明确说明，不要 silent substitute。
 
-## Plan Quality Bar
+## 计划质量标准
 
-Every plan should contain:
-- A clear problem frame and scope boundary
-- Concrete requirements traceability back to the request or origin document
-- Repo-relative file paths for the work being proposed (never absolute paths — see Planning Rules)
-- Explicit test file paths for feature-bearing implementation units
-- Decisions with rationale, not just tasks
-- Existing patterns or code references to follow
-- Enumerated test scenarios for each feature-bearing unit, specific enough that an implementer knows exactly what to test without inventing coverage themselves
-- Clear dependencies and sequencing
+每个 plan 应包含：
+- 清晰的 problem frame 和 scope boundary
+- 可追溯回 request 或 origin document 的 concrete requirements traceability
+- Proposed work 的 repo-relative file paths（绝不使用 absolute paths：见 Planning Rules）
+- Feature-bearing implementation units 的 explicit test file paths
+- 带 rationale 的 decisions，而不只是 tasks
+- 要 follow 的 existing patterns 或 code references
+- 每个 feature-bearing unit 的 enumerated test scenarios，足够 specific，让 implementer 无需自行 invent coverage 就知道 exactly what to test
+- 清晰 dependencies 和 sequencing
 
-A plan is ready when an implementer can start confidently without needing the plan to write the code for them.
+当 implementer 可 confident start，且不需要 plan 替他们 write code 时，plan 就 ready。
 
-## Workflow
+## 工作流
 
-### Phase 0: Resume, Source, and Scope
+### Phase 0：恢复、来源与范围
 
-#### 0.0 Resolve Output Mode
+#### 0.0 解析输出模式
 
-Determine `OUTPUT_FORMAT` before any other phase fires. Output mode is **exclusive** — the plan is written as either markdown (`.md`) OR HTML (`.html`), never both. Precedence: CLI arg > config > default (`md`), with a hard pipeline-mode override.
+在任何其它 phase 触发前确定 `OUTPUT_FORMAT`。Output mode 是 **exclusive**：plan 写为 markdown（`.md`）或 HTML（`.html`），绝不同时写两者。Precedence：CLI arg > config > default（`md`），并有 hard pipeline-mode override。
 
-**Read config (pre-resolved at skill load):**
+**读取 config（skill load 时 pre-resolved）：**
 !`cat "$(git rev-parse --show-toplevel 2>/dev/null)/.compound-engineering/config.local.yaml" 2>/dev/null || echo '__NO_CONFIG__'`
 
-Resolution steps:
+解析步骤：
 
-1. **CLI arg.** Scan `$ARGUMENTS` for a token starting with the literal prefix `output:`. If found, strip it from arguments before treating the remainder as the feature description, and match its value case-insensitively against `md` and `html`.
-   - `output:` alone (no value) → no-op, fall through to step 2.
-   - `output:<unknown>` (e.g., `output:pdf`) → drop the token, fall through to step 2, and remember to emit a one-line note above the post-generation menu after final resolution: `Ignored unknown output: value '<value>' — using <resolved_format> instead.` where `<resolved_format>` is the value `OUTPUT_FORMAT` actually resolved to after steps 2-4. Do not hardcode `md` in the note — that misleads users when config has set HTML.
-2. **Config.** If step 1 did not resolve and the pre-resolved YAML above has an **active (non-commented)** `plan_output:` key whose value matches `md` or `html` (case-insensitive), use it. Missing, invalid, or commented values fall through silently. Critical: lines starting with `#` are YAML comments and must be ignored — the shipped config template includes commented examples like `# plan_output: html` to document the option, and matching those as active settings would silently force HTML mode on every run without the user having opted in.
-3. **Default.** Otherwise `OUTPUT_FORMAT=md`.
-4. **Pipeline override.** When invoked from LFG or any `disable-model-invocation` context, force `OUTPUT_FORMAT=md` regardless of steps 1-3. `ce-work` and other automated downstream consumers parse markdown reliably; HTML in pipeline runs is unnecessary friction.
+1. **CLI arg。** 扫描 `$ARGUMENTS` 中以 literal prefix `output:` 开头的 token。如果找到，在将剩余内容作为 feature description 前移除该 token，并将其 value case-insensitively 匹配 `md` 和 `html`。
+   - `output:` alone（无 value）→ no-op，fall through 到 step 2。
+   - `output:<unknown>`（例如 `output:pdf`）→ drop token，fall through 到 step 2，并记住在 final resolution 后的 post-generation menu 上方 emit one-line note：`Ignored unknown output: value '<value>' — using <resolved_format> instead.` 其中 `<resolved_format>` 是 steps 2-4 后 `OUTPUT_FORMAT` 实际 resolved 的 value。不要在 note 中 hardcode `md`：当 config 设置 HTML 时会误导用户。
+2. **Config。** 如果 step 1 未 resolve，且上方 pre-resolved YAML 有 **active（non-commented）** `plan_output:` key，其 value 匹配 `md` 或 `html`（case-insensitive），使用它。Missing、invalid 或 commented values silently fall through。Critical：以 `#` 开头的 lines 是 YAML comments，必须 ignored：shipped config template 包含 `# plan_output: html` 这类 commented examples 用于 document option，如果把它们匹配为 active settings，会在用户未 opt in 时 silently force HTML mode。
+3. **Default。** 否则 `OUTPUT_FORMAT=md`。
+4. **Pipeline override。** 当从 LFG 或任何 `disable-model-invocation` context invoke 时，无论 steps 1-3 如何，强制 `OUTPUT_FORMAT=md`。`ce-work` 和其它 automated downstream consumers 可 reliably parse markdown；pipeline runs 中 HTML 是 unnecessary friction。
 
-**Token-parsing convention:** only literal-prefix flag tokens (`output:`, `mode:`, `delegate:` where applicable) are consumed and stripped. Other `<word>:<word>` tokens — including conventional commit prefixes like `feat:`, `fix:`, `chore:` that may appear inside a feature description — pass through verbatim.
+**Token-parsing convention：** 只有 literal-prefix flag tokens（`output:`、`mode:`、适用时的 `delegate:`）会被 consumed and stripped。其它 `<word>:<word>` tokens：包括 feature description 中可能出现的 conventional commit prefixes，如 `feat:`、`fix:`、`chore:`，都 verbatim pass through。
 
-**Load the format-rendering reference based on the resolved value.** Section content is the same in either format; presentation differs. Both references are paired with `references/plan-sections.md`, which describes what the plan contains regardless of format.
+**基于 resolved value 加载 format-rendering reference。** 两种 format 中 section content 相同；presentation 不同。两个 references 都与 `references/plan-sections.md` 配对，后者描述 plan 无论 format 如何都包含什么。
 
-- When `OUTPUT_FORMAT=md`, read `references/markdown-rendering.md` for format principles.
-- When `OUTPUT_FORMAT=html`, read `references/html-rendering.md` for format principles.
+- 当 `OUTPUT_FORMAT=md` 时，读取 `references/markdown-rendering.md` 获取 format principles。
+- 当 `OUTPUT_FORMAT=html` 时，读取 `references/html-rendering.md` 获取 format principles。
 
-#### 0.1 Resume Existing Plan Work When Appropriate
+#### 0.1 在适当时恢复现有计划工作
 
-If the user references an existing plan file or there is an obvious recent matching plan in `docs/plans/`:
-- Read it
-- Confirm whether to update it in place or create a new plan
-- If updating, revise only the still-relevant sections. Plans do not carry per-unit progress state — progress is derived from git by `ce-work`, so there is no progress to preserve across edits
+如果用户 reference existing plan file，或 `docs/plans/` 中有 obvious recent matching plan：
+- 读取它
+- 确认是 update in place 还是 create new plan
+- 如果 updating，只 revise 仍 relevant 的 sections。Plans 不携带 per-unit progress state：progress 由 `ce-work` 从 git 派生，因此没有要跨 edits preserve 的 progress
 
-**Deepen intent:** The word "deepen" (or "deepening") in reference to a plan is the primary trigger for the deepening fast path. When the user says "deepen the plan", "deepen my plan", "run a deepening pass", or similar, the target document is a **plan** in `docs/plans/`, not a requirements document. Use any path, keyword, or context the user provides to identify the right plan. If a path is provided, verify it is actually a plan document. If the match is not obvious, confirm with the user before proceeding.
+**Deepen intent：** 在 reference plan 时出现 "deepen"（或 "deepening"）是 deepening fast path 的 primary trigger。当用户说 "deepen the plan"、"deepen my plan"、"run a deepening pass" 或类似表达时，target document 是 `docs/plans/` 中的 **plan**，不是 requirements document。使用用户提供的任何 path、keyword 或 context 识别正确 plan。如果提供 path，verify 它实际是 plan document。如果 match 不 obvious，继续前向用户 confirm。
 
-Words like "strengthen", "confidence", "gaps", and "rigor" are NOT sufficient on their own to trigger deepening. These words appear in normal editing requests ("strengthen that section about the diagram", "there are gaps in the test scenarios") and should not cause a holistic deepening pass. Only treat them as deepening intent when the request clearly targets the plan as a whole and does not name a specific section or content area to change — and even then, prefer to confirm with the user before entering the deepening flow.
+像 "strengthen"、"confidence"、"gaps" 和 "rigor" 这样的词本身 **不足以** 触发 deepening。这些词会出现在 normal editing requests 中（"strengthen that section about the diagram"、"there are gaps in the test scenarios"），不应导致 holistic deepening pass。只有当 request 明确 target 整个 plan，且没有命名 specific section 或 content area to change 时，才将它们视为 deepening intent；即便如此，也优先在进入 deepening flow 前向用户 confirm。
 
-Once the plan is identified and appears complete (all major sections present, implementation units defined, `status: active`):
-- **Routing is keyed on file extension first, then frontmatter.** HTML plans (`.html`) are always software plans — the html-rendering invariant forbids YAML frontmatter, so frontmatter absence is not a non-software signal for HTML. Treat the visible-header metadata (title, status, date) as the frontmatter equivalent.
-  - **`.html` plan:** short-circuit to Phase 5.3 (Confidence Check and Deepening) in **interactive mode**. Never route to `references/universal-planning.md` based on missing YAML.
-  - **`.md` plan WITH YAML frontmatter:** short-circuit to Phase 5.3 in **interactive mode**.
-  - **`.md` plan WITHOUT YAML frontmatter** (non-software plans use a simple `# Title` heading with `Created:` date instead): route to `references/universal-planning.md` for editing or deepening instead of Phase 5.3. Non-software plans do not use the software confidence check.
+一旦 plan 已识别且看起来 complete（所有 major sections present、implementation units defined、`status: active`）：
+- **Routing 先基于 file extension，再看 frontmatter。** HTML plans（`.html`）始终是 software plans：html-rendering invariant 禁止 YAML frontmatter，因此 missing frontmatter 对 HTML 不是 non-software signal。将 visible-header metadata（title、status、date）视为 frontmatter equivalent。
+  - **`.html` plan：** 在 **interactive mode** 中 short-circuit 到 Phase 5.3（Confidence Check and Deepening）。绝不要基于 missing YAML route 到 `references/universal-planning.md`。
+  - **带 YAML frontmatter 的 `.md` plan：** 在 **interactive mode** 中 short-circuit 到 Phase 5.3。
+  - **无 YAML frontmatter 的 `.md` plan**（non-software plans 使用 simple `# Title` heading 和 `Created:` date）：route 到 `references/universal-planning.md` 进行 editing 或 deepening，而不是 Phase 5.3。Non-software plans 不使用 software confidence check。
 
-The Phase 5.3 short-circuit avoids re-running the full planning workflow and gives the user control over which findings are integrated.
+Phase 5.3 short-circuit 避免重新运行 full planning workflow，并让用户控制 integrated 哪些 findings。
 
-Normal editing requests (e.g., "update the test scenarios", "add a new implementation unit", "strengthen the risk section") should NOT trigger the fast path — they follow the standard resume flow.
+Normal editing requests（例如 "update the test scenarios"、"add a new implementation unit"、"strengthen the risk section"）不应触发 fast path：它们遵循 standard resume flow。
 
-If the plan already has a `deepened: YYYY-MM-DD` frontmatter field and there is no explicit user request to re-deepen, the fast path still applies the same confidence-gap evaluation — it does not force deepening.
+如果 plan 已有 `deepened: YYYY-MM-DD` frontmatter field，且没有 explicit user request 要 re-deepen，fast path 仍应用相同 confidence-gap evaluation：它不强制 deepening。
 
-**Resume preserves the existing artifact's format, except pipeline mode.** When resuming an existing plan, the resume run writes back in whatever format the existing artifact uses — markdown if the existing file is `.md`, HTML if it is `.html` — so a resume doesn't silently change the artifact shape. Explicit `output:` arguments on this run override (e.g., resuming an `.html` plan with `output:md` switches the artifact to markdown). Pipeline mode (LFG, any `disable-model-invocation` context) always wins per Phase 0.0: even when resuming an existing `.html` plan, pipeline runs force `OUTPUT_FORMAT=md` so downstream automation receives the markdown shape it expects. The resume rewrites the markdown file at the parallel path (`<plan-basename>.md`) and the original `.html` is left in place untouched.
+**Resume 会 preserve existing artifact format，pipeline mode 除外。** Resuming existing plan 时，resume run 按 existing artifact 使用的 format 写回：existing file 是 `.md` 则 markdown，是 `.html` 则 HTML，这样 resume 不会 silently change artifact shape。本 run 的 explicit `output:` arguments 会 override（例如用 `output:md` resume `.html` plan 会将 artifact switch 到 markdown）。Pipeline mode（LFG、任何 `disable-model-invocation` context）始终按 Phase 0.0 获胜：即使 resuming existing `.html` plan，pipeline runs 也强制 `OUTPUT_FORMAT=md`，让 downstream automation 收到其预期的 markdown shape。Resume 会在 parallel path（`<plan-basename>.md`）rewrite markdown file，原 `.html` 保持 untouched。
 
-#### 0.1b Classify Task Domain
+#### 0.1b 分类任务领域
 
-If the task asks to build, modify, refactor, deploy, or architect software (code, schemas, infrastructure), continue to Phase 0.2.
+如果 task 要求 build、modify、refactor、deploy 或 architect software（code、schemas、infrastructure），继续 Phase 0.2。
 
-Classify by task-type, not topic. A request that merely *references* code, a repo, an API, or a database is not automatically software work: building or modifying code is software; investigating or analyzing it is an answer-seeking question. "How often does X star repos — is it a big deal?" or "how does our approach compare to Y?" route to `references/universal-planning.md` (answer-seeking), not the implementation-plan path.
+按 task-type classify，而不是按 topic。仅仅 *references* code、repo、API 或 database 的 request，并不自动是 software work：building 或 modifying code 是 software；investigating 或 analyzing 它是 answer-seeking question。"How often does X star repos — is it a big deal?" 或 "how does our approach compare to Y?" route 到 `references/universal-planning.md`（answer-seeking），而不是 implementation-plan path。
 
-If the domain is genuinely ambiguous (e.g., "plan a migration" with no other context), ask the user before routing.
+如果 domain genuinely ambiguous（例如 "plan a migration" 但没有其它 context），routing 前询问用户。
 
-Otherwise, read `references/universal-planning.md` and follow that workflow instead. Skip all subsequent phases. Named tools or source links don't change this routing — they're inputs, handled per Core Principle 8.
+否则，读取 `references/universal-planning.md` 并改用该 workflow。跳过所有 subsequent phases。Named tools 或 source links 不改变此 routing：它们是 inputs，按 Core Principle 8 处理。
 
-#### 0.2 Find Upstream Requirements Document
+#### 0.2 查找上游需求文档
 
-Before asking planning questions, search `docs/brainstorms/` for files matching `*-requirements.md` or `*-requirements.html` (ce-brainstorm emits whichever extension matches its resolved output format; both are valid upstream requirements docs and either may be carried as the plan's `origin:`).
+在询问 planning questions 前，搜索 `docs/brainstorms/` 中匹配 `*-requirements.md` 或 `*-requirements.html` 的 files（ce-brainstorm 会按其 resolved output format emit 对应 extension；二者都是 valid upstream requirements docs，任一都可作为 plan 的 `origin:`）。
 
-**Relevance criteria:** A requirements document is relevant if:
-- The topic semantically matches the feature description
-- It was created within the last 30 days (use judgment to override if the document is clearly still relevant or clearly stale)
-- It appears to cover the same user problem or scope
+**Relevance criteria（相关性标准）：** Requirements document relevant 的条件：
+- topic 在语义上匹配 feature description
+- 它在最近 30 天内创建（如果 document 明显仍 relevant 或明显 stale，可用 judgment override）
+- 它看起来覆盖相同 user problem 或 scope
 
-If multiple source documents match, ask which one to use using the platform's blocking question tool when available (see Interaction Method). Otherwise, present numbered options in chat and wait for the user's reply before proceeding.
+如果多个 source documents match，在可用时使用平台 blocking question tool 询问使用哪个（见 Interaction Method）。否则，在 chat 中 present numbered options，并等待用户回复再继续。
 
-#### 0.3 Use the Source Document as Primary Input
+#### 0.3 将来源文档作为主要输入
 
-If a relevant requirements document exists:
-1. Read it thoroughly
-2. Announce that it will serve as the origin document for planning
-3. Carry forward all of the following:
-   - Problem frame
-   - Actors (A-IDs), Key Flows (F-IDs), and Acceptance Examples (AE-IDs) when present — preserve these as constraints that implementation units must honor
-   - Requirements and success criteria
-   - Scope boundaries (including "Deferred for later" and "Outside this product's identity" subsections when present)
-   - Key decisions and rationale
-   - Dependencies or assumptions
-   - Outstanding questions, preserving whether they are blocking or deferred
-4. Use the source document as the primary input to planning and research
-5. Reference important carried-forward decisions in the plan with `(see origin: <source-path>)`
-6. Do not silently omit source content — if the origin document discussed it, the plan must address it even if briefly. Before finalizing, scan each section of the origin document to verify nothing was dropped.
+如果 relevant requirements document 存在：
+1. Thoroughly 读取它
+2. Announce 它将作为 planning 的 origin document
+3. Carry forward 以下全部：
+   - problem frame（问题框架）
+   - Actors（A-IDs）、Key Flows（F-IDs）和 Acceptance Examples（AE-IDs）（如果存在）：将这些 preserve 为 implementation units 必须 honor 的 constraints
+   - Requirements 和 success criteria
+   - Scope boundaries（如果存在，包含 "Deferred for later" 和 "Outside this product's identity" subsections）
+   - Key decisions 和 rationale
+   - Dependencies 或 assumptions
+   - Outstanding questions，并 preserve 它们是 blocking 还是 deferred
+4. 将 source document 作为 planning 和 research 的 primary input
+5. 在 plan 中用 `(see origin: <source-path>)` reference important carried-forward decisions
+6. 不要 silently omit source content：如果 origin document 讨论了它，plan 必须 address，即使只是 briefly。Finalizing 前，scan origin document 的每个 section，verify nothing was dropped。
 
-If no relevant requirements document exists, planning may proceed from the user's request directly.
+如果不存在 relevant requirements document，planning 可直接从用户 request 继续。
 
-#### 0.4 Planning Bootstrap (No Requirements Doc or Unclear Input)
+#### 0.4 Planning Bootstrap（无需求文档或输入不清晰）
 
-If no relevant requirements document exists, or the input needs more structure:
-- Assess whether the request is already clear enough for direct technical planning — if so, continue to Phase 0.5
-- If the ambiguity is mainly product framing, user behavior, or scope definition, recommend `ce-brainstorm` as a suggestion — but always offer to continue planning here as well
-- If the user wants to continue here (or was already explicit about wanting a plan), run the planning bootstrap below
+如果不存在 relevant requirements document，或 input 需要更多 structure：
+- 评估 request 是否已经足够 clear，可 direct technical planning：如果是，继续 Phase 0.5
+- 如果 ambiguity 主要是 product framing、user behavior 或 scope definition，推荐 `ce-brainstorm` 作为 suggestion：但始终也 offer 在这里继续 planning
+- 如果用户想在这里继续（或已明确想要 plan），运行下方 planning bootstrap
 
-The planning bootstrap should establish:
-- Problem frame
-- Intended behavior
-- Scope boundaries and obvious non-goals
-- Success criteria
-- Blocking questions or assumptions
+Planning bootstrap 应 establish：
+- problem frame（问题框架）
+- intended behavior（预期行为）
+- Scope boundaries 和 obvious non-goals
+- success criteria（成功标准）
+- Blocking questions 或 assumptions
 
-Keep this bootstrap brief. It exists to preserve direct-entry convenience, not to replace a full brainstorm.
+保持此 bootstrap brief。它用于 preserve direct-entry convenience，不用于替代 full brainstorm。
 
-If the bootstrap uncovers major unresolved product questions:
-- Recommend `ce-brainstorm` again
-- If the user still wants to continue, require explicit assumptions before proceeding
+如果 bootstrap uncover major unresolved product questions：
+- 再次 recommend `ce-brainstorm`
+- 如果用户仍想继续，proceeding 前要求 explicit assumptions
 
-If the bootstrap reveals that a different workflow would serve the user better:
+如果 bootstrap reveals 不同 workflow 更适合用户：
 
-- **Bug-shaped prompt** (user describes broken behavior — "fix the bug where X", error message, regression, "doesn't work"). Surface `ce-debug` as a route-out option alongside continuing with `ce-plan` whenever the bug surface is reachable (in cwd OR named repo found at another local path). Stay in `ce-plan` silently when the named code can't be found anywhere local — paper-planning is the only useful output for unreachable surfaces.
+- **Bug-shaped prompt**（用户描述 broken behavior："fix the bug where X"、error message、regression、"doesn't work"）。只要 bug surface reachable（在 cwd 中，或 named repo 可在另一本地路径找到），surface `ce-debug` 作为 route-out option，并同时提供继续 `ce-plan`。当 named code 在本地任何地方都找不到时，静默留在 `ce-plan`：对 unreachable surfaces，paper-planning 是唯一有用 output。
 
-  **When the bug is at another local path (not cwd):**
-  - Announce the target explicitly **before** any cross-repo investigation: which path will be read AND where plan outputs will land (default: target repo's `docs/plans/`, not cwd's).
-  - Default: proceed from the target repo for both investigation and plan-write. The user can interrupt to redirect (switch context, paper-plan, abandon, etc.). No location menu — the announcement makes the cross-repo nature visible, and the user can speak up if they want something unusual.
-  - **After** announcing and proceeding, fire the standard ce-debug routing menu (continue with `ce-plan` vs switch to `ce-debug`) — same shape as the in-cwd case. Cross-repo location and ce-debug skill routing are orthogonal decisions; do not merge them into a single question.
+  **当 bug 位于另一本地路径（不是 cwd）时：**
+  - 在任何 cross-repo investigation **之前** 明确 announce target：会读取哪个 path，以及 plan outputs 会落在哪里（default：target repo 的 `docs/plans/`，不是 cwd 的）。
+  - Default：从 target repo 进行 investigation 和 plan-write。用户可 interrupt 来 redirect（switch context、paper-plan、abandon 等）。不要 location menu：announcement 已让 cross-repo nature 可见，用户如果想要 unusual path 会开口。
+  - Announcing 并 proceeding 后，触发 standard ce-debug routing menu（继续 `ce-plan` vs switch to `ce-debug`）：shape 与 in-cwd case 相同。Cross-repo location 和 ce-debug skill routing 是 orthogonal decisions；不要将它们 merge 成单个问题。
 
-  Reading code at another path is fine in principle — that's just file access. The harm to avoid is silent operation on the wrong repo, especially writing the plan doc somewhere it won't be discovered (a busyblock plan landing in `cli-printing-press/docs/plans/` is a discoverability disaster). The announcement requirement makes the target visible; defaulting to the target repo for both investigation and outputs respects the user's stated intent (they named that repo); the orthogonal ce-debug menu keeps the skill-choice question clean.
+  原则上读取另一路径的 code 没问题：那只是 file access。要避免的伤害是 silent operation on the wrong repo，尤其是将 plan doc 写到不会被 discover 的位置（busyblock plan 落到 `cli-printing-press/docs/plans/` 就是 discoverability disaster）。Announcement requirement 让 target 可见；investigation 和 outputs 都 default 到 target repo，尊重用户 stated intent（他们命名了该 repo）；orthogonal ce-debug menu 保持 skill-choice question 干净。
 
-  The accessibility classification is conservative and may under-suggest in monorepos, dependency bugs, or after renames. Users can always invoke `/ce-debug` manually.
+  Accessibility classification 是 conservative，在 monorepos、dependency bugs 或 renames 后可能 under-suggest。用户始终可手动 invoke `/ce-debug`。
 
-  **Headless mode**: skip the ce-debug suggestion menu entirely; default to continuing with `/ce-plan` (the user's explicit invocation). There is no synchronous user to resolve a route-out choice, and auto-routing to ce-debug would change the skill mid-flight without authorization.
+  **Headless mode**：完全跳过 ce-debug suggestion menu；default 为继续 `/ce-plan`（用户 explicit invocation）。没有 synchronous user 可 resolve route-out choice，auto-routing 到 ce-debug 会未经授权 mid-flight change skill。
 
-- **Clear task ready to execute** (known root cause, obvious fix, no architectural decisions) — suggest `ce-work` as a faster alternative alongside continuing with planning. The user decides.
+- **Clear task ready to execute**（known root cause、obvious fix、无 architectural decisions）：suggest `ce-work` 作为 faster alternative，并同时提供继续 planning。由用户决定。
 
-#### 0.5 Classify Outstanding Questions Before Planning
+#### 0.5 在规划前分类未决问题
 
-If the origin document contains `Resolve Before Planning` or similar blocking questions:
-- Review each one before proceeding
-- Reclassify it into planning-owned work **only if** it is actually a technical, architectural, or research question
-- Keep it as a blocker if it would change product behavior, scope, or success criteria
+如果 origin document 包含 `Resolve Before Planning` 或类似 blocking questions：
+- Proceeding 前 review 每一个
+- **只有当** 它实际是 technical、architectural 或 research question 时，才 reclassify 为 planning-owned work
+- 如果它会 change product behavior、scope 或 success criteria，将其保留为 blocker
 
-If true product blockers remain:
-- Surface them clearly
-- Ask the user, using the platform's blocking question tool when available (see Interaction Method), whether to:
-  1. Resume `ce-brainstorm` to resolve them
-  2. Convert them into explicit assumptions or decisions and continue
-- Do not continue planning while true blockers remain unresolved
+如果仍有 true product blockers：
+- Clearly surface 它们
+- 可用时使用平台 blocking question tool（见 Interaction Method）询问用户是否：
+  1. Resume `ce-brainstorm` 来 resolve 它们
+  2. 将它们 convert 为 explicit assumptions 或 decisions 并继续
+- True blockers unresolved 时，不要继续 planning
 
-#### 0.6 Assess Plan Depth
+#### 0.6 评估计划深度
 
-Classify the work into one of these plan depths:
+将 work classify 为以下 plan depths 之一：
 
-- **Lightweight** - small, well-bounded, low ambiguity
-- **Standard** - normal feature or bounded refactor with some technical decisions to document
-- **Deep** - cross-cutting, strategic, high-risk, or highly ambiguous implementation work
+- **Lightweight**：小型、边界清楚、低歧义
+- **Standard**：普通 feature 或 bounded refactor，有一些 technical decisions 要 document
+- **Deep**：cross-cutting、strategic、高风险或高度模糊的 implementation work
 
-If depth is unclear, ask one targeted question and then continue.
+如果 depth unclear，询问一个 targeted question，然后继续。
 
-#### 0.7 Solo-Mode Scoping Synthesis
+#### 0.7 Solo-Mode 范围综合
 
-Surface call-outs to the user — the specific forks in scope or approach where user input materially changes the plan — so scope can be corrected **before Phase 1 research is spent**. Sub-agent dispatch (repo-research-analyst, learnings-researcher, etc.) is the expensive next step this phase guards against wasted effort on.
+向用户 surface call-outs：scope 或 approach 中那些 user input 会 materially change plan 的 specific forks，让 scope 可在 **Phase 1 research 被消耗前** corrected。Sub-agent dispatch（repo-research-analyst、learnings-researcher 等）是 expensive next step，此 phase 防止在其上 wasted effort。
 
-Fires **only in solo invocation** — when Phase 0.2 found no upstream brainstorm doc AND Phase 0.4 stayed in ce-plan (did not route to ce-debug, ce-work, or universal-planning) AND Phase 0.5 cleared (no unresolved blockers) AND not on Phase 0.1 fast paths (resume normal, deepen-intent). Each guard is an explicit conditional. Skip Phase 0.7 entirely when any guard fails — brainstorm-sourced invocations defer to Phase 5.1.5 instead.
+仅在 **solo invocation** 中 fire：Phase 0.2 未找到 upstream brainstorm doc，且 Phase 0.4 留在 ce-plan（未 route 到 ce-debug、ce-work 或 universal-planning），且 Phase 0.5 cleared（无 unresolved blockers），且不在 Phase 0.1 fast paths（resume normal、deepen-intent）上。每个 guard 都是 explicit conditional。任何 guard fails 时完全跳过 Phase 0.7：brainstorm-sourced invocations 改为 defer 到 Phase 5.1.5。
 
-**Read `references/synthesis-summary.md` before composing the scoping synthesis.** It carries the affirmability test, keep-test criteria, detail test, summary shape budgets, granularity rules, anti-patterns, revision-vs-confirmation discipline, doc-shape routing, soft-cut behavior, self-redirect support, the worked PII compression example, and full headless-mode routing — all required for a well-shaped synthesis.
+**Composing scoping synthesis 前读取 `references/synthesis-summary.md`。** 它携带 affirmability test、keep-test criteria、detail test、summary shape budgets、granularity rules、anti-patterns、revision-vs-confirmation discipline、doc-shape routing、soft-cut behavior、self-redirect support、worked PII compression example，以及完整 headless-mode routing：这些都是 well-shaped synthesis 所必需。
 
-**Required gate output — do not skip; silent proceeding is not allowed.** Compose an internal three-bucket scope draft (Stated / Inferred / Out of scope — internal thinking that feeds plan-body routing at Phase 5.2, not the chat output below). Derive call-outs (specific forks where user input materially changes the plan), then emit one of the two literal templates below in chat before continuing to Phase 1.
+**Required gate output：不要跳过；不允许 silent proceeding。** Compose internal three-bucket scope draft（Stated / Inferred / Out of scope：这是供 Phase 5.2 plan-body routing 使用的 internal thinking，不是下方 chat output）。Derive call-outs（user input materially changes plan 的 specific forks），然后在继续 Phase 1 前，在 chat 中 emit 下方两个 literal templates 之一。
 
-**Synthesis is pre-plan-write.** The agent does NOT yet know how plan-write will sequence the work. Do not claim PR count ("one PR"), commit/branch shape, effort or time estimates, Implementation Unit boundaries, or exact file paths in the synthesis. The synthesis surfaces decisions knowable at THIS point — for the solo variant, that's the user's request plus the Phase 0.4 bootstrap dialogue plus the agent's own internal three-bucket draft. Phase 1 research has not happened yet and there is no upstream brainstorm; do not claim grounding from either. Plan-write produces the rest. This rule holds even when the agent has formed plan-write opinions earlier in the session — those stay internal until plan-write.
+**Synthesis 是 pre-plan-write。** Agent 尚不知道 plan-write 会如何 sequence work。不要在 synthesis 中声称 PR count（"one PR"）、commit/branch shape、effort 或 time estimates、Implementation Unit boundaries 或 exact file paths。Synthesis surface 此刻可知的 decisions：对 solo variant 来说，就是用户 request、Phase 0.4 bootstrap dialogue，以及 agent 自身 internal three-bucket draft。Phase 1 research 尚未发生，也没有 upstream brainstorm；不要声称来自二者的 grounding。剩余内容由 plan-write 产生。即使 agent 在 session 更早形成了 plan-write opinions，此规则仍成立：这些 opinions 在 plan-write 前保持 internal。
 
-**Summary shape:** the summary is a **scope claim** — what the plan will target, what it will not — at affirm-or-redirect level. NOT an enumeration of Implementation Units. Form is prose, bullets, or mix; tier budgets are **ceilings, not targets** (Lightweight 1-3 lines; Standard up to 3-5 lines or 2-4 bullets; Deep up to 4-6 lines or 3-6 bullets). 1-2 lines per bullet, conversational not documentary. Less is correct when there isn't more to say. See reference for keep test, detail test, and source-vocabulary discipline.
+**Summary shape：** summary 是 **scope claim**：plan 会 target 什么，不会 target 什么，处于 affirm-or-redirect level。它 **不是** Implementation Units enumeration。Form 可以是 prose、bullets 或 mix；tier budgets 是 **ceilings，不是 targets**（Lightweight 1-3 lines；Standard 最多 3-5 lines 或 2-4 bullets；Deep 最多 4-6 lines 或 3-6 bullets）。每个 bullet 1-2 lines，conversational 而非 documentary。没有更多内容时，少就是正确。Keep test、detail test 和 source-vocabulary discipline 见 reference。
 
-**Do NOT enumerate the touch surface.** Sentences like "The touch surface is...", "This plan touches...", "The implementation reaches into..." are plan-pitch leaks. File paths, module names, directory introductions, and per-file change descriptions belong in the plan body (Implementation Units at Phase 5.2), not the synthesis. The synthesis names *what* the plan targets, not *where* the code lives.
+**不要 enumerate touch surface。** "The touch surface is..."、"This plan touches..."、"The implementation reaches into..." 这类句子是 plan-pitch leaks。File paths、module names、directory introductions 和 per-file change descriptions 属于 plan body（Phase 5.2 的 Implementation Units），不属于 synthesis。Synthesis 命名 plan targets 的 *what*，不是 code lives 的 *where*。
 
-**Pre-emit scans.** Before emitting the synthesis, scan the output:
-- Bare ID references (`AE\d+`, `R\d+`, `F\d+`, `A\d+`, `U\d+`) → replace with plain names.
-- File paths (`path/like.md`, `path/like.py`, etc.) → cut unless the path IS the topic of an explicit fork in the call-outs.
+**Pre-emit scans。** Emit synthesis 前，scan output：
+- Bare ID references（`AE\d+`、`R\d+`、`F\d+`、`A\d+`、`U\d+`）→ 替换为 plain names。
+- File paths（`path/like.md`、`path/like.py` 等）→ cut，除非 path 本身就是 call-outs 中 explicit fork 的 topic。
 
-**Tier guard on auto-proceed:** the auto-proceed path (announce without waiting for confirmation) fires only when plan depth is **Lightweight AND zero call-outs survive**. Standard and Deep plans always fire the confirmation gate, even with zero call-outs — substance earns the checkpoint, not interaction history.
+**Auto-proceed 的 tier guard：** auto-proceed path（announce 而不等待 confirmation）只在 plan depth 为 **Lightweight 且 zero call-outs survive** 时 fire。Standard 和 Deep plans 始终 fire confirmation gate，即使 zero call-outs：checkpoint 来自 substance，不是 interaction history。
 
-**Confirmation template (Standard/Deep regardless of call-out count, or any tier with one or more call-outs surviving):**
+**Confirmation template（Standard/Deep 无论 call-out count，或任何 tier 有一个或多个 surviving call-outs）：**
 
 ````text
 Based on your request and our brief discussion, here's the scope I'm proposing to plan against:
@@ -238,533 +238,538 @@ Based on your request and our brief discussion, here's the scope I'm proposing t
 [scope claim — what the plan will target, what it will not; affirm-or-redirect level; NOT an enumeration of Implementation Units]
 
 **Call outs:** (omit this header when zero forks survived the keep test)
-- [decision-level fork in 1-2 lines: name the choice and optional one-clause trade-off in parens. NO multi-sentence rationale, NO "my default is X" pitch]
+- [用 1-2 行写 decision-level fork：命名选择，并可在括号中写一个从句的 trade-off。不要写多句 rationale，不要写 "my default is X" 式 pitch]
 
-Confirm and I'll proceed to research, drawing on this scope. (You can also redirect to /ce-brainstorm if this is bigger than you initially thought — I'll stop here and load it for you.)
+确认后我会基于这个 scope 开始 research。（如果这件事比你最初想的更大，也可以 redirect 到 /ce-brainstorm；我会停在这里并为你加载它。）
 ````
 
-Wait for user confirmation before continuing to Phase 1.
+继续 Phase 1 前等待用户 confirmation。
 
-**Auto-proceed template (Lightweight with zero call-outs only):**
+**Auto-proceed template（仅 Lightweight with zero call-outs）：**
 
 ````text
-Planning: [1-3 line scope claim]
+正在规划：[1-3 行 scope claim]
 
-No open decisions to weigh in on — proceeding to research. Interrupt if I have the scope wrong.
+没有需要你权衡的开放决定 — 我会继续 research。如果我理解错了 scope，请随时打断。
 ````
 
-Then continue to Phase 1 without a blocking question.
+然后不使用 blocking question，继续 Phase 1。
 
-**Headless mode**: internal draft is composed but stage 2 (chat-time call-outs) is skipped — no synchronous user to confirm to. Continue to Phase 1 research as normal. At plan-write time (Phase 5.2), Inferred bets from the internal draft route to a `## Assumptions` section in the plan instead of Key Technical Decisions. See `references/synthesis-summary.md` Headless mode for the full routing.
+**Headless mode**：compose internal draft，但跳过 stage 2（chat-time call-outs）：没有 synchronous user 可 confirm。照常继续 Phase 1 research。在 plan-write time（Phase 5.2），internal draft 中的 Inferred bets route 到 plan 的 `## Assumptions` section，而不是 Key Technical Decisions。完整 routing 见 `references/synthesis-summary.md` Headless mode。
 
-### Phase 1: Gather Context
+### Phase 1：收集上下文
 
-#### 1.1 Local Research (Always Runs)
+#### 1.1 本地调研（始终运行）
 
-Prepare a concise planning context summary (a paragraph or two) to pass as input to the research agents:
-- If an origin document exists, summarize the problem frame, requirements, and key decisions from that document
-- Otherwise use the feature description directly
-- If `STRATEGY.md` exists, read it and include the relevant pieces (target problem, approach, active tracks) in the summary so downstream research and planning decisions are anchored to product strategy
-- If `CONCEPTS.md` exists at repo root, read it — its definitions are the canonical names for domain entities, named processes, and status concepts. Plan with those terms rather than synonyms.
+准备 concise planning context summary（一两段），作为 input 传给 research agents：
+- 如果 origin document 存在，summarize 该 document 的 problem frame、requirements 和 key decisions
+- 否则直接使用 feature description
+- 如果 `STRATEGY.md` 存在，读取它，并在 summary 中包含 relevant pieces（target problem、approach、active tracks），让 downstream research 和 planning decisions anchored to product strategy
+- 如果 repo root 存在 `CONCEPTS.md`，读取它：其 definitions 是 domain entities、named processes 和 status concepts 的 canonical names。Plan 时使用这些 terms，而不是 synonyms。
 
-Run these agents in parallel:
+并行运行这些 agents：
 
 - Task ce-repo-research-analyst(Scope: technology, architecture, patterns. {planning context summary})
 - Task ce-learnings-researcher(planning context summary)
-Collect:
-- Technology stack and versions (used in section 1.2 to make sharper external research decisions)
-- Architectural patterns and conventions to follow
-- Implementation patterns, relevant files, modules, and tests
-- AGENTS.md guidance that materially affects the plan, with CLAUDE.md used only as compatibility fallback when present
-- Institutional learnings from `docs/solutions/`
-- Product strategy context when `STRATEGY.md` is present — flag any plan decisions that pull away from the active tracks or the stated approach
 
-**Slack context** (opt-in) — never auto-dispatch. Route by condition:
+第一项收集技术栈、架构和 patterns；第二项收集仓库内已有 learnings。保留上述 Task invocation 的英文参数形式，作为跨 runtime 的调用提示。
 
-- **Tools available + user asked**: Dispatch `ce-slack-researcher` with the planning context summary in parallel with other Phase 1.1 agents. If the origin document has a Slack context section, pass it verbatim so the researcher focuses on gaps. Include findings in consolidation.
-- **Tools available + user didn't ask**: Note in output: "Slack tools detected. Ask me to search Slack for organizational context at any point, or include it in your next prompt."
-- **No tools + user asked**: Note in output: "Slack context was requested but no Slack tools are available. Install and authenticate the Slack plugin to enable organizational context search."
+收集：
+- Technology stack 和 versions（section 1.2 用来做更 sharp 的 external research decisions）
+- 要 follow 的 architectural patterns 和 conventions
+- Implementation patterns、relevant files、modules 和 tests
+- Materially affects plan 的 AGENTS.md guidance；CLAUDE.md 仅在 present 时作为 compatibility fallback 使用
+- `docs/solutions/` 中的 institutional learnings
+- 当 `STRATEGY.md` present 时的 product strategy context：flag 任何偏离 active tracks 或 stated approach 的 plan decisions
 
-#### 1.1b Detect Execution Posture Signals
+**Slack context（opt-in，需用户明确启用）：** 绝不 auto-dispatch。按 condition route：
 
-Decide whether the plan should carry a lightweight execution posture signal.
+- **Tools available + user asked**：将 planning context summary 传给 `ce-slack-researcher`，并与其它 Phase 1.1 agents 并行 dispatch。如果 origin document 有 Slack context section，verbatim 传入，让 researcher 聚焦 gaps。将 findings 纳入 consolidation。
+- **Tools available + user didn't ask**：在 output 中 note："Slack tools detected. Ask me to search Slack for organizational context at any point, or include it in your next prompt."
+- **No tools + user asked**：在 output 中 note："Slack context was requested but no Slack tools are available. Install and authenticate the Slack plugin to enable organizational context search."
 
-Look for signals such as:
-- The user explicitly asks for TDD, test-first, or characterization-first work
-- The origin document calls for test-first implementation or exploratory hardening of legacy code
-- Local research shows the target area is legacy, weakly tested, or historically fragile, suggesting characterization coverage before changing behavior
+#### 1.1b 检测执行姿态信号
 
-When the signal is clear, carry it forward silently in the relevant implementation units.
+判断 plan 是否应携带 lightweight execution posture signal。
 
-Ask the user only if the posture would materially change sequencing or risk and cannot be responsibly inferred.
+查找以下 signals：
+- 用户明确要求 TDD、test-first 或 characterization-first work
+- Origin document 要求 test-first implementation，或对 legacy code 做 exploratory hardening
+- Local research 显示 target area 是 legacy、weakly tested 或 historically fragile，暗示 changing behavior 前需要 characterization coverage
 
-#### 1.2 Decide on External Research
+当 signal clear 时，在 relevant implementation units 中 silently carry forward。
 
-Based on the origin document, user signals, and local findings, decide **whether** external research adds value and, if so, **what kind**. Resolve this in three stages: explicit-request priority, intent classification, then the implicit signals below.
+只有当 posture 会 materially change sequencing 或 risk，且无法 responsibly inferred 时，才询问用户。
 
-**Stage 1 — An explicit request takes precedence.** If the user prompt **or** the origin requirements document explicitly asks for external input — a signal that the answer lives outside the repo, such as competitor/prior-art comparison, "what should we borrow", "from the web", "best practices", "official docs", "alternatives to", a market scan, or naming a specific external technology to consult — external research is **required**, regardless of how strong local patterns look. The list is illustrative; key on the signal, not the exact phrase — any wording that clearly points outside the repo qualifies. The skip conditions below do **not** apply to an explicit request. The only thing that overrides it is an explicit opt-out ("no web research", "skip external research"): honor that, skip, and note it. Improvement or quality verbs ("improve", "make better") carry no external signal on their own and never trigger research by themselves.
+#### 1.2 决定是否做外部调研
 
-**Stage 2 — Classify the research intent** (whenever external research will run, from Stage 1 or the implicit signals below) so Phase 1.3 routes correctly. Use this mechanical test, not a fixed phrase list:
-- **Implementation-guidance** — the approach or technology is already settled; the question is *how to build it well* (best practices, version-specific docs, API constraints, known pitfalls, deprecations).
-- **Landscape / option-discovery** — the question is *what options or prior art exist* (competitor scans, build-vs-buy, library/provider selection, prior art, market signals, cross-domain analogies).
-- **Mixed** — both: discover an unsettled external option set first, then research the shortlisted choice for implementation guidance.
+基于 origin document、user signals 和 local findings，判断 external research **是否** adds value，以及如果有价值，属于 **哪种**。按三阶段 resolve：explicit-request priority、intent classification，然后是下方 implicit signals。
 
-**Stage 3 — Implicit signals** decide the call when no explicit request fired.
+**Stage 1：explicit request 优先。** 如果 user prompt **或** origin requirements document 明确要求 external input：这是 answer lives outside the repo 的 signal，例如 competitor/prior-art comparison、"what should we borrow"、"from the web"、"best practices"、"official docs"、"alternatives to"、market scan，或命名要 consult 的 specific external technology，那么 external research 是 **required**，无论 local patterns 看起来多强。该 list 是 illustrative；根据 signal，而不是 exact phrase 判断：任何 clearly points outside the repo 的 wording 都 qualify。下方 skip conditions **不** 适用于 explicit request。唯一 override 是 explicit opt-out（"no web research"、"skip external research"）：honor 它、skip 并 note。Improvement 或 quality verbs（"improve"、"make better"）本身不携带 external signal，也绝不单独触发 research。
 
-**Read between the lines.** Pay attention to signals from the conversation so far:
-- **User familiarity** — Are they pointing to specific files or patterns? They likely know the codebase well.
-- **User intent** — Do they want speed or thoroughness? Exploration or execution?
-- **Topic risk** — Security, payments, external APIs warrant more caution regardless of user signals.
-- **Uncertainty level** — Is the approach clear or still open-ended?
+**Stage 2：Classify research intent（分类 research 意图）**（无论 external research 是由 Stage 1 还是下方 implicit signals 触发），让 Phase 1.3 正确 route。使用此 mechanical test，而不是 fixed phrase list：
+- **Implementation-guidance（实现指导）**：approach 或 technology 已 settled；问题是 *how to build it well*（best practices、version-specific docs、API constraints、known pitfalls、deprecations）。
+- **Landscape / option-discovery（格局/选项发现）**：问题是 *what options or prior art exist*（competitor scans、build-vs-buy、library/provider selection、prior art、market signals、cross-domain analogies）。
+- **Mixed（混合）**：两者都有：先 discover unsettled external option set，再为 shortlisted choice research implementation guidance。
 
-**Leverage ce-repo-research-analyst's technology context:**
+**Stage 3：Implicit signals（隐含信号）** 在没有 explicit request 触发时决定是否 research。
 
-The ce-repo-research-analyst output includes a structured Technology & Infrastructure summary. Use it to make sharper external research decisions:
+**Read between the lines（读懂言外之意）。** 注意当前 conversation 中的 signals：
+- **User familiarity（用户熟悉度）**：他们是否指向 specific files 或 patterns？他们可能很熟悉 codebase。
+- **User intent（用户意图）**：他们想要 speed 还是 thoroughness？Exploration 还是 execution？
+- **Topic risk（主题风险）**：Security、payments、external APIs 不管 user signals 如何，都 warrant more caution。
+- **Uncertainty level（不确定性水平）**：Approach clear，还是仍 open-ended？
 
-- If specific frameworks and versions were detected (e.g., Rails 7.2, Next.js 14, Go 1.22), pass those exact identifiers to ce-framework-docs-researcher so it fetches version-specific documentation
-- If the feature touches a technology layer the scan found well-established in the repo (e.g., existing Sidekiq jobs when planning a new background job), lean toward skipping external research -- local patterns are likely sufficient
-- If the feature touches a technology layer the scan found absent or thin (e.g., no existing proto files when planning a new gRPC service), lean toward external research -- there are no local patterns to follow
-- If the scan detected deployment infrastructure (Docker, K8s, serverless), note it in the planning context passed to downstream agents so they can account for deployment constraints
-- If the scan detected a monorepo and scoped to a specific service, pass that service's tech context to downstream research agents -- not the aggregate of all services. If the scan surfaced the workspace map without scoping, use the feature description to identify the relevant service before proceeding with research
+**利用 ce-repo-research-analyst 的 technology context：**
 
-**Always lean toward external research when:**
-- The topic is high-risk: security, payments, privacy, external APIs, migrations, compliance
-- The codebase lacks relevant local patterns -- fewer than 3 direct examples of the pattern this plan needs
-- Local patterns exist for an adjacent domain but not the exact one -- e.g., the codebase has HTTP clients but not webhook receivers, or has background jobs but not event-driven pub/sub. Adjacent patterns suggest the team is comfortable with the technology layer but may not know domain-specific pitfalls. When this signal is present, frame the external research query around the domain gap specifically, not the general technology
-- The user is exploring unfamiliar territory
-- The technology scan found the relevant layer absent or thin in the codebase
-- The plan's recommendations depend on a genuinely external, **unsettled** option set — which library, provider, or approach to adopt, or what competitors and prior art do — **even when local implementation patterns are strong** (intent: landscape). Bound this implicit landscape trigger by three gates: (a) the option set genuinely lives outside the repo, (b) the decision materially shapes the plan (a KTD, dependency, or architecture choice — not an incidental detail), and (c) no settled local or team choice already exists. Improvement verbs alone never satisfy this.
+ce-repo-research-analyst output 包含 structured Technology & Infrastructure summary。用它做更 sharper 的 external research decisions：
 
-**Skip external research when** (only when Stage 1 found no explicit request — an explicit request is never skipped):
-- The codebase already shows a strong local pattern -- multiple direct examples (not adjacent-domain), recently touched, following current conventions
-- The user already knows the intended shape
-- Additional external context would add little practical value
-- The technology scan found the relevant layer well-established with existing examples to follow
+- 如果检测到 specific frameworks 和 versions（例如 Rails 7.2、Next.js 14、Go 1.22），将这些 exact identifiers 传给 ce-framework-docs-researcher，让它 fetch version-specific documentation
+- 如果 feature 触及 scan 发现 repo 中 well-established 的 technology layer（例如 planning new background job 时已有 Sidekiq jobs），lean toward skipping external research：local patterns 很可能 sufficient
+- 如果 feature 触及 scan 发现 absent 或 thin 的 technology layer（例如 planning new gRPC service 时没有 existing proto files），lean toward external research：没有 local patterns 可 follow
+- 如果 scan 检测到 deployment infrastructure（Docker、K8s、serverless），在传给 downstream agents 的 planning context 中 note，让它们 account for deployment constraints
+- 如果 scan 检测到 monorepo 并 scoped 到 specific service，将该 service 的 tech context 传给 downstream research agents：不要传所有 services 的 aggregate。如果 scan surfaced workspace map 但未 scoping，继续 research 前用 feature description 识别 relevant service
 
-When an explicit request *did* fire but a settled local or team choice already exists, **narrow the research rather than skipping it** — research the current pitfalls, docs, and practices for the chosen library/pattern instead of re-surveying the whole option set.
+**以下情况始终 lean toward external research：**
+- topic 高风险：security、payments、privacy、external APIs、migrations、compliance
+- Codebase 缺少 relevant local patterns：此 plan 所需 pattern 的 direct examples 少于 3 个
+- Local patterns 存在于 adjacent domain，但不是 exact one：例如 codebase 有 HTTP clients 但没有 webhook receivers，或有 background jobs 但没有 event-driven pub/sub。Adjacent patterns 表明 team 熟悉 technology layer，但可能不了解 domain-specific pitfalls。当此 signal present 时，external research query 应专门围绕 domain gap，而不是 general technology
+- 用户正在 explore unfamiliar territory
+- Technology scan 发现 relevant layer 在 codebase 中 absent 或 thin
+- Plan recommendations 依赖 genuinely external、**unsettled** option set：采用哪个 library、provider 或 approach，或 competitors/prior art 做什么；**即使 local implementation patterns 很强**（intent: landscape）。此 implicit landscape trigger 受三道 gates 限制：(a) option set 确实 lives outside repo，(b) decision materially shapes plan（KTD、dependency 或 architecture choice，而不是 incidental detail），且 (c) 不存在 settled local 或 team choice。Improvement verbs alone 永不满足此条件。
 
-Announce the decision and the intent briefly before continuing. Examples:
-- "Your codebase has solid patterns for this. Proceeding without external research."
-- "This involves payment processing, so I'll research current best practices first (implementation-guidance)."
-- "You asked what to borrow from competitors, so I'll run a landscape scan first (landscape/option-discovery)."
+**Skip external research 的条件**（仅当 Stage 1 未发现 explicit request：explicit request 绝不 skipped）：
+- Codebase 已显示 strong local pattern：多个 direct examples（不是 adjacent-domain）、recently touched、following current conventions
+- 用户已经知道 intended shape
+- Additional external context practical value 很低
+- Technology scan 发现 relevant layer well-established，且有 existing examples 可 follow
 
-#### 1.3 External Research (Conditional)
+当 explicit request *确实* 触发，但 settled local 或 team choice 已存在时，**narrow research，而不是 skip**：research chosen library/pattern 的 current pitfalls、docs 和 practices，而不是重新 survey entire option set。
 
-If Step 1.2 indicates external research is useful, dispatch by the **intent** classified in Stage 2, using the platform's subagent primitive (`Agent`/`Task` in Claude Code, `spawn_agent` in Codex, `subagent` in Pi). For `ce-web-researcher`, pass a focus hint plus the planning context summary and do **not** pass codebase content — it operates externally.
+继续前 briefly announce decision 和 intent。Examples：
+- "你的 codebase 对此已有稳固 patterns。我会跳过 external research 继续。"
+- "这涉及 payment processing，所以我会先 research current best practices（implementation-guidance）。"
+- "你要求判断可从 competitors 借鉴什么，所以我会先做 landscape scan（landscape/option-discovery）。"
 
-- **Implementation-guidance** — run in parallel:
+#### 1.3 外部调研（条件触发）
+
+如果 Step 1.2 表示 external research 有用，按 Stage 2 classified 的 **intent** dispatch，使用平台 subagent primitive（Claude Code 中的 `Agent`/`Task`、Codex 中的 `spawn_agent`、Pi 中的 `subagent`）。对 `ce-web-researcher`，传 focus hint 加 planning context summary，且 **不要** 传 codebase content：它在 external 范围工作。
+
+- **Implementation-guidance**：并行运行：
   - Task ce-best-practices-researcher(planning context summary)
-  - Task ce-framework-docs-researcher(planning context summary, with exact frameworks/versions from Phase 1.1 where available)
-- **Landscape / option-discovery** — Task ce-web-researcher(focus hint, planning context summary). When the request targets projects on a code host (e.g., "competitors on GitHub"), name the discovery dimensions in the focus hint: project names and URLs, release recency and activity, CLI/UX shape, install path, docs and examples, plugin/extension surfaces, recurring issue themes, and license — treating star counts as a weak signal only.
-- **Mixed** — **sequential, not parallel**: run `ce-web-researcher` first to map the landscape and produce a shortlist; then run `ce-framework-docs-researcher` and/or `ce-best-practices-researcher` against the shortlisted technologies only when their details materially shape the plan.
+- Task ce-framework-docs-researcher(planning context summary, 如果 Phase 1.1 中有 exact frameworks/versions，则一并传入)
+- **Landscape / option-discovery**：Task ce-web-researcher(focus hint, planning context summary)。当 request targets code host 上的 projects（例如 "competitors on GitHub"）时，在 focus hint 中命名 discovery dimensions：project names and URLs、release recency and activity、CLI/UX shape、install path、docs and examples、plugin/extension surfaces、recurring issue themes 和 license：star counts 仅作为 weak signal。
+- **Mixed**：**sequential, not parallel**：先运行 `ce-web-researcher` map landscape 并产出 shortlist；然后仅当 shortlisted technologies 的 details materially shape plan 时，针对它们运行 `ce-framework-docs-researcher` 和/或 `ce-best-practices-researcher`。
 
-**Tool-unavailable handling.** `ce-web-researcher` self-checks for web tools and stops if they are missing. Never block on this: if it reports research unavailable, or any researcher fails, warn and proceed, and carry the gap into Phase 1.4 so the plan records it honestly — especially when the user explicitly requested external research, where a silent skip would leave the plan looking evidence-based when it is not.
+**Tool-unavailable handling（工具不可用处理）。** `ce-web-researcher` 会 self-check web tools，缺失时 stop。绝不要因此 block：如果它报告 research unavailable，或任何 researcher fails，warn 并继续，并将 gap 带入 Phase 1.4，让 plan 诚实记录它；尤其是用户明确 requested external research 时，silent skip 会让 plan 看起来 evidence-based，但实际不是。
 
-#### 1.4 Consolidate Research
+#### 1.4 汇总调研
 
-Summarize:
-- Relevant codebase patterns and file paths
-- Relevant institutional learnings
-- Organizational context from Slack conversations, if gathered (prior discussions, decisions, or domain knowledge relevant to the feature)
-- External references, prior art, competitor/landscape findings, and best practices, if gathered
-- Related issues, PRs, or prior art
-- Any constraints that should materially shape the plan
+汇总：
+- Relevant codebase patterns 和 file paths
+- relevant institutional learnings（相关组织内 learnings）
+- 如果 gathered，来自 Slack conversations 的 organizational context（与 feature relevant 的 prior discussions、decisions 或 domain knowledge）
+- 如果 gathered，external references、prior art、competitor/landscape findings 和 best practices
+- Related issues、PRs 或 prior art
+- 任何应 materially shape plan 的 constraints
 
-**Land external findings in decisions, not an appendix.** Any external research that ran must surface where it changes a choice — Key Technical Decisions rationale, Alternatives, Risks, or Sources & Research — not as a detached list with no bearing on the plan. If a finding shaped nothing, it was not load-bearing; do not pad the plan with it.
+**将 external findings 落在 decisions 中，而不是 appendix。** 任何运行过的 external research 都必须在它改变 choice 的地方 surface：Key Technical Decisions rationale、Alternatives、Risks 或 Sources & Research；不要作为 detached list 且对 plan 没影响。如果 finding 没有 shape anything，它就不是 load-bearing；不要用它 pad plan。
 
-**Mark whether external research was load-bearing.** Record a single internal flag: did external findings materially shape a KTD, Alternative, Scope boundary, or Risk? This flag answers only that question — it does **not** gate whether research runs (Phase 1.2 owns that decision). Phase 5.3.2 reads it to decide whether to enter a confidence-scoring pass.
+**标记 external research 是否 load-bearing。** Record 一个 internal flag：external findings 是否 materially shape KTD、Alternative、Scope boundary 或 Risk？此 flag 只回答该问题：它 **不** gate research 是否运行（该 decision 属于 Phase 1.2）。Phase 5.3.2 读取它来决定是否进入 confidence-scoring pass。
 
-**Record requested-but-unavailable.** If the user explicitly requested external research but it could not run (web tools unavailable, researcher failed), state that in the plan as an assumption or open question rather than presenting the plan as externally grounded.
+**Record requested-but-unavailable（记录已请求但不可用）。** 如果用户明确 requested external research 但无法运行（web tools unavailable、researcher failed），在 plan 中将其声明为 assumption 或 open question，而不是将 plan 呈现为 externally grounded。
 
-#### 1.4b Reclassify Depth When Research Reveals External Contract Surfaces
+#### 1.4b 当调研发现外部契约面时重新分类深度
 
-If the current classification is **Lightweight** and Phase 1 research found that the work touches any of these external contract surfaces, reclassify to **Standard**:
+如果 current classification 是 **Lightweight**，且 Phase 1 research 发现 work 触及以下任何 external contract surfaces，reclassify 为 **Standard**：
 
-- Environment variables consumed by external systems, CI, or other repositories
-- Exported public APIs, CLI flags, or command-line interface contracts
-- CI/CD configuration files (`.github/workflows/`, `Dockerfile`, deployment scripts)
-- Shared types or interfaces imported by downstream consumers
-- Documentation referenced by external URLs or linked from other systems
+- 被 external systems、CI 或其它 repositories 消费的 environment variables
+- exported public APIs、CLI flags 或 command-line interface contracts
+- CI/CD configuration files（CI/CD 配置文件：`.github/workflows/`、`Dockerfile`、deployment scripts）
+- 被 downstream consumers import 的 shared types 或 interfaces
+- external URLs 引用或其它 systems link 到的 documentation
 
-This ensures flow analysis (Phase 1.5) runs and the confidence check (Phase 5.3) applies critical-section bonuses. Announce the reclassification briefly: "Reclassifying to Standard — this change touches [environment variables / exported APIs / CI config] with external consumers."
+这确保 flow analysis（Phase 1.5）运行，且 confidence check（Phase 5.3）应用 critical-section bonuses。Briefly announce reclassification："Reclassifying to Standard — this change touches [environment variables / exported APIs / CI config] with external consumers."
 
-#### 1.5 Flow and Edge-Case Analysis (Conditional)
+#### 1.5 Flow 和边界情况分析（条件触发）
 
-For **Standard** or **Deep** plans, or when user flow completeness is still unclear, run:
+对 **Standard** 或 **Deep** plans，或当 user flow completeness 仍 unclear 时，运行：
 
 - Task ce-spec-flow-analyzer(planning context summary, research findings)
 
-Use the output to:
-- Identify missing edge cases, state transitions, or handoff gaps
-- Tighten requirements trace or verification strategy
-- Add only the flow details that materially improve the plan
+该 Task 用 planning context summary 和 research findings 检查 flow、边界情况与 handoff gaps；保留英文 invocation，确保不同 runtime 能按原提示 dispatch。
 
-### Phase 2: Resolve Planning Questions
+使用 output 来：
+- Identify missing edge cases、state transitions 或 handoff gaps
+- Tighten requirements trace 或 verification strategy
+- 只添加 materially improve plan 的 flow details
 
-Build a planning question list from:
-- Deferred questions in the origin document
-- Gaps discovered in repo or external research
-- Technical decisions required to produce a useful plan
+### Phase 2：解决规划问题
 
-For each question, decide whether it should be:
-- **Resolved during planning** - the answer is knowable from repo context, documentation, or user choice
-- **Deferred to implementation** - the answer depends on code changes, runtime behavior, or execution-time discovery
+从以下来源构建 planning question list：
+- Origin document 中的 deferred questions
+- Repo 或 external research 中 discovered 的 gaps
+- 产出 useful plan 所需的 technical decisions
 
-Ask the user only when the answer materially affects architecture, scope, sequencing, or risk and cannot be responsibly inferred. Use the platform's blocking question tool when available (see Interaction Method).
+对每个 question，判断它应当：
+- **Resolved during planning**：answer 可从 repo context、documentation 或 user choice 得知
+- **Deferred to implementation**：answer 依赖 code changes、runtime behavior 或 execution-time discovery
 
-**Do not** run tests, build the app, or probe runtime behavior in this phase. The goal is a strong plan, not partial execution.
+只有当 answer materially affects architecture、scope、sequencing 或 risk，且无法 responsibly inferred 时，才询问用户。可用时使用平台 blocking question tool（见 Interaction Method）。
 
-### Phase 3: Structure the Plan
+此 phase **不要** run tests、build app 或 probe runtime behavior。目标是 strong plan，不是 partial execution。
 
-#### 3.1 Title and File Naming
+### Phase 3：组织计划结构
 
-- Draft a clear, searchable title using conventional format such as `feat: Add user authentication` or `fix: Prevent checkout double-submit`
-- Determine the plan type: `feat`, `fix`, or `refactor`
-- Build the filename following the repository convention: `docs/plans/YYYY-MM-DD-NNN-<type>-<descriptive-name>-plan.md`
-  - Create `docs/plans/` if it does not exist
-  - Check existing files for today's date to determine the next sequence number (zero-padded to 3 digits, starting at 001)
-  - Keep the descriptive name concise (3-5 words) and kebab-cased
-  - Examples: `2026-01-15-001-feat-user-authentication-flow-plan.md`, `2026-02-03-002-fix-checkout-race-condition-plan.md`
-  - Avoid: missing sequence numbers, vague names like "new-feature", invalid characters (colons, spaces)
+#### 3.1 标题和文件命名
 
-#### 3.2 Stakeholder and Impact Awareness
+- Draft clear、searchable title，使用 conventional format，如 `feat: Add user authentication` 或 `fix: Prevent checkout double-submit`
+- 确定 plan type：`feat`、`fix` 或 `refactor`
+- 按 repository convention 构建 filename：`docs/plans/YYYY-MM-DD-NNN-<type>-<descriptive-name>-plan.md`
+  - 如果 `docs/plans/` 不存在，创建它
+  - 检查今天日期的 existing files，确定 next sequence number（zero-padded to 3 digits，从 001 开始）
+  - Descriptive name 保持 concise（3-5 words）且 kebab-cased
+  - Examples（示例）：`2026-01-15-001-feat-user-authentication-flow-plan.md`、`2026-02-03-002-fix-checkout-race-condition-plan.md`
+  - Avoid：missing sequence numbers、"new-feature" 这类 vague names、invalid characters（colons、spaces）
 
-For **Standard** or **Deep** plans, briefly consider who is affected by this change — end users, developers, operations, other teams — and how that should shape the plan. For cross-cutting work, note affected parties in the System-Wide Impact section.
+#### 3.2 Stakeholder 和影响感知
 
-#### 3.3 Break Work into Implementation Units
+对 **Standard** 或 **Deep** plans，briefly consider 谁会受此 change 影响：end users、developers、operations、other teams，以及这应如何 shape plan。对 cross-cutting work，在 System-Wide Impact section 中 note affected parties。
 
-Break the work into logical implementation units. Each unit should represent one meaningful change that an implementer could typically land as an atomic commit.
+#### 3.3 将工作拆分为 Implementation Units
 
-Good units are:
-- Focused on one component, behavior, or integration seam
-- Usually touching a small cluster of related files
-- Ordered by dependency
-- Concrete enough for execution without pre-writing code
+将 work 拆成 logical implementation units。每个 unit 应代表一个 meaningful change，implementer 通常可将其作为 atomic commit land。
 
-Avoid:
-- 2-5 minute micro-steps
-- Units that span multiple unrelated concerns
-- Units that are so vague an implementer still has to invent the plan
+好的 units：
+- 聚焦一个 component、behavior 或 integration seam
+- 通常触及 small cluster of related files
+- 按 dependency 排序
+- 足够 concrete，可在不预写 code 的情况下 execution
 
-Each unit carries a stable plan-local **U-ID** assigned in Phase 3.5 (`U1`, `U2`, …). U-IDs survive reordering, splitting, and deletion: new units take the next unused number, gaps are fine, and existing IDs are never renumbered. This lets `ce-work` reference units unambiguously across plan edits.
+避免：
+- 2-5 分钟级别的 micro-steps
+- 跨 multiple unrelated concerns 的 units
+- 过于 vague，以至于 implementer 仍需 invent plan 的 units
 
-#### 3.4 High-Level Technical Design
+每个 unit 携带 Phase 3.5 分配的 stable plan-local **U-ID**（`U1`、`U2` …）。U-IDs 会跨 reordering、splitting 和 deletion 保留：new units 使用 next unused number，gaps 没问题，existing IDs 绝不 renumber。这让 `ce-work` 可跨 plan edits unambiguously reference units。
 
-When the plan's technical approach has shape that prose alone doesn't carry well — architecture across components, sequencing across processes, state machines, branching gates, lifecycles, quantitative comparisons — include a High-Level Technical Design section that conveys the shape. The exact form (component diagram, sequence, swim lane, flowchart, state machine, decision matrix, pseudo-code grammar, bar chart for sizing concerns) is the agent's call per artifact — pick what makes the content land fastest for the reader.
+#### 3.4 高层技术设计
 
-See `references/plan-sections.md` for the section catalog including HTD's "include when material" criterion. See the format-rendering reference loaded at Phase 0.0 for how visualizations render in the target format (mermaid in markdown, inline SVG in HTML — with the layout-legibility principles around halo, contrast, and label placement when in HTML).
+当 plan 的 technical approach 具有 prose alone 难以承载的 shape 时：components 间 architecture、processes 间 sequencing、state machines、branching gates、lifecycles、quantitative comparisons，包含一个 High-Level Technical Design section 来 convey shape。Exact form（component diagram、sequence、swim lane、flowchart、state machine、decision matrix、pseudo-code grammar、bar chart for sizing concerns）由 agent 按 artifact 决定：选择能让 reader 最快理解 content 的形式。
 
-When the plan's approach is a one-paragraph pattern application that prose conveys directly, skip the section. The presence of HTD should earn its keep with content that genuinely benefits from visualization.
+Section catalog（包括 HTD 的 "include when material" criterion）见 `references/plan-sections.md`。Visualizations 如何在 target format 中 render（markdown 中 mermaid，HTML 中 inline SVG；HTML 时包含 halo、contrast 和 label placement 的 layout-legibility principles）见 Phase 0.0 加载的 format-rendering reference。
 
-Plan diagrams render authoritative content alongside the prose — they are not "directional sketches." Do not add hedging captions like *"directional guidance for review, not implementation specification"* to plan diagrams; the prose-is-authoritative rule already governs disagreement, and the hedging weakens the diagram unnecessarily.
+当 plan approach 是 prose 可直接 convey 的 one-paragraph pattern application 时，跳过此 section。HTD 的存在必须以 genuinely benefits from visualization 的 content 赚回其成本。
 
-#### 3.4b Output Structure (Optional)
+Plan diagrams 与 prose 一起 render authoritative content：它们不是 "directional sketches."。不要给 plan diagrams 添加 *"directional guidance for review, not implementation specification"* 这类 hedging captions；prose-is-authoritative rule 已处理 disagreement，hedging 会不必要地削弱 diagram。
 
-For greenfield plans that create a new directory structure (new plugin, service, package, or module), include an `## Output Structure` section with a file tree showing the expected layout. This gives reviewers the overall shape before diving into per-unit details.
+#### 3.4b 输出结构（可选）
 
-**When to include it:**
-- The plan creates 3+ new files in a new directory hierarchy
-- The directory layout itself is a meaningful design decision
+对创建 new directory structure 的 greenfield plans（new plugin、service、package 或 module），包含一个 `## Output Structure` section，用 file tree 展示 expected layout。这让 reviewers 在进入 per-unit details 前看到 overall shape。
 
-**When to skip it:**
-- The plan only modifies existing files
-- The plan creates 1-2 files in an existing directory — the per-unit file lists are sufficient
+**何时 include：**
+- Plan 在 new directory hierarchy 中创建 3+ new files
+- Directory layout 本身是 meaningful design decision
 
-The tree is a scope declaration showing the expected output shape. It is not a constraint — the implementer may adjust the structure if implementation reveals a better layout. The per-unit `**Files:**` sections remain authoritative for what each unit creates or modifies.
+**何时 skip：**
+- Plan 只 modifies existing files
+- Plan 在 existing directory 中创建 1-2 files：per-unit file lists 已足够
 
-#### 3.5 Define Each Implementation Unit
+Tree 是展示 expected output shape 的 scope declaration。它不是 constraint：如果 implementation reveals 更好 layout，implementer 可 adjust structure。每个 unit 的 `**Files:**` sections 仍对该 unit create 或 modify 什么保持 authoritative。
 
-Each unit is a level-3 heading carrying a stable U-ID prefix matching the format used for R/A/F/AE in requirements docs: `### U1. [Name]`. Number sequentially within the plan starting at U1. Do not render units as bulleted list items or prefix them with `- [ ]` / `- [x]` checkbox markers. List-based unit titles fragment in every standard renderer because the per-unit fields (`**Goal:**`, `**Files:**`, `**Approach:**`, etc.) are written flush-left, which terminates CommonMark list continuation and detaches the fields from the unit they describe. Headings render correctly everywhere, are the right semantic match for sections containing multi-block content, and give each unit an anchor link. The plan is a decision artifact; execution progress is derived from git by `ce-work` rather than stored in the plan body.
+#### 3.5 定义每个 Implementation Unit
 
-**Stability rule.** Once assigned, a U-ID is never renumbered. Reordering units leaves their IDs in place (e.g., U1, U3, U5 in their new order is correct; renumbering to U1, U2, U3 is not). Splitting a unit keeps the original U-ID on the original concept and assigns the next unused number to the new unit. Deletion leaves a gap; gaps are fine. This rule matters most during deepening (Phase 5.3), which is the most likely accidental-renumber vector.
+每个 unit 是 level-3 heading，携带 stable U-ID prefix，格式匹配 requirements docs 中 R/A/F/AE 的用法：`### U1. [Name]`。在 plan 内从 U1 开始 sequentially number。不要将 units render 为 bulleted list items，也不要用 `- [ ]` / `- [x]` checkbox markers prefix。List-based unit titles 会在每个 standard renderer 中 fragment，因为 per-unit fields（`**Goal:**`、`**Files:**`、`**Approach:**` 等）写在 flush-left，会终止 CommonMark list continuation，并使 fields 与它们描述的 unit 脱离。Headings everywhere render correctly，语义上也适合包含 multi-block content 的 sections，并为每个 unit 提供 anchor link。Plan 是 decision artifact；execution progress 由 `ce-work` 从 git 派生，而不是存储在 plan body 中。
 
-For each unit, include:
-- **Goal** - what this unit accomplishes
-- **Requirements** - which requirements or success criteria it advances (cite R-IDs, and A/F/AE IDs when origin supplies them)
-- **Dependencies** - what must exist first (cite by U-ID, e.g., "U1, U3")
-- **Files** - repo-relative file paths to create, modify, or test (never absolute paths)
-- **Approach** - key decisions, data flow, component boundaries, or integration notes
-- **Execution note** - optional, only when the unit benefits from a non-default execution posture such as test-first or characterization-first
-- **Technical design** - optional pseudo-code or diagram when the unit's approach is non-obvious and prose alone would leave it ambiguous. Frame explicitly as directional guidance, not implementation specification
-- **Patterns to follow** - existing code or conventions to mirror
-- **Test scenarios** - enumerate the specific test cases the implementer should write, right-sized to the unit's complexity and risk. Consider each category below and include scenarios from every category that applies to this unit. A simple config change may need one scenario; a payment flow may need a dozen. The quality signal is specificity — each scenario should name the input, action, and expected outcome so the implementer doesn't have to invent coverage. For units with no behavioral change (pure config, scaffolding, styling), use `Test expectation: none -- [reason]` instead of leaving the field blank. **AE-link convention:** when a test scenario directly enforces an origin Acceptance Example, prefix it with `Covers AE<N>.` (or `Covers F<N> / AE<N>.`). This is sparse-by-design — most test scenarios are finer-grained than AEs and do not link. Do not force AE links onto tests that only cover lower-level implementation details.
-  - **Happy path behaviors** - core functionality with expected inputs and outputs
-  - **Edge cases** (when the unit has meaningful boundaries) - boundary values, empty inputs, nil/null states, concurrent access
-  - **Error and failure paths** (when the unit has failure modes) - invalid input, downstream service failures, timeout behavior, permission denials
-  - **Integration scenarios** (when the unit crosses layers) - behaviors that mocks alone will not prove, e.g., "creating X triggers callback Y which persists Z". Include these for any unit touching callbacks, middleware, or multi-layer interactions
-- **Verification** - how an implementer should know the unit is complete, expressed as outcomes rather than shell command scripts
+**Stability rule。** U-ID 一旦 assigned，绝不 renumber。Reordering units 保留其 IDs（例如 new order 中 U1、U3、U5 是正确的；renumber 为 U1、U2、U3 不正确）。Splitting unit 时，在 original concept 上保留 original U-ID，并将 next unused number 分配给 new unit。Deletion 留下 gap；gaps 没问题。此 rule 在 deepening（Phase 5.3）期间最重要，因为那是最可能 accidental-renumber 的 vector。
 
-Every feature-bearing unit should include the test file path in `**Files:**`.
+每个 unit 包含：
+- **Goal**：此 unit accomplishes 什么
+- **Requirements**：推进哪些 requirements 或 success criteria（cite R-IDs，以及 origin 提供时的 A/F/AE IDs）
+- **Dependencies**：必须先存在什么（用 U-ID cite，例如 "U1, U3"）
+- **Files**：要 create、modify 或 test 的 repo-relative file paths（绝不使用 absolute paths）
+- **Approach**：key decisions、data flow、component boundaries 或 integration notes
+- **Execution note**：optional，仅当 unit 受益于 non-default execution posture，如 test-first 或 characterization-first
+- **Technical design**：optional pseudo-code 或 diagram；当 unit approach non-obvious 且 prose alone 会留下 ambiguity 时使用。明确 frame 为 directional guidance，而不是 implementation specification
+- **Patterns to follow**：要 mirror 的 existing code 或 conventions
+- **Test scenarios**：枚举 implementer 应写的 specific test cases，按 unit complexity 和 risk right-sized。考虑下方每个 category，并包含该 unit 适用的每个 category 的 scenarios。Simple config change 可能只需一个 scenario；payment flow 可能需要一打。Quality signal 是 specificity：每个 scenario 应命名 input、action 和 expected outcome，让 implementer 无需 invent coverage。对于无 behavioral change 的 units（pure config、scaffolding、styling），使用 `Test expectation: none -- [reason]`，不要留空 field。**AE-link convention：** 当 test scenario 直接 enforce origin Acceptance Example 时，用 `Covers AE<N>.` prefix（或 `Covers F<N> / AE<N>.`）。这 sparse-by-design：大多数 test scenarios 比 AEs 更 fine-grained，不需要 link。不要将 AE links 强行加到只覆盖 lower-level implementation details 的 tests 上。
+  - **Happy path behaviors**：带 expected inputs 和 outputs 的 core functionality
+  - **Edge cases**（当 unit 有 meaningful boundaries 时）：boundary values、empty inputs、nil/null states、concurrent access
+  - **Error and failure paths**（当 unit 有 failure modes 时）：invalid input、downstream service failures、timeout behavior、permission denials
+  - **Integration scenarios**（当 unit crosses layers 时）：mocks alone 无法证明的 behaviors，例如 "creating X triggers callback Y which persists Z"。任何触及 callbacks、middleware 或 multi-layer interactions 的 unit 都要 include
+- **Verification**：implementer 如何知道 unit complete，以 outcomes 而不是 shell command scripts 表达
 
-Use `Execution note` sparingly. Good uses include:
+每个 feature-bearing unit 都应在 `**Files:**` 中包含 test file path。
+
+节制使用 `Execution note`。好的用法包括：
 - `Execution note: Start with a failing integration test for the request/response contract.`
 - `Execution note: Add characterization coverage before modifying this legacy parser.`
 - `Execution note: Implement new domain behavior test-first.`
 
-Do not expand units into literal `RED/GREEN/REFACTOR` substeps.
+不要将 units 展开为 literal `RED/GREEN/REFACTOR` substeps。
 
-#### 3.6 Keep Planning-Time and Implementation-Time Unknowns Separate
+#### 3.6 区分规划时未知项和实现时未知项
 
-If something is important but not knowable yet, record it explicitly under deferred implementation notes rather than pretending to resolve it in the plan.
+如果某事重要但尚不可知，在 deferred implementation notes 下明确记录，而不是假装在 plan 中 resolve 它。
 
-Examples:
-- Exact method or helper names
-- Final SQL or query details after touching real code
-- Runtime behavior that depends on seeing actual test failures
-- Refactors that may become unnecessary once implementation starts
+示例：
+- exact method 或 helper names
+- 接触真实代码后才能确定的 final SQL 或 query details
+- 依赖实际 test failures 才能观察到的 runtime behavior
+- implementation 开始后可能变得不必要的 refactors
 
-#### 3.7 Anti-Expansion: Tangential Cleanup and Scope Creep Go to Deferred
+#### 3.7 反扩张：旁支清理和范围膨胀进入 Deferred
 
-Distinct from 3.6 (which is about *unknowns* at plan time): 3.7 is about *known but tangential* work that the agent notices while planning but that falls outside the user's confirmed scope. When research surfaces an adjacent refactor, a "while we're here" cleanup, or a scope-adjacent nice-to-have ("we could also add rate limiting"), route it to the existing `### Deferred to Follow-Up Work` subsection in Scope Boundaries (Phase 4.2 Core Plan Template), not into active Implementation Units.
+不同于 3.6（关于 plan time 的 *unknowns*）：3.7 关于 agent 在 planning 时注意到、但落在用户 confirmed scope 之外的 *known but tangential* work。当 research surface adjacent refactor、"while we're here" cleanup，或 scope-adjacent nice-to-have（"we could also add rate limiting"），将其 route 到 Scope Boundaries 中现有的 `### Deferred to Follow-Up Work` subsection（Phase 4.2 Core Plan Template），不要放入 active Implementation Units。
 
-This reinforces the synthesis discipline established at Phase 0.7 / Phase 5.1.5 — the user's confirmed scope is what the active plan executes; everything else is deferred. Does NOT impose architectural bias on extend-vs-invent decisions within confirmed scope — that judgment stays with the agent (and is surfaced via the Phase 5.1.5 synthesis when material). The user's explicit ask overrides this default — if the user explicitly requested a refactor, it's in-scope, not deferred.
+这强化 Phase 0.7 / Phase 5.1.5 建立的 synthesis discipline：active plan 执行的是用户 confirmed scope；其它一切 deferred。它 **不** 对 confirmed scope 内的 extend-vs-invent decisions 施加 architectural bias：该 judgment 仍由 agent 做出（material 时通过 Phase 5.1.5 synthesis surface）。用户 explicit ask 会 override 此 default：如果用户明确 requested refactor，它就是 in-scope，不是 deferred。
 
-### Phase 4: Write the Plan
+### Phase 4：撰写计划
 
-**NEVER CODE during this skill.** Research, decide, and write the plan — do not start implementation.
+**此 skill 期间绝不 CODE。** Research、decide 并 write plan：不要 start implementation。
 
-Use one planning philosophy across all depths. Change the amount of detail, not the boundary between planning and execution.
+所有 depths 使用同一 planning philosophy。改变 detail 数量，而不是 planning 和 execution 之间的边界。
 
-#### 4.1 Plan Depth Guidance
+#### 4.1 计划深度指南
 
-**Lightweight**
-- Keep the plan compact
-- Usually 2-4 implementation units
-- Omit optional sections that add little value
+**Lightweight（轻量）**
+- 保持 plan compact
+- 通常 2-4 implementation units
+- 省略 value 不大的 optional sections
 
-**Standard**
-- Use the full core template, omitting optional sections (including High-Level Technical Design) that add no value for this particular work
-- Usually 3-6 implementation units
-- Include risks, deferred questions, and system-wide impact when relevant
+**Standard（标准）**
+- 使用 full core template，omit 对此 particular work 无 value 的 optional sections（包括 High-Level Technical Design）
+- 通常 3-6 implementation units
+- Relevant 时 include risks、deferred questions 和 system-wide impact
 
-**Deep**
-- Use the full core template plus optional analysis sections where warranted
-- Usually 4-8 implementation units
-- Group units into phases when that improves clarity
-- Include alternatives considered, documentation impacts, and deeper risk treatment when warranted
+**Deep（深入）**
+- 使用 full core template，并在 warranted 时添加 optional analysis sections
+- 通常 4-8 implementation units
+- 当能 improve clarity 时，将 units group into phases
+- Warranted 时 include alternatives considered、documentation impacts 和 deeper risk treatment
 
-#### 4.1b Optional Deep Plan Extensions
+#### 4.1b 可选 Deep Plan 扩展
 
-For sufficiently large, risky, or cross-cutting work, add the sections that genuinely help:
-- **Alternative Approaches Considered**
-- **Success Metrics**
-- **Dependencies / Prerequisites**
-- **Risk Analysis & Mitigation**
-- **Phased Delivery**
-- **Documentation Plan**
-- **Operational / Rollout Notes**
-- **Future Considerations** only when they materially affect current design
+对 sufficiently large、risky 或 cross-cutting work，添加 genuinely help 的 sections：
+- **Alternative Approaches Considered（备选方案）**
+- **Success Metrics（成功指标）**
+- **Dependencies / Prerequisites（依赖 / 前置条件）**
+- **Risk Analysis & Mitigation（风险分析与缓解）**
+- **Phased Delivery（分阶段交付）**
+- **Documentation Plan（文档计划）**
+- **Operational / Rollout Notes（运营 / rollout 说明）**
+- **Future Considerations**：仅当它们会 materially affect current design 时才包含
 
-Do not add these as boilerplate. Include them only when they improve execution quality or stakeholder alignment.
+不要将这些作为 boilerplate 添加。只有当它们 improve execution quality 或 stakeholder alignment 时才 include。
 
-**Alternatives Considered — what to vary.** When this section is included, alternatives must differ on *how* the work is built: architecture, sequencing, boundaries, integration pattern, rollout strategy. Tiny implementation variants (which hash function, which serialization format) belong in Key Technical Decisions, not Alternatives. Product-shape alternatives (different actors, different core outcome, different positioning) belong in `ce-brainstorm`, not here — surface them back upstream rather than re-litigating product questions during planning.
+**Alternatives Considered：what to vary。** 包含此 section 时，alternatives 必须在 work 如何 build 上有差异：architecture、sequencing、boundaries、integration pattern、rollout strategy。Tiny implementation variants（哪个 hash function、哪个 serialization format）属于 Key Technical Decisions，不属于 Alternatives。Product-shape alternatives（different actors、different core outcome、different positioning）属于 `ce-brainstorm`，不是这里：将它们 surface back upstream，而不是在 planning 期间重新争论 product questions。
 
-#### 4.2 Section Contract and Rendering
+#### 4.2 Section Contract 和渲染
 
-Compose the plan using two paired references:
+使用两份 paired references compose plan：
 
-- `references/plan-sections.md` — the section contract. Describes what the plan contains: the outcome the plan must enable for downstream consumers, the hard floor (Summary, Problem Frame, Requirements, KTDs, Implementation Units), the include-when-material catalog (HTD, Scope Boundaries, Open Questions, System-Wide Impact, Risks & Dependencies, Acceptance Examples, Documentation/Operational Notes, Sources & Research), the agency-driven escape hatch (introduce new sections when content warrants), and the ID/content rules.
-- The format-rendering reference loaded at Phase 0.0 (`markdown-rendering.md` OR `html-rendering.md`) — how to present the sections in the resolved output format.
+- `references/plan-sections.md`：section contract。描述 plan 包含什么：plan 必须为 downstream consumers enable 的 outcome、hard floor（Summary、Problem Frame、Requirements、KTDs、Implementation Units）、include-when-material catalog（HTD、Scope Boundaries、Open Questions、System-Wide Impact、Risks & Dependencies、Acceptance Examples、Documentation/Operational Notes、Sources & Research）、agency-driven escape hatch（content warrants 时 introduce new sections），以及 ID/content rules。
+- Phase 0.0 加载的 format-rendering reference（`markdown-rendering.md` 或 `html-rendering.md`）：如何以 resolved output format present sections。
 
-The section catalog is the same regardless of format. Format-specific principles (table-vs-prose by content shape, ID prefix format, diagram rendering, etc.) live in the rendering reference.
+无论 format 如何，section catalog 相同。Format-specific principles（按 content shape 决定 table-vs-prose、ID prefix format、diagram rendering 等）位于 rendering reference。
 
-Omit "include when material" sections that don't carry information for this specific plan. Filling a section with placeholder prose is worse than omitting it.
+Omit 对此 specific plan 不携带 information 的 "include when material" sections。用 placeholder prose 填充 section 比 omit 更糟。
 
-#### 4.3 Planning Rules
+#### 4.3 规划规则
 
-- **Horizontal rules (`---`) between top-level sections** in Standard and Deep plans, mirroring the `ce-brainstorm` requirements doc convention. Improves scannability of dense plans where many H2 sections sit close together. Omit for Lightweight plans where the whole doc fits on a single screen.
-- **All file paths must be repo-relative** — never use absolute paths like `/Users/name/Code/project/src/file.ts`. Use `src/file.ts` instead. Absolute paths make plans non-portable across machines, worktrees, and teammates. When a plan targets a different repo than the document's home, state the target repo once at the top of the plan (e.g., `**Target repo:** my-other-project`) and use repo-relative paths throughout
-- Prefer path plus class/component/pattern references over brittle line numbers
-- Do not include implementation code — no imports, exact method signatures, or framework-specific syntax
-- Pseudo-code sketches and DSL grammars are allowed in the High-Level Technical Design section and per-unit technical design fields when they communicate design direction. Frame them explicitly as directional guidance, not implementation specification
-- Mermaid diagrams are encouraged when they clarify relationships or flows that prose alone would make hard to follow — ERDs for data model changes, sequence diagrams for multi-service interactions, state diagrams for lifecycle transitions, flowcharts for complex branching logic
-- Do not include git commands, commit messages, or exact test command recipes
-- Do not expand implementation units into micro-step `RED/GREEN/REFACTOR` instructions
-- Do not pretend an execution-time question is settled just to make the plan look complete
+- Standard 和 Deep plans 中，在 top-level sections 之间使用 **horizontal rules（`---`）**，mirror `ce-brainstorm` requirements doc convention。对于 many H2 sections 靠得很近的 dense plans，可 improve scannability。Whole doc 可 fits on single screen 的 Lightweight plans 中 omit。
+- **所有 file paths 必须 repo-relative**：绝不使用 `/Users/name/Code/project/src/file.ts` 这类 absolute paths。改用 `src/file.ts`。Absolute paths 让 plans 在 machines、worktrees 和 teammates 之间 non-portable。当 plan target 的 repo 与 document home 不同时，在 plan 顶部 state target repo 一次（例如 `**Target repo:** my-other-project`），并全程使用 repo-relative paths
+- Prefer path 加 class/component/pattern references，而不是 brittle line numbers
+- 不要 include implementation code：无 imports、exact method signatures 或 framework-specific syntax
+- 当 pseudo-code sketches 和 DSL grammars communicate design direction 时，允许放在 High-Level Technical Design section 和 per-unit technical design fields。明确 frame 为 directional guidance，而不是 implementation specification
+- Mermaid diagrams 在能 clarify prose alone 难以 follow 的 relationships 或 flows 时 encouraged：data model changes 用 ERDs，multi-service interactions 用 sequence diagrams，lifecycle transitions 用 state diagrams，complex branching logic 用 flowcharts
+- 不要 include git commands、commit messages 或 exact test command recipes
+- 不要将 implementation units 展开成 micro-step `RED/GREEN/REFACTOR` instructions
+- 不要为了让 plan 看起来 complete，就假装 execution-time question 已 settled
 
-### Phase 5: Final Review, Write File, and Handoff
+### Phase 5：最终审查、写入文件和交接
 
-#### 5.1 Review Before Writing
+#### 5.1 写入前审查
 
-Before finalizing, check:
-- The plan does not invent product behavior that should have been defined in `ce-brainstorm`
-- If there was no origin document, the bounded planning bootstrap established enough product clarity to plan responsibly
-- Every major decision is grounded in the origin document or research
-- Each implementation unit is concrete, dependency-ordered, and implementation-ready
-- If test-first or characterization-first posture was explicit or strongly implied, the relevant units carry it forward with a lightweight `Execution note`
-- Each feature-bearing unit has test scenarios from every applicable category (happy path, edge cases, error paths, integration) — right-sized to the unit's complexity, not padded or skimped
-- Test scenarios name specific inputs, actions, and expected outcomes without becoming test code
-- Feature-bearing units with blank or missing test scenarios are flagged as incomplete — feature-bearing units must have actual test scenarios, not just an annotation. The `Test expectation: none -- [reason]` annotation is only valid for non-feature-bearing units (pure config, scaffolding, styling)
-- Deferred items are explicit and not hidden as fake certainty
-- **High-Level Technical Design presence audit (load-bearing).** For each architecture trigger in Phase 3.4 that the plan content satisfies (3+ components with directed relationships, 3+ protocol steps, 3+ state machine states, lifecycle, 3+ decision points, 3+ data-flow stages, mode/flag combinations, DSL/API surface design, non-obvious single-component shape), verify a corresponding sketch/diagram is present in the High-Level Technical Design section. Count the firing triggers; count the sketches; the sketch count must be at least the count of distinct trigger categories that fired. Missing the section when a trigger fired, OR including the section but skipping a triggered sketch within it, is incomplete — return to Phase 3.4 and add the missing sketch. Token cost is not a valid reason to fail this check.
-- If a High-Level Technical Design section is included, it uses the right medium for the work, carries the non-prescriptive framing, and does not contain implementation code (no imports, exact signatures, or framework-specific syntax)
-- Per-unit technical design fields, if present, are concise and directional rather than copy-paste-ready
-- If the plan creates a new directory structure, would an Output Structure tree help reviewers see the overall shape?
-- If Scope Boundaries lists items that are planned work for a separate PR, issue, or repo, are they under `### Deferred to Follow-Up Work` rather than mixed with true non-goals?
-- U-IDs are unique within the plan and follow the stability rule — no two units share an ID; reordering or splitting did not renumber existing units; gaps from deletions are preserved
-- Would a visual aid (dependency graph, interaction diagram, comparison table) help a reader grasp the plan structure faster than scanning prose alone?
+Finalizing 前，检查：
+- Plan 没有 invent 应在 `ce-brainstorm` 中定义的 product behavior
+- 如果没有 origin document，bounded planning bootstrap 已建立足够 product clarity，可 responsibly plan
+- 每个 major decision 都 grounded in origin document 或 research
+- 每个 implementation unit concrete、dependency-ordered 且 implementation-ready
+- 如果 test-first 或 characterization-first posture 是 explicit 或 strongly implied，relevant units 用 lightweight `Execution note` carry forward
+- 每个 feature-bearing unit 都有来自每个 applicable category（happy path、edge cases、error paths、integration）的 test scenarios：按 unit complexity right-sized，既不 padded 也不 skimped
+- Test scenarios 命名 specific inputs、actions 和 expected outcomes，但不变成 test code
+- Blank 或 missing test scenarios 的 feature-bearing units flagged as incomplete：feature-bearing units 必须有 actual test scenarios，而不只是 annotation。`Test expectation: none -- [reason]` annotation 仅对 non-feature-bearing units valid（pure config、scaffolding、styling）
+- Deferred items explicit，且不 hidden as fake certainty
+- **High-Level Technical Design presence audit（load-bearing）。** 对 Phase 3.4 中 plan content 满足的每个 architecture trigger（3+ components with directed relationships、3+ protocol steps、3+ state machine states、lifecycle、3+ decision points、3+ data-flow stages、mode/flag combinations、DSL/API surface design、non-obvious single-component shape），verify High-Level Technical Design section 中存在 corresponding sketch/diagram。Count firing triggers；count sketches；sketch count 必须至少等于 fired 的 distinct trigger categories count。Trigger fired 但 missing section，或包含 section 但跳过 triggered sketch，都是 incomplete：回到 Phase 3.4 并添加 missing sketch。Token cost 不是 fail 此 check 的 valid reason。
+- 如果包含 High-Level Technical Design section，它使用适合 work 的 medium，携带 non-prescriptive framing，且不包含 implementation code（无 imports、exact signatures 或 framework-specific syntax）
+- Per-unit technical design fields 如果 present，应 concise 且 directional，而非 copy-paste-ready
+- 如果 plan 创建 new directory structure，Output Structure tree 是否能帮助 reviewers 看到 overall shape？
+- 如果 Scope Boundaries 列出的 items 是 separate PR、issue 或 repo 的 planned work，它们是否位于 `### Deferred to Follow-Up Work` 下，而不是与 true non-goals 混在一起？
+- U-IDs 在 plan 内 unique 且遵循 stability rule：没有两个 units 共享 ID；reordering 或 splitting 未 renumber existing units；preserve deletion gaps
+- Visual aid（dependency graph、interaction diagram、comparison table）是否能比扫描 prose 更快帮助 reader grasp plan structure？
 
-If the plan originated from a requirements document, re-read that document and verify:
-- The chosen approach still matches the product intent
-- Scope boundaries and success criteria are preserved
-- Blocking questions were either resolved, explicitly assumed, or sent back to `ce-brainstorm`
-- Every section of the origin document is addressed in the plan — scan each section to confirm nothing was silently dropped
-- If origin supplies A/F/AE IDs: every origin R/F/AE that *affects implementation* is referenced in Requirements, a U-ID unit, test scenarios, verification, scope boundaries, or explicitly deferred. Actors are carried forward when they affect behavior, permissions, UX, orchestration, handoff, or verification. The standard is preservation of product intent, not mandatory ID spam — irrelevant origin IDs may be omitted
-- If origin was Deep-product (origin contains an `Outside this product's identity` subsection): the plan's Scope Boundaries preserves the three-way split — `Deferred for later` and `Outside this product's identity` carried verbatim from origin, `Deferred to Follow-Up Work` reserved for plan-local implementation sequencing
+如果 plan 源自 requirements document，重新读取该 document 并 verify：
+- Chosen approach 仍匹配 product intent
+- Scope boundaries 和 success criteria 已 preserved
+- Blocking questions 要么 resolved、explicitly assumed，要么 sent back to `ce-brainstorm`
+- Origin document 的每个 section 都在 plan 中 addressed：scan 每个 section 确认 nothing was silently dropped
+- 如果 origin supplies A/F/AE IDs：每个 *affects implementation* 的 origin R/F/AE 都在 Requirements、U-ID unit、test scenarios、verification、scope boundaries 中 referenced，或 explicitly deferred。当 Actors affect behavior、permissions、UX、orchestration、handoff 或 verification 时 carry forward。Standard 是 preservation of product intent，不是 mandatory ID spam：irrelevant origin IDs 可 omitted
+- 如果 origin 是 Deep-product（origin 包含 `Outside this product's identity` subsection）：plan 的 Scope Boundaries preserve three-way split：`Deferred for later` 和 `Outside this product's identity` 从 origin verbatim carried，`Deferred to Follow-Up Work` 保留给 plan-local implementation sequencing
 
-#### 5.1.5 Brainstorm-Sourced Scoping Synthesis
+#### 5.1.5 Brainstorm-Sourced 范围综合
 
-Surface plan-time call-outs to the user before Phase 5.2 commits the plan to disk — the latest cheap moment to catch plan-time scope errors. The brainstorm already validated WHAT to build; this phase surfaces HOW the plan will execute on the forks that matter.
+在 Phase 5.2 将 plan commit to disk 前，向用户 surface plan-time call-outs：这是捕获 plan-time scope errors 的最后 cheap moment。Brainstorm 已验证 WHAT to build；此 phase surface plan 会如何在 matter 的 forks 上 execute。
 
-Fires **only when the plan was sourced from an upstream brainstorm doc** (Phase 0.2 found a `*-requirements.md` or `*-requirements.html` match) AND not on Phase 0.1 fast paths (resume normal, deepen-intent). Skip Phase 5.1.5 in solo invocation — solo plans handled their synthesis in Phase 0.7.
+仅当 plan 源自 upstream brainstorm doc（Phase 0.2 找到 `*-requirements.md` 或 `*-requirements.html` match），且不在 Phase 0.1 fast paths（resume normal、deepen-intent）上时 fire。Solo invocation 中跳过 Phase 5.1.5：solo plans 已在 Phase 0.7 处理 synthesis。
 
-**Read `references/synthesis-summary.md` before composing the scoping synthesis.** It carries the affirmability test, keep-test criteria, detail test, summary shape budgets, granularity rules, anti-patterns, revision-vs-confirmation discipline, doc-body reading rules, doc-shape routing, soft-cut behavior, self-redirect support, the worked PII compression example, and full headless-mode routing — all required for a well-shaped synthesis.
+**在撰写 scoping synthesis 前阅读 `references/synthesis-summary.md`。** 它包含 affirmability test、keep-test criteria、detail test、summary shape budgets、granularity rules、anti-patterns、revision-vs-confirmation discipline、doc-body reading rules、doc-shape routing、soft-cut behavior、self-redirect support、PII 压缩 worked example，以及完整 headless-mode routing；这些都是写出合格 synthesis 所必需的。
 
-**Required gate output — do not skip; silent proceeding is not allowed.** Compose an internal three-bucket scope draft (Stated / Inferred / Out of scope — internal thinking that feeds plan-body routing at Phase 5.2, not the chat output below). Derive call-outs (specific forks where user input materially changes the plan), then emit one of the two literal templates below in chat before continuing to Phase 5.2.
+**必须输出 gate；不要跳过，也不允许静默继续。** 先拟定内部三桶 scope 草稿（Stated / Inferred / Out of scope，这是供 Phase 5.2 plan body routing 使用的内部思考，不是下面的 chat 输出）。再提炼 call-outs（用户输入会实质改变 plan 的具体分叉），然后在继续 Phase 5.2 之前，于 chat 中发出下面两个 literal templates 之一。
 
-**Synthesis is pre-plan-write.** The agent does NOT yet know how plan-write will sequence the work. Do not claim PR count ("one PR"), commit/branch shape, effort or time estimates, Implementation Unit boundaries, or exact file paths in the synthesis. The synthesis surfaces decisions knowable at THIS point (brainstorm + research + agent posture); plan-write produces the rest. This rule holds even when the agent has formed plan-write opinions earlier in the session — those stay internal until plan-write.
+**Synthesis 发生在 pre-plan-write。** agent 此时还不知道 plan-write 会如何安排 work。不要在 synthesis 中声称 PR 数量（如 "one PR"）、commit/branch 形态、工作量或时间估计、Implementation Unit 边界，或精确文件路径。Synthesis 只 surface 此刻可知的决定（brainstorm + research + agent posture）；其余由 plan-write 产出。即使 agent 在 session 早些时候已经形成 plan-write 倾向，这条规则仍然成立：那些想法要留到 plan-write。
 
-**Summary shape: two paragraphs.**
+**Summary shape：两段。**
 
-1. **Brainstorm-scope restatement** (1-2 sentences, prose). Restates the brainstorm's scope as orientation, in the brainstorm's own vocabulary. NOT an enumeration of Implementation Units, restated constraints, or listed acceptance examples — the user wrote those.
-2. **Plan-specific scoping decisions** (prose, or bullets when multi-faceted). Scope-level commitments the agent made that the brainstorm did not: full brainstorm coverage vs. narrowed subset; adjacent refactors pulled in vs. held out; test scope at scenario level. Each item must be affirmable by the user without reading code. Form follows substance; tier budgets are **ceilings, not targets** (Lightweight 1-3 lines; Standard up to 3-5 lines or 2-4 bullets; Deep up to 4-6 lines or 3-6 bullets). 1-2 lines per bullet. Less is correct when there isn't more to say. See reference for keep test, detail test, and source-vocabulary discipline.
+1. **Brainstorm-scope restatement**（1-2 句，prose）。用 brainstorm 自己的词汇复述其 scope，作为 orientation。不要枚举 Implementation Units、重述 constraints，或列出 acceptance examples；这些是用户已经写过的。
+2. **Plan-specific scoping decisions**（prose；多面向时可用 bullets）。记录 agent 做出的、brainstorm 未明确给出的 scope-level commitments：完整覆盖 brainstorm 还是缩窄子集；相邻 refactors 纳入还是排除；scenario level 的 test scope。每一项都必须让用户不读代码也能确认。形式服务于内容；tier budgets 是**上限，不是目标**（Lightweight 1-3 行；Standard 最多 3-5 行或 2-4 个 bullets；Deep 最多 4-6 行或 3-6 个 bullets）。每个 bullet 1-2 行即可。没有更多内容时，更少才是正确。keep test、detail test 和 source-vocabulary discipline 见 reference。
 
-**Do NOT enumerate the touch surface.** Sentences like "The touch surface is...", "This plan touches...", "The implementation reaches into...", "Files modified include..." are plan-pitch leaks. File paths, module names, directory introductions, and per-file change descriptions belong in the plan body (Implementation Units at Phase 5.2), not the synthesis. The synthesis names *what* the plan targets, not *where* the code lives.
+**不要枚举 touch surface。** 像 "The touch surface is..."、"This plan touches..."、"The implementation reaches into..."、"Files modified include..." 这类句子都是 plan-pitch 泄漏。文件路径、module 名、directory introductions 和 per-file change descriptions 属于 plan body（Phase 5.2 的 Implementation Units），不属于 synthesis。Synthesis 命名 plan 针对的 *what*，不是代码里的 *where*。
 
-**Pre-emit scans.** Before emitting the synthesis, scan the output:
-- Bare ID references (`AE\d+`, `R\d+`, `F\d+`, `A\d+`, `U\d+`) → replace with plain names.
-- File paths (`path/like.md`, `path/like.py`, etc.) → cut unless the path IS the topic of an explicit fork in the call-outs.
+**Pre-emit scans。** 发出 synthesis 前扫描输出：
+- Bare ID references（`AE\d+`、`R\d+`、`F\d+`、`A\d+`、`U\d+`）→ 替换成 plain names。
+- File paths（`path/like.md`、`path/like.py` 等）→ 删除，除非该 path 本身就是 call-outs 中显式分叉的主题。
 
-**Tier guard on auto-proceed:** the auto-proceed path (announce without waiting for confirmation) fires only when plan depth is **Lightweight AND zero call-outs survive**. Standard and Deep plans always fire the confirmation gate, even with zero call-outs — substance earns the checkpoint, not interaction history.
+**Auto-proceed 的 tier guard：** auto-proceed path（宣布而不等待确认）只在 plan depth 为 **Lightweight 且 zero call-outs survive** 时触发。Standard 和 Deep plans 即使 zero call-outs 也始终触发 confirmation gate；检查点由内容分量决定，不由 interaction history 决定。
 
-**Confirmation template (Standard/Deep regardless of call-out count, or any tier with one or more call-outs surviving):**
+**Confirmation template（Standard/Deep 不管 call-out 数量如何，或任何 tier 只要有一个以上 call-outs survive）：**
 
 ````text
-The brainstorm scopes [1-2 sentence restatement in the brainstorm's vocabulary as orientation; NOT an enumeration of Implementation Units, constraints, or acceptance examples].
+Brainstorm 的 scope 是：[使用 brainstorm 词汇写 1-2 句 restatement，作为 orientation；不要枚举 Implementation Units、constraints 或 acceptance examples]。
 
-This plan [plan-specific scoping decisions: full-brainstorm coverage vs. narrowed subset; adjacent refactors in or out; test scope at scenario level. NOT PR count, sequencing, IU lists, or file paths].
+这个 plan 会：[写 plan-specific scoping decisions：完整覆盖 brainstorm 还是缩窄子集；相邻 refactors 纳入或排除；scenario level 的 test scope。不要写 PR count、sequencing、IU lists 或 file paths]。
 
 **Call outs:** (omit this header when zero forks survived the keep test)
-- [plan-time fork in 1-2 lines: name the choice and optional one-clause trade-off in parens. NO multi-sentence rationale, NO "my default is X" pitch]
+- [用 1-2 行写 plan-time fork：命名选择，并可在括号中写一句 trade-off。不要多句 rationale，不要写 "my default is X" 式 pitch]
 
-Confirm and I'll write the plan next, drawing on the brainstorm, research, and this synthesis.
+确认后我会基于 brainstorm、research 和这份 synthesis 写出 plan。
 ````
 
-Wait for user confirmation before continuing to Phase 5.2.
+等待用户确认后再继续 Phase 5.2。
 
-**Auto-proceed template (Lightweight with zero call-outs only):**
+**Auto-proceed template（仅 Lightweight 且 zero call-outs）：**
 
 ````text
-Planning [brief brainstorm-scope restatement] — [plan-specific shape in one clause].
+正在规划 [brief brainstorm-scope restatement] — [用一个从句写 plan-specific shape]。
 
-No open decisions to weigh in on — proceeding to plan-write. Interrupt if I have the scope wrong.
+没有需要你权衡的开放决定 — 我会继续 plan-write。如果我理解错了 scope，请随时打断。
 ````
 
-Then continue to Phase 5.2 without a blocking question.
+然后不提出 blocking question，直接继续 Phase 5.2。
 
-**Headless mode**: internal draft is composed but stage 2 (chat-time call-outs) is skipped — no synchronous user to confirm to. Proceed to Phase 5.2 plan-write. Inferred bets from the internal draft route to a `## Assumptions` section in the plan instead of Key Technical Decisions. See `references/synthesis-summary.md` Headless mode for the full routing.
+**Headless mode**：仍然撰写 internal draft，但跳过 stage 2（chat-time call-outs），因为没有同步用户可确认。继续 Phase 5.2 plan-write。Internal draft 中的 inferred bets 进入 plan 的 `## Assumptions` section，而不是 Key Technical Decisions。完整 routing 见 `references/synthesis-summary.md` 的 Headless mode。
 
-#### 5.2 Write Plan File
+#### 5.2 写入计划文件
 
-**REQUIRED: Write the plan file to disk before presenting any options.**
+**必须：在呈现任何 options 前，先把 plan file 写入磁盘。**
 
-Use the Write tool to save the complete plan to the resolved format's extension:
+使用 Write tool，把完整 plan 保存为 resolved format 对应的 extension：
 
 ```text
 docs/plans/YYYY-MM-DD-NNN-<type>-<descriptive-name>-plan.<md|html>
 ```
 
-Extension follows `OUTPUT_FORMAT` from Phase 0.0 — `.md` when markdown, `.html` when HTML. Sequence number `NNN` is derived from existing plan files in `docs/plans/` regardless of extension (count both `.md` and `.html`) to ensure unique daily ordering.
+Extension 遵循 Phase 0.0 的 `OUTPUT_FORMAT`：markdown 时为 `.md`，HTML 时为 `.html`。Sequence number `NNN` 根据 `docs/plans/` 中已有 plan files 计算，不区分 extension（同时计入 `.md` 和 `.html`），以保证当天排序唯一。
 
-Compose the plan using the content from `references/plan-sections.md` and the format-specific principles from the rendering reference loaded at Phase 0.0 (`markdown-rendering.md` OR `html-rendering.md`).
+使用 `references/plan-sections.md` 的内容，以及 Phase 0.0 加载的 rendering reference 中的 format-specific principles（`markdown-rendering.md` 或 `html-rendering.md`）来撰写 plan。
 
-**HTML composition timing.** When `OUTPUT_FORMAT=html`, Phase 5.3 deepening runs before this write completes its final form, but `ce-doc-review` is skipped in HTML mode (its mutation mechanics are markdown-only today — see Phase 5.3.8 format gate in `references/plan-handoff.md`). The HTML artifact reflects deepening synthesis but not doc-review autofixes; this is a known gap until ce-doc-review gains HTML-aware mutation.
+**HTML composition timing。** 当 `OUTPUT_FORMAT=html` 时，Phase 5.3 deepening 会在本次写入最终成形前运行，但 HTML mode 会跳过 `ce-doc-review`（它今天的 mutation mechanics 仅支持 markdown；见 `references/plan-handoff.md` 的 Phase 5.3.8 format gate）。HTML artifact 会反映 deepening synthesis，但不包含 doc-review autofixes；这是 `ce-doc-review` 支持 HTML-aware mutation 前的已知 gap。
 
-Confirm (use absolute path so the reference is clickable in modern terminals):
+确认（使用 absolute path，让现代 terminal 中的引用可点击）：
 
 ```text
 Plan written to <absolute path to plan>
 ```
 
-**Pipeline mode:** If invoked from an automated workflow such as LFG or any `disable-model-invocation` context, skip interactive questions. Make the needed choices automatically and proceed to writing the plan. Pipeline mode forces `OUTPUT_FORMAT=md` at Phase 0.0.
+**Pipeline mode：** 如果由 LFG 等 automated workflow 或任何 `disable-model-invocation` context 调用，跳过 interactive questions。自动做出必要选择并继续写 plan。Pipeline mode 在 Phase 0.0 强制 `OUTPUT_FORMAT=md`。
 
-**CONCEPTS.md gap-fill (only if the file already exists):** If the plan body uses a domain term whose definition is missing from `CONCEPTS.md`, add the entry. **Domain entities, named processes, and status concepts with project-specific meaning only** — not file paths, class names, function signatures, or implementation decisions. `CONCEPTS.md` is a glossary, not a spec or catch-all. Follow the format set by existing entries. Apply silently. Skip entirely if `CONCEPTS.md` does not exist — creation is owned by ce-compound and ce-compound-refresh.
+**CONCEPTS.md gap-fill（仅当文件已存在）：** 如果 plan body 使用了 `CONCEPTS.md` 中缺少定义的 domain term，添加对应 entry。**只添加具有 project-specific meaning 的 domain entities、named processes 和 status concepts**；不要添加文件路径、class names、function signatures 或 implementation decisions。`CONCEPTS.md` 是 glossary，不是 spec 或 catch-all。遵循现有 entries 的格式。静默应用。如果 `CONCEPTS.md` 不存在则完全跳过；创建职责属于 `ce-compound` 和 `ce-compound-refresh`。
 
-#### 5.3 Confidence Check and Deepening
+#### 5.3 Confidence Check 和 Deepening
 
-After writing the plan file, automatically evaluate whether the plan needs strengthening.
+写入 plan file 后，自动评估 plan 是否需要 strengthening。
 
-**Two deepening modes:**
+**两种 deepening modes：**
 
-- **Auto mode** (default during plan generation): Runs without asking the user for approval. The user sees what is being strengthened but does not need to make a decision. Sub-agent findings are synthesized directly into the plan.
-- **Interactive mode** (activated by the re-deepen fast path in Phase 0.1): The user explicitly asked to deepen an existing plan. Sub-agent findings are presented individually for review before integration. The user can accept, reject, or discuss each agent's findings. Only accepted findings are synthesized into the plan.
+- **Auto mode**（plan generation 的默认模式）：运行时不向用户请求 approval。用户会看到哪些内容正在被 strengthened，但不需要做决定。Sub-agent findings 会直接 synthesized into the plan。
+- **Interactive mode**（由 Phase 0.1 的 re-deepen fast path 激活）：用户明确要求 deepen 一个 existing plan。Sub-agent findings 在集成前逐条呈现给用户 review。用户可以 accept、reject，或讨论每个 agent 的 findings。只有 accepted findings 会 synthesized into the plan。
 
-Interactive mode exists because on-demand deepening is a different user posture — the user already has a plan they are invested in and wants to be surgical about what changes. This applies whether the plan was generated by this skill, written by hand, or produced by another tool.
+Interactive mode 存在是因为 on-demand deepening 是不同的用户姿态：用户已经有一份投入过的 plan，并希望精准控制哪些 change 被纳入。无论 plan 是由本 skill 生成、手写，还是由其他工具产出，都适用。
 
-`ce-doc-review` and this confidence check are different:
-- Use the `ce-doc-review` skill when the document needs clarity, simplification, completeness, or scope control
-- This confidence check strengthens rationale, sequencing, risk treatment, and system-wide thinking when the plan is structurally sound but still needs stronger grounding
+`ce-doc-review` 和本 confidence check 不同：
+- 当 document 需要 clarity、simplification、completeness 或 scope control 时，使用 `ce-doc-review` skill
+- 当 plan 结构上已经 sound、但仍需要更强 grounding 时，本 confidence check 用来加强 rationale、sequencing、risk treatment 和 system-wide thinking
 
-**Pipeline mode:** This phase always runs in auto mode in pipeline/disable-model-invocation contexts. No user interaction needed.
+**Pipeline mode：** 在 pipeline/disable-model-invocation contexts 中，本 phase 始终以 auto mode 运行。不需要用户交互。
 
-##### 5.3.1 Classify Plan Depth and Topic Risk
+##### 5.3.1 分类 Plan Depth 和 Topic Risk
 
-Determine the plan depth from the document:
-- **Lightweight** - small, bounded, low ambiguity, usually 2-4 implementation units
-- **Standard** - moderate complexity, some technical decisions, usually 3-6 units
-- **Deep** - cross-cutting, high-risk, or strategically important work, usually 4-8 units or phased delivery
+根据 document 判断 plan depth：
+- **Lightweight** - 小、边界清晰、低歧义，通常 2-4 个 implementation units
+- **Standard** - 中等复杂度，包含一些 technical decisions，通常 3-6 个 units
+- **Deep** - cross-cutting、高风险或具备战略重要性的 work，通常 4-8 个 units 或 phased delivery
 
-Build a risk profile. Treat these as high-risk signals:
-- Authentication, authorization, or security-sensitive behavior
-- Payments, billing, or financial flows
-- Data migrations, backfills, or persistent data changes
-- External APIs or third-party integrations
-- Privacy, compliance, or user data handling
-- Cross-interface parity or multi-surface behavior
-- Significant rollout, monitoring, or operational concerns
+构建 risk profile。将以下情况视为 high-risk signals：
+- Authentication、authorization 或 security-sensitive behavior
+- Payments、billing 或 financial flows
+- Data migrations、backfills 或 persistent data changes
+- External APIs 或 third-party integrations
+- Privacy、compliance 或 user data handling
+- Cross-interface parity 或 multi-surface behavior
+- 重要的 rollout、monitoring 或 operational concerns
 
-##### 5.3.2 Gate: Decide Whether to Deepen
+##### 5.3.2 Gate：决定是否 Deepen
 
-- **Lightweight** plans usually do not need deepening unless they are high-risk
-- **Standard** plans often benefit when one or more important sections still look thin
-- **Deep** or high-risk plans often benefit from a targeted second pass
-- **Thin local grounding override:** If Phase 1.2 triggered external research because local patterns were thin (fewer than 3 direct examples or adjacent-domain match), always proceed to scoring regardless of how grounded the plan appears. When the plan was built on unfamiliar territory, claims about system behavior are more likely to be assumptions than verified facts. The scoring pass is cheap — if the plan is genuinely solid, scoring finds nothing and exits quickly
-- **Load-bearing external research override:** If Phase 1.4 marked external research as load-bearing (it materially shaped a KTD, Alternative, Scope boundary, or Risk), always proceed to scoring — **even when local implementation patterns are strong**. A landscape or prior-art finding can shape recommendations the local codebase cannot verify, and the thin-grounding override above would miss it. This enters the scoring pass only; it does not force deepening
+- **Lightweight** plans 通常不需要 deepening，除非它们是 high-risk
+- **Standard** plans 如果一个或多个重要 sections 仍显得 thin，通常会受益于 deepening
+- **Deep** 或 high-risk plans 通常会受益于 targeted second pass
+- **Thin local grounding override：** 如果 Phase 1.2 因 local patterns thin（少于 3 个 direct examples 或 adjacent-domain match）而触发 external research，无论 plan 看起来多 grounded，都始终进入 scoring。当 plan 建立在陌生区域上时，关于 system behavior 的 claim 更可能是 assumptions，而不是 verified facts。Scoring pass 成本很低；如果 plan 确实 solid，scoring 会快速发现无事可做并退出
+- **Load-bearing external research override：** 如果 Phase 1.4 将 external research 标记为 load-bearing（它实质塑造了 KTD、Alternative、Scope boundary 或 Risk），始终进入 scoring，**即使 local implementation patterns 很强**。Landscape 或 prior-art finding 可能塑造 local codebase 无法验证的 recommendations，而上面的 thin-grounding override 会漏掉这一类情况。这只进入 scoring pass；并不强制 deepening
 
-If the plan already appears sufficiently grounded and neither the thin-grounding nor the load-bearing-external-research override applies, report "Confidence check passed — no sections need strengthening", then **load `references/plan-handoff.md` now and execute 5.3.8 → 5.3.9 → 5.4 in sequence**. Document review is mandatory for markdown plans — do not skip it because the confidence check passed. The two tools catch different classes of issues. For HTML plans (`OUTPUT_FORMAT=html`), the plan-handoff 5.3.8 format gate skips ce-doc-review since its mutation mechanics are markdown-only today; the menu summary surfaces that limitation explicitly.
+如果 plan 已显得足够 grounded，且 thin-grounding 与 load-bearing-external-research overrides 都不适用，报告 "Confidence check passed — no sections need strengthening"，然后**立刻加载 `references/plan-handoff.md` 并依次执行 5.3.8 → 5.3.9 → 5.4**。Markdown plans 必须做 document review；不要因为 confidence check passed 就跳过。两个工具捕获的是不同类别的问题。对于 HTML plans（`OUTPUT_FORMAT=html`），plan-handoff 的 5.3.8 format gate 会跳过 `ce-doc-review`，因为它今天的 mutation mechanics 仅支持 markdown；menu summary 会显式说明这个限制。
 
-##### 5.3.3–5.3.7 Deepening Execution
+##### 5.3.3–5.3.7 执行 Deepening
 
-When deepening is warranted, read `references/deepening-workflow.md` for confidence scoring checklists, section-to-agent dispatch mapping, execution mode selection, research execution, interactive finding review, and plan synthesis instructions. Execute steps 5.3.3 through 5.3.7 from that file, then return here for 5.3.8.
+当 deepening 有必要时，阅读 `references/deepening-workflow.md`，获取 confidence scoring checklists、section-to-agent dispatch mapping、execution mode selection、research execution、interactive finding review 和 plan synthesis instructions。执行该文件中的 5.3.3 到 5.3.7，然后回到这里继续 5.3.8。
 
-##### 5.3.8–5.4 Document Review, Final Checks, and Post-Generation Options
+##### 5.3.8–5.4 Document Review、Final Checks 和 Post-Generation Options
 
-**STOP. Load `references/plan-handoff.md` now before continuing.** It carries the full instructions for 5.3.8 (document review), 5.3.9 (final checks and cleanup), and 5.4 (post-generation handoff, including the Proof HITL flow, post-HITL re-review, and Issue Creation branching). **This load is non-optional** — without it, the agent renders the post-generation menu, captures the user's selection, and stops without firing the routed action. Document review at 5.3.8 runs unconditionally for `OUTPUT_FORMAT=md` regardless of whether the confidence check already ran; for `OUTPUT_FORMAT=html`, plan-handoff's 5.3.8 format gate skips ce-doc-review because its mutation mechanics are markdown-only today. The default mode for markdown is headless (`mode:headless`) — `safe_auto` fixes apply silently, remaining findings surface contextually above the menu, and a deeper interactive review is opt-in via free-form prompt.
+**STOP。继续前立刻加载 `references/plan-handoff.md`。** 它包含 5.3.8（document review）、5.3.9（final checks and cleanup）和 5.4（post-generation handoff，包括 Proof HITL flow、post-HITL re-review 和 Issue Creation branching）的完整 instructions。**这一步不可选**；否则 agent 会渲染 post-generation menu、捕获用户选择，然后没有触发 routed action 就停下。只要 `OUTPUT_FORMAT=md`，无论 confidence check 是否已经运行，5.3.8 的 document review 都无条件运行；对于 `OUTPUT_FORMAT=html`，plan-handoff 的 5.3.8 format gate 会跳过 `ce-doc-review`，因为它今天的 mutation mechanics 仅支持 markdown。Markdown 的默认模式是 headless（`mode:headless`）：`safe_auto` fixes 静默应用，remaining findings 在 menu 上方按上下文 surface，更深的 interactive review 通过 free-form prompt opt in。
 
-After document review and final checks, print a one-line summary of the headless review state above the menu (e.g., `Doc review applied 3 fixes. 2 decisions, 1 proposed fix, 4 FYI observations remain (1 at P1).`; for HTML plans where 5.3.8 was skipped, print `Doc review skipped — ce-doc-review is markdown-only today; the HTML plan was not reviewed.`), then present the menu. The menu has 5 options when actionable findings remain (`proposed_fixes_count + decisions_count > 0`) and 4 options otherwise — including the FYI-only case AND the HTML-skip case (`skipped_reason: output_format_html`), both of which hide option 2 because ce-doc-review's walkthrough is gated to actionable markdown findings and would have nothing valid to walk through. See `references/plan-handoff.md` for the full rule. Render the 5-option menu as a numbered list in chat per the AGENTS.md narrow exception for legitimate option overflow, with the hint "Pick a number or describe what you want." On platforms whose blocking question tool has no option cap (Codex `request_user_input`, Pi `ask_user`), use the platform's blocking tool; when that tool is unavailable or errors (e.g., Codex edit modes where `request_user_input` is not exposed), fall back to the same numbered-list-in-chat rendering with the "Pick a number or describe what you want." hint. The 4-option case routes through the platform's blocking tool normally (`AskUserQuestion` in Claude Code — call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), with the same numbered-list-in-chat fallback when no blocking tool is available or the call errors. Never silently skip the question.
+Document review 和 final checks 后，在 menu 上方打印一行 headless review state summary（例如 `Doc review applied 3 fixes. 2 decisions, 1 proposed fix, 4 FYI observations remain (1 at P1).`；对于 5.3.8 被跳过的 HTML plans，打印 `Doc review skipped — ce-doc-review is markdown-only today; the HTML plan was not reviewed.`），然后呈现 menu。当仍有 actionable findings（`proposed_fixes_count + decisions_count > 0`）时，menu 有 5 个 options；否则有 4 个 options，包括 FYI-only case 和 HTML-skip case（`skipped_reason: output_format_html`）。后两者都隐藏 option 2，因为 `ce-doc-review` walkthrough 只面向 actionable markdown findings，此时没有有效内容可 walkthrough。完整规则见 `references/plan-handoff.md`。5-option menu 按 AGENTS.md 对 legitimate option overflow 的 narrow exception，在 chat 中渲染为 numbered list，并附上提示 "Pick a number or describe what you want." 对 blocking question tool 没有 option 上限的平台（Codex `request_user_input`、Pi `ask_user`），使用平台 blocking tool；当该 tool 不可用或报错（例如 Codex edit modes 未暴露 `request_user_input`）时，fallback 到同样的 numbered-list-in-chat 渲染，并保留 "Pick a number or describe what you want." 提示。4-option case 正常通过平台 blocking tool routing（Claude Code 中是 `AskUserQuestion`；如果 schema 未加载，先调用 `ToolSearch` 并使用 `select:AskUserQuestion`），当 blocking tool 不可用或调用失败时，同样 fallback 为 numbered-list-in-chat。绝不要静默跳过该 question。
 
-**Question:** "Plan ready at `<absolute path to plan>`. What would you like to do next?" (use absolute path so the reference is clickable in modern terminals)
+**问题：** "Plan ready at `<absolute path to plan>`. What would you like to do next?"（使用 absolute path，让现代 terminal 中的引用可点击）
 
-**Options.** Option 4's label matches the artifact's format. Under exclusive output mode, exactly one of "Open in Proof" or "Open in browser" applies per run — `OUTPUT_FORMAT=md` shows Proof; `OUTPUT_FORMAT=html` shows browser. Proof operates on markdown and cannot ingest HTML; the browser option opens the local `.html` file. Render the option matching the format produced this run.
+**选项。** Option 4 的 label 要匹配 artifact 的 format。在 exclusive output mode 下，每次运行只适用 "Open in Proof" 或 "Open in browser" 之一：`OUTPUT_FORMAT=md` 显示 Proof；`OUTPUT_FORMAT=html` 显示 browser。Proof 基于 markdown，不能 ingest HTML；browser option 会打开本地 `.html` 文件。渲染与本次产出 format 匹配的 option。
 
-1. **Start `/ce-work`** (recommended) - Begin implementing this plan in the current session
-2. **Run deeper doc review** - Walk through the remaining findings interactively (full ce-doc-review walkthrough)
-3. **Create Issue** - Create a tracked issue from this plan in your configured issue tracker (GitHub or Linear)
-4. **Open in Proof (web app) — review and comment to iterate with the agent** - Open the doc in Every's Proof editor, iterate with the agent via comments, or copy a link to share with others. **Render only when `OUTPUT_FORMAT=md`.**
-4. **Open in browser** - Open the HTML plan file locally for review and sharing. **Render only when `OUTPUT_FORMAT=html`.**
-5. **Done for now** - Pause; the plan file is saved and can be resumed later
+1. **Start `/ce-work`**（recommended）- 在当前 session 中开始实现这个 plan
+2. **Run deeper doc review** - 以 interactive 方式 walkthrough remaining findings（完整 `ce-doc-review` walkthrough）
+3. **Create Issue** - 从这个 plan 在已配置的 issue tracker（GitHub 或 Linear）中创建 tracked issue
+4. **Open in Proof (web app) — review and comment to iterate with the agent** - 在 Every 的 Proof editor 中打开 doc，通过 comments 与 agent 迭代，或复制 link 分享给他人。**仅当 `OUTPUT_FORMAT=md` 时渲染。**
+4. **Open in browser** - 在本地打开 HTML plan file，用于 review 和 sharing。**仅当 `OUTPUT_FORMAT=html` 时渲染。**
+5. **Done for now** - 暂停；plan file 已保存，之后可 resume
 
-**Routing.** Act on the user's selection — do not just announce it. Elaborate sub-flows (Proof HITL state machine, Issue Creation tracker detection, post-HITL resync) live in `references/plan-handoff.md`.
+**路由。** 根据用户选择采取行动；不要只是宣布。复杂 sub-flows（Proof HITL state machine、Issue Creation tracker detection、post-HITL resync）位于 `references/plan-handoff.md`。
 
-- **Start `/ce-work`** — Invoke the `ce-work` skill via the platform's skill-invocation primitive (`Skill` in Claude Code, `Skill` in Codex, the equivalent on Gemini/Pi), passing the plan path as the skill argument. Do not merely tell the user to type `/ce-work` — fire the invocation now so the plan executes in this session.
-- **Run deeper doc review** — Re-invoke the `ce-doc-review` skill on the plan path **without** `mode:headless` so the interactive routing question and walkthrough fire. After it returns, re-render this menu with refreshed counts so the user can pick a next-stage action.
-- **Create Issue** — Detect the project tracker (`gh` for GitHub, `linear` for Linear) and create the issue from the plan file as described under "Issue Creation" in `references/plan-handoff.md`. After creation, display the issue URL and ask whether to proceed to `/ce-work` via the platform's blocking question tool.
-- **Open in Proof (web app) — review and comment to iterate with the agent** — Load the `ce-proof` skill in HITL-review mode with the plan file as `source file`, the plan title as `doc title`, identity `ai:compound-engineering` / `Compound Engineering`, and recommended next step `/ce-work`. Then follow the post-HITL resync logic in `references/plan-handoff.md`, which handles the four `ce-proof` return statuses, re-runs `ce-doc-review` after material edits, and falls back gracefully on upload failure.
-- **Open in browser** — Display the absolute path to the `.html` plan file so the user can open it locally. Where the platform exposes a browser-opening primitive (e.g., `open` on macOS, `xdg-open` on Linux, `start` on Windows), the agent may use it; otherwise print the absolute path and let the user open it. Do not invoke `ce-work` from this option — the user picked HTML for review/sharing, not handoff.
-- **Done for now** — Display a brief confirmation that the plan file is saved and end the turn. Do not start follow-up work without an explicit further user prompt.
+- **Start `/ce-work`** — 通过平台的 skill-invocation primitive（Claude Code 中的 `Skill`、Codex 中的 `Skill`、Gemini/Pi 上的等价机制）调用 `ce-work` skill，并把 plan path 作为 skill argument。不要只是告诉用户输入 `/ce-work`；现在就触发 invocation，让 plan 在本 session 中执行。
+- **Run deeper doc review** — 在 plan path 上重新调用 `ce-doc-review` skill，且**不带** `mode:headless`，以触发 interactive routing question 和 walkthrough。返回后，用刷新后的 counts 重新渲染此 menu，让用户选择 next-stage action。
+- **Create Issue** — 检测 project tracker（GitHub 用 `gh`，Linear 用 `linear`），并按 `references/plan-handoff.md` 中 "Issue Creation" 的说明，从 plan file 创建 issue。创建后显示 issue URL，并通过平台 blocking question tool 询问是否继续 `/ce-work`。
+- **Open in Proof (web app) — review and comment to iterate with the agent** — 以 HITL-review mode 加载 `ce-proof` skill，参数包括：plan file 作为 `source file`，plan title 作为 `doc title`，identity 为 `ai:compound-engineering` / `Compound Engineering`，recommended next step 为 `/ce-work`。然后遵循 `references/plan-handoff.md` 的 post-HITL resync logic；它会处理四种 `ce-proof` return statuses，在 material edits 后重新运行 `ce-doc-review`，并在 upload failure 时 graceful fallback。
+- **Open in browser** — 显示 `.html` plan file 的 absolute path，让用户可在本地打开。若平台暴露 browser-opening primitive（例如 macOS 的 `open`、Linux 的 `xdg-open`、Windows 的 `start`），agent 可以使用；否则打印 absolute path，让用户打开。不要从这个 option 调用 `ce-work`；用户选择 HTML 是为了 review/sharing，不是 handoff。
+- **Done for now** — 简短确认 plan file 已保存，然后结束本 turn。没有用户明确后续 prompt 时，不要启动 follow-up work。
 
-If the user types free-form prompts targeting the findings (e.g., "review", "walk through", "deep review"), route as if they picked `Run deeper doc review` — fire the skill rather than looping back to the menu. For other free-text revisions, accept the input and loop back to this menu after applying the revision.
+如果用户输入针对 findings 的 free-form prompts（例如 "review"、"walk through"、"deep review"），按其选择了 `Run deeper doc review` 来 routing；触发 skill，而不是回到 menu。对于其他 free-text revisions，接受输入，应用 revision 后再回到此 menu。
 
-**Completion check:** This skill is not complete until the post-generation menu above has been presented, the user has selected an action, and the inline routing for that selection has been executed. Presenting the menu and stopping at the user's selection is not completion — fire the routed action.
+**完成检查：** 直到上方 post-generation menu 已呈现、用户已选择 action，且该选择的 inline routing 已执行，本 skill 才算 complete。只呈现 menu 并停在用户选择处并不算完成；必须触发 routed action。
 
-**Pipeline mode exception:** In LFG or any `disable-model-invocation` context, skip the interactive menu and return control to the caller after the plan file is written, confidence check has run, and `ce-doc-review` has run in headless mode (per `references/plan-handoff.md`). Pipeline mode forces `OUTPUT_FORMAT=md` at Phase 0.0, so the 5.3.8 format gate never selects the HTML skip path in pipeline runs.
+**Pipeline mode exception：** 在 LFG 或任何 `disable-model-invocation` context 中，跳过 interactive menu；在 plan file 已写入、confidence check 已运行，且 `ce-doc-review` 已按 `references/plan-handoff.md` 以 headless mode 运行后，把控制权交还 caller。Pipeline mode 在 Phase 0.0 强制 `OUTPUT_FORMAT=md`，因此 pipeline runs 中 5.3.8 format gate 永远不会选择 HTML skip path。

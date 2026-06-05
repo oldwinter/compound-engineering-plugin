@@ -1,29 +1,29 @@
 <overview>
-Agent execution patterns for building robust agent loops. This covers how agents signal completion, track partial progress for resume, select appropriate model tiers, and handle context limits.
+用于构建 robust agent loops 的 agent execution patterns。本文涵盖 agents 如何 signal completion、为 resume 跟踪 partial progress、选择 appropriate model tiers，以及处理 context limits。
 </overview>
 
 <completion_signals>
-## Completion Signals
+## Completion Signals（完成信号）
 
-Agents need an explicit way to say "I'm done."
+Agents 需要一种 explicit 方式来表示 "I'm done."
 
-### Anti-Pattern: Heuristic Detection
+### Anti-Pattern: Heuristic Detection（反模式：启发式检测）
 
-Detecting completion through heuristics is fragile:
+通过 heuristics 检测 completion 很 fragile：
 
-- Consecutive iterations without tool calls
-- Checking for expected output files
-- Tracking "no progress" states
-- Time-based timeouts
+- 连续 iterations 没有 tool calls
+- 检查 expected output files
+- Tracking "no progress" states（跟踪“无进展”状态）
+- Time-based timeouts（基于时间的超时）
 
-These break in edge cases and create unpredictable behavior.
+这些方式会在 edge cases 中失效，并产生 unpredictable behavior。
 
-### Pattern: Explicit Completion Tool
+### Pattern: Explicit Completion Tool（模式：显式 Completion Tool）
 
-Provide a `complete_task` tool that:
-- Takes a summary of what was accomplished
-- Returns a signal that stops the loop
-- Works identically across all agent types
+提供一个 `complete_task` tool，它：
+- 接收 accomplished 内容的 summary
+- 返回停止 loop 的 signal
+- 在所有 agent types 中工作方式一致
 
 ```typescript
 tool("complete_task", {
@@ -37,9 +37,9 @@ tool("complete_task", {
 });
 ```
 
-### The ToolResult Pattern
+### ToolResult Pattern（ToolResult 模式）
 
-Structure tool results to separate success from continuation:
+组织 tool results 时，将 success 与 continuation 分开：
 
 ```swift
 struct ToolResult {
@@ -48,7 +48,7 @@ struct ToolResult {
     let shouldContinue: Bool    // Should agent loop continue?
 }
 
-// Three common cases:
+// 三种常见情况：
 extension ToolResult {
     static func success(_ output: String) -> ToolResult {
         // Tool succeeded, keep going
@@ -67,12 +67,12 @@ extension ToolResult {
 }
 ```
 
-### Key Insight
+### Key Insight（关键洞察）
 
-**This is different from success/failure:**
+**这不同于 success/failure：**
 
-- A tool can **succeed** AND signal **stop** (task complete)
-- A tool can **fail** AND signal **continue** (recoverable error, try something else)
+- tool 可以 **succeed** 并 signal **stop**（task complete）
+- tool 可以 **fail** 并 signal **continue**（recoverable error，try something else）
 
 ```typescript
 // Examples:
@@ -89,9 +89,9 @@ write_file("/output.md", content)
 // Agent keeps working toward the goal
 ```
 
-### System Prompt Guidance
+### System Prompt Guidance（System Prompt 指导）
 
-Tell the agent when to complete:
+告诉 agent 何时 complete：
 
 ```markdown
 ## Completing Tasks
@@ -108,11 +108,11 @@ If you're blocked and can't proceed:
 </completion_signals>
 
 <partial_completion>
-## Partial Completion
+## Partial Completion（部分完成）
 
-For multi-step tasks, track progress at the task level for resume capability.
+对 multi-step tasks，在 task level 跟踪 progress，以支持 resume capability。
 
-### Task State Tracking
+### Task State Tracking（Task 状态跟踪）
 
 ```swift
 enum TaskStatus {
@@ -144,9 +144,9 @@ struct AgentSession {
 }
 ```
 
-### UI Progress Display
+### UI Progress Display（UI 进度展示）
 
-Show users what's happening:
+向 users 展示正在发生什么：
 
 ```
 Progress: 3/5 tasks complete (60%)
@@ -157,25 +157,25 @@ Progress: 3/5 tasks complete (60%)
 ⏳ [5] Create outline - Pending
 ```
 
-### Partial Completion Scenarios
+### Partial Completion Scenarios（部分完成场景）
 
-**Agent hits max iterations before finishing:**
-- Some tasks completed, some pending
-- Checkpoint saved with current state
-- Resume continues from where it left off, not from beginning
+**Agent 在 finishing 前 hit max iterations：**
+- 一些 tasks completed，一些 pending
+- checkpoint 保存 current state
+- resume 从 left off 的地方继续，而不是从头开始
 
-**Agent fails on one task:**
-- Task marked `.failed` with error in notes
-- Other tasks may continue (agent decides)
-- Orchestrator doesn't automatically abort entire session
+**Agent 在某个 task 上失败：**
+- Task 标记为 `.failed`，error 写入 notes
+- 其他 tasks 可以继续（由 agent 决定）
+- Orchestrator 不会 automatically abort entire session
 
-**Network error mid-task:**
-- Current iteration throws
-- Session marked `.failed`
-- Checkpoint preserves messages up to that point
-- Resume possible from checkpoint
+**task 中途发生 Network error：**
+- Current iteration throws（当前 iteration 抛错）
+- Session 标记为 `.failed`
+- Checkpoint 保存截至该点的 messages
+- 可从 checkpoint resume
 
-### Checkpoint Structure
+### Checkpoint Structure（Checkpoint 结构）
 
 ```swift
 struct AgentCheckpoint: Codable {
@@ -194,37 +194,37 @@ struct AgentCheckpoint: Codable {
 }
 ```
 
-### Resume Flow
+### Resume Flow（恢复流程）
 
-1. On app launch, scan for valid checkpoints
-2. Show user: "You have an incomplete session. Resume?"
-3. On resume:
-   - Restore messages to conversation
-   - Restore task states
-   - Continue agent loop from where it left off
-4. On dismiss:
-   - Delete checkpoint
-   - Start fresh if user tries again
+1. app launch 时 scan valid checkpoints
+2. 向 user 展示："You have an incomplete session. Resume?"
+3. resume 时：
+   - 将 messages restore 到 conversation
+   - restore task states（恢复 task 状态）
+   - 从 left off 的位置继续 agent loop
+4. dismiss 时：
+   - delete checkpoint（删除 checkpoint）
+   - 如果 user 再试，从 fresh start 开始
 </partial_completion>
 
 <model_tier_selection>
-## Model Tier Selection
+## Model Tier Selection（模型层级选择）
 
-Different agents need different intelligence levels. Use the cheapest model that achieves the outcome.
+不同 agents 需要不同 intelligence levels。使用能达成 outcome 的最便宜 model。
 
-### Tier Guidelines
+### Tier Guidelines（层级指南）
 
-| Agent Type | Recommended Tier | Reasoning |
+| Agent Type（Agent 类型） | Recommended Tier（推荐层级） | Reasoning（理由） |
 |------------|-----------------|-----------|
-| Chat/Conversation | Balanced (Sonnet) | Fast responses, good reasoning |
-| Research | Balanced (Sonnet) | Tool loops, not ultra-complex synthesis |
-| Content Generation | Balanced (Sonnet) | Creative but not synthesis-heavy |
-| Complex Analysis | Powerful (Opus) | Multi-document synthesis, nuanced judgment |
-| Profile Generation | Powerful (Opus) | Photo analysis, complex pattern recognition |
-| Quick Queries | Fast (Haiku) | Simple lookups, quick transformations |
-| Simple Classification | Fast (Haiku) | High volume, simple decisions |
+| Chat/Conversation | Balanced (Sonnet) | Fast responses、good reasoning |
+| Research | Balanced (Sonnet) | Tool loops，不是 ultra-complex synthesis |
+| Content Generation | Balanced (Sonnet) | Creative 但不是 synthesis-heavy |
+| Complex Analysis | Powerful (Opus) | Multi-document synthesis、nuanced judgment |
+| Profile Generation | Powerful (Opus) | Photo analysis、complex pattern recognition |
+| Quick Queries | Fast (Haiku) | Simple lookups、quick transformations |
+| Simple Classification | Fast (Haiku) | High volume、simple decisions |
 
-### Implementation
+### Implementation（实现）
 
 ```swift
 enum ModelTier {
@@ -267,21 +267,21 @@ let quickLookupConfig = AgentConfig(
 )
 ```
 
-### Cost Optimization Strategies
+### Cost Optimization Strategies（成本优化策略）
 
-1. **Start with balanced, upgrade if quality insufficient**
-2. **Use fast tier for tool-heavy loops** where each turn is simple
-3. **Reserve powerful tier for synthesis tasks** (comparing multiple sources)
-4. **Consider token limits per turn** to control costs
-5. **Cache expensive operations** to avoid repeated calls
+1. **Start with balanced, upgrade if quality insufficient（从 balanced 开始，质量不足时再 upgrade）**
+2. 对每 turn 很简单的 **tool-heavy loops 使用 fast tier**
+3. **将 powerful tier 留给 synthesis tasks**（comparing multiple sources）
+4. **考虑 per turn token limits** 来控制 costs
+5. **Cache expensive operations（缓存昂贵操作）** 以避免 repeated calls
 </model_tier_selection>
 
 <context_limits>
-## Context Limits
+## Context Limits（Context 限制）
 
-Agent sessions can extend indefinitely, but context windows don't. Design for bounded context from the start.
+Agent sessions 可以无限延展，但 context windows 不行。从一开始就为 bounded context 设计。
 
-### The Problem
+### The Problem（问题）
 
 ```
 Turn 1: User asks question → 500 tokens
@@ -292,11 +292,11 @@ Turn 4: Agent researches → 20,000 tokens
 Turn 10: Context window exceeded
 ```
 
-### Design Principles
+### Design Principles（设计原则）
 
-**1. Tools should support iterative refinement**
+**1. Tools should support iterative refinement（Tools 应支持迭代式细化）**
 
-Instead of all-or-nothing, design for summary → detail → full:
+不要 all-or-nothing；设计成 summary → detail → full：
 
 ```typescript
 // Good: Supports iterative refinement
@@ -312,9 +312,9 @@ tool("search_files", {
 }, ...);
 ```
 
-**2. Provide consolidation tools**
+**2. Provide consolidation tools（提供整合 tools）**
 
-Give agents a way to consolidate learnings mid-session:
+给 agents 一种在 mid-session consolidate learnings 的方式：
 
 ```typescript
 tool("summarize_and_continue", {
@@ -327,14 +327,14 @@ tool("summarize_and_continue", {
 });
 ```
 
-**3. Design for truncation**
+**3. Design for truncation（为截断而设计）**
 
-Assume the orchestrator may truncate early messages. Important context should be:
-- In the system prompt (always present)
-- In files (can be re-read)
-- Summarized in context.md
+假设 orchestrator 可能 truncate early messages。Important context 应该位于：
+- system prompt 中（always present）
+- files 中（can be re-read）
+- context.md 中的 summary
 
-### Implementation Strategies
+### Implementation Strategies（实现策略）
 
 ```swift
 class AgentOrchestrator {
@@ -355,7 +355,7 @@ class AgentOrchestrator {
 }
 ```
 
-### System Prompt Guidance
+### System Prompt Guidance（System Prompt 指导）
 
 ```markdown
 ## Managing Context
@@ -370,9 +370,9 @@ Don't try to hold everything in memory. Write it down.
 </context_limits>
 
 <orchestrator_pattern>
-## Unified Agent Orchestrator
+## Unified Agent Orchestrator（统一 Agent Orchestrator）
 
-One execution engine, many agent types. All agents use the same orchestrator with different configurations.
+一个 execution engine，多个 agent types。所有 agents 使用同一个 orchestrator，只是 configurations 不同。
 
 ```swift
 class AgentOrchestrator {
@@ -429,39 +429,39 @@ class AgentOrchestrator {
 }
 ```
 
-### Benefits
+### Benefits（收益）
 
-- Consistent lifecycle management across all agent types
-- Automatic checkpoint/resume (critical for mobile)
-- Shared tool protocol
-- Easy to add new agent types
-- Centralized error handling and logging
+- 所有 agent types 共享 consistent lifecycle management
+- Automatic checkpoint/resume（对 mobile 很 critical）
+- Shared tool protocol（共享 tool 协议）
+- 容易添加 new agent types
+- Centralized error handling and logging（集中式错误处理和日志）
 </orchestrator_pattern>
 
 <checklist>
-## Agent Execution Checklist
+## Agent Execution Checklist（Agent 执行检查清单）
 
-### Completion Signals
-- [ ] `complete_task` tool provided (explicit completion)
-- [ ] No heuristic completion detection
-- [ ] Tool results include `shouldContinue` flag
-- [ ] System prompt guides when to complete
+### Completion Signals（完成信号）
+- [ ] 提供 `complete_task` tool（explicit completion）
+- [ ] 不使用 heuristic completion detection
+- [ ] Tool results 包含 `shouldContinue` flag
+- [ ] System prompt 指导何时 complete
 
-### Partial Completion
-- [ ] Tasks tracked with status (pending, in_progress, completed, failed)
-- [ ] Checkpoints saved for resume
-- [ ] Progress visible to user
-- [ ] Resume continues from where left off
+### Partial Completion（部分完成）
+- [ ] Tasks 带 status 跟踪（pending、in_progress、completed、failed）
+- [ ] 保存 checkpoints 以支持 resume
+- [ ] Progress 对 user visible
+- [ ] Resume 从 left off 的地方继续
 
-### Model Tiers
-- [ ] Tier selected based on task complexity
-- [ ] Cost optimization considered
-- [ ] Fast tier for simple operations
-- [ ] Powerful tier reserved for synthesis
+### Model Tiers（模型层级）
+- [ ] 基于 task complexity 选择 tier
+- [ ] 已考虑 cost optimization
+- [ ] Fast tier 用于 simple operations
+- [ ] Powerful tier reserved for synthesis（powerful tier 留给 synthesis）
 
-### Context Limits
-- [ ] Tools support iterative refinement (preview vs full)
-- [ ] Consolidation mechanism available
-- [ ] Important context persisted to files
-- [ ] Truncation strategy defined
+### Context Limits（Context 限制）
+- [ ] Tools 支持 iterative refinement（preview vs full）
+- [ ] Consolidation mechanism 可用
+- [ ] Important context persisted to files（重要 context 持久化到 files）
+- [ ] 已定义 truncation strategy
 </checklist>

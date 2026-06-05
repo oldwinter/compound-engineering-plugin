@@ -1,60 +1,60 @@
 ---
 name: ce-setup
-description: "Diagnose and configure compound-engineering environment. Checks CLI dependencies, plugin version, and repo-local config. Offers guided installation for missing tools. Use when troubleshooting missing tools, verifying setup, or before onboarding."
+description: "诊断并配置 compound-engineering environment。检查 CLI dependencies、plugin version 和 repo-local config。为 missing tools 提供 guided installation。用于 troubleshooting missing tools、verifying setup，或 onboarding 前。"
 disable-model-invocation: true
 ---
 
-# Compound Engineering Setup
+# Compound Engineering Setup（Compound Engineering 设置）
 
-## Interaction Method
+## Interaction Method（交互方式）
 
-Ask the user each question below using the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting each question as a numbered list in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip or auto-configure. For multiSelect questions, accept comma-separated numbers (e.g. `1, 3`).
+使用平台 blocking question tool 向用户询问下方每个问题：Claude Code 中用 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 搭配 `select:AskUserQuestion`）、Codex 中用 `request_user_input`、Gemini 中用 `ask_user`、Pi 中用 `ask_user`（需要 `pi-ask-user` extension）。只有 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中的 numbered list；不要因为需要 schema load 就 fallback。绝不要 silently skip 或 auto-configure。对于 multiSelect questions，接受 comma-separated numbers（例如 `1, 3`）。
 
-Interactive setup for compound-engineering — diagnoses environment health, cleans obsolete repo-local CE config, and helps configure required tools. Review agent selection is handled automatically by `ce-code-review`; project-specific review guidance belongs in `CLAUDE.md` or `AGENTS.md`.
+Compound-engineering 的 interactive setup：诊断 environment health、清理 obsolete repo-local CE config，并帮助配置 required tools。Review agent selection 由 `ce-code-review` 自动处理；project-specific review guidance 属于 `CLAUDE.md` 或 `AGENTS.md`。
 
-## Phase 1: Diagnose
+## Phase 1：Diagnose（诊断）
 
-### Step 1: Determine Plugin Version
+### Step 1：Determine Plugin Version（确定 Plugin Version）
 
-Detect the installed compound-engineering plugin version by reading the plugin metadata or manifest. This is platform-specific -- use whatever mechanism is available (e.g., reading `plugin.json` from the plugin root or cache directory). If the version cannot be determined, skip this step.
+通过读取 plugin metadata 或 manifest 检测 installed compound-engineering plugin version。这是 platform-specific：使用任何可用机制（例如从 plugin root 或 cache directory 读取 `plugin.json`）。如果无法确定 version，跳过此 step。
 
-If a version is found, pass it to the check script via `--version`. Otherwise omit the flag.
+如果找到 version，通过 `--version` 传给 check script。否则省略该 flag。
 
-### Step 2: Run the Health Check Script
+### Step 2：Run the Health Check Script（运行健康检查 Script）
 
-Before running the script, display: "Compound Engineering -- checking your environment..."
+运行 script 前，显示："Compound Engineering -- checking your environment..."
 
-Run the bundled check script. Do not perform manual dependency checks -- the script handles all CLI tools, agent skills, repo-local CE file checks, and `.gitignore` guidance in one pass.
+运行 bundled check script。不要执行 manual dependency checks；script 会在一次 pass 中处理所有 CLI tools、agent skills、repo-local CE file checks 和 `.gitignore` guidance。
 
 ```bash
 bash scripts/check-health --version VERSION
 ```
 
-Or without version if Step 1 could not determine it:
+如果 Step 1 无法确定 version，则不带 version 运行：
 
 ```bash
 bash scripts/check-health
 ```
 
-Script reference: `scripts/check-health`
+Script reference（script 引用）：`scripts/check-health`
 
-Display the script's output to the user.
+向用户展示 script output。
 
-### Step 3: Evaluate Results
+### Step 3：Evaluate Results（评估结果）
 
-**Plugin root (pre-resolved):** !`echo "${CLAUDE_PLUGIN_ROOT}"`
+**Plugin root（pre-resolved，plugin 根目录）:** !`echo "${CLAUDE_PLUGIN_ROOT}"`
 
-If the line above resolved to an absolute path (starts with `/` and contains no `${`), this is a Claude Code session and `/ce-update` is available. Anything else — empty, the literal `${CLAUDE_PLUGIN_ROOT}` token, or an unresolved command string like `echo "${CLAUDE_PLUGIN_ROOT}"` left in place by a non-Claude harness that doesn't process `!` pre-resolution — means this is not Claude Code; omit any `/ce-update` references from output.
+如果上方 line resolved 为 absolute path（以 `/` 开头且不含 `${`），这是 Claude Code session，`/ce-update` 可用。其他任何情况：empty、literal `${CLAUDE_PLUGIN_ROOT}` token，或 non-Claude harness 未处理 `!` pre-resolution 而留下的 unresolved command string（如 `echo "${CLAUDE_PLUGIN_ROOT}"`），都表示这不是 Claude Code；从 output 中省略任何 `/ce-update` references。
 
-After the diagnostic report, check whether:
+Diagnostic report 后，检查是否：
 
-- any CLI tools are missing (reported as yellow in the Tools section)
-- any agent skills are missing (reported as yellow in the Skills section)
-- `compound-engineering.local.md` is present and needs cleanup
-- `.compound-engineering/config.local.yaml` does not exist or is not safely gitignored
-- `.compound-engineering/config.local.example.yaml` is missing or outdated
+- 有 CLI tools missing（Tools section 中 yellow）
+- 有 agent skills missing（Skills section 中 yellow）
+- `compound-engineering.local.md` 存在且需要 cleanup
+- `.compound-engineering/config.local.yaml` 不存在或未 safely gitignored
+- `.compound-engineering/config.local.example.yaml` missing 或 outdated
 
-If everything is installed, no repo-local cleanup is needed, and `.compound-engineering/config.local.yaml` already exists and is gitignored, display the tool and skill list and completion message. Parse the tool and skill names from the script output and list each with a green circle. Omit the Skills line if the Skills section is absent from the script output:
+如果所有内容已安装、不需要 repo-local cleanup，且 `.compound-engineering/config.local.yaml` 已存在并 gitignored，展示 tool 和 skill list 及 completion message。从 script output parse tool 和 skill names，并用 green circle 列出每项。如果 script output 中没有 Skills section，省略 Skills line：
 
 ```
  ✅ Compound Engineering setup complete
@@ -66,25 +66,25 @@ If everything is installed, no repo-local cleanup is needed, and `.compound-engi
     Run /ce-setup anytime to re-check.
 ```
 
-If this is a Claude Code session (the **Plugin root** above resolved to a non-empty path), append to the message: "Run /ce-update to grab the latest plugin version."
+如果这是 Claude Code session（上方 **Plugin root** resolved 为 non-empty path），在 message 后追加："Run /ce-update to grab the latest plugin version."
 
-Stop here.
+在此停止。
 
-Otherwise proceed to Phase 2 to resolve any issues. Handle repo-local cleanup (Step 4) first, then config bootstrapping (Step 5), then missing dependencies (Step 6).
+否则进入 Phase 2 resolve issues。先处理 repo-local cleanup（Step 4），再 config bootstrapping（Step 5），最后 missing dependencies（Step 6）。
 
-## Phase 2: Fix
+## Phase 2：Fix（修复）
 
-### Step 4: Resolve Repo-Local CE Issues
+### Step 4：Resolve Repo-Local CE Issues（解决 Repo-Local CE 问题）
 
-Resolve the repository root (`git rev-parse --show-toplevel`). If `compound-engineering.local.md` exists at the repo root, explain that it is obsolete because review-agent selection is automatic and CE now uses `.compound-engineering/config.local.yaml` for any surviving machine-local state. Ask whether to delete it now. Use the repo-root path when deleting.
+Resolve repository root（`git rev-parse --show-toplevel`）。如果 repo root 存在 `compound-engineering.local.md`，解释它已 obsolete，因为 review-agent selection 已自动化，CE 现在使用 `.compound-engineering/config.local.yaml` 存放仍需保留的 machine-local state。询问是否现在删除。删除时使用 repo-root path。
 
-### Step 5: Bootstrap Project Config
+### Step 5：Bootstrap Project Config（初始化 Project Config）
 
-Resolve the repository root (`git rev-parse --show-toplevel`). All paths below are relative to the repo root, not the current working directory.
+Resolve repository root（`git rev-parse --show-toplevel`）。下方所有 paths 都相对 repo root，而不是 current working directory。
 
-**Example file (always refresh):** Copy `references/config-template.yaml` to `<repo-root>/.compound-engineering/config.local.example.yaml`, creating the directory if needed. This file is committed to the repo and always overwritten with the latest template so teammates can see available settings.
+**Example file（示例文件，always refresh）:** 将 `references/config-template.yaml` 复制到 `<repo-root>/.compound-engineering/config.local.example.yaml`，必要时创建 directory。该文件会 commit 到 repo，并始终用 latest template overwrite，让 teammates 能看到 available settings。
 
-**Local config (create once):** If `.compound-engineering/config.local.yaml` does not exist, ask whether to create it:
+**Local config（本地 config，create once）:** 如果 `.compound-engineering/config.local.yaml` 不存在，询问是否创建：
 
 ```
 Set up a local config file for this project?
@@ -95,17 +95,17 @@ Everything starts commented out -- you only enable what you need.
 2. No thanks
 ```
 
-If the user approves, copy `references/config-template.yaml` to `<repo-root>/.compound-engineering/config.local.yaml`. If `.compound-engineering/config.local.yaml` is not already covered by `.gitignore`, offer to add the entry:
+如果用户 approve，将 `references/config-template.yaml` 复制到 `<repo-root>/.compound-engineering/config.local.yaml`。如果 `.compound-engineering/config.local.yaml` 尚未被 `.gitignore` 覆盖，提供添加 entry：
 
 ```text
 .compound-engineering/*.local.yaml
 ```
 
-If the local config already exists, check whether it is safely gitignored. If not, offer to add the `.gitignore` entry as above.
+如果 local config 已存在，检查它是否 safely gitignored。如果没有，按上方提供添加 `.gitignore` entry。
 
-### Step 6: Offer Installation
+### Step 6：Offer Installation（提供安装）
 
-Present the missing tools and skills using a multiSelect question with all items pre-selected. Use the install commands and URLs from the script's diagnostic output. Group items under `Tools:` and `Skills:` so the user can see which runtime each item targets; omit a group whose items are all installed.
+用 multiSelect question 展示 missing tools 和 skills，且所有 items pre-selected。使用 script diagnostic output 中的 install commands 和 URLs。将 items 分组到 `Tools:` 和 `Skills:` 下，让用户看到每项 target 的 runtime；如果某 group 全部已安装，则省略该 group。
 
 ```
 The following items are missing. Select which to install:
@@ -124,13 +124,13 @@ Skills:
   [x] ast-grep - Agent skill for structural code search with ast-grep
 ```
 
-Only show items that are actually missing. Omit installed ones.
+只展示实际 missing 的 items。省略已安装 items。
 
-### Step 7: Install Selected Dependencies
+### Step 7：Install Selected Dependencies（安装选中的依赖）
 
-For each selected dependency, in order:
+对每个 selected dependency，按顺序：
 
-1. **Show the install command** (from the diagnostic output) and ask for approval:
+1. **展示 install command**（来自 diagnostic output），并请求 approval：
 
    ```
    Install agent-browser?
@@ -140,17 +140,17 @@ For each selected dependency, in order:
    2. Skip - I'll install it manually
    ```
 
-2. **If approved:** Run the install command using a shell execution tool. After the command completes, verify installation:
-   - For a CLI tool, run the dependency's check command (e.g., `command -v agent-browser`).
-   - For an agent skill, prefer `npx --yes skills list --global --json | jq -r '.[].name' | grep -qx <skill-name>` when `npx` is available; otherwise fall back to checking that `~/.claude/skills/<skill-name>`, `~/.agents/skills/<skill-name>`, or `~/.codex/skills/<skill-name>` exists (file, directory, or symlink).
+2. **如果 approved:** 使用 shell execution tool 运行 install command。Command 完成后，verify installation：
+   - 对 CLI tool，运行 dependency 的 check command（例如 `command -v agent-browser`）。
+   - 对 agent skill，当 `npx` 可用时优先使用 `npx --yes skills list --global --json | jq -r '.[].name' | grep -qx <skill-name>`；否则 fallback 到检查 `~/.claude/skills/<skill-name>`、`~/.agents/skills/<skill-name>` 或 `~/.codex/skills/<skill-name>` 是否存在（file、directory 或 symlink）。
 
-3. **If verification succeeds:** Report success.
+3. **如果 verification succeeds:** Report success。
 
-4. **If verification fails or install errors:** Display the project URL as fallback and continue to the next dependency.
+4. **如果 verification fails 或 install errors:** Display project URL as fallback，并继续下一个 dependency。
 
-### Step 8: Summary
+### Step 8：Summary（总结）
 
-Display a brief summary:
+展示 brief summary：
 
 ```
  ✅ Compound Engineering setup complete
@@ -161,4 +161,4 @@ Display a brief summary:
     Run /ce-setup anytime to re-check.
 ```
 
-If this is a Claude Code session (per platform detection in Step 3), append: "Run /ce-update to grab the latest plugin version."
+如果这是 Claude Code session（按 Step 3 的 platform detection），追加："Run /ce-update to grab the latest plugin version."

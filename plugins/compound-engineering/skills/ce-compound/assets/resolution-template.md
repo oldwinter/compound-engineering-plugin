@@ -1,12 +1,12 @@
-# Resolution Templates
+# Resolution Templates（解决方案模板）
 
-Choose the template matching the problem_type track (see `references/schema.yaml`).
+选择与 problem_type track 匹配的 template（见 `references/schema.yaml`）。
 
 ---
 
-## Bug Track Template
+## Bug Track Template（bug track 模板）
 
-Use for: `build_error`, `test_failure`, `runtime_error`, `performance_issue`, `database_issue`, `security_issue`, `ui_bug`, `integration_issue`, `logic_error`
+用于：`build_error`、`test_failure`、`runtime_error`、`performance_issue`、`database_issue`、`security_issue`、`ui_bug`、`integration_issue`、`logic_error`
 
 <!-- YAML safety: array items (symptoms, applies_when, tags, related_components) starting with ` [ * & ! | > % @ ? or containing ": " must be wrapped in double quotes. See references/yaml-schema.md > "YAML Safety Rules". -->
 
@@ -52,9 +52,9 @@ tags: [keyword-one, keyword-two]
 
 ---
 
-## Knowledge Track Template
+## Knowledge Track Template（knowledge track 模板）
 
-Use for: `best_practice`, `documentation_gap`, `workflow_issue`, `developer_experience`
+用于：`best_practice`、`documentation_gap`、`workflow_issue`、`developer_experience`
 
 <!-- YAML safety: array items (symptoms, applies_when, tags, related_components) starting with ` [ * & ! | > % @ ? or containing ": " must be wrapped in double quotes. See references/yaml-schema.md > "YAML Safety Rules". -->
 

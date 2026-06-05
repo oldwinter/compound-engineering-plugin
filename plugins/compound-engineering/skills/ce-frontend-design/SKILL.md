@@ -1,23 +1,23 @@
 ---
 name: ce-frontend-design
-description: 'Build web interfaces with genuine design quality, not AI slop. Use for any frontend work - landing pages, web apps, dashboards, admin panels, components, interactive experiences. Activates for both greenfield builds and modifications to existing applications. Detects existing design systems and respects them. Covers composition, typography, color, motion, and copy. Verifies results via screenshots before declaring done.'
+description: '构建真正有设计质量的 web interfaces，而不是 AI slop。用于任何 frontend work：landing pages、web apps、dashboards、admin panels、components、interactive experiences。greenfield builds 和修改现有 applications 时都会激活。检测并尊重 existing design systems。覆盖 composition、typography、color、motion 和 copy。在宣称完成前通过 screenshots 验证结果。'
 ---
 
-# Frontend Design
+# Frontend Design（前端设计）
 
-Guide creation of distinctive, production-grade frontend interfaces that avoid generic AI aesthetics. This skill covers the full lifecycle: detect what exists, plan the design, build with intention, and verify visually.
+指导创建有辨识度、production-grade 的 frontend interfaces，避免 generic AI aesthetics。此 skill 覆盖完整 lifecycle：检测现有内容、规划设计、有意图地构建，并进行视觉验证。
 
-## Authority Hierarchy
+## 权威层级
 
-Every rule in this skill is a default, not a mandate.
+此 skill 中的每条规则都是 default，不是 mandate。
 
-1. **Existing design system / codebase patterns** -- highest priority, always respected
-2. **User's explicit instructions** -- override skill defaults
-3. **Skill defaults** -- apply in greenfield work or when the user asks for design guidance
+1. **Existing design system / codebase patterns** -- 最高优先级，始终尊重
+2. **User's explicit instructions** -- 覆盖 skill defaults
+3. **Skill defaults** -- 适用于 greenfield work，或用户要求 design guidance 时
 
-When working in an existing codebase with established patterns, follow those patterns. When the user specifies a direction that contradicts a default, follow the user.
+在带有 established patterns 的 existing codebase 中工作时，遵循那些 patterns。当用户指定的方向与 default 矛盾时，遵循用户。
 
-## Workflow
+## Workflow（工作流）
 
 ```
 Detect context -> Plan the design -> Build -> Verify visually
@@ -25,234 +25,234 @@ Detect context -> Plan the design -> Build -> Verify visually
 
 ---
 
-## Layer 0: Context Detection
+## Layer 0：Context Detection（上下文检测）
 
-Before any design work, examine the codebase for existing design signals. This determines how much of the skill's opinionated guidance applies.
+在任何 design work 前，检查 codebase 中的 existing design signals。这决定 skill 中带主张的 guidance 有多少适用。
 
-### What to Look For
+### 要查找什么
 
-- **Design tokens / CSS variables**: `--color-*`, `--spacing-*`, `--font-*` custom properties, theme files
-- **Component libraries**: shadcn/ui, Material UI, Chakra, Ant Design, Radix, or project-specific component directories
-- **CSS frameworks**: `tailwind.config.*`, `styled-components` theme, Bootstrap imports, CSS modules with consistent naming
-- **Typography**: Font imports in HTML/CSS, `@font-face` declarations, Google Fonts links
-- **Color palette**: Defined color scales, brand color files, design token exports
-- **Animation libraries**: Framer Motion, GSAP, anime.js, Motion One, Vue Transition imports
-- **Spacing / layout patterns**: Consistent spacing scale usage, grid systems, layout components
+- **Design tokens / CSS variables（设计 tokens / CSS variables）**：`--color-*`、`--spacing-*`、`--font-*` custom properties、theme files
+- **Component libraries**：shadcn/ui、Material UI、Chakra、Ant Design、Radix，或项目专用 component directories
+- **CSS frameworks**：`tailwind.config.*`、`styled-components` theme、Bootstrap imports、命名一致的 CSS modules
+- **Typography**：HTML/CSS 中的 font imports、`@font-face` declarations、Google Fonts links
+- **Color palette**：已定义的 color scales、brand color files、design token exports
+- **Animation libraries（动画库）**：Framer Motion、GSAP、anime.js、Motion One、Vue Transition imports
+- **Spacing / layout patterns**：一致使用的 spacing scale、grid systems、layout components
 
-Use the platform's native file-search and content-search tools (e.g., Glob/Grep in Claude Code) to scan for these signals. Do not use shell commands for routine file exploration.
+使用平台原生 file-search 和 content-search tools（例如 Claude Code 中的 Glob/Grep）扫描这些 signals。不要为了 routine file exploration 使用 shell commands。
 
-### Mode Classification
+### Mode Classification（模式分类）
 
-Based on detected signals, choose a mode:
+基于检测到的 signals，选择 mode：
 
-- **Existing system** (4+ signals across multiple categories): Defer to it. The skill's aesthetic opinions (typography, color, motion) yield to the established system. Structural guidance (composition, copy, accessibility, verification) still applies.
-- **Partial system** (1-3 signals): Follow what exists; apply skill defaults only for areas where no convention was detected. For example, if Tailwind is configured but no component library exists, follow the Tailwind tokens and apply skill guidance for component structure.
-- **Greenfield** (no signals detected): Full skill guidance applies.
-- **Ambiguous** (signals are contradictory or unclear): Ask the user before proceeding.
+- **Existing system**（跨多个 categories 有 4+ signals）：让位给它。skill 的 aesthetic opinions（typography、color、motion）服从 established system。结构性 guidance（composition、copy、accessibility、verification）仍适用。
+- **Partial system**（1-3 signals）：遵循已有内容；只在未检测到 convention 的区域应用 skill defaults。例如，如果 Tailwind 已配置但没有 component library，就遵循 Tailwind tokens，并对 component structure 应用 skill guidance。
+- **Greenfield**（未检测到 signals）：完整 skill guidance 适用。
+- **Ambiguous**（signals 矛盾或不清楚）：继续前询问用户。
 
-### Asking the User
+### 询问用户
 
-When context is ambiguous, use the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip. If the user declines to pick, assume "partial" mode and proceed conservatively.
+当 context ambiguous 时，使用平台的 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中呈现 options；不要仅因为需要加载 schema 就退回。绝不要静默跳过。如果用户拒绝选择，假设为 "partial" mode 并保守继续。
 
-Example question: "I found [detected signals]. Should I follow your existing design patterns or create something distinctive?"
-
----
-
-## Layer 1: Pre-Build Planning
-
-Before writing code, write three short statements. These create coherence and give the user a checkpoint to redirect before code is written.
-
-1. **Visual thesis** -- one sentence describing the mood, material, and energy
-   - Greenfield examples: "Clean editorial feel, lots of whitespace, serif headlines, muted earth tones" or "Dense data-forward dashboard, monospace accents, dark surface hierarchy"
-   - Existing codebase: Describe the *existing* aesthetic and how the new work will extend it
-
-2. **Content plan** -- what goes on the page and in what order
-   - Landing page: hero, support, detail, CTA
-   - App: primary workspace, nav, secondary context
-   - Component: what states it has, what it communicates
-
-3. **Interaction plan** -- 2-3 specific motion ideas that change the feel
-   - Not "add animations" but "staggered fade-in on hero load, parallax on scroll between sections, scale-up on card hover"
-   - In an existing codebase, describe only the interactions being added, using the existing motion library
+Example question（示例问题）："I found [detected signals]. Should I follow your existing design patterns or create something distinctive?"
 
 ---
 
-## Layer 2: Design Guidance Core
+## Layer 1：Pre-Build Planning（构建前规划）
 
-These principles apply across all context types. Each yields to existing design systems and user instructions per the authority hierarchy.
+写代码前，写三段简短 statement。它们创造 coherence，并在代码写入前给用户一个可 redirect 的 checkpoint。
 
-### Typography
+1. **Visual thesis（视觉主张）** -- 用一句话描述 mood、material 和 energy
+   - Greenfield examples（greenfield 示例）："Clean editorial feel, lots of whitespace, serif headlines, muted earth tones" 或 "Dense data-forward dashboard, monospace accents, dark surface hierarchy"
+   - Existing codebase：描述 *existing* aesthetic，以及新工作如何 extend 它
 
-- Choose distinctive, characterful fonts. Avoid the usual suspects (Inter, Roboto, Arial, system defaults) unless the existing codebase uses them.
-- Two typefaces maximum without a clear reason for more. Pair a display/headline font with a body font.
-- *Yields to existing font choices when detected in Layer 0.*
+2. **Content plan（内容计划）** -- 页面上放什么，以及顺序
+   - Landing page（landing page，落地页）：hero、support、detail、CTA
+   - App（app，应用）：primary workspace、nav、secondary context
+   - Component：它有哪些 states、传达什么
 
-### Color & Theme
-
-- Commit to a cohesive palette using CSS variables. A dominant color with sharp accents outperforms timid, evenly-distributed palettes.
-- No purple-on-white bias, no dark-mode bias. Vary between light and dark based on context.
-- One accent color by default unless the product already has a multi-color system.
-- *Yields to existing color tokens when detected.*
-
-### Composition
-
-- Start with composition, not components. Treat the first viewport as a poster, not a document.
-- Use whitespace, alignment, scale, cropping, and contrast before adding chrome (borders, shadows, cards).
-- Default to cardless layouts. Cards are allowed when they serve as the container for a user interaction (clickable item, draggable unit, selectable option). If removing the card styling would not hurt comprehension, it should not be a card.
-- *All composition rules are defaults. The user can override them.*
-
-### Motion
-
-- Ship 2-3 intentional motions for visually-led work: one entrance sequence, one scroll-linked or depth effect, one hover/reveal transition.
-- Use the project's existing animation library if one is present.
-- When no existing library is found, use framework-conditional defaults:
-  - **CSS animations** as the universal baseline
-  - **Framer Motion** for React projects
-  - **Vue Transition / Motion One** for Vue projects
-  - **Svelte transitions** for Svelte projects
-- Motion should be noticeable in a quick recording, smooth on mobile, and consistent across the page. Remove if purely ornamental.
-
-### Accessibility
-
-- Semantic HTML by default: `nav`, `main`, `section`, `article`, `button` -- not divs for everything.
-- Color contrast meeting WCAG AA minimum.
-- Focus states on all interactive elements.
-- Accessibility and aesthetics are not in tension when done well.
-
-### Imagery
-
-- When images are needed, prefer real or realistic photography over abstract gradients or fake 3D objects.
-- Choose or generate images with a stable tonal area for text overlay.
-- If image generation tools are available in the environment, use them to create contextually appropriate visuals rather than placeholder stock.
+3. **Interaction plan（交互计划）** -- 2-3 个会改变 feel 的具体 motion ideas
+   - 不是 "add animations"，而是 "staggered fade-in on hero load, parallax on scroll between sections, scale-up on card hover"
+   - 在 existing codebase 中，只描述正在添加的 interactions，并使用 existing motion library
 
 ---
 
-## Context Modules
+## Layer 2：Design Guidance Core（设计指导核心）
 
-Select the module that fits what is being built. When working inside an existing application, default to Module C regardless of what the feature is.
+这些 principles 适用于所有 context types。每条都会根据权威层级让位于 existing design systems 和用户指令。
 
-### Module A: Landing Pages & Marketing (Greenfield)
+### Typography（排版）
 
-**Default section sequence:**
-1. Hero -- brand/product, promise, CTA, one dominant visual
-2. Support -- one concrete feature, offer, or proof point
-3. Detail -- atmosphere, workflow, product depth, or story
-4. Final CTA -- convert, start, visit, or contact
+- 选择有辨识度、有性格的 fonts。除非 existing codebase 使用它们，否则避免 usual suspects（Inter、Roboto、Arial、system defaults）。
+- 如果没有明确理由，最多两种 typefaces。将 display/headline font 与 body font 搭配。
+- *Layer 0 检测到 existing font choices 时让位给它们。*
 
-**Hero rules (defaults):**
-- One composition, not a dashboard. Full-bleed image or dominant visual plane.
-- Brand first, headline second, body third, CTA fourth.
-- Keep the text column narrow and anchored to a calm area of the image.
-- No more than 6 sections total without a clear reason.
-- One H1 headline. One primary CTA above the fold.
+### Color & Theme（色彩与主题）
 
-**Copy:**
-- Let the headline carry the meaning. Supporting copy is usually one short sentence.
-- Write in product language, not design commentary. No prompt language or AI commentary in the UI.
-- Each section gets one job: explain, prove, deepen, or convert.
-- Every sentence should earn its place. Default to less copy, not more.
+- 使用 CSS variables 坚定采用 cohesive palette。一个 dominant color 加鲜明 accents，胜过胆怯且平均分布的 palettes。
+- 不要 purple-on-white bias，也不要 dark-mode bias。根据 context 在 light 和 dark 之间变化。
+- 默认使用一个 accent color，除非产品已有 multi-color system。
+- *检测到 existing color tokens 时让位给它们。*
 
-### Module B: Apps & Dashboards (Greenfield)
+### Composition（构图）
 
-**Default patterns:**
-- Calm surface hierarchy, strong typography and spacing, few colors, dense but readable information, minimal chrome.
-- Organize around: primary workspace, navigation, secondary context/inspector, one clear accent for action or state.
-- Cards only when the card is the interaction (clickable item, draggable unit, selectable option). If a panel can become plain layout without losing meaning, remove the card treatment.
+- 从 composition 开始，而不是 components。将 first viewport 当作 poster，而不是 document。
+- 添加 chrome（borders、shadows、cards）前，先使用 whitespace、alignment、scale、cropping 和 contrast。
+- 默认 cardless layouts。当 cards 作为 user interaction 的 container（clickable item、draggable unit、selectable option）时允许使用。如果移除 card styling 不会伤害 comprehension，它就不该是 card。
+- *所有 composition rules 都是 defaults。用户可以 override。*
 
-**Copy (utility, not marketing):**
-- Prioritize orientation, status, and action over promise, mood, or brand voice.
-- Section headings should say what the area is or what the user can do there. Good: "Plan status", "Search metrics". Bad: "Unlock Your Potential".
-- If a sentence could appear in a homepage hero, rewrite it until it sounds like product UI.
-- Litmus: if an operator scans only headings, labels, and numbers, can they understand the page immediately?
+### Motion（动效）
 
-### Module C: Components & Features (Default in Existing Apps)
+- 对 visually-led work，ship 2-3 个 intentional motions：一个 entrance sequence、一个 scroll-linked 或 depth effect、一个 hover/reveal transition。
+- 如果项目已有 animation library，使用它。
+- 如果未找到 existing library，使用 framework-conditional defaults：
+  - **CSS animations** 作为 universal baseline
+  - React projects 使用 **Framer Motion**
+  - Vue projects 使用 **Vue Transition / Motion One**
+  - Svelte projects 使用 **Svelte transitions**
+- Motion 应该在快速 recording 中可见、在 mobile 上顺滑，并在页面内一致。如果纯粹 ornamental，就移除。
 
-For adding to an existing application:
+### Accessibility（可访问性）
 
-- Match the existing visual language. This module is about making something that belongs, not something that stands out.
-- Inherit spacing scale, border radius, color tokens, and typography from surrounding code.
-- Focus on interaction quality: clear states (default, hover, active, disabled, loading, error), smooth transitions between states, obvious affordances.
-- One new component should not introduce a new design system. If the existing app uses 4px border radius, do not add a component with 8px.
+- 默认使用 semantic HTML：`nav`、`main`、`section`、`article`、`button`，而不是一切都用 div。
+- Color contrast 满足 WCAG AA minimum。
+- 所有 interactive elements 都有 focus states。
+- 做得好时，accessibility 与 aesthetics 并不冲突。
 
----
+### Imagery（图像）
 
-## Hard Rules & Anti-Patterns
-
-### Default Against (Overridable)
-
-These are the skill being opinionated. The user can override any of them.
-
-- Generic SaaS card grid as the first impression
-- Purple-on-white color schemes, dark-mode bias
-- Overused fonts (Inter, Roboto, Arial, Space Grotesk, system defaults) in greenfield work
-- Hero sections cluttered with stats, schedules, pill clusters, logo clouds
-- Sections that repeat the same mood statement in different words
-- Carousel with no narrative purpose
-- Multiple competing accent colors
-- Decorative gradients or abstract backgrounds standing in for real visual content
-- Copy that sounds like design commentary ("Experience the seamless integration")
-- Split-screen heroes where text sits on the busy side of an image
-
-### Always Avoid (Quality Floor)
-
-These are genuine quality failures no user would want.
-
-- Prompt language or AI commentary leaking into the UI
-- Broken contrast -- text unreadable over images or backgrounds
-- Interactive elements without visible focus states
-- Semantic div soup when proper HTML elements exist
+- 需要 images 时，优先使用 real 或 realistic photography，而不是 abstract gradients 或 fake 3D objects。
+- 选择或生成带 stable tonal area 的 images，用于 text overlay。
+- 如果 environment 中有 image generation tools，使用它们创建 contextually appropriate visuals，而不是 placeholder stock。
 
 ---
 
-## Litmus Checks
+## Context Modules（上下文模块）
 
-Quick self-review before moving to visual verification. Not all checks apply in every context -- apply judgment about which are relevant.
+选择与正在构建内容匹配的 module。在 existing application 内工作时，无论 feature 是什么，默认使用 Module C。
 
-- Is the brand or product unmistakable in the first screen?
-- Is there one strong visual anchor?
-- Can the page be understood by scanning headlines only?
-- Does each section have one job?
-- Are cards actually necessary where they are used?
-- Does motion improve hierarchy or atmosphere, or is it just there?
-- Would the design feel premium if all decorative shadows were removed?
-- Does the copy sound like the product, not like a prompt?
-- Does the new work match the existing design system? (Module C)
+### Module A：Landing Pages & Marketing（landing pages 与 marketing，Greenfield）
+
+**Default section sequence（默认 section 顺序）：**
+1. Hero -- brand/product、promise、CTA、一个 dominant visual
+2. Support -- 一个 concrete feature、offer 或 proof point
+3. Detail -- atmosphere、workflow、product depth 或 story
+4. Final CTA -- convert、start、visit 或 contact
+
+**Hero rules（默认规则）：**
+- 一个 composition，而不是 dashboard。Full-bleed image 或 dominant visual plane。
+- Brand first、headline second、body third、CTA fourth（先 brand，再 headline，再 body，最后 CTA）。
+- 保持 text column 狭窄，并锚定到 image 的 calm area。
+- 没有明确理由时，总 sections 不超过 6 个。
+- 一个 H1 headline。above the fold 一个 primary CTA。
+
+**Copy（文案）：**
+- 让 headline 承载 meaning。Supporting copy 通常是一句短句。
+- 使用 product language，而不是 design commentary。UI 中不要出现 prompt language 或 AI commentary。
+- 每个 section 只有一个 job：explain、prove、deepen 或 convert。
+- 每个句子都应该值得存在。默认 copy 更少，而不是更多。
+
+### Module B：Apps & Dashboards（apps 与 dashboards，Greenfield）
+
+**Default patterns（默认模式）：**
+- Calm surface hierarchy、强 typography 和 spacing、少量 colors、dense but readable information、minimal chrome。
+- 围绕这些组织：primary workspace、navigation、secondary context/inspector，以及一个清晰 action 或 state accent。
+- 只有当 card 本身就是 interaction（clickable item、draggable unit、selectable option）时才使用 cards。如果 panel 变成 plain layout 也不丢失 meaning，移除 card treatment。
+
+**Copy（utility，而不是 marketing）：**
+- 优先 orientation、status 和 action，而不是 promise、mood 或 brand voice。
+- Section headings 应说明该区域是什么，或用户能在那里做什么。好例子："Plan status", "Search metrics"。坏例子："Unlock Your Potential"。
+- 如果某句话可以出现在 homepage hero 中，重写它，直到它听起来像 product UI。
+- Litmus：如果 operator 只扫 headings、labels 和 numbers，是否能立即理解页面？
+
+### Module C：Components & Features（components 与 features，Existing Apps 默认）
+
+向 existing application 添加内容时：
+
+- 匹配 existing visual language。此 module 关注的是让东西属于这里，而不是让它突出。
+- 从 surrounding code 继承 spacing scale、border radius、color tokens 和 typography。
+- 聚焦 interaction quality：清晰 states（default、hover、active、disabled、loading、error）、states 之间的 smooth transitions、明显 affordances。
+- 一个 new component 不应引入 new design system。如果 existing app 使用 4px border radius，不要添加 8px 的 component。
 
 ---
 
-## Visual Verification
+## Hard Rules & Anti-Patterns（硬规则与反模式）
 
-After implementing, verify visually. This is a sanity check, not a pixel-perfect review. One pass. If there is a glaring issue, fix it. If it looks solid, move on.
+### Default Against（可覆盖）
 
-### Tool Preference Cascade
+这些是 skill 的 opinionated 部分。用户可以 override 其中任何一条。
 
-Use the first available option:
+- 以 generic SaaS card grid 作为 first impression
+- Purple-on-white color schemes（紫白配色）、dark-mode bias（深色模式偏置）
+- greenfield work 中使用 overused fonts（Inter、Roboto、Arial、Space Grotesk、system defaults）
+- Hero sections 被 stats、schedules、pill clusters、logo clouds 塞满
+- 用不同措辞重复同一个 mood statement 的 sections
+- 没有 narrative purpose 的 carousel
+- 多个相互竞争的 accent colors
+- 用 decorative gradients 或 abstract backgrounds 代替真实 visual content
+- 听起来像 design commentary 的 copy（"Experience the seamless integration"）
+- text 位于 image busy side 的 split-screen heroes
 
-1. **Existing project browser tooling** -- if Playwright, Puppeteer, Cypress, or similar is already in the project's dependencies, use it. Do not introduce new dependencies just for verification.
-2. **Browser MCP tools** -- if browser automation tools (e.g., claude-in-chrome) are available in the agent's environment, use them.
-3. **agent-browser CLI** -- if nothing else is available and `agent-browser` is installed, use it. If not installed, inform the user: "`agent-browser` is not installed. Run `/ce-setup` to install required dependencies." Then skip to the next option.
-4. **Mental review** -- if no browser access is possible (headless CI, no permissions to install), apply the litmus checks as a self-review and note that visual verification was skipped.
+### Always Avoid（质量底线）
 
-### What to Assess
+这些是真正的 quality failures，没有用户会想要。
 
-- Does the output match the visual thesis from the pre-build plan?
-- Are there obvious visual problems (broken layout, unreadable text, missing images)?
-- Does it look like the context module intended (landing page feels like a landing page, dashboard feels like a dashboard, component fits its surroundings)?
-
-### Scope Control
-
-One iteration. Take a screenshot, assess against the litmus checks, fix any glaring issues, and move on. Include the screenshot in the deliverable (PR description, conversation output, etc.).
-
-For iterative refinement beyond a single pass (multiple rounds of screenshot-assess-fix), see the `ce-design-iterator` agent.
+- Prompt language 或 AI commentary 泄露到 UI 中
+- Broken contrast：text 在 images 或 backgrounds 上不可读
+- Interactive elements 没有 visible focus states
+- 明明有 proper HTML elements，却做成 semantic div soup
 
 ---
 
-## Creative Energy
+## Litmus Checks（快速检验）
 
-This skill provides structure, but the goal is distinctive work that avoids AI slop -- not formulaic output.
+进入 visual verification 前的快速 self-review。并非所有 checks 都适用于每个 context：判断哪些 relevant。
 
-For greenfield work, commit to a bold aesthetic direction. Consider the tone: brutally minimal, maximalist, retro-futuristic, organic/natural, luxury/refined, playful, editorial, brutalist, art deco, soft/pastel, industrial -- or invent something that fits the context. There are endless flavors. Use these for inspiration but design one that is true to the project.
+- brand 或 product 是否在 first screen 中 unmistakable？
+- 是否有一个 strong visual anchor？
+- 只扫 headlines 是否能理解页面？
+- 每个 section 是否只有一个 job？
+- 使用 cards 的地方，它们是否真的必要？
+- motion 是否改善 hierarchy 或 atmosphere，还是只是存在？
+- 如果移除所有 decorative shadows，design 是否仍感觉 premium？
+- copy 是否听起来像 product，而不是 prompt？
+- new work 是否匹配 existing design system？（Module C）
 
-Ask: what makes this unforgettable? What is the one thing someone will remember?
+---
 
-Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well, not from intensity.
+## Visual Verification（视觉验证）
+
+实现后，进行 visual verification。这是 sanity check，不是 pixel-perfect review。一轮即可。如果有 glaring issue，修复它。如果看起来 solid，就继续。
+
+### Tool Preference Cascade（工具优先级）
+
+使用第一个可用选项：
+
+1. **Existing project browser tooling（现有项目浏览器工具）** -- 如果 Playwright、Puppeteer、Cypress 或类似工具已经在项目 dependencies 中，使用它。不要只为 verification 引入 new dependencies。
+2. **Browser MCP tools（Browser MCP 工具）** -- 如果 agent environment 中有 browser automation tools（例如 claude-in-chrome），使用它们。
+3. **agent-browser CLI** -- 如果没有其他可用项且已安装 `agent-browser`，使用它。如果未安装，告知用户："`agent-browser` is not installed. Run `/ce-setup` to install required dependencies." 然后跳到下一选项。
+4. **Mental review（心智检查）** -- 如果无法 browser access（headless CI、无安装权限），将 litmus checks 用作 self-review，并注明 visual verification 被跳过。
+
+### 要评估什么
+
+- output 是否匹配 pre-build plan 中的 visual thesis？
+- 是否有 obvious visual problems（broken layout、unreadable text、missing images）？
+- 它是否符合 context module 的意图（landing page 感觉像 landing page、dashboard 感觉像 dashboard、component 融入 surroundings）？
+
+### Scope Control（范围控制）
+
+一轮 iteration。截图，对照 litmus checks 评估，修复任何 glaring issues，然后继续。在 deliverable（PR description、conversation output 等）中包含 screenshot。
+
+对于超出单轮的 iterative refinement（多轮 screenshot-assess-fix），见 `ce-design-iterator` agent。
+
+---
+
+## Creative Energy（创造性能量）
+
+此 skill 提供 structure，但目标是避免 AI slop 的 distinctive work，而不是 formulaic output。
+
+对于 greenfield work，坚定采用 bold aesthetic direction。考虑 tone：brutally minimal、maximalist、retro-futuristic、organic/natural、luxury/refined、playful、editorial、brutalist、art deco、soft/pastel、industrial，或发明一个适合 context 的方向。flavors 无穷无尽。把这些当灵感，但设计一个真实契合项目的方向。
+
+询问：什么让它 unforgettable？别人会记住的一件事是什么？
+
+让 implementation complexity 匹配 aesthetic vision。Maximalist designs 需要 elaborate code、丰富 animations 和 effects。Minimalist designs 需要 restraint、precision，以及对 spacing、typography 和 subtle details 的细致关注。Elegance 来自把 vision 执行好，而不是来自强度。

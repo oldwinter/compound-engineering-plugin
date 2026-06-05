@@ -1,5 +1,5 @@
 ---
-title: "Codex Delegation Best Practices"
+title: "Codex Delegation 最佳实践"
 date: 2026-04-01
 category: best-practices
 module: "Codex delegation / skill design"
@@ -21,183 +21,183 @@ tags:
   - ce-work-beta
 ---
 
-# Codex Delegation Best Practices
+# Codex Delegation 最佳实践
 
-## Context
+## 背景
 
-Over six iterations of evaluation building Codex delegation into `ce-work-beta`, we collected quantitative data on the token economics of orchestrating work between Claude Code (the orchestrator) and Codex (the delegated executor). The core question: when does delegating plan units to Codex actually save Claude tokens, and what architectural patterns control the cost?
+在围绕 `ce-work-beta` 构建 Codex delegation 的六轮 evaluation 中，我们收集了 Claude Code（orchestrator）与 Codex（delegated executor）之间编排工作的 token economics 定量数据。核心问题是：什么时候把 plan units delegate 给 Codex 真的能节省 Claude tokens？哪些 architectural patterns 控制成本？
 
-The delegation model: `ce-work-beta` receives a plan with N implementation units, then decides whether to execute them directly (standard mode) or delegate them to Codex via `codex exec`. Delegation has a fixed orchestration overhead per batch (prompt file write, codex exec invocation, result classification, commit) of approximately 4-5k Claude tokens. Each unit of code Claude does not write saves roughly 3-5k tokens. The crossover depends on how many units are batched per delegation call.
+Delegation model：`ce-work-beta` 收到包含 N 个 implementation units 的 plan，然后决定直接执行（standard mode），还是通过 `codex exec` delegate 给 Codex。Delegation 每个 batch 有固定 orchestration overhead（写 prompt file、调用 codex exec、result classification、commit），约 4-5k Claude tokens。Claude 不亲自写的每个 code unit 大约节省 3-5k tokens。crossover 取决于每次 delegation call batching 了多少 units。
 
-The evaluation spanned iterations 1-6, testing small (1-2 units), medium (4 units), large (7 units), and extra-large (10 units) plans in both delegation and standard modes, with real code implementation and test verification in isolated worktrees.
+Evaluation 覆盖 iterations 1-6，在 delegation 和 standard modes 下测试 small（1-2 units）、medium（4 units）、large（7 units）和 extra-large（10 units）plans，并在 isolated worktrees 中进行真实 code implementation 和 test verification。
 
 ---
 
-## Guidance
+## 指南
 
-### Token Economics
+### Token Economics（token 经济性）
 
-Delegation has a fixed orchestration cost per batch (~4-5k Claude tokens for prompt generation, codex exec, result classification, and commit) and a variable savings per unit (~3-5k Claude tokens of code-writing avoided). The crossover depends on how many units are batched per call.
+Delegation 每个 batch 有固定 orchestration cost（prompt generation、codex exec、result classification 和 commit 约 4-5k Claude tokens），并有每个 unit 的 variable savings（避免 Claude 写 code 约 3-5k Claude tokens）。crossover 取决于每次 call batching 多少 units。
 
-**Crossover by plan size:**
+**按 plan size 划分的 crossover:**
 
-| Plan size | Units | Delegate tokens | Standard tokens | Overhead | Verdict |
+| Plan size | Units | Delegate tokens | Standard tokens | Overhead | Verdict（结论） |
 |-----------|-------|----------------|-----------------|----------|---------|
-| Small (bug fix) | 1 | 51k | 38k | +34% | Not worth it for token savings |
-| Small (new feature) | 1 | 63k | 42k | +50% | Not worth it for token savings |
-| Medium | 4 | 54k | 53k | +2% | Marginal |
+| Small (bug fix) | 1 | 51k | 38k | +34% | 不值得为 token savings 使用 |
+| Small (new feature) | 1 | 63k | 42k | +50% | 不值得为 token savings 使用 |
+| Medium | 4 | 54k | 53k | +2% | 边际 |
 | Large | 7 | 62k | 62k | +1% | Break-even |
-| Extra-large | 10 | 54k | 62k* | **-13%** | Delegation is cheaper |
+| Extra-large | 10 | 54k | 62k* | **-13%** | Delegation 更便宜 |
 
-*Standard mode extrapolated from 7-unit baseline. The XL delegate cost (54k) is lower than the 7-unit standard cost (62k) because orchestration is amortized over more units per batch.
+*Standard mode 从 7-unit baseline 外推。XL delegate cost（54k）低于 7-unit standard cost（62k），因为 orchestration 被更多 units amortized。
 
-**How it scales:** Each additional unit in a batch saves ~3-5k Claude tokens while adding zero orchestration cost. The orchestration is per-batch, not per-unit. A 10-unit plan in 2 batches costs ~8-10k in orchestration regardless of whether those batches contain 5 units or 50 lines of code each.
+**How it scales（扩展方式）:** batch 中每增加一个 unit，会节省约 3-5k Claude tokens，同时不增加 orchestration cost。Orchestration 是 per-batch，不是 per-unit。一个 10-unit plan 分成 2 batches 时，无论每个 batch 包含 5 units 还是 50 lines of code，orchestration 都约 8-10k。
 
-**The crossover point is ~5-7 units.** Below that, orchestration overhead dominates. Above it, code-writing savings dominate. Users may still choose delegation below the crossover for cost arbitrage (Codex tokens are cheaper than Claude tokens) or coding preference.
+**crossover point 约为 5-7 units。** 低于它时，orchestration overhead 占主导。高于它时，code-writing savings 占主导。用户仍可能在 crossover 以下选择 delegation，用于 cost arbitrage（Codex tokens 比 Claude tokens 便宜）或 coding preference。
 
-**Wall clock time cost:** Delegation is 1.7-2.2x slower due to codex exec latency:
+**Wall clock time cost（实际耗时成本）:** 因 codex exec latency，delegation 慢 1.7-2.2x：
 
-| Plan size | Delegate time | Standard time | Slowdown |
+| Plan size | Delegate time | Standard time | Slowdown（变慢幅度） |
 |-----------|---------------|---------------|----------|
 | Medium (4 units) | 353s | 188s | 1.9x |
 | Large (7 units) | 569s | 254s | 2.2x |
 | Extra-large (10 units) | 574s | ~300s* | ~1.9x |
 
-**Test coverage cost:** Without explicit testing guidance in the prompt, Codex produces 15-43% fewer tests than Claude. Adding the `<testing>` section to the prompt closed this gap by ~35% on large plans (see Prompt Engineering section below).
+**Test coverage cost（测试覆盖成本）:** 如果 prompt 中没有 explicit testing guidance，Codex 生成的 tests 比 Claude 少 15-43%。在 prompt 中加入 `<testing>` section 后，大 plans 的差距缩小约 35%（见 Prompt Engineering section）。
 
-**Evolution across iterations:**
+**Evolution across iterations（迭代演进）：**
 
-| Iteration | Architecture | Medium delegate tokens | Change |
+| Iteration | Architecture | Medium delegate tokens | Change（变化） |
 |-----------|-------------|----------------------|--------|
 | 3 | Per-unit loop, all content in SKILL.md body (776 lines) | 58k | Baseline |
-| 4 | Added optimizations to body (~810 lines) | 79k | +38% (worse — body growth overwhelmed savings) |
-| 5 | Extracted to reference file, batched model (514 lines) | 61k | -23% from iter-4, back to baseline |
-| 6 | Added `<testing>` to prompt | 54k | -7% (with better test quality) |
+| 4 | Added optimizations to body (~810 lines) | 79k | +38%（更差，因为 body growth 压过 savings） |
+| 5 | Extracted to reference file, batched model (514 lines) | 61k | 从 iter-4 降 -23%，回到 baseline |
+| 6 | Added `<testing>` to prompt | 54k | -7%（且 test quality 更好） |
 
-The key lesson from iteration 4: adding content to the skill body increases cost on every tool call. Optimizations that save a few tool calls but add 50+ lines to the body can be net negative.
+iteration 4 的关键教训：把内容加进 skill body 会增加每次 tool call 的成本。节省少量 tool calls、但给 body 增加 50+ lines 的优化，可能 net negative。
 
-### Skill Body Size is the Multiplicative Cost Driver
+### Skill body size 是 multiplicative cost driver
 
-The dominant formula:
+主导公式：
 
 ```
 total_token_cost ~ skill_body_lines x tokens_per_line x num_tool_calls
 ```
 
-Reducing tool calls helps linearly. Reducing skill body size helps **multiplicatively** because it affects every remaining tool call for the entire session. In iteration 4, adding optimization instructions directly to the SKILL.md body caused a net token *increase* despite the optimizations being structurally sound — the larger body cost more on every subsequent tool call than the optimizations saved.
+减少 tool calls 是线性帮助。减少 skill body size 是 **multiplicative** 帮助，因为它影响整个 session 中每一个剩余 tool call。在 iteration 4 中，将 optimization instructions 直接加入 SKILL.md body，尽管这些 optimizations 在结构上合理，仍导致 token *increase*，因为更大的 body 在每个后续 tool call 上的成本超过了优化节省。
 
-**Threshold rule:** Move content to a reference file if it exceeds ~50 lines AND is only used in a minority of invocations. Keep always-needed content in the body.
+**Threshold rule:** 如果内容超过约 50 行，并且只在少数 invocations 中使用，就移到 reference file。始终需要的内容保留在 body。
 
-### Architecture Patterns That Reduce Cost (Ranked by Impact)
+### 降低成本的 architecture patterns（按影响排序）
 
-**1. Extract conditional content to reference files.**
-Moving delegation-specific content (~250 lines) from the SKILL.md body to `references/codex-delegation-workflow.md` shrank the skill from 776 to 514 lines. This saved ~15k Claude tokens per non-delegation run — a 34% body reduction affecting every tool call. The reference is loaded once, only when delegation is active.
+**1. 将 conditional content extract 到 reference files。**
+把 delegation-specific content（约 250 lines）从 SKILL.md body 移到 `references/codex-delegation-workflow.md`，使 skill 从 776 行降到 514 行。这在 non-delegation run 中节省约 15k Claude tokens -- body 减少 34%，影响每个 tool call。reference 只在 delegation active 时加载一次。
 
-**2. Batch execution over per-unit execution.**
-Sending all units (or groups of roughly 5) in a single `codex exec` call reduces orchestration from O(N) to O(ceil(N/batch_size)). For a 10-unit plan: 2 batches x ~4-5k = 8-10k orchestration vs 10 x 4-5k = 40-50k with per-unit delegation.
+**2. Batch execution，而不是 per-unit execution。**
+在一次 `codex exec` call 中发送所有 units（或约 5 个一组），把 orchestration 从 O(N) 降到 O(ceil(N/batch_size))。10-unit plan：2 batches x 约 4-5k = 8-10k orchestration，而 per-unit delegation 是 10 x 4-5k = 40-50k。
 
-**3. Delegate the verify/test-fix loop to Codex.**
-In the original design, Codex wrote code and the orchestrator independently ran tests to verify. This doubled the verification cost — Claude re-ran the same tests Codex already ran, adding a tool call per batch and classification logic for "completed but verify failed" (a 6th signal in the result table). Moving verification into the delegation prompt ("run tests, fix failures, do not report completed unless tests pass") eliminates that round-trip.
+**3. 把 verify/test-fix loop delegate 给 Codex。**
+原设计中 Codex 写 code，orchestrator 独立运行 tests 来 verify。这让 verification cost 翻倍 -- Claude 重新运行 Codex 已跑过的同一批 tests，每个 batch 增加一次 tool call，并为 "completed but verify failed" 添加 classification logic（result table 的第 6 个 signal）。把 verification 放入 delegation prompt（"run tests, fix failures, do not report completed unless tests pass"）可以消除这次 round-trip。
 
-The safety net is the circuit breaker, not the orchestrator re-running tests. If Codex reports "completed" but the code is actually broken, the failure surfaces at one of three catch points: (1) the result schema — Codex reports "failed" or "partial" when it cannot get tests to pass, triggering rollback; (2) the circuit breaker — 3 consecutive failures disable delegation and fall back to standard mode where Claude implements with full Phase 2 testing guidance; (3) Phase 3 quality check — the full test suite runs before shipping regardless of execution mode. The orchestrator does not need to independently verify each batch because these layered catches prevent bad code from shipping. This is the key design insight: trust the delegate's self-report, protect against systematic failure with the circuit breaker, and verify the whole at the end.
+safety net 是 circuit breaker，而不是 orchestrator 重新跑 tests。如果 Codex 报告 "completed" 但代码实际坏了，failure 会在三个 catch points 之一浮现：(1) result schema -- Codex 在无法让 tests pass 时报告 "failed" 或 "partial"，触发 rollback；(2) circuit breaker -- 3 次 consecutive failures 禁用 delegation，并 fallback 到 standard mode，由 Claude 按完整 Phase 2 testing guidance 实现；(3) Phase 3 quality check -- shipping 前无论 execution mode 都运行 full test suite。orchestrator 不需要独立 verify 每个 batch，因为这些 layered catches 能防止坏代码 shipping。关键设计 insight 是：trust delegate's self-report，用 circuit breaker 防 systematic failure，最后 verify whole。
 
-**4. Cache pre-delegation checks.**
-Environment guard, CLI availability, and consent checks run once before the first batch, not per-unit or per-batch. These don't change mid-execution.
+**4. 缓存 pre-delegation checks。**
+Environment guard、CLI availability 和 consent checks 在第一个 batch 前运行一次，而不是 per-unit 或 per-batch。它们不会在 execution 中途变化。
 
-**5. Batch scratch cleanup.**
-Clean up `.context/` delegation artifacts at end-of-plan, not per-unit. Fewer tool calls, same outcome.
+**5. 批量 scratch cleanup。**
+在 end-of-plan 清理 `.context/` delegation artifacts，而不是 per-unit 清理。更少 tool calls，同样 outcome。
 
-### Plan Quality Enables Good Delegation Decisions
+### Plan quality 决定 delegation decisions 的质量
 
-Every delegation decision — whether to delegate, how to batch, what to include in the prompt — depends on what the plan file provides. The orchestrator can only be as smart as the plan it reads.
+每个 delegation decision -- 是否 delegate、如何 batch、prompt 中包含什么 -- 都依赖 plan file 提供的信息。orchestrator 的聪明程度只能等于它读取的 plan。
 
 | Plan signal | What it enables |
 |-------------|----------------|
-| Unit count and scope | The crossover decision (5-7 unit threshold) |
+| Unit count and scope | crossover decision（5-7 unit threshold） |
 | File lists per unit | "Don't split units that share files" batching rule |
-| Test scenarios per unit | Forwarded to Codex via the `<testing>` prompt section; thin plan scenarios produce thin Codex tests regardless of prompt engineering |
-| Verification commands | Become the `<verify>` section; missing verification means Codex cannot confirm its own work |
-| Triviality signals (Goal, Approach) | Whether delegation is considered at all ("config change" vs "recursive validation engine") |
-| Dependencies between units | Batch boundary decisions for plans >5 units |
+| Test scenarios per unit | 转发给 Codex 的 `<testing>` prompt section；thin plan scenarios 会产生 thin Codex tests，无论 prompt engineering 如何 |
+| Verification commands | 成为 `<verify>` section；缺失 verification 意味着 Codex 无法确认自己的工作 |
+| Triviality signals (Goal, Approach) | 是否考虑 delegation（"config change" vs "recursive validation engine"） |
+| Dependencies between units | >5 units plans 的 batch boundary decisions |
 
-A well-structured ce:plan output provides all of these. A hand-written requirements doc or TODO list may provide few or none — the delegation logic still works (the skill handles non-standard plans), but the decisions are less informed. For example, without explicit file lists, the batching rule cannot check for shared files; without test scenarios, the Codex prompt's `<testing>` section has nothing to supplement.
+结构良好的 ce:plan output 会提供以上全部内容。手写 requirements doc 或 TODO list 可能提供很少甚至没有 -- delegation logic 仍可工作（skill 处理 non-standard plans），但 decisions 的信息量更少。例如，没有 explicit file lists 时，batching rule 无法检查 shared files；没有 test scenarios 时，Codex prompt 的 `<testing>` section 就没有补充材料。
 
-This does not mean delegation requires ce:plan output. It means the quality of delegation improves proportionally with the structure of the plan. Users who invest in structured plans get smarter delegation decisions. Users with lightweight plans get delegation that works but makes conservative choices (e.g., single-batch everything, generic test guidance).
+这并不意味着 delegation 要求 ce:plan output。它意味着 delegation quality 会随 plan structure 成比例改善。投入 structured plans 的用户会获得更聪明的 delegation decisions。轻量 plans 的用户也能使用 delegation，但会做 conservative choices（例如 single-batch everything、generic test guidance）。
 
-### Prompt Engineering for Delegation Quality
+### 为 delegation quality 做 prompt engineering
 
-Without explicit testing guidance, Codex produces 15-43% fewer tests than Claude. Three prompt additions close this gap:
+没有 explicit testing guidance 时，Codex 生成的 tests 比 Claude 少 15-43%。三个 prompt additions 可以缩小这个差距：
 
-**`<testing>` section** — Include Test Scenario Completeness guidance (happy path, edge cases, error paths, integration). This improved Codex test output by ~35% on large plans. Codex implements what the prompt asks; it does not infer quality standards from context.
+**`<testing>` section** -- 包含 Test Scenario Completeness guidance（happy path、edge cases、error paths、integration）。这让 large plans 中 Codex test output 改进约 35%。Codex 会实现 prompt 要求的内容；它不会从 context 中推断 quality standards。
 
-**Combined `<verify>` command** — Require running ALL test files in a single command, not per-file. Per-file verification misses cross-file contamination — observed in eval when mocked `globalThis.fetch` in one test file leaked into integration tests running in the same bun process.
+**Combined `<verify>` command** -- 要求用单个 command 运行 ALL test files，而不是 per-file。Per-file verification 会漏掉 cross-file contamination -- eval 中观察到，一个 test file 中 mocked `globalThis.fetch` 泄漏到了同一 bun process 中运行的 integration tests。
 
-**Light system-wide check** — "If your changes touch callbacks, middleware, or event handlers, verify the interaction chain end-to-end." One sentence that catches architectural issues Codex would otherwise miss.
+**Light system-wide check** -- "If your changes touch callbacks, middleware, or event handlers, verify the interaction chain end-to-end." 这一句话能抓住 Codex 否则会漏掉的 architectural issues。
 
-### Batching Strategy
+### Batching 策略
 
-Delegate all units in one batch. If the plan exceeds 5 units, split into batches of roughly 5 — never splitting units that share files. Skip delegation entirely if every unit is trivial.
+把所有 units 放进一个 batch。如果 plan 超过 5 units，就拆成约 5 个一组的 batches，且绝不拆开共享 files 的 units。如果每个 unit 都 trivial，则完全跳过 delegation。
 
-Between batches: report progress and continue immediately unless the user intervenes. The checkpoint exists so the user *can* steer, not so they *must*.
+Batches 之间：报告 progress，然后除非用户介入，否则立即继续。checkpoint 的存在是为了让用户 *can* steer，而不是要求他们 *must* steer。
 
-### User Choice Matters
+### 用户选择很重要
 
-Users may prefer delegation even when it is not optimal for Claude token savings:
+即使 delegation 对 Claude token savings 不最优，用户也可能更偏好它：
 
-- **Cost arbitrage** — Codex tokens may be cheaper on their usage plan
-- **Coding preference** — they may prefer Codex's implementation style for certain tasks
-- **Usage conservation** — they may want to conserve Claude Code usage specifically
+- **Cost arbitrage** -- 在用户的 usage plan 中，Codex tokens 可能更便宜
+- **Coding preference** -- 用户可能更喜欢 Codex 在某些 tasks 上的 implementation style
+- **Usage conservation** -- 用户可能专门想节省 Claude Code usage
 
-The `work_delegate_decision` setting (`auto`/`ask`) supports this. In `ask` mode, the skill presents a recommendation with rationale but lets the user override. When recommending against delegation: "Codex delegation active, but these are small changes where the cost of delegating outweighs having Claude Code do them." The user can still choose "Delegate to Codex anyway."
-
----
-
-## Why This Matters
-
-The naive assumption — that offloading work to a secondary agent always saves the orchestrator tokens — is wrong for small workloads and only becomes true past a specific threshold. Without this data, skill authors will either avoid delegation entirely (missing savings on large plans) or apply it universally (wasting tokens on small plans). The 5-7 unit crossover, derived from six evaluation iterations with real token counts, provides a concrete decision boundary.
-
-The discovery that skill body size is a multiplicative cost driver changes how skills should be authored across the entire plugin. Every line in a SKILL.md body is paid for on every tool call in the session. This makes "extract rarely-used content to reference files" one of the highest-leverage optimizations available to skill authors, and it reframes the instinct to add helpful content to a skill body as a potential anti-pattern when that content is conditional.
+`work_delegate_decision` setting（`auto`/`ask`）支持这一点。在 `ask` mode 中，skill 会给出 recommendation 和 rationale，但允许用户 override。当建议不要 delegation 时："Codex delegation active, but these are small changes where the cost of delegating outweighs having Claude Code do them." 用户仍可选择 "Delegate to Codex anyway."
 
 ---
 
-## When to Apply
+## 为什么重要
 
-- **Designing delegation in any orchestrator skill:** Use the 5-7 unit crossover as the threshold. Below it, prefer direct execution unless the user explicitly requests delegation.
-- **Authoring or editing any SKILL.md:** Audit for conditional content blocks exceeding ~50 lines. If they apply to a minority of invocations, extract to reference files.
-- **Adding optimization or guidance content to a skill:** Measure whether the added body size costs more per-call than the optimization saves. If content is only relevant to a specific execution path, it belongs in a reference file.
-- **Writing delegation prompts:** Include explicit testing completeness guidance and require unified test execution. Do not assume the delegated agent will infer quality standards.
-- **Choosing batch sizes:** Use batches of up to roughly 5 units, never splitting units that share files.
+天真的假设 -- 把工作 offload 给 secondary agent 总能节省 orchestrator tokens -- 对 small workloads 是错的，只有超过特定 threshold 才成立。如果没有这些数据，skill authors 要么完全避免 delegation（错过 large plans 的 savings），要么普遍应用它（在 small plans 上浪费 tokens）。由六轮 evaluation 的真实 token counts 得出的 5-7 unit crossover，提供了具体 decision boundary。
+
+skill body size 是 multiplicative cost driver 这一发现，改变了整个 plugin 中 skills 的 authoring 方式。SKILL.md body 中的每一行都会在 session 的每次 tool call 上付费。这使 "extract rarely-used content to reference files" 成为 skill authors 可用的最高 leverage optimizations 之一，也把向 skill body 添加 helpful content 的直觉重新 framed 为 potential anti-pattern，尤其当该 content 是 conditional 时。
 
 ---
 
-## Examples
+## 适用时机
 
-**Skill body size impact — iteration 4 regression:**
-
-Iteration 3: SKILL.md at 776 lines. Medium plan (4 units) delegated cost 58k Claude tokens.
-Iteration 4: Added optimization content to body, SKILL.md grew to ~810 lines. Same plan cost 79k tokens (+38%) despite fewer tool calls. The optimization content was sound but the body growth overwhelmed the savings.
-Iteration 5: Extracted delegation to reference file, SKILL.md back to 514 lines. Same plan cost 61k tokens — back to iter-3 levels with more features.
-
-**Delegation decision examples:**
-
-3-unit plan, all implementation:
-> Standard mode recommended. These 3 units are below the efficiency threshold. Direct execution uses fewer Claude tokens.
-
-8-unit plan, mixed implementation and tests:
-> Delegate. Batch into [units 1-5] and [units 6-8], keeping shared-file units together. Pre-delegation checks run once. Progress reported between batches.
-
-4-unit plan, all config/renames:
-> Skip delegation. All units are trivial — orchestration overhead exceeds any benefit.
-
-4-unit plan, user explicitly requests delegation:
-> Delegate despite marginal economics. User preference is respected. One batch, standard flow.
+- **在任何 orchestrator skill 中设计 delegation：** 使用 5-7 unit crossover 作为 threshold。低于它时，除非用户明确要求 delegation，否则偏好 direct execution。
+- **Authoring 或 editing 任意 SKILL.md：** 审计超过约 50 行的 conditional content blocks。如果它们只适用于少数 invocations，extract 到 reference files。
+- **向 skill 添加 optimization 或 guidance content：** 衡量新增 body size 的 per-call 成本是否超过 optimization savings。如果 content 只与特定 execution path 相关，它属于 reference file。
+- **编写 delegation prompts：** 包含 explicit testing completeness guidance，并要求 unified test execution。不要假设 delegated agent 会推断 quality standards。
+- **选择 batch sizes：** 使用最多约 5 units 的 batches，绝不拆开共享 files 的 units。
 
 ---
 
-## Related
+## 示例
 
-- [Codex delegation requirements](../../brainstorms/2026-03-31-codex-delegation-requirements.md) — origin requirements defining the delegation flow
-- [Codex delegation implementation plan](../../plans/2026-03-31-001-feat-codex-delegation-plan.md) — implementation plan with prompt template and circuit breaker design
-- [Pass paths not content to subagents](../skill-design/pass-paths-not-content-to-subagents.md) — foundational token efficiency pattern for multi-agent orchestration
-- [Script-first skill architecture](../skill-design/script-first-skill-architecture.md) — complementary token reduction pattern (60-75% savings by moving processing to scripts)
-- [Agent-friendly CLI principles](../agent-friendly-cli-principles.md) — CLI design principles relevant to how `codex exec` is consumed
+**Skill body size 影响 -- iteration 4 regression：**
+
+Iteration 3：SKILL.md 为 776 行。Medium plan（4 units）delegated cost 58k Claude tokens。
+Iteration 4：向 body 添加 optimization content，SKILL.md 增长到约 810 行。同一 plan cost 79k tokens（+38%），尽管 tool calls 更少。optimization content 本身合理，但 body growth 压过了 savings。
+Iteration 5：将 delegation extract 到 reference file，SKILL.md 回到 514 行。同一 plan cost 61k tokens -- 带着更多 features 回到 iter-3 水平。
+
+**Delegation decision 示例（delegation 决策示例）：**
+
+3-unit plan（3 个 unit 的 plan），全部 implementation:
+> Standard mode recommended（推荐 standard mode）。这 3 个 units 低于效率阈值。Direct execution 使用更少 Claude tokens。
+
+8-unit plan（8 个 unit 的 plan），混合 implementation 和 tests:
+> Delegate（委托）。Batch into [units 1-5] and [units 6-8]，保持 shared-file units 在一起。Pre-delegation checks 只运行一次。Progress 在 batches 之间报告。
+
+4-unit plan（4 个 unit 的 plan），全部 config/renames:
+> Skip delegation（跳过委托）。所有 units 都很 trivial，orchestration overhead 超过任何收益。
+
+4-unit plan（4 个 unit 的 plan），用户显式要求 delegation:
+> Delegate despite marginal economics（即使收益边际也委托）。尊重 user preference。One batch，standard flow。
+
+---
+
+## 相关
+
+- [Codex delegation requirements](../../brainstorms/2026-03-31-codex-delegation-requirements.md) -- 定义 delegation flow 的 origin requirements
+- [Codex delegation implementation plan](../../plans/2026-03-31-001-feat-codex-delegation-plan.md) -- 含 prompt template 与 circuit breaker design 的 implementation plan
+- [Pass paths not content to subagents](../skill-design/pass-paths-not-content-to-subagents.md) -- multi-agent orchestration 的 foundational token efficiency pattern
+- [Script-first skill architecture](../skill-design/script-first-skill-architecture.md) -- complementary token reduction pattern（通过把 processing 移到 scripts 节省 60-75%）
+- [Agent-friendly CLI principles](../agent-friendly-cli-principles.md) -- 与 `codex exec` consumption 相关的 CLI design principles

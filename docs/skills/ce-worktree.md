@@ -1,94 +1,94 @@
 # `ce-worktree`
 
-> Create a git worktree under `.worktrees/<branch>` with branch-specific setup that `git worktree add` alone doesn't handle — `.env` copying, dev-tool trust with branch-aware safety, gitignore management.
+> 在 `.worktrees/<branch>` 下创建 git worktree，并补上 `git worktree add` 本身不会处理的 branch-specific setup：`.env` copying、带 branch-aware safety 的 dev-tool trust、gitignore management。
 
-`ce-worktree` is the **isolated-checkout** skill. Plain `git worktree add` creates the worktree but skips the per-checkout setup most projects need: `.env` files don't follow, `mise`/`direnv` configs aren't trusted (so hooks block on prompts), and `.worktrees/` doesn't get gitignored. This skill handles those for you, with safety rules that prevent untrusted PR-review branches from auto-trusting `.envrc` content the user hasn't seen.
+`ce-worktree` 是 **isolated-checkout** skill。普通 `git worktree add` 会创建 worktree，但跳过大多数项目需要的 per-checkout setup：`.env` files 不会跟过去，`mise`/`direnv` configs 未 trust（hooks 会卡在 prompts），`.worktrees/` 不会被 gitignore。此 skill 会处理这些，同时用 safety rules 防止对用户尚未看过的 untrusted PR-review branch 自动 trust `.envrc` content。
 
 ---
 
 ## TL;DR
 
-| Question | Answer |
+| Question（问题） | Answer（答案） |
 |----------|--------|
-| What does it do? | Creates `.worktrees/<branch>`, copies `.env*` from main repo, trusts `mise`/`direnv` configs with safety rules, adds `.worktrees` to `.gitignore` |
-| When to use it | Reviewing a PR while keeping the main checkout free; running multiple features in parallel; keeping the default branch clean |
-| What it produces | A worktree at `.worktrees/<branch-name>` ready to `cd` into |
-| Skip when | Single-task work that fits on a branch in the main checkout |
+| 它做什么？ | 创建 `.worktrees/<branch>`，从 main repo 复制 `.env*`，按安全规则 trust `mise`/`direnv` configs，并把 `.worktrees` 加入 `.gitignore` |
+| 何时使用 | Review PR 且保持 main checkout 空闲；并行运行多个 features；保持 default branch 干净 |
+| 产出什么 | 位于 `.worktrees/<branch-name>`、可直接 `cd` 进入的 worktree |
+| 何时跳过 | 单个 task 放在 main checkout 的 branch 中就足够 |
 
 ---
 
-## The Problem
+## 问题
 
-Plain `git worktree add` leaves you with a working tree that's *technically* checked out but practically broken:
+普通 `git worktree add` 会给你一个技术上 checked out、实际却可能 broken 的 working tree：
 
-- **`.env*` files don't follow** — the new worktree has no `.env`, so dev servers fail or fall back to fragile defaults
-- **`mise`/`direnv` configs aren't trusted** — every `cd` into the worktree blocks on a trust prompt, slowing down agent flows
-- **Dangerous `.envrc` auto-trust on review branches** — naïvely running `direnv allow` on a PR-review worktree trusts whatever the contributor put in `.envrc`, which can source files direnv doesn't validate
-- **`.worktrees/` not in `.gitignore`** — every `git status` from the main checkout shows the worktree directory as untracked
-- **Main checkout disturbed** — `git worktree add origin/<branch>` may end up changing the main checkout's state in ways the user doesn't expect
-- **Cryptic auto-generated branch names** like `worktree-jolly-beaming-raven` from some tools obscure what the worktree is actually for
+- **`.env*` files 不会跟随**：新 worktree 没有 `.env`，dev servers 会失败或 fallback 到 fragile defaults
+- **`mise`/`direnv` configs 未 trust**：每次 `cd` 进 worktree 都会被 trust prompt 阻塞，拖慢 agent flows
+- **Review branches 上危险的 `.envrc` auto-trust**：在 PR-review worktree 上 naïvely 运行 `direnv allow`，等于 trust contributor 放进 `.envrc` 的任意内容；`.envrc` 可以 source direnv 不验证的 files
+- **`.worktrees/` 不在 `.gitignore`**：main checkout 中每次 `git status` 都会显示 worktree directory 是 untracked
+- **Main checkout 被扰动**：`git worktree add origin/<branch>` 可能以用户不预期的方式改变 main checkout state
+- **Cryptic auto-generated branch names**（例如 `worktree-jolly-beaming-raven`）会掩盖 worktree 的真实用途
 
-## The Solution
+## 方案
 
-`ce-worktree` runs worktree creation as a structured pass:
+`ce-worktree` 以 structured pass 创建 worktree：
 
-- Creates the worktree at `.worktrees/<branch>` (consistent location, never random)
-- Copies `.env`, `.env.local`, `.env.test`, etc. (skips `.env.example`)
-- Trusts `mise`/`direnv` configs with branch-aware safety rules — never auto-trusts modified configs, never `direnv allow` on PR-review branches
-- Adds `.worktrees` to `.gitignore` if not already there
-- Fetches the `from-branch` instead of checking it out — main repo stays undisturbed
-- Provides clear naming guidance to upstream callers (`feat/crowd-sniff`, `fix/email-validation`, never random)
+- 在 `.worktrees/<branch>` 创建 worktree（consistent location，绝不 random）
+- 复制 `.env`、`.env.local`、`.env.test` 等（跳过 `.env.example`）
+- 用 branch-aware safety rules trust `mise`/`direnv` configs：modified configs 永不 auto-trust，PR-review branches 上永不 `direnv allow`
+- 如果 `.worktrees` 尚未在 `.gitignore`，添加它
+- Fetch `from-branch`，而不是 check it out；main repo 保持不受扰动
+- 为 upstream callers 提供清晰 naming guidance（`feat/crowd-sniff`、`fix/email-validation`，绝不 random）
 
 ---
 
-## What Makes It Novel
+## 它的新意
 
-### 1. Branch-aware dev-tool trust
+### 1. Branch-aware dev-tool trust（分支感知的 dev-tool trust）
 
-Trust for `mise`/`direnv` is split by base branch:
+`mise`/`direnv` 的 trust 按 base branch 分开：
 
-| Base branch | Behavior |
+| Base branch（基准分支） | Behavior（行为） |
 |-------------|----------|
-| **Trusted base** (`main`, `develop`, `dev`, `trunk`, `staging`, `release/*`) | Configs compared against that branch; unchanged configs auto-trusted; `direnv allow` permitted |
-| **Other branches** (feature, PR review) | Configs compared against the default branch; `direnv allow` skipped regardless because `.envrc` can source files direnv doesn't validate |
+| **Trusted base**（`main`、`develop`、`dev`、`trunk`、`staging`、`release/*`） | Configs 与该 branch 比较；unchanged configs auto-trusted；允许 `direnv allow` |
+| **Other branches**（feature、PR review） | Configs 与 default branch 比较；无论如何跳过 `direnv allow`，因为 `.envrc` 可以 source direnv 不验证的 files |
 
-The split exists because review branches often contain code from external contributors. Auto-trusting their `.envrc` is the same shape of mistake as auto-running their setup script — you wouldn't, so the skill doesn't.
+这个 split 存在是因为 review branches 经常包含外部 contributors 的 code。Auto-trusting 他们的 `.envrc` 与 auto-running 他们的 setup script 是同形错误；你不会这么做，所以 skill 也不会。
 
-**Modified configs are never auto-trusted.** When a config differs from the base, the skill prints the manual trust command and waits for the user to review the diff first.
+**Modified configs 永远不 auto-trusted。** 当 config 与 base 不同时，skill 会打印 manual trust command，并等待用户先 review diff。
 
-### 2. `.env*` propagation with `.env.example` skip
+### 2. `.env*` propagation，跳过 `.env.example`
 
-Most projects need `.env`, `.env.local`, `.env.test`, etc. in the worktree to run anything. The skill copies all `.env*` files from the main repo, **except `.env.example`** (which is the committed template, not the user's local secrets). After creation, the worktree can run dev servers, tests, or scripts that depend on env state without manual setup.
+大多数 projects 需要 `.env`、`.env.local`、`.env.test` 等文件才能在 worktree 中运行。Skill 会从 main repo 复制所有 `.env*` files，**但跳过 `.env.example`**（它是 committed template，不是用户 local secrets）。创建后，worktree 可以运行依赖 env state 的 dev servers、tests 或 scripts，无需手动 setup。
 
-### 3. Doesn't disturb the main checkout
+### 3. 不扰动 main checkout
 
-`git worktree add` with a remote ref behaves differently depending on whether the local branch exists. Plain usage can accidentally check out something in the main repo or fail with a confusing error. This skill **fetches** the `from-branch` rather than checking it out — the new worktree is created from the remote ref, but the main checkout stays exactly where it was.
+`git worktree add` 搭配 remote ref 时，行为取决于 local branch 是否存在。Plain usage 可能意外在 main repo 中 check out 某些内容，或以 confusing error 失败。此 skill 会 **fetch** `from-branch`，而不是 check it out；new worktree 从 remote ref 创建，main checkout 保持原样。
 
-### 4. Consistent location: `.worktrees/<branch>`
+### 4. Consistent location（一致位置）：`.worktrees/<branch>`
 
-Worktrees go to `.worktrees/<branch>` — no exceptions. Predictable for `cd` shortcuts, predictable for cleanup, predictable for tooling that scans for worktrees. Branch names with slashes (`feat/login`) become directory paths (`.worktrees/feat/login`), which all major filesystems support.
+Worktrees 固定放到 `.worktrees/<branch>`，没有例外。这样对 `cd` shortcuts、cleanup，以及扫描 worktrees 的 tooling 都 predictable。带 slash 的 branch names（`feat/login`）会变成 directory paths（`.worktrees/feat/login`），所有主要 filesystems 都支持。
 
-### 5. Auto-`.gitignore` for `.worktrees`
+### 5. Auto-`.gitignore` for `.worktrees`（自动为 `.worktrees` 更新 `.gitignore`）
 
-If `.worktrees` isn't already in `.gitignore`, the skill adds it. Without this, every `git status` from the main checkout shows the worktree directory as a noisy untracked entry. With it, the directory is invisible to git operations from the main checkout.
+如果 `.worktrees` 尚未在 `.gitignore`，skill 会添加它。否则，从 main checkout 运行每次 `git status` 都会把 worktree directory 显示成 noisy untracked entry。添加后，该 directory 对 main checkout 的 git operations 不可见。
 
-### 6. Naming guidance for upstream callers
+### 6. 给 upstream callers 的 naming guidance
 
-When `/ce-work` or `/ce-code-review` invoke this skill, they pass a meaningful branch name derived from the work description (`feat/crowd-sniff`, `fix/email-validation`). The skill explicitly discourages auto-generated cryptic names — they obscure what the worktree is for and make cleanup harder later.
+当 `/ce-work` 或 `/ce-code-review` 调用此 skill，它们会传入从 work description 派生的 meaningful branch name（`feat/crowd-sniff`、`fix/email-validation`）。Skill 明确不鼓励 auto-generated cryptic names；它们会掩盖 worktree 用途，让后续 cleanup 更难。
 
-### 7. No wrapper for read/list/remove — just use `git`
+### 7. 不包装 read/list/remove：直接用 `git`
 
-Other worktree operations (list, remove, switch) don't get a wrapper. The skill explicitly tells you to use `git worktree list`, `git worktree remove .worktrees/<branch>`, `cd .worktrees/<branch>`, `cd "$(git rev-parse --show-toplevel)"` directly. Wrapping bare git commands adds no value and creates a maintenance burden — the skill is focused on the parts where setup matters.
+其他 worktree operations（list、remove、switch）不提供 wrapper。Skill 明确告诉你直接使用 `git worktree list`、`git worktree remove .worktrees/<branch>`、`cd .worktrees/<branch>`、`cd "$(git rev-parse --show-toplevel)"`。包装 bare git commands 没有价值，还会增加 maintenance burden；skill 聚焦于 setup matters 的部分。
 
 ---
 
-## Quick Example
+## 快速示例
 
-You're starting work on a notification-mute feature and want it isolated from your main checkout (which has another feature in progress). You invoke `/ce-worktree feat/notification-mute`.
+你要开始 notification-mute feature，希望它与 main checkout 隔离（main checkout 中还有另一个 feature 进行中）。调用 `/ce-worktree feat/notification-mute`。
 
-The skill runs `bash scripts/worktree-manager.sh create feat/notification-mute`. Defaults: `from-branch` is `origin/main`. Creates `.worktrees/feat/notification-mute` from the fetched `origin/main`. Copies your `.env`, `.env.local`, `.env.test`. Detects you have a `.mise.toml` matching `main`'s; auto-trusts since the base branch is `main` and the config is unchanged. `.worktrees` is already in your `.gitignore`, so no edit there.
+Skill 运行 `bash scripts/worktree-manager.sh create feat/notification-mute`。Defaults：`from-branch` 是 `origin/main`。它从 fetched `origin/main` 创建 `.worktrees/feat/notification-mute`。复制 `.env`、`.env.local`、`.env.test`。检测到 `.mise.toml` 与 `main` 匹配；因为 base branch 是 `main` 且 config unchanged，所以 auto-trust。`.worktrees` 已在 `.gitignore`，无需 edit。
 
-Output:
+Output（输出）：
 
 ```text
 Worktree created: .worktrees/feat/notification-mute
@@ -98,47 +98,47 @@ Trusted .mise.toml (matches main, auto-trust permitted)
 Switch with: cd .worktrees/feat/notification-mute
 ```
 
-You `cd .worktrees/feat/notification-mute`, run `bin/dev`, and start working — no env setup, no trust prompts, no disturbance to your other feature in the main checkout.
+你 `cd .worktrees/feat/notification-mute`，运行 `bin/dev`，开始工作：无需 env setup，无 trust prompts，也不会扰动 main checkout 中的另一个 feature。
 
 ---
 
-## When to Reach For It
+## 何时使用
 
-Reach for `ce-worktree` when:
+在以下情况使用 `ce-worktree`：
 
-- You're reviewing a PR and want to keep the main checkout free for ongoing work
-- You're running multiple features in parallel and don't want to context-switch via `git checkout`
-- You want to keep the default branch free of in-progress state
-- A skill (`ce-work`, `ce-code-review`) offered worktree as an option
+- 正在 review PR，并希望 main checkout 可继续其他工作
+- 并行运行多个 features，不想通过 `git checkout` context-switch
+- 希望 default branch 没有 in-progress state
+- 某个 skill（`ce-work`、`ce-code-review`）提供 worktree 作为 option
 
-Skip `ce-worktree` when:
+以下情况跳过 `ce-worktree`：
 
-- The work is single-task and fits on a branch in the main checkout — worktree overhead exceeds yield
-- You're already inside a worktree — nested worktrees aren't a thing the skill is designed for
-- The repo doesn't have `.env` files or dev-tool configs — plain `git worktree add` is sufficient
-
----
-
-## Use as Part of the Workflow
-
-`ce-worktree` is invoked from chain skills as their parallel-isolation option:
-
-- **`/ce-work` Phase 1.2** — when starting work, the user can choose worktree (recommended for parallel features) over branching in the main checkout
-- **`/ce-code-review`** — for reviewing PRs concurrently with browser tests on a separate checkout
-- **`/ce-debug`** — when investigating a bug on a branch other than the current one without disturbing in-progress work
-
-Upstream callers pass meaningful branch names; the skill expects `feat/...`, `fix/...`, `refactor/...` shapes — not auto-generated random names.
+- Work 是 single-task，放在 main checkout 的 branch 中即可；worktree overhead 超过收益
+- 已经在 worktree 中；nested worktrees 不是此 skill 设计目标
+- Repo 没有 `.env` files 或 dev-tool configs；普通 `git worktree add` 足够
 
 ---
 
-## Use Standalone
+## 作为 Workflow 的一部分使用
 
-Direct invocation:
+`ce-worktree` 是 chain skills 的 parallel-isolation option：
 
-- `/ce-worktree feat/notification-mute` — create from default branch
-- `/ce-worktree fix/email-validation develop` — create from a different base
+- **`/ce-work` Phase 1.2**：开始工作时，用户可选择 worktree（parallel features 推荐）而不是在 main checkout 中 branch
+- **`/ce-code-review`**：用于在 separate checkout 上并发 review PR 和 browser tests
+- **`/ce-debug`**：调查非当前 branch 上的 bug，且不扰动 in-progress work
 
-Other worktree operations (list, remove, switch) use `git` directly:
+Upstream callers 传 meaningful branch names；skill 期望 `feat/...`、`fix/...`、`refactor/...` 形状，而不是 auto-generated random names。
+
+---
+
+## 单独使用
+
+直接调用：
+
+- `/ce-worktree feat/notification-mute`：从 default branch 创建
+- `/ce-worktree fix/email-validation develop`：从不同 base 创建
+
+其他 worktree operations（list、remove、switch）直接使用 `git`：
 
 ```bash
 git worktree list                          # list worktrees
@@ -147,7 +147,7 @@ cd .worktrees/<branch>                     # switch to a worktree
 cd "$(git rev-parse --show-toplevel)"      # return to main checkout
 ```
 
-To copy `.env*` into an existing worktree created without them, run from the main repo (not from inside the worktree, because branch names with slashes confuse the relative path):
+要把 `.env*` 复制到此前创建但缺少这些文件的 existing worktree，请从 main repo 运行（不要在 worktree 内运行，因为带 slash 的 branch names 会混淆 relative path）：
 
 ```bash
 cp .env* .worktrees/<branch>/
@@ -155,43 +155,44 @@ cp .env* .worktrees/<branch>/
 
 ---
 
-## Reference
+## 参考
 
-| Argument | Effect |
+| Argument（参数） | Effect（效果） |
 |----------|--------|
-| `<branch-name>` | Create worktree from default branch |
-| `<branch-name> <from-branch>` | Create worktree from specified base |
+| `<branch-name>` | 从 default branch 创建 worktree |
+| `<branch-name> <from-branch>` | 从指定 base 创建 worktree |
 
-Defaults:
-- `from-branch` defaults to origin's default branch (or `main` if that can't be resolved)
-- The new branch is created at `origin/<from-branch>` (or the local ref if remote is unavailable)
+Defaults（默认值）：
 
----
-
-## FAQ
-
-**Why a separate worktree skill instead of just `git worktree add`?**
-Because the per-checkout setup matters — `.env` copying, `mise`/`direnv` trust, `.gitignore` management. Plain `git worktree add` leaves you with a tree that doesn't run.
-
-**Why is `direnv allow` skipped on review branches?**
-Because `.envrc` can source other files that direnv doesn't validate. Auto-trusting an external contributor's `.envrc` is the same shape of mistake as auto-running their setup script. The skill skips `direnv allow` on review branches and prints the manual command — you review the diff, then trust if appropriate.
-
-**What if the worktree was created without `.env*` files?**
-Run `cp .env* .worktrees/<branch>/` from the main repo (not from inside the worktree, since branch names often contain slashes that confuse relative paths from inside).
-
-**How do I clean up a worktree?**
-`cd "$(git rev-parse --show-toplevel)"` to leave the worktree, then `git worktree remove .worktrees/<branch>`. If the branch was deleted upstream, `/ce-clean-gone-branches` handles worktree-and-branch cleanup together.
-
-**Why `.worktrees/<branch>` and not somewhere else?**
-Predictability. Tooling that scans for worktrees, tab-completion, branch-to-path lookup all benefit from one canonical location. The directory is gitignored so it doesn't pollute git status.
-
-**Does it work for branches that don't exist on the remote yet?**
-Yes — the new branch is created locally at the resolved base ref. The skill fetches `origin/<from-branch>` to be current, but doesn't require the new branch name to already exist on the remote.
+- `from-branch` 默认为 origin 的 default branch（无法 resolve 时为 `main`）
+- New branch 在 `origin/<from-branch>` 创建（remote 不可用时使用 local ref）
 
 ---
 
-## See Also
+## 常见问题
 
-- [`/ce-work`](./ce-work.md) — calls this skill at Phase 1.2 when the user picks worktree mode for parallel features
-- [`/ce-code-review`](./ce-code-review.md) — recommends worktree for review concurrent with browser tests
-- [`/ce-clean-gone-branches`](./ce-clean-gone-branches.md) — cleans up worktrees and branches together when the remote tracking branch is gone
+**为什么要单独的 worktree skill，而不是直接 `git worktree add`？**
+因为 per-checkout setup 很重要：`.env` copying、`mise`/`direnv` trust、`.gitignore` management。Plain `git worktree add` 留下的 tree 往往跑不起来。
+
+**为什么在 review branches 上跳过 `direnv allow`？**
+因为 `.envrc` 可以 source direnv 不验证的其他 files。Auto-trusting 外部 contributor 的 `.envrc` 与 auto-running 他们的 setup script 是同形错误。Skill 在 review branches 上跳过 `direnv allow`，并打印 manual command；你先 review diff，再在合适时 trust。
+
+**如果 worktree 创建时没有 `.env*` files 怎么办？**
+从 main repo 运行 `cp .env* .worktrees/<branch>/`（不要在 worktree 内运行，因为 branch names 常含 slashes，会混淆内部 relative paths）。
+
+**如何清理 worktree？**
+先运行 `cd "$(git rev-parse --show-toplevel)"` 离开 worktree，再运行 `git worktree remove .worktrees/<branch>`。如果 branch upstream 已删除，`/ce-clean-gone-branches` 会一起处理 worktree 和 branch cleanup。
+
+**为什么是 `.worktrees/<branch>`，而不是其他位置？**
+Predictability。扫描 worktrees 的 tooling、tab-completion、branch-to-path lookup 都受益于一个 canonical location。该 directory 已 gitignored，不会污染 git status。
+
+**对 remote 上尚不存在的 branches 有效吗？**
+有效。New branch 会基于 resolved base ref 在本地创建。Skill 会 fetch `origin/<from-branch>` 以保持 current，但不要求 new branch name 已存在于 remote。
+
+---
+
+## 另见
+
+- [`/ce-work`](./ce-work.md) - 用户为 parallel features 选择 worktree mode 时，在 Phase 1.2 调用此 skill
+- [`/ce-code-review`](./ce-code-review.md) - 推荐 worktree，用于 review 与 browser tests 并发
+- [`/ce-clean-gone-branches`](./ce-clean-gone-branches.md) - remote tracking branch gone 时一起清理 worktrees 和 branches

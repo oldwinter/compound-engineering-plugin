@@ -1,184 +1,184 @@
 # `ce-debug`
 
-> Find root causes systematically — trace the full causal chain before proposing any fix, refuse symptom-level patches, escalate when stuck.
+> 系统找出 root causes：提出任何 fix 前先追完整 causal chain，拒绝 symptom-level patches，卡住时升级。
 
-`ce-debug` is the **investigation-first** debugging skill. It refuses to propose a fix until it can explain the full causal chain from trigger to symptom with no gaps. For uncertain links in that chain, it requires a **prediction** — something in a different code path or scenario that must also be true if the link is right. **When a prediction is wrong but a fix appears to work, the skill flags it: you found a symptom, not the cause.**
+`ce-debug` 是 **investigation-first** debugging skill。除非它能无缺口解释从 trigger 到 symptom 的完整 causal chain，否则拒绝提出 fix。对于 chain 中 uncertain links，它要求给出一个 **prediction**：如果这个 link 是对的，那么另一个 code path 或 scenario 中也必须为真的东西。**当 prediction 错了但 fix 看起来有效，skill 会标出来：你找到的是 symptom，不是 cause。**
 
-It right-sizes. Trivial bugs (typos, missing imports, obvious one-line fixes) take an explicit fast-path in Phase 0 — fix it, leave a one-line note, stop. Anything else flows through the full framework, with complex bugs spending more time in each phase naturally. The fix is optional — diagnosis-only is a first-class outcome.
+它会 right-size。Trivial bugs（typos、missing imports、明显 one-line fixes）在 Phase 0 有 explicit fast-path：修掉，留一行 note，停止。其他所有情况进入完整 framework；复杂 bugs 自然会在每个 phase 花更多时间。Fix 是可选的；diagnosis-only 是 first-class outcome。
 
-The compound-engineering ideation chain is `/ce-ideate → /ce-brainstorm → /ce-plan → /ce-work`. `ce-debug` is the bug-shaped sibling to `/ce-work` — when the input is broken behavior rather than a feature to build, this skill takes over. It can also escalate to `/ce-brainstorm` when investigation reveals the bug isn't really a bug; it's a design problem.
+Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-plan -> /ce-work`。`ce-debug` 是 `/ce-work` 的 bug-shaped sibling：当输入是 broken behavior，而不是要 build 的 feature 时，由它接手。当 investigation 揭示这个 bug 其实不是 bug，而是 design problem 时，它也可以升级到 `/ce-brainstorm`。
 
 ---
 
 ## TL;DR
 
-| Question | Answer |
+| Question（问题） | Answer（答案） |
 |----------|--------|
-| What does it do? | Investigates a bug end-to-end (reproduce, trace, root-cause), forms hypotheses with predictions, optionally implements a test-first fix, and hands off to commit + PR |
-| When to use it | Failed tests, error messages, regressions, GitHub/Linear/Jira issue references, "I've been stuck on this for hours" |
-| What it produces | A debug summary with root cause, recommended tests, and (if you opt in) a PR with the fix |
-| What's next | Auto commit + PR by default; or "diagnosis only" if you'd rather take it from there |
+| 它做什么？ | 端到端调查 bug（reproduce、trace、root-cause），形成带 predictions 的 hypotheses，可选实现 test-first fix，并 hand off 到 commit + PR |
+| 何时使用 | Failed tests、error messages、regressions、GitHub/Linear/Jira issue references、"I've been stuck on this for hours" |
+| 产出什么 | Debug summary，包含 root cause、recommended tests，以及（如果 opt in）带 fix 的 PR |
+| 下一步 | 默认 auto commit + PR；也可选择 "diagnosis only" 自己接手 |
 
 ---
 
-## The Problem
+## 问题
 
-Common debugging anti-patterns:
+常见 debugging anti-patterns：
 
-- **Shotgun fixes** — change three things at once "to see if it helps"; if anything works, you don't know why
-- **Symptom-level patches** — the bug stops manifesting after the change, but the root cause is still active and surfaces somewhere else weeks later
-- **Wrong-assumption fixation** — the hypothesis is correct, but you're testing it against an assumption (the framework behaves this way, this function returns what its name implies) that isn't true
-- **"Just try one more thing" loops** — three failed fixes in a row means the diagnosis is wrong; trying harder makes it worse
-- **Fixing the first thing that looks wrong** — the root cause is where bad state originates, not where it's first observed
+- **Shotgun fixes**：一次改三件事 "to see if it helps"；即使有用，也不知道为什么
+- **Symptom-level patches**：change 后 bug 不再显现，但 root cause 仍活着，几周后在别处出现
+- **Wrong-assumption fixation**：hypothesis 是对的，但测试它依赖的 assumption 不成立（framework 实际不是这样、function 返回值不像名字暗示的那样）
+- **"Just try one more thing" loops**：连续三个 failed fixes 意味着 diagnosis 错了；更努力尝试只会更糟
+- **Fixing the first thing that looks wrong**：root cause 在 bad state 起源处，不在第一次观察到它的地方
 
-## The Solution
+## 方案
 
-`ce-debug` runs investigation as a structured process with explicit gates:
+`ce-debug` 以 explicit gates 运行 structured investigation：
 
-- **Causal chain gate** — no fix proposed until the chain is explained end-to-end with no gaps
-- **Predictions for uncertain links** — something in a different code path that must also be true if the link is right
-- **Assumption audit** — list "this must be true" beliefs your understanding depends on, mark each verified or assumed
-- **One change at a time** — anti-shotgun discipline
-- **Smart escalation when stuck** — diagnose *why* hypotheses are exhausted, don't just try harder
-- **Test-first fix** — write the failing test, verify it fails for the right reason, then implement; never both at once
-
----
-
-## What Makes It Novel
-
-### 1. Causal chain gate — no fix until the chain is explained
-
-`ce-debug` does not propose a fix until it can explain the full causal chain from trigger to symptom with no gaps. "Somehow X leads to Y" is a gap. The fix gate is structural: there's an explicit phase transition that requires the chain explanation to pass.
-
-### 2. Predictions for uncertain links — anti-symptom-fix
-
-For each uncertain link in the causal chain, the skill states a **prediction**: something in a different code path or scenario that must also be true if this link is correct. **If the prediction is wrong but a fix appears to work, you found a symptom, not the cause.** Predictions aren't required for obvious links (missing imports, clear null dereference); they're a tool for testing uncertainty, not a ritual for every hypothesis.
-
-### 3. Assumption audit — catches right-hypothesis-wrong-assumption
-
-Before forming hypotheses, the skill enumerates the "this must be true" beliefs your understanding depends on — the framework behaves this way here, this function returns what its name implies, the config loads before this runs, the database is in the state the test implies. Each is marked verified (you read the code, checked state, or ran it) or assumed. Many "wrong hypotheses" are actually correct hypotheses tested against a wrong assumption.
-
-### 4. Smart escalation when stuck — diagnose, don't try harder
-
-After 2-3 hypotheses are exhausted without confirmation, the skill diagnoses *why* you're stuck:
-
-- Hypotheses point to different subsystems → likely architecture problem; suggest `/ce-brainstorm`
-- Evidence contradicts itself → wrong mental model of the code; step back and re-read without assumptions
-- Works locally, fails in CI/prod → environment problem; focus on env, config, dependencies, timing
-- Fix works but prediction was wrong → symptom fix; the real cause is still active
-
-### 5. Issue tracker integration — reads the full thread
-
-When the input references an issue (`#123`, GitHub URL, Linear URL, Jira key), the skill fetches the full conversation including all comments — not just the original description. Comments frequently contain updated reproduction steps, narrowed scope, prior failed attempts, and pivots to a different suspected root cause. Treating the opening post as the whole picture often sends the investigation in the wrong direction.
-
-### 6. Test-first fix discipline
-
-If you opt to fix (rather than "diagnosis only"), the skill writes a failing test that captures the bug, verifies it fails for the right reason (the root cause, not unrelated setup), implements the minimal fix, and verifies the test passes. The test-and-fix-in-the-same-step shortcut is explicitly disallowed.
-
-### 7. Conditional defense-in-depth
-
-When the root-cause pattern appears in 3+ other files, or the bug would have been catastrophic in production, the skill considers four defense layers (entry validation, invariant check, environment guard, diagnostic breadcrumb) and applies what fits. For one-off errors with no realistic recurrence, defense-in-depth is skipped.
-
-### 8. Brainstorm escalation when bug reveals a design problem
-
-Concrete signals trigger a `/ce-brainstorm` recommendation rather than a fix: the root cause is a wrong responsibility or interface; the requirements are wrong or incomplete; every fix is a workaround. Size alone doesn't make something a design problem — clear-fix-but-large bugs are still bugs.
+- **Causal chain gate**：chain 未被无缺口端到端解释前，不提出 fix
+- **Predictions for uncertain links**：如果某个 link 是对的，另一个 code path 中也必须为真的东西
+- **Assumption audit**：列出理解依赖的 "this must be true" beliefs，并标记 verified 或 assumed
+- **One change at a time（一次只改一件事）**：anti-shotgun discipline
+- **Smart escalation when stuck**：诊断 *为什么* hypotheses exhausted，而不是继续硬试
+- **Test-first fix**：先写 failing test，确认它因正确原因失败，再实现；绝不两者同时做
 
 ---
 
-## Quick Example
+## 它的新意
 
-You paste a stack trace or a GitHub issue URL. The skill fetches the full issue thread (including comments with the latest reproduction details), reproduces the bug locally, and verifies environment sanity (correct branch, dependencies installed, env vars present).
+### 1. Causal chain gate：chain 未解释前不 fix
 
-It traces the code path from the error back upstream, asking "where did this value come from?" until it reaches the point where valid state first became invalid. It performs an assumption audit and flags one belief as unverified.
+`ce-debug` 在能无缺口解释从 trigger 到 symptom 的完整 causal chain 前，不会提出 fix。"Somehow X leads to Y" 就是 gap。Fix gate 是结构性的：有一个 explicit phase transition，要求 chain explanation 通过。
 
-It forms two hypotheses, ranked by likelihood. The first is testable directly; the second has an uncertain link, so it generates a prediction: if this link is right, a different code path that calls the same function under different conditions should also fail. It tests the prediction.
+### 2. Predictions for uncertain links（不确定 link 的预测）：anti-symptom-fix
 
-The prediction holds. The skill presents the root cause with file:line references, the proposed fix, and the specific tests that should be added (with assertion guidance). It asks: fix it now, diagnosis only, or rethink the design?
+对 causal chain 中每个 uncertain link，skill 都陈述一个 **prediction**：如果该 link 正确，另一个 code path 或 scenario 中也必须为真的东西。**如果 prediction 错了但 fix 看起来有效，你找到的是 symptom，不是 cause。** Obvious links（missing imports、clear null dereference）不需要 predictions；它是测试 uncertainty 的工具，不是每个 hypothesis 的仪式。
 
-You pick "fix it now." It creates a feature branch, writes the failing test, verifies it fails for the right reason, implements the minimal fix, runs tests, and hands off to `/ce-commit-push-pr`.
+### 3. Assumption audit：抓住 right-hypothesis-wrong-assumption
 
----
+形成 hypotheses 前，skill 会枚举理解依赖的 "this must be true" beliefs：framework 在这里这样工作、function 返回值符合名字、config 在这里运行前已加载、database 处于 test 暗示的状态。每项标记为 verified（读过 code、检查过 state 或运行过）或 assumed。许多 "wrong hypotheses" 其实是正确 hypotheses 被拿去测试了错误 assumption。
 
-## When to Reach For It
+### 4. Smart escalation when stuck：诊断，而不是更用力
 
-Reach for `ce-debug` when:
+当 2-3 个 hypotheses exhausted 且没有 confirmation，skill 会诊断 *为什么* 卡住：
 
-- A test is failing and you need to know why
-- You have an error message, stack trace, or unexpected behavior
-- A regression appeared and you need to find when it broke
-- You have a GitHub, Linear, or Jira issue reference
-- You've been stuck on a problem after a few failed fix attempts
-- You suspect the bug surface is wider than one symptom (defense-in-depth territory)
+- Hypotheses 指向不同 subsystems -> 可能是 architecture problem；建议 `/ce-brainstorm`
+- Evidence 自相矛盾 -> 对 code 的 mental model 错了；后退一步，不带 assumptions 重读
+- Locally works、CI/prod fails -> environment problem；聚焦 env、config、dependencies、timing
+- Fix works 但 prediction wrong -> symptom fix；real cause 仍然 active
 
-Skip `ce-debug` when:
+### 5. Issue tracker integration：读取完整 thread
 
-- You already know the root cause and the fix is obvious — just fix it (or use `/ce-work` for a small change)
-- The "bug" is really a feature decision in disguise → `/ce-brainstorm`
-- The work is implementing something new, not investigating something broken → `/ce-work`
+当输入引用 issue（`#123`、GitHub URL、Linear URL、Jira key）时，skill 会 fetch 完整 conversation，包括所有 comments，而不只是 original description。Comments 经常包含更新的 reproduction steps、缩小后的 scope、此前失败尝试，以及转向另一个 suspected root cause 的 pivots。把 opening post 当成全貌，经常会把 investigation 带错方向。
 
----
+### 6. Test-first fix discipline（测试先行修复纪律）
 
-## Use as Part of the Workflow
+如果你选择 fix（而不是 "diagnosis only"），skill 会写一个捕获 bug 的 failing test，验证它因正确原因失败（root cause，而不是 unrelated setup），实现 minimal fix，并验证 test passes。明确禁止 test-and-fix-in-the-same-step shortcut。
 
-`ce-debug` interlocks with the rest of the chain in three ways:
+### 7. Conditional defense-in-depth（条件式纵深防御）
 
-- **Called from `/ce-plan`** — when a planning prompt is bug-shaped (error message, "fix the bug where X", regression), `ce-plan` surfaces `ce-debug` as a route-out option before doing structural planning
-- **Escalates to `/ce-brainstorm`** — when investigation reveals a design problem rather than a logic error, the skill recommends rethinking before implementing
-- **Hands off to `/ce-commit-push-pr`** — after a successful fix on a skill-created branch, the skill defaults to commit-and-PR without further prompting (with an explicit override path if your repo's `AGENTS.md` says otherwise)
+当 root-cause pattern 出现在 3+ 其他 files，或 bug 若在 production 中发生会 catastrophic，skill 会考虑四层 defense（entry validation、invariant check、environment guard、diagnostic breadcrumb）并应用合适部分。对没有 realistic recurrence 的 one-off errors，会跳过 defense-in-depth。
 
-After a PR opens, the skill optionally offers `/ce-compound` to capture learning — but only when the bug is generalizable (3+ recurrence, wrong assumption about a shared dependency). Localized mechanical fixes are skipped silently to avoid cluttering `docs/solutions/` with one-off entries.
+### 8. Bug 暴露 design problem 时升级到 brainstorm
+
+具体 signals 会触发 `/ce-brainstorm` recommendation，而不是 fix：root cause 是 wrong responsibility 或 interface；requirements 错误或不完整；每种 fix 都是 workaround。Size alone 不会让事情变成 design problem；clear-fix-but-large bugs 仍然是 bugs。
 
 ---
 
-## Use Standalone
+## 快速示例
 
-`ce-debug` is the standalone entry point for most bug work:
+你粘贴 stack trace 或 GitHub issue URL。Skill fetch 完整 issue thread（包括带最新 reproduction details 的 comments），在本地 reproduce bug，并验证 environment sanity（正确 branch、dependencies installed、env vars present）。
 
-- **Failing test** — `/ce-debug spec/models/notification_subscription_spec.rb`
-- **Error message paste** — `/ce-debug` followed by a stack trace
-- **GitHub issue** — `/ce-debug #1234` or `/ce-debug https://github.com/.../issues/1234`
-- **Linear ticket** — `/ce-debug ABC-456` or paste the URL
-- **Stuck on something** — `/ce-debug "why is X returning undefined when Y"`
+它从 error 反向 upstream trace code path，不断问 "where did this value come from?"，直到到达 valid state 首次变 invalid 的点。它做 assumption audit，并标记一个 belief 未验证。
 
-When you only want the diagnosis (you'll handle the fix yourself), pick "Diagnosis only — I'll take it from here" at the Phase 2 handoff. The summary is still produced; the test recommendations are part of the diagnosis regardless.
+它形成两个 hypotheses，并按 likelihood 排序。第一个可直接测试；第二个有 uncertain link，因此生成 prediction：如果这个 link 是对的，另一个在不同 conditions 下调用同一 function 的 code path 也应该 fail。它测试 prediction。
+
+Prediction 成立。Skill 用 file:line references 呈现 root cause、proposed fix，以及应添加的具体 tests（含 assertion guidance）。它询问：现在 fix、diagnosis only，还是 rethink design？
+
+你选择 "fix it now"。它创建 feature branch，写 failing test，验证它因正确原因失败，实现 minimal fix，运行 tests，并 hand off 给 `/ce-commit-push-pr`。
 
 ---
 
-## Reference
+## 何时使用
 
-| Argument | Effect |
+在以下情况使用 `ce-debug`：
+
+- Test 正在失败，需要知道原因
+- 有 error message、stack trace 或 unexpected behavior
+- 出现 regression，需要找出何时坏掉
+- 有 GitHub、Linear 或 Jira issue reference
+- 几次 failed fix attempts 后仍卡在问题上
+- 怀疑 bug surface 比单个 symptom 更宽（defense-in-depth territory）
+
+以下情况跳过 `ce-debug`：
+
+- 已经知道 root cause，fix obvious：直接修（或用 `/ce-work` 做 small change）
+- "Bug" 实际是伪装成 bug 的 feature decision：使用 `/ce-brainstorm`
+- 工作是实现新东西，而不是调查 broken behavior：使用 `/ce-work`
+
+---
+
+## 作为 Workflow 的一部分使用
+
+`ce-debug` 通过三种方式与 chain interlock：
+
+- **Called from `/ce-plan`**：当 planning prompt 是 bug-shaped（error message、"fix the bug where X"、regression），`ce-plan` 会在做 structural planning 前把 `ce-debug` 作为 route-out option
+- **Escalates to `/ce-brainstorm`**：当 investigation 揭示 design problem，而不是 logic error，skill 会建议先 rethink 再 implement
+- **Hands off to `/ce-commit-push-pr`**：当 skill-created branch 上成功 fix 后，skill 默认 commit-and-PR，不再额外 prompt（如果 repo 的 `AGENTS.md` 另有 explicit override path，则遵守）
+
+PR 打开后，skill 可选提供 `/ce-compound` 来捕获 learning，但只在 bug 可 generalize 时（3+ recurrence、对 shared dependency 的 wrong assumption）。Localized mechanical fixes 会 silently skip，避免用 one-off entries 弄乱 `docs/solutions/`。
+
+---
+
+## 单独使用
+
+`ce-debug` 是大多数 bug work 的 standalone entry point：
+
+- **Failing test（失败测试）**：`/ce-debug spec/models/notification_subscription_spec.rb`
+- **Error message paste**：`/ce-debug` 后跟 stack trace
+- **GitHub issue**：`/ce-debug #1234` 或 `/ce-debug https://github.com/.../issues/1234`
+- **Linear ticket**：`/ce-debug ABC-456` 或粘贴 URL
+- **Stuck on something（卡在某个问题上）**：`/ce-debug "why is X returning undefined when Y"`
+
+如果只想要 diagnosis（你自己处理 fix），在 Phase 2 handoff 选择 "Diagnosis only — I'll take it from here"。Summary 仍会生成；test recommendations 是 diagnosis 的一部分。
+
+---
+
+## 参考
+
+| Argument（参数） | Effect（效果） |
 |----------|--------|
-| _(empty)_ | Asks for the bug description |
+| _(empty)_ | 询问 bug description |
 | `<error message or stack trace>` | Direct investigation |
-| `<test path>` | Reproduces the failing test, traces from there |
-| `<issue reference>` (`#123`, URL, Linear ID, Jira key) | Fetches the full thread, reads all comments |
-| `<description>` | e.g., "why is the cart total wrong on checkout" |
+| `<test path>` | Reproduce failing test，并从那里 trace |
+| `<issue reference>` (`#123`, URL, Linear ID, Jira key) | Fetch 完整 thread，读取所有 comments |
+| `<description>` | 例如 "why is the cart total wrong on checkout" |
 
 ---
 
-## FAQ
+## 常见问题
 
-**Why investigate before fixing?**
-Fixes that aren't tied to a clear causal chain often address symptoms rather than the cause. The bug stops manifesting, but the real problem is still active and surfaces somewhere else weeks later. The causal chain gate is the structural defense against this.
+**为什么 fix 前要 investigation？**
+不绑定 clear causal chain 的 fixes 往往处理 symptom，而不是 cause。Bug 不再显现，但真实问题仍活着，几周后会在别处出现。Causal chain gate 是对此的 structural defense。
 
-**What's the difference between a hypothesis and a prediction?**
-A hypothesis says "I think this is the cause." A prediction says "if my hypothesis is right, then *this other thing* must also be true." Predictions test the hypothesis against independent evidence — and if the prediction is wrong but a fix works, you've found a symptom.
+**Hypothesis 和 prediction 有什么区别？**
+Hypothesis 说 "I think this is the cause." Prediction 说 "if my hypothesis is right, then *this other thing* must also be true." Predictions 用 independent evidence 测试 hypothesis；如果 prediction 错了但 fix 有效，你找到的是 symptom。
 
-**When should the skill suggest `/ce-brainstorm`?**
-Only when the bug can't be properly fixed within the current design — wrong responsibility, wrong interface, requirements gap, or every fix is a workaround. Size alone doesn't make something a design problem.
+**什么时候 skill 应建议 `/ce-brainstorm`？**
+只有当 bug 无法在当前 design 内 proper fix 时：wrong responsibility、wrong interface、requirements gap，或每个 fix 都是 workaround。Size alone 不会让它成为 design problem。
 
-**What if I just want to fix it without all this process?**
-Skip the skill — go directly to `/ce-work` or just edit the file. `ce-debug` is for cases where the root cause isn't obvious or the fix has failed to stick.
+**如果我只想不走流程直接修呢？**
+跳过这个 skill，直接用 `/ce-work` 或编辑文件。`ce-debug` 适用于 root cause 不明显，或 fix 一直不稳定的场景。
 
-**Does it work for non-software bugs?**
-Not really — the skill assumes code, tests, and a tracker. The investigation discipline (causal chain, predictions, assumption audit) generalizes, but the skill's mechanics (test-first fix, defense-in-depth, PR handoff) are software-shaped.
+**它适用于非 software bugs 吗？**
+不太适合。Skill 假设有 code、tests 和 tracker。Investigation discipline（causal chain、predictions、assumption audit）可以 generalize，但 skill mechanics（test-first fix、defense-in-depth、PR handoff）是 software-shaped。
 
 ---
 
-## See Also
+## 另见
 
-- [`ce-plan`](./ce-plan.md) — routes bug-shaped prompts here when you start at planning
-- [`ce-brainstorm`](./ce-brainstorm.md) — escalation target when the bug reveals a design problem
-- [`ce-work`](./ce-work.md) — sibling skill for feature work; use this when input isn't bug-shaped
-- [`ce-commit-push-pr`](./ce-commit-push-pr.md) — handles the final commit + PR after a fix
-- [`ce-compound`](./ce-compound.md) — capture reusable learning when the bug is generalizable
+- [`ce-plan`](./ce-plan.md) - 从 planning 开始时，把 bug-shaped prompts route 到这里
+- [`ce-brainstorm`](./ce-brainstorm.md) - bug 暴露 design problem 时的 escalation target
+- [`ce-work`](./ce-work.md) - feature work 的 sibling skill；当 input 不是 bug-shaped 时使用它
+- [`ce-commit-push-pr`](./ce-commit-push-pr.md) - fix 后处理 final commit + PR
+- [`ce-compound`](./ce-compound.md) - bug 可 generalize 时捕获 reusable learning

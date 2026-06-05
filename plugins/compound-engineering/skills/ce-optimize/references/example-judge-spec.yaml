@@ -1,8 +1,8 @@
-# Minimal first-run template for qualitative metrics.
-# Start here when true quality requires semantic judgment, not a proxy metric.
+# qualitative metrics 的 minimal first-run template。
+# 当 true quality 需要 semantic judgment 而不是 proxy metric 时，从这里开始。
 
 name: improve-search-relevance
-description: Improve semantic relevance of search results without obvious failures
+description: 提升 search results 的 semantic relevance，同时避免 obvious failures
 
 metric:
   primary:
@@ -12,22 +12,22 @@ metric:
   degenerate_gates:
     - name: result_count
       check: ">= 5"
-      description: Return enough results to judge quality
+      description: 返回足够 results 以判断 quality
     - name: empty_query_failures
       check: "== 0"
-      description: Empty or trivial queries must not fail
+      description: Empty 或 trivial queries 不能 fail
   diagnostics:
     - name: latency_ms
     - name: recall_at_10
   judge:
     rubric: |
-      Rate each result set from 1-5 for relevance:
-      - 5: Results are directly relevant and well ordered
-      - 4: Mostly relevant with minor ordering issues
-      - 3: Mixed relevance or one obvious miss
-      - 2: Weak relevance, several misses, or poor ordering
-      - 1: Mostly irrelevant
-      Also report: ambiguous (boolean)
+      按 1-5 分评价每组 results 的 relevance：
+      - 5: Results are directly relevant and well ordered（直接相关且排序良好）
+      - 4: Mostly relevant with minor ordering issues（大多相关，仅有轻微排序问题）
+      - 3: Mixed relevance or one obvious miss（相关性混合，或有一个明显 miss）
+      - 2: Weak relevance, several misses, or poor ordering（相关性弱，有多个 misses，或排序差）
+      - 1: Mostly irrelevant（大多不相关）
+      同时报告：ambiguous (boolean)
     scoring:
       primary: mean_score
       secondary:
@@ -66,8 +66,8 @@ dependencies:
   approved: []
 
 constraints:
-  - "Preserve the existing search response shape"
-  - "Do not add new dependencies on the first run"
+  - "保留 existing search response shape"
+  - "首次运行不要添加 new dependencies"
 
 stopping:
   max_iterations: 4

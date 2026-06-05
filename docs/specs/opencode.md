@@ -1,8 +1,8 @@
-# OpenCode Spec (Config, Agents, Plugins)
+# OpenCode Spec（OpenCode 规格：Config、Agents、Plugins）
 
-Last verified: 2026-04-19
+最后验证：2026-04-19
 
-## Primary sources
+## 主要来源
 
 ```
 https://opencode.ai/docs/config/
@@ -15,78 +15,78 @@ https://opencode.ai/docs/skills
 https://opencode.ai/config.json
 ```
 
-## Config files and precedence
+## Config files and precedence（配置文件与优先级）
 
-- OpenCode supports JSON and JSONC configs.
-- Config sources are merged rather than replaced, with global and project config both participating in the final config.
-- Global config is stored at `~/.config/opencode/opencode.json`, and project config is `opencode.json` in the project root.
-- Custom config file and directory can be provided via `OPENCODE_CONFIG` and `OPENCODE_CONFIG_DIR`.
-- The `.opencode` and `~/.config/opencode` directories use plural subdirectory names (`agents/`, `commands/`, `modes/`, `plugins/`, `skills/`, `tools/`, `themes/`).
+- OpenCode 支持 JSON 和 JSONC configs。
+- Config sources 会 merge，而不是 replace；global 和 project config 都参与 final config。
+- Global config 存储在 `~/.config/opencode/opencode.json`，project config 是 project root 下的 `opencode.json`。
+- 可通过 `OPENCODE_CONFIG` 和 `OPENCODE_CONFIG_DIR` 提供 custom config file 和 directory。
+- `.opencode` 和 `~/.config/opencode` directories 使用 plural subdirectory names（`agents/`、`commands/`、`modes/`、`plugins/`、`skills/`、`tools/`、`themes/`）。
 
-## Core config keys
+## Core config keys（核心 config key）
 
-- `model` and `small_model` set the primary and lightweight models; `provider` configures provider options.
-- `tools` is still supported but deprecated as of OpenCode v1.1.1; permissions are now the canonical control surface.
-- `permission` controls tool approvals and can be configured globally or per tool, including pattern-based rules.
-- `mcp`, `instructions`, `disabled_providers`, `enabled_providers`, and `plugin` are supported config sections.
-- `plugin` can list npm packages to load at startup.
-- `skills.paths` and `skills.urls` can add extra skill discovery locations, but CE should not depend on them until the layout is smoke-tested locally with OpenCode.
+- `model` 和 `small_model` 设置 primary 与 lightweight models；`provider` 配置 provider options。
+- `tools` 仍被支持，但自 OpenCode v1.1.1 起 deprecated；permissions 现在是 canonical control surface。
+- `permission` 控制 tool approvals，可 globally 或 per tool 配置，也支持 pattern-based rules。
+- 支持 `mcp`、`instructions`、`disabled_providers`、`enabled_providers` 和 `plugin` config sections。
+- `plugin` 可列出 startup 时加载的 npm packages。
+- `skills.paths` 和 `skills.urls` 可添加 extra skill discovery locations，但在用 local OpenCode smoke-test 该 layout 之前，CE 不应依赖它们。
 
-## Tools
+## Tools（工具）
 
-- OpenCode ships with built-in tools, and permissions determine whether each tool runs automatically, requires approval, or is denied.
-- Tools are enabled by default; permissions provide the gating mechanism.
+- OpenCode 自带 built-in tools；permissions 决定每个 tool 是自动运行、需要 approval，还是 denied。
+- Tools 默认 enabled；permissions 提供 gating mechanism。
 
-## Permissions
+## Permissions（权限）
 
-- Permissions resolve to `allow`, `ask`, or `deny` and can be configured globally or per tool, with pattern-based rules.
-- Defaults are permissive, with special cases such as `.env` file reads.
-- Agent-level permissions override the global permission block.
+- Permissions 解析为 `allow`、`ask` 或 `deny`，可 globally 或 per tool 配置，也支持 pattern-based rules。
+- Defaults 较 permissive，但 `.env` file reads 等有 special cases。
+- Agent-level permissions 会覆盖 global permission block。
 
-## Agents
+## Agents（agents，agent）
 
-- Agents can be configured in `opencode.json` or as markdown files in `~/.config/opencode/agents/` or `.opencode/agents/`.
-- Agent config supports `mode`, `model`, `variant`, `temperature`, `top_p`, `hidden`, `steps`, `options`, `permission`, and other schema fields. `tools` still exists but is deprecated.
-- `mode` can be `primary`, `subagent`, or `all`; omitted mode defaults to `all`.
-- `hidden: true` hides subagents from the `@` autocomplete menu.
-- `permission.task` controls which subagents an agent may invoke.
-- Model IDs use the `provider/model-id` format.
+- Agents 可在 `opencode.json` 中配置，也可作为 markdown files 放在 `~/.config/opencode/agents/` 或 `.opencode/agents/`。
+- Agent config 支持 `mode`、`model`、`variant`、`temperature`、`top_p`、`hidden`、`steps`、`options`、`permission` 和其他 schema fields。`tools` 仍存在但 deprecated。
+- `mode` 可以是 `primary`、`subagent` 或 `all`；省略 mode 时默认为 `all`。
+- `hidden: true` 会把 subagents 从 `@` autocomplete menu 中隐藏。
+- `permission.task` 控制一个 agent 可调用哪些 subagents。
+- Model IDs 使用 `provider/model-id` format。
 
-## Skills
+## Skills（skills，skill）
 
-- Skills are reusable `SKILL.md` definitions loaded on demand through OpenCode's native `skill` tool.
-- OpenCode searches direct child skill directories in its built-in roots:
+- Skills 是可复用的 `SKILL.md` definitions，通过 OpenCode native `skill` tool 按需加载。
+- OpenCode 会在 built-in roots 中搜索 direct child skill directories：
   - `.opencode/skills/<name>/SKILL.md`
   - `~/.config/opencode/skills/<name>/SKILL.md`
   - `.claude/skills/<name>/SKILL.md`
   - `~/.claude/skills/<name>/SKILL.md`
   - `.agents/skills/<name>/SKILL.md`
   - `~/.agents/skills/<name>/SKILL.md`
-- The config schema also exposes `skills.paths` and `skills.urls` for extra skill sources. Do not switch CE to those until tested against a local OpenCode install; direct `~/.config/opencode/skills/<name>/SKILL.md` remains the stable writer shape.
-- Skill frontmatter recognizes `name`, `description`, `license`, `compatibility`, and `metadata`; unknown fields are ignored.
-- Skill names must be lowercase alphanumeric with single hyphen separators and must match the directory name.
+- config schema 也暴露 `skills.paths` 和 `skills.urls` 用于 extra skill sources。在本地 OpenCode install 测试之前，不要把 CE 切换到这些字段；direct `~/.config/opencode/skills/<name>/SKILL.md` 仍是 stable writer shape。
+- Skill frontmatter 识别 `name`、`description`、`license`、`compatibility` 和 `metadata`；unknown fields 会被 ignored。
+- Skill names 必须是 lowercase alphanumeric，使用 single hyphen separators，并且必须匹配 directory name。
 
-## Commands
+## Commands（commands，命令）
 
-- Commands can be configured in `opencode.json` or as Markdown files in `~/.config/opencode/commands/` or `.opencode/commands/`.
-- Markdown command frontmatter can include fields such as `description`, `agent`, `model`, and `subtask`; the body becomes the prompt template.
-- If a command targets an agent whose mode is `subagent`, OpenCode invokes it as a subagent by default. `subtask: true` can force subagent invocation.
+- Commands 可在 `opencode.json` 中配置，也可作为 Markdown files 放在 `~/.config/opencode/commands/` 或 `.opencode/commands/`。
+- Markdown command frontmatter 可包含 `description`、`agent`、`model` 和 `subtask` 等 fields；body 会成为 prompt template。
+- 如果 command 目标 agent 的 mode 是 `subagent`，OpenCode 默认将其作为 subagent 调用。`subtask: true` 可强制 subagent invocation。
 
-## Plugins and events
+## Plugins and events（plugins 与 events）
 
-- Local plugins are loaded from `.opencode/plugins/` and `~/.config/opencode/plugins/`. npm plugins can be listed in `plugin` in `opencode.json`.
-- Plugins are JavaScript/TypeScript modules. Each exported plugin function receives OpenCode context and returns hooks/event handlers.
-- Local plugins and custom tools can use npm dependencies declared in a `package.json` in the OpenCode config directory; OpenCode runs `bun install` at startup.
+- Local plugins 从 `.opencode/plugins/` 和 `~/.config/opencode/plugins/` 加载。npm plugins 可在 `opencode.json` 的 `plugin` 中列出。
+- Plugins 是 JavaScript/TypeScript modules。每个 exported plugin function 接收 OpenCode context，并返回 hooks/event handlers。
+- Local plugins 和 custom tools 可使用 OpenCode config directory 中 `package.json` 声明的 npm dependencies；OpenCode 在 startup 时运行 `bun install`。
 
-## Notes for this repository
+## 本仓库说明
 
-- The current documented global CE install root should stay `~/.config/opencode`, not `~/.agents`, to avoid conflicts with harnesses that also read `~/.agents`.
-- The current CE writer shape is still appropriate in April 2026:
+- 当前 documented global CE install root 应保持为 `~/.config/opencode`，而不是 `~/.agents`，以避免与同样读取 `~/.agents` 的 harnesses 冲突。
+- 2026 年 4 月时，当前 CE writer shape 仍然合适：
   - `~/.config/opencode/opencode.json`
   - `~/.config/opencode/agents/*.md`
-  - `~/.config/opencode/commands/*.md` only when a source plugin ships commands
+  - 仅当 source plugin ships commands 时，写入 `~/.config/opencode/commands/*.md`
   - `~/.config/opencode/plugins/*.ts`
   - `~/.config/opencode/skills/*/SKILL.md`
-- OpenCode's plugin system is useful for JS/TS hooks and custom tools, but current docs do not describe a native marketplace command that consumes CE's `.claude-plugin/marketplace.json` and installs the full skills/agents/commands payload.
-- Keep the custom Bun writer until OpenCode documents a native distribution path for packaged skills and agents.
-- The `compound-engineering` plugin currently emits skills and subagent Markdown files for OpenCode. It should not emit deprecated `tools` config; permission config is enough for non-default permission modes.
+- OpenCode 的 plugin system 对 JS/TS hooks 和 custom tools 有用，但当前 docs 没有描述一个 native marketplace command 可以消费 CE 的 `.claude-plugin/marketplace.json` 并安装完整 skills/agents/commands payload。
+- 在 OpenCode 记录 packaged skills 和 agents 的 native distribution path 之前，保留 custom Bun writer。
+- `compound-engineering` plugin 当前为 OpenCode 产出 skills 和 subagent Markdown files。它不应输出 deprecated `tools` config；permission config 足以支持 non-default permission modes。

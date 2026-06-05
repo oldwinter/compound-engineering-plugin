@@ -1,103 +1,103 @@
-# Universal Ideation Facilitator
+# Universal Ideation Facilitator（通用 Ideation 引导器）
 
-This file is loaded when ce-ideate detects an elsewhere-mode topic with no software surface at all — naming (independent of product), narrative writing, personal decisions, non-digital business strategy, physical-product design. Topics that concern a software artifact (page, app, feature, flow, product) are routed to elsewhere-software and do not load this file, even when the ideas are about copy, UX, or visual design for that artifact.
+当 ce-ideate 检测到完全没有 software surface 的 elsewhere-mode topic 时加载本文件：naming（独立于 product）、narrative writing、personal decisions、non-digital business strategy、physical-product design。涉及 software artifact（page、app、feature、flow、product）的 topics 会路由到 elsewhere-software，并且不加载本文件，即使 ideas 是关于该 artifact 的 copy、UX 或 visual design。
 
-Phase 1 elsewhere-mode grounding runs before this reference takes over — user-context synthesis and web-research feed the facilitation below. Learnings-researcher is skipped by default for elsewhere-non-software since the CWD's `docs/solutions/` almost always contains engineering patterns that do not transfer to non-digital topics. What this file replaces is Phase 2's software-flavored frame dispatch and the post-ideation wrap-up; the repo-specific codebase scan never runs in elsewhere mode. Absorb these principles and facilitate ideation in the topic's native domain, using the Phase 1 grounding summary as input.
+Phase 1 elsewhere-mode grounding 会在本 reference 接管前运行；user-context synthesis 和 web-research 会 feed 下方 facilitation。对 elsewhere-non-software，默认跳过 learnings-researcher，因为 CWD 的 `docs/solutions/` 几乎总是包含无法迁移到 non-digital topics 的 engineering patterns。本文件替换的是 Phase 2 的 software-flavored frame dispatch 和 post-ideation wrap-up；repo-specific codebase scan 在 elsewhere mode 中永不运行。吸收这些 principles，并使用 Phase 1 grounding summary 作为输入，在 topic 的 native domain 中 facilitate ideation。
 
-The mechanism that makes ideation good — generate many, critique adversarially, present survivors with reasons — is preserved. Only the framing of the work changes.
+让 ideation 有质量的机制会保留：generate many、critique adversarially、present survivors with reasons。改变的只有 work framing。
 
 ---
 
-## Your role
+## Your role（你的角色）
 
-Be a divergent thinking partner, not a delivery service. The user came here for a stronger candidate set than they could generate alone, not a single recommendation. Resist the urge to converge early. A premature favorite anchors the conversation and crowds out better candidates that have not surfaced yet.
+做 divergent thinking partner，而不是 delivery service。用户来到这里，是为了获得比自己单独生成更强的 candidate set，而不是单个 recommendation。抵制过早 converge 的冲动。Premature favorite 会 anchor conversation，并挤掉尚未浮现的更好 candidates。
 
-Match the tone to the stakes. For business or product decisions (pricing, positioning, roadmap), lead with constraints and tradeoffs. For creative work (naming, narrative, visual concepts), lead with energy and range. For personal decisions, lead with values before mechanics.
+根据 stakes 匹配 tone。对 business 或 product decisions（pricing、positioning、roadmap），先从 constraints 和 tradeoffs 入手。对 creative work（naming、narrative、visual concepts），先带出 energy 和 range。对 personal decisions，先处理 values，再处理 mechanics。
 
-## How to start
+## How to start（如何开始）
 
-Match depth to scope:
+根据 scope 匹配 depth：
 
-- **Quick** — the user wants a starter set right now. Generate one round, critique briefly, present 3-5 survivors, done.
-- **Standard** — light intake (one or two questions), one round of generation, adversarial critique, present 5-7 survivors.
-- **Full** — rich intake, multiple frames in parallel, deep critique, present 5-7 survivors with strong rationale.
+- **Quick**：用户现在就想要 starter set。生成一轮，简短 critique，展示 3-5 个 survivors，结束。
+- **Standard**：light intake（一个或两个问题）、一轮 generation、adversarial critique，展示 5-7 个 survivors。
+- **Full**：rich intake、多个 frames parallel、deep critique，展示带 strong rationale 的 5-7 个 survivors。
 
-Apply the discrimination test before asking anything. Would swapping one piece of the user's stated context for a contrasting alternative materially change which ideas survive? If yes, the context is load-bearing — proceed. If no, ask 1-3 narrowly chosen questions. Follow the questioning principles from SKILL.md Phase 0.2: ask only about the **subject** (what to ideate on) or **substance** (what Phase 1 agents need to say something specific) — never about solution direction, constraints, audience, tone, or success criteria. Those belong to `ce-brainstorm`. Build on what the user already provided rather than starting from a template. After each answer, re-apply the test before asking another. Stop on dismissive responses ("idk just go") and treat genuine "no constraint" answers as real answers.
+询问任何问题前先应用 discrimination test。把用户已说明 context 的某一部分换成 contrasting alternative，是否会 materially 改变哪些 ideas survive？如果是，该 context 是 load-bearing；继续。如果不是，问 1-3 个 narrowly chosen questions。遵循 SKILL.md Phase 0.2 的 questioning principles：只问 **subject**（要 ideate 什么）或 **substance**（Phase 1 agents 需要什么才能说出具体内容）；永远不要问 solution direction、constraints、audience、tone 或 success criteria。这些属于 `ce-brainstorm`。基于用户已提供内容继续，而不是从 template 开始。每个回答后，再次应用 test 再决定是否问下一个。遇到 dismissive responses（"idk just go"）就停止，并把真正的 "no constraint" answers 当作真实答案。
 
-**Grounding freshness.** Phase 1 elsewhere-mode grounding (user-context synthesis + web-research by default; learnings skipped for non-software, see SKILL.md Phase 1) has already run before this reference takes over, and its outputs feed the generation below. If intake answers here materially refine the topic or constraints — new scope, different audience, a domain shift that the original grounding did not cover — re-dispatch the affected Phase 1 agents on the refined topic before generating ideas. The guardrail mirrors SKILL.md Phase 0.4's rule that mode and grounding re-evaluate when intake changes the scope to be acted on; ranking against stale grounding risks surfacing ideas fit to the wrong topic.
+**Grounding freshness。** Phase 1 elsewhere-mode grounding（默认 user-context synthesis + web-research；non-software 跳过 learnings，见 SKILL.md Phase 1）已在本 reference 接管前运行，其 outputs feed 下方 generation。如果这里的 intake answers materially refine 了 topic 或 constraints：new scope、different audience、原 grounding 未覆盖的 domain shift，则在生成 ideas 前，基于 refined topic 重新 dispatch 受影响的 Phase 1 agents。该 guardrail 对应 SKILL.md Phase 0.4 的规则：当 intake 改变要行动的 scope 时，mode 和 grounding 需要重新评估；基于 stale grounding ranking 有可能 surfacing 适配错误 topic 的 ideas。
 
-When the user provides rich context up front (a paste, a brief, an existing draft), confirm understanding in one line and skip intake.
+当用户一开始提供 rich context（paste、brief、existing draft）时，用一行确认理解并跳过 intake。
 
-## How to decompose
+## How to decompose（如何分解）
 
-Before generating, decompose the topic into 3-5 orthogonal **axes** that name *what aspects of the subject to think about*. Frames in "How to generate" determine *how to think* (the lens); axes determine *what to think on* (the surface). Without explicit axes, the same topic interpreted six ways through six lenses still leaves most of the surface unexamined — lens diversity does not produce surface coverage on its own.
+生成前，将 topic 分解为 3-5 个 orthogonal **axes**，命名*应思考 subject 的哪些方面*。"How to generate" 中的 frames 决定*如何思考*（lens）；axes 决定*思考什么*（surface）。没有 explicit axes，同一 topic 即使通过六种 lenses 解读六次，仍会留下大部分 surface 未被检查；lens diversity 不会自行产生 surface coverage。
 
-This step is the facilitator's own analysis — no sub-agent, no additional research. The Phase 1 grounding supplies the substance.
+此 step 是 facilitator 自己的 analysis：不使用 sub-agent，不做 additional research。Phase 1 grounding 提供 substance。
 
-Axes should be:
+Axes 应该：
 
-- **3-5 in number.** Fewer means atomic — skip decomposition. More fragments coverage.
-- **Orthogonal.** A single idea should fall on one axis, not span multiple.
-- **Derived from grounding**, not from a generic template.
-- **At the same level** of granularity.
-- **Named in the topic's language**, not meta-language about ideation.
+- **数量为 3-5。** 更少表示 atomic，跳过 decomposition。更多会 fragment coverage。
+- **Orthogonal。** 单个 idea 应落在一个 axis 上，而不是横跨多个。
+- **Derived from grounding**，不是来自 generic template。
+- **处于同一 level** 的 granularity。
+- **用 topic 自身语言命名**，不要用关于 ideation 的 meta-language。
 
-**Worked examples (illustrative, not a template):**
+**Worked examples（illustrative，不是 template）：**
 
-- "Name my new coffee shop" → atomic; skip decomposition (the candidate *is* a name)
-- "Plot ideas for a short story" → atomic; skip decomposition (the candidate *is* a plot)
-- "Brand strategy for a launch" → axes might be: positioning; visual identity; voice; launch channels; pricing/packaging
-- "Career options for the next 5 years" → axes might be: domain (industry/role); structure (employee/founder/freelance); geography; growth ambition; financial floor
+- "Name my new coffee shop" → atomic；skip decomposition（candidate *就是* name）
+- "Plot ideas for a short story" → atomic；skip decomposition（candidate *就是* plot）
+- "Brand strategy for a launch" → axes 可能是：positioning；visual identity；voice；launch channels；pricing/packaging
+- "Career options for the next 5 years" → axes 可能是：domain（industry/role）；structure（employee/founder/freelance）；geography；growth ambition；financial floor
 
-**Skip condition.** Many elsewhere-non-software topics are atomic by nature — a single name, tagline, or one-shot creative output. When 3+ orthogonal axes do not emerge, skip decomposition and note `Decomposition skipped — atomic subject` in the grounding summary.
+**Skip condition。** 许多 elsewhere-non-software topics 天然就是 atomic：单个 name、tagline 或 one-shot creative output。当无法浮现 3+ orthogonal axes 时，跳过 decomposition，并在 grounding summary 中注明 `Decomposition skipped — atomic subject`。
 
-**Surprise-me skip.** No settled subject in surprise-me mode; skip decomposition and note `Decomposition skipped — surprise-me mode`.
+**Surprise-me skip。** Surprise-me mode 中没有 settled subject；跳过 decomposition，并注明 `Decomposition skipped — surprise-me mode`。
 
-Record the axes (or skip-reason) at the head of generation. Generation will distribute ideas across axes; convergence will weight axis spread alongside other rubric criteria.
+在 generation 开头记录 axes（或 skip-reason）。Generation 会跨 axes 分配 ideas；convergence 会把 axis spread 与其他 rubric criteria 一起加权。
 
-## How to generate
+## How to generate（如何生成）
 
-Generate the full candidate list before critiquing any idea. Use the same six frames as software ideation, described in domain-agnostic language. Each frame is a **starting bias, not a constraint** — follow promising threads across frames.
+在 critique 任何 idea 前，先生成完整 candidate list。使用与 software ideation 相同的六个 frames，并用 domain-agnostic language 描述。每个 frame 是 **starting bias，不是 constraint**；跨 frames 追踪 promising threads。
 
-- **Pain and friction** — what is consistently annoying, slow, or broken in the current state of the topic? Generate ideas that remove or reduce that friction.
-- **Inversion, removal, automation** — what would happen if a step were inverted, removed entirely, or automated away? The result is often a candidate even if the inversion itself is unrealistic.
-- **Assumption-breaking and reframing** — what is being treated as fixed that is actually a choice? Reframe the problem one level up or sideways.
-- **Leverage and compounding** — what choices, once made, make many future moves cheaper or stronger? Look for second-order effects.
-- **Cross-domain analogy** — how do completely different fields solve a structurally similar problem? The grounding domain is the user's topic; the analogy domain is anywhere else (other industries, biology, games, infrastructure, history). Push past the obvious analogy to non-obvious ones.
-- **Constraint-flipping** — invert the obvious constraint to its opposite or extreme. What if the budget were 10x or 0? What if there were one constraint instead of ten, or ten instead of one? Use the resulting design as a candidate even if the flip itself is not realistic.
+- **Pain and friction（痛点与摩擦）**：topic 当前状态中，什么持续 annoying、slow 或 broken？生成移除或减少 friction 的 ideas。
+- **Inversion, removal, automation（反转、移除、自动化）**：如果某一步被 inverted、entirely removed 或 automated away，会发生什么？即使 inversion 本身不现实，其结果也常是 candidate。
+- **Assumption-breaking and reframing（打破假设与重构框架）**：什么被当作 fixed，但其实是 choice？把 problem 向上一层或侧向 reframe。
+- **Leverage and compounding（杠杆与复利）**：哪些 choices 一旦做出，会让许多 future moves 更便宜或更强？寻找 second-order effects。
+- **Cross-domain analogy（跨领域类比）**：完全不同领域如何解决 structurally similar problem？Grounding domain 是用户 topic；analogy domain 可以是任何其他地方（other industries、biology、games、infrastructure、history）。越过 obvious analogy，推进到 non-obvious ones。
+- **Constraint-flipping（约束翻转）**：把 obvious constraint 反转到 opposite 或 extreme。如果 budget 是 10x 或 0 会怎样？如果只有一个 constraint 而不是十个，或有十个而不是一个，会怎样？即使 flip 本身不现实，也把 resulting design 作为 candidate。
 
-Aim for 5-8 ideas per frame. **When axes are present, distribute ideas across axes** — each frame's lens applies to every axis, but ideas should not all cluster on one. Tag each idea with the axis it targets. After generating, merge and dedupe; scan for cross-cutting combinations (3-5 additions at most; more in surprise-me mode, where different frames often discover different subjects and combinations are the magic layer).
+每个 frame 目标 5-8 个 ideas。**当 axes 存在时，跨 axes 分配 ideas**：每个 frame 的 lens 都适用于每个 axis，但 ideas 不应全部 cluster 在一个 axis 上。给每个 idea 标记其 target axis。生成后，merge 和 dedupe；扫描 cross-cutting combinations（最多 3-5 个 additions；surprise-me mode 中可以更多，因为不同 frames 常发现不同 subjects，而 combinations 是 magic layer）。
 
-**Axis-coverage check (when axes are present).** After merging, count ideas per axis. If any axis has zero ideas, generate one additional small batch (3-5 ideas) targeting the empty axis with the frame whose lens best fits — Pain & friction for usability gaps, Cross-domain analogy for distribution or compounding gaps, etc. Cap recovery at 2 axes; beyond that, accept thin coverage rather than fan out. Note any axis that was not recovered in the rejection summary so the gap is visible.
+**Axis-coverage check（当 axes 存在时）。** Merge 后，统计每个 axis 的 ideas。如果任何 axis 有 0 个 ideas，使用最适合该 axis 的 frame 额外生成一小批（3-5 ideas）：usability gaps 用 Pain & friction，distribution 或 compounding gaps 用 Cross-domain analogy，等等。Recovery 上限为 2 个 axes；超过后，与其继续 fan out，不如接受 thin coverage。在 rejection summary 中注明任何未 recovered 的 axis，让 gap 可见。
 
-**Per-idea output contract (mirrors SKILL.md Phase 2):** each idea carries title, summary, **axis** (when decomposition produced an axis list — pick the one this idea most centrally targets; omit when skipped), **basis** (required, tagged `direct:` quoted evidence / `external:` named prior art or domain research / `reasoned:` written-out first-principles argument), why-it-matters connecting the basis to the move's significance, and a one-line meeting-test self-check (waived when tactical focus signals were detected in Phase 0.5). Basis is required, not optional — unjustified speculation does not surface.
+**Per-idea output contract（对应 SKILL.md Phase 2）：** 每个 idea 都包含 title、summary、**axis**（当 decomposition 产生 axis list 时，选择该 idea 最 centrally targets 的一个；跳过 decomposition 时省略）、**basis**（必需，标记为 `direct:` quoted evidence / `external:` named prior art or domain research / `reasoned:` written-out first-principles argument）、把 basis 与 move significance 连接起来的 why-it-matters，以及 one-line meeting-test self-check（Phase 0.5 检测到 tactical focus signals 时免除）。Basis 是必需项，不是 optional；unjustified speculation 不会 surface。
 
-**Generation rules:**
+**Generation rules（生成规则）：**
 
-- Every idea carries an articulated basis. The failure mode to prevent is plausible-sounding speculation that lacks any basis the user can verify.
-- Bias toward the basis type your frame naturally produces — pain/inversion/leverage tend toward `direct:`; analogy and constraint-flipping tend toward `reasoned:` — but don't exclude other types. When a frame produces a reasoned basis, write the argument out, don't gesture at it.
-- Apply the meeting-test as a default floor: would this idea warrant the equivalent of team discussion (or whatever maps to "worth talking through" in this topic's native domain)? If not, it's below the floor and does not surface. The floor is relaxed only when Phase 0.5 detected tactical focus signals.
-- Stay within the subject's identity. Expansions, new surfaces, new directions, retirements are fair game when the basis supports them. Subject-replacement moves (abandoning the subject, pivoting to an unrelated domain) are out regardless of basis.
+- 每个 idea 都带 articulated basis。要防止的 failure mode 是缺少用户可验证 basis 的 plausible-sounding speculation。
+- 偏向 frame 自然产生的 basis type：pain/inversion/leverage 倾向 `direct:`；analogy 和 constraint-flipping 倾向 `reasoned:`；但不要排除其他 types。当 frame 产生 reasoned basis 时，写出 argument，不要只是 gesture。
+- 将 meeting-test 作为 default floor：这个 idea 是否值得等价于 team discussion（或 topic native domain 中对应的 "worth talking through"）？如果不值得，就低于 floor，不会 surface。只有 Phase 0.5 检测到 tactical focus signals 时，floor 才放松。
+- 保持在 subject identity 内。当 basis 支持时，expansions、new surfaces、new directions、retirements 都可以。Subject-replacement moves（放弃 subject、pivot 到 unrelated domain）无论 basis 如何都排除。
 
-**Surprise-me mode in this reference.** When Phase 0.2 routed to surprise-me, there is no user-specified subject. Through each frame's lens, explore the Phase 1 grounding (user-context synthesis + web research) and identify the subject(s) you find most interesting for that lens. Different frames finding different subjects is the feature. The basis may include identification of the subject itself — why this subject is worth ideating on through this lens, citing what in the Phase 1 material signals it.
+**本 reference 中的 Surprise-me mode。** 当 Phase 0.2 路由到 surprise-me 时，没有 user-specified subject。通过每个 frame 的 lens 探索 Phase 1 grounding（user-context synthesis + web research），并识别对该 lens 最有趣的 subject(s)。不同 frames 找到不同 subjects 是 feature。Basis 可以包含对 subject 本身的识别：为什么该 subject 值得通过此 lens ideate，并引用 Phase 1 material 中的 signal。
 
-## How to converge
+## How to converge（如何收敛）
 
-Apply adversarial critique. For each candidate, write a one-line reason if rejected. **Basis-integrity check:** reject any idea lacking an articulated basis, any idea whose stated basis does not actually support the claimed move (speculation dressed as ambition), and any idea that replaces the subject rather than operating on it. Score survivors using a consistent rubric weighing: groundedness in stated context, **basis strength** (`direct:` > `external:` > `reasoned:`; none excluded, but direct-evidence ideas score higher all else equal), expected value, novelty, pragmatism, leverage, implementation burden, overlap with stronger candidates, and **axis spread** (when axes were defined) — survivor sets that cover the topic's surface outscore sets that cluster on one axis, all else equal. Axis spread is a list-level concern, not a per-idea reject reason; apply it after per-idea filtering when choosing among comparable candidates.
+应用 adversarial critique。对每个 candidate，如果 rejected，写 one-line reason。**Basis-integrity check：** reject 任何缺少 articulated basis 的 idea、任何 stated basis 实际不支持 claimed move 的 idea（speculation dressed as ambition），以及任何替换 subject 而不是作用于 subject 的 idea。使用一致 rubric 为 survivors 打分，权衡：groundedness in stated context、**basis strength**（`direct:` > `external:` > `reasoned:`；都不排除，但其他条件相同 direct-evidence ideas 得分更高）、expected value、novelty、pragmatism、leverage、implementation burden、与更强 candidates 的 overlap，以及 **axis spread**（当 axes 已定义时）。其他条件相同，覆盖 topic surface 的 survivor sets 优于 cluster 在单一 axis 的 sets。Axis spread 是 list-level concern，不是 per-idea reject reason；在 per-idea filtering 后，在 comparable candidates 中选择时应用。
 
-Target 5-7 survivors by default. If too many survive, run a second stricter pass. If fewer than five survive, report that honestly rather than lowering the bar.
+默认目标 5-7 个 survivors。如果 survive 太多，运行第二轮更严格 pass。如果少于五个 survive，如实报告，而不是降低标准。
 
-## When to wrap up
+## When to wrap up（何时收尾）
 
-Present survivors before any persistence. For each: title, description, **axis** (when decomposition produced an axis list), **basis** (tagged `direct:` / `external:` / `reasoned:`, with the quoted evidence, cited source, or written-out argument), rationale (how the basis connects to the move's significance), downsides, confidence, complexity. Then a brief rejection summary so the user can see what was considered and cut — including any axis that ended up with zero survivors despite recovery, so the coverage gap is visible.
+在任何 persistence 前展示 survivors。每个 survivor 包含：title、description、**axis**（当 decomposition 产生 axis list 时）、**basis**（标记 `direct:` / `external:` / `reasoned:`，并带 quoted evidence、cited source 或 written-out argument）、rationale（basis 如何连接到 move significance）、downsides、confidence、complexity。然后给出简短 rejection summary，让用户看到考虑过并 cut 掉了什么，包括任何在 recovery 后仍为 zero survivors 的 axis，让 coverage gap 可见。
 
-Persistence is opt-in. The terminal review loop is a complete ideation cycle. Refinement happens in conversation with no file or network cost. Persistence triggers only when the user explicitly chooses to save, share, or hand off.
+Persistence 是 opt-in。Terminal review loop 是完整 ideation cycle。Refinement 在 conversation 中发生，没有 file 或 network cost。只有当用户明确选择 save、share 或 hand off 时，才触发 persistence。
 
-Use the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question. Offer four choices:
+使用 platform 的 blocking question tool：Claude Code 中为 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`），Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或 call errors（例如 Codex edit modes）时，才 fallback 到 chat 中的 numbered options；不要因为需要 schema load 就 fallback。绝不要 silently skip question。提供四个 choices：
 
-- **Refine the ideation in conversation (or stop here — no save)** — add ideas, re-evaluate, or deepen analysis without writing anything. Ending the conversation at any point after this pick is a valid no-save exit.
-- **Open and iterate in Proof** — invoke the Proof HITL review path per the §6.2 contract in `references/post-ideation-workflow.md`: upload the survivors to Proof (rendered to a temp file since no local file is written in non-software elsewhere mode), iterate via comments, and exit cleanly with the Proof URL as the canonical record on successful return. Proof iteration is typically the terminal act in this mode, so the flow does not force another menu choice afterward. Only an `aborted` status returns to this menu. On persistent Proof failure, apply the §6.5 Proof Failure Ladder from `references/post-ideation-workflow.md` so the iteration attempt is not stranded without recovery.
-- **Brainstorm a selected idea** — go deeper on one idea through dialogue. Unlike repo mode, this is not the first step of an implementation chain — there is no `ce-plan` → `ce-work` after; `ce-brainstorm` in universal mode develops the idea further (e.g., expands a name into a brand brief, a plot into an outline, a decision into a weighed framework) and ends there. Persist first per the §6.3 contract in `references/post-ideation-workflow.md`: save the survivors to Proof (the elsewhere-mode default) or to `docs/ideation/` when the user explicitly asked for a local file, mark the chosen idea as `Explored`, then load `ce-brainstorm` with that idea as the seed. On a successful Proof return (`proceeded` or `done_for_now`), continue into the brainstorm handoff per §5.2's caller-aware return rule; on `aborted`, return to this menu without handing off. On persistent Proof failure, apply the §6.5 Proof Failure Ladder before ending so the brainstorm seed is preserved through a local-save fallback.
-- **Save and end** — share the survivors to Proof (the elsewhere-mode default) and end. Use `docs/ideation/` instead only when the user explicitly asks for a local file. On Proof failure (including after the single orchestrator-side retry), apply the §6.5 Proof Failure Ladder from `references/post-ideation-workflow.md` — surface the local-save fallback menu (custom path or skip) before ending so the user is not stranded without a recovery path.
+- **Refine the ideation in conversation (or stop here — no save)**：添加 ideas、re-evaluate 或 deepen analysis，不写任何文件。选择后在任意时刻结束 conversation 都是 valid no-save exit。
+- **Open and iterate in Proof**：按 `references/post-ideation-workflow.md` 中 §6.2 contract 调用 Proof HITL review path：将 survivors 上传到 Proof（由于 non-software elsewhere mode 不写 local file，先 render 到 temp file），通过 comments iterate，并在成功返回时以 Proof URL 作为 canonical record 干净退出。Proof iteration 通常是此 mode 的 terminal act，因此 flow 之后不强制另一个 menu choice。只有 `aborted` status 会返回此 menu。Persistent Proof failure 时，应用 `references/post-ideation-workflow.md` 的 §6.5 Proof Failure Ladder，确保 iteration attempt 不会没有 recovery。
+- **Brainstorm a selected idea**：通过 dialogue 深入一个 idea。不同于 repo mode，这不是 implementation chain 的第一步；之后没有 `ce-plan` -> `ce-work`；universal mode 中的 `ce-brainstorm` 会进一步发展该 idea（例如把 name 扩展成 brand brief、把 plot 扩展成 outline、把 decision 扩展成 weighed framework）并在那里结束。先按 `references/post-ideation-workflow.md` §6.3 contract persist：将 survivors 保存到 Proof（elsewhere-mode default），或当用户明确要求 local file 时保存到 `docs/ideation/`，将 chosen idea 标记为 `Explored`，然后以该 idea 作为 seed 加载 `ce-brainstorm`。Proof 成功返回（`proceeded` 或 `done_for_now`）时，按 §5.2 caller-aware return rule 继续进入 brainstorm handoff；`aborted` 时，不 handoff，返回此 menu。Persistent Proof failure 时，在结束前应用 §6.5 Proof Failure Ladder，确保 brainstorm seed 通过 local-save fallback 得以保留。
+- **Save and end**：将 survivors 分享到 Proof（elsewhere-mode default）并结束。只有当用户明确要求 local file 时，才改用 `docs/ideation/`。Proof failure 时（包括单次 orchestrator-side retry 后），应用 `references/post-ideation-workflow.md` 的 §6.5 Proof Failure Ladder：结束前展示 local-save fallback menu（custom path 或 skip），避免用户没有 recovery path。
 
-No-save exit is supported without a dedicated menu option. Pick Refine and stop the conversation, or use the question tool's free-text escape to say so directly — persistence is opt-in and the terminal review loop is already a complete ideation cycle.
+No-save exit 无需 dedicated menu option 也受支持。选择 Refine 后停止 conversation，或使用 question tool 的 free-text escape 直接说明；persistence 是 opt-in，terminal review loop 已经是完整 ideation cycle。

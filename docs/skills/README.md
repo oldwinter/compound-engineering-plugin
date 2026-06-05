@@ -1,12 +1,12 @@
-# Skill Documentation
+# Skill Documentation（Skill 文档）
 
-End-user-facing documentation for compound-engineering plugin skills. Each page covers the skill's high-level purpose, novel mechanics, use cases, and chain position relative to other skills.
+面向最终用户的 compound-engineering plugin skills 文档。每个页面覆盖该 skill 的 high-level purpose、novel mechanics、use cases，以及它在其他 skills 链条中的位置。
 
-For runtime behavior and contributor reference, the `SKILL.md` in each skill's source folder under `plugins/compound-engineering/skills/` is authoritative.
+Runtime behavior 和 contributor reference 以每个 skill source folder（`plugins/compound-engineering/skills/`）下的 `SKILL.md` 为准。
 
 ---
 
-## The compound-engineering core loop
+## compound-engineering core loop（核心循环）
 
 ```text
    [/ce-ideate]       (optional) "What's worth exploring?"
@@ -24,104 +24,104 @@ For runtime behavior and contributor reference, the `SKILL.md` in each skill's s
 └── /ce-compound      "Capture what we learned."
 ```
 
-`/ce-compound` is the closer that makes the loop *compound*: it writes learnings into `docs/solutions/`, which the next iteration's `/ce-brainstorm` and `/ce-plan` read as grounding — that return arrow is the whole point. `/ce-ideate` is an optional prelude for when you don't yet know what to work on. Everything else in this catalog is either an anchor around the loop or an on-demand tool used when a specific need arises — not a step you walk through every time.
+`/ce-compound` 是让 loop 真正 *compound* 的收尾：它把 learnings 写入 `docs/solutions/`，下一轮 `/ce-brainstorm` 和 `/ce-plan` 会读取这些内容作为 grounding。图中的回环就是全部重点。`/ce-ideate` 是可选前奏，用于你还不知道该做什么时。这个 catalog 里的其他内容，要么是围绕 loop 的 anchor，要么是在出现特定需求时调用的 on-demand tool，不是每次都要走一遍的步骤。
 
 ---
 
-## The Core Loop
+## Core Loop（核心循环）
 
-The steps of every engineering iteration. `/ce-ideate` runs only when you need to find a direction first; the other four run in order per piece of work.
+每次工程 iteration 的步骤。`/ce-ideate` 只在需要先找方向时运行；其他四个按每项工作的顺序运行。
 
-| Skill | Description |
+| Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-ideate`](./ce-ideate.md) | *Optional first step* — discover strong, qualified directions worth exploring with six conceptual frames, warrant requirement, adversarial filtering |
-| [`/ce-brainstorm`](./ce-brainstorm.md) | Define what something should become — collaborative dialogue, named gap lenses, right-sized requirements doc |
-| [`/ce-plan`](./ce-plan.md) | Bound execution with guardrails — U-IDs, test scenarios, automatic confidence check; WHAT decisions, not HOW code |
-| [`/ce-work`](./ce-work.md) | Execute against the plan's guardrails — figure out the HOW with code in front of you, ship through quality gates |
-| [`/ce-compound`](./ce-compound.md) | Close the loop by capturing what you learned into `docs/solutions/` so the next iteration starts smarter — bug track + knowledge track |
+| [`/ce-ideate`](./ce-ideate.md) | *可选第一步*：用六个 conceptual frames、warrant requirement 和 adversarial filtering 发现值得探索的强方向 |
+| [`/ce-brainstorm`](./ce-brainstorm.md) | 定义某个东西应该变成什么：collaborative dialogue、named gap lenses、尺寸合适的 requirements doc |
+| [`/ce-plan`](./ce-plan.md) | 用 guardrails 约束 execution：U-IDs、test scenarios、automatic confidence check；做 WHAT decisions，而不是 HOW code |
+| [`/ce-work`](./ce-work.md) | 按 plan 的 guardrails 执行：面对代码决定 HOW，通过 quality gates ship |
+| [`/ce-compound`](./ce-compound.md) | 通过把 learnings 捕获到 `docs/solutions/` 来闭环，让下一次 iteration 更聪明：bug track + knowledge track |
 
 ---
 
-## Around the Loop
+## Around the Loop（围绕循环）
 
-Skills that anchor, feed, or maintain the loop without being steps inside it.
+不作为 loop 内部步骤、但用于锚定、供给或维护 loop 的 skills。
 
-| Skill | Description |
+| Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-strategy`](./ce-strategy.md) | Create or maintain `STRATEGY.md` — the upstream anchor read by `ce-ideate`, `ce-brainstorm`, and `ce-plan` as grounding |
-| [`/ce-product-pulse`](./ce-product-pulse.md) | Outer feedback loop — single-page time-windowed report on usage, performance, errors, followups; saved to `docs/pulse-reports/` as a timeline |
-| [`/ce-compound-refresh`](./ce-compound-refresh.md) | Maintain `docs/solutions/` over time — five outcomes (Keep / Update / Consolidate / Replace / Delete), Interactive + Autofix modes |
+| [`/ce-strategy`](./ce-strategy.md) | 创建或维护 `STRATEGY.md`，作为上游 anchor，被 `ce-ideate`、`ce-brainstorm`、`ce-plan` 读取作为 grounding |
+| [`/ce-product-pulse`](./ce-product-pulse.md) | 外层 feedback loop：单页 time-windowed report，覆盖 usage、performance、errors、followups；保存到 `docs/pulse-reports/` 作为 timeline |
+| [`/ce-compound-refresh`](./ce-compound-refresh.md) | 随时间维护 `docs/solutions/`：五种 outcomes（Keep / Update / Consolidate / Replace / Delete），支持 Interactive + Autofix modes |
 
 ---
 
-## On-Demand
+## On-Demand（按需调用）
 
-Invoked when a specific need arises — not part of any chain.
+在出现特定需求时调用；不属于任何固定 chain。
 
-| Skill | Description |
+| Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-debug`](./ce-debug.md) | Find root causes systematically — causal chain gate, predictions for uncertain links, smart escalation |
-| [`/ce-code-review`](./ce-code-review.md) | Structured code review with tiered persona agents, confidence-gated findings, four modes |
-| [`/ce-doc-review`](./ce-doc-review.md) | Review requirements or plan documents using parallel persona agents — coherence, feasibility, product-lens, design-lens, security-lens, scope-guardian, adversarial |
-| [`/ce-simplify-code`](./ce-simplify-code.md) | Refine recently changed code — three parallel reviewer agents (reuse, quality, efficiency); behavior preservation verified |
-| [`/ce-optimize`](./ce-optimize.md) | Metric-driven iterative optimization loops — three-tier evaluation, parallel experiments, persistence discipline |
+| [`/ce-debug`](./ce-debug.md) | 系统找出 root causes：causal chain gate、uncertain links 的 predictions、smart escalation |
+| [`/ce-code-review`](./ce-code-review.md) | 带 tiered persona agents、confidence-gated findings 和四种 modes 的 structured code review |
+| [`/ce-doc-review`](./ce-doc-review.md) | 使用 parallel persona agents review requirements 或 plan documents：coherence、feasibility、product-lens、design-lens、security-lens、scope-guardian、adversarial |
+| [`/ce-simplify-code`](./ce-simplify-code.md) | Refine 最近改动的 code：三个 parallel reviewer agents（reuse、quality、efficiency）；验证 behavior preservation |
+| [`/ce-optimize`](./ce-optimize.md) | Metric-driven iterative optimization loops：three-tier evaluation、parallel experiments、persistence discipline |
 
 ---
 
-## Research & Context
+## Research & Context（研究与上下文）
 
-| Skill | Description |
+| Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-sessions`](./ce-sessions.md) | Search session history across Claude Code, Codex, and Cursor for context relevant to a question |
-| [`/ce-slack-research`](./ce-slack-research.md) | Search Slack for interpreted organizational context — workspace identity, research-value assessment, cross-cutting analysis |
-| [`/ce-riffrec-feedback-analysis`](./ce-riffrec-feedback-analysis.md) | Turn raw [Riffrec](https://github.com/kieranklaassen/riffrec) recordings into structured feedback — quick bug or extensive analysis with `ce-brainstorm` handoff |
+| [`/ce-sessions`](./ce-sessions.md) | 搜索 Claude Code、Codex 和 Cursor 的 session history，寻找与问题相关的 context |
+| [`/ce-slack-research`](./ce-slack-research.md) | 搜索 Slack 中已解释的 organizational context：workspace identity、research-value assessment、cross-cutting analysis |
+| [`/ce-riffrec-feedback-analysis`](./ce-riffrec-feedback-analysis.md) | 把原始 [Riffrec](https://github.com/kieranklaassen/riffrec) recordings 转成 structured feedback：quick bug 或 extensive analysis，并 hand off 给 `ce-brainstorm` |
 
 ---
 
-## Git Workflow
+## Git Workflow（Git 工作流）
 
-| Skill | Description |
+| Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-commit`](./ce-commit.md) | Create a single, well-crafted git commit — convention-aware, sensitive-file-safe, file-level logical splitting |
-| [`/ce-commit-push-pr`](./ce-commit-push-pr.md) | Go from working changes to an open PR with adaptive descriptions — three modes (full workflow / description update / description-only generation) |
-| [`/ce-clean-gone-branches`](./ce-clean-gone-branches.md) | Delete local branches whose remote tracking branch is gone, including any associated worktrees |
-| [`/ce-worktree`](./ce-worktree.md) | Create a git worktree at `.worktrees/<branch>` with `.env` copying, branch-aware dev-tool trust, and gitignore management |
+| [`/ce-commit`](./ce-commit.md) | 创建单个精心组织的 git commit：convention-aware、sensitive-file-safe、file-level logical splitting |
+| [`/ce-commit-push-pr`](./ce-commit-push-pr.md) | 从 working changes 到 open PR，并生成 adaptive descriptions：三种 modes（full workflow / description update / description-only generation） |
+| [`/ce-clean-gone-branches`](./ce-clean-gone-branches.md) | 删除 remote tracking branch 已消失的 local branches，包括关联 worktrees |
+| [`/ce-worktree`](./ce-worktree.md) | 在 `.worktrees/<branch>` 创建 git worktree，包含 `.env` copying、branch-aware dev-tool trust 和 gitignore management |
 
 ---
 
-## Frontend Design
+## Frontend Design（前端设计）
 
-| Skill | Description |
+| Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-frontend-design`](./ce-frontend-design.md) | Build web interfaces with genuine design quality — context detection, visual-thesis pre-build, opinionated defaults, visual verification |
-| [`/ce-polish`](./ce-polish.md) | Conversational UX polish — start dev server, open browser, iterate together; auto-detects 8 frameworks (manual invocation only) |
+| [`/ce-frontend-design`](./ce-frontend-design.md) | 用真正的 design quality 构建 web interfaces：context detection、visual-thesis pre-build、opinionated defaults、visual verification |
+| [`/ce-polish`](./ce-polish.md) | 对话式 UX polish：启动 dev server、打开 browser、一起迭代；自动检测 8 种 frameworks（仅手动调用） |
 
 ---
 
-## Collaboration
+## Collaboration（协作）
 
-| Skill | Description |
+| Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-proof`](./ce-proof.md) | Create, share, and run human-in-the-loop review loops over markdown via [Proof](https://www.proofeditor.ai), Every's collaborative editor — Web API and Local Bridge surfaces |
+| [`/ce-proof`](./ce-proof.md) | 通过 [Proof](https://www.proofeditor.ai)（Every 的 collaborative editor）创建、share 并运行 human-in-the-loop review loops，覆盖 markdown、Web API 和 Local Bridge surfaces |
 
 ---
 
-## Workflow Utilities
+## Workflow Utilities（Workflow 工具）
 
-| Skill | Description |
+| Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-demo-reel`](./ce-demo-reel.md) | Capture visual evidence (GIF, terminal recording, screenshots) for PR descriptions — strict separation from test output |
-| [`/ce-promote`](./ce-promote.md) | Draft user-facing announcement copy for a shipped feature (X, changelog, LinkedIn, email) — voice-matched via the optional Spiral CLI, a lite layer of editorial & social expertise without it, drafts only |
-| [`/ce-resolve-pr-feedback`](./ce-resolve-pr-feedback.md) | Evaluate, fix, and reply to PR review feedback in parallel — including nitpicks |
-| [`/ce-test-browser`](./ce-test-browser.md) | End-to-end browser tests on PR / branch-affected pages using `agent-browser` exclusively |
-| [`/ce-test-xcode`](./ce-test-xcode.md) | Build and test iOS apps on simulator using XcodeBuildMCP — screenshots, logs, human verification |
-| [`/ce-setup`](./ce-setup.md) | Diagnose environment, install missing tools, bootstrap project-local config — interactive onboarding in one flow |
-| [`/ce-update`](./ce-update.md) | Check the installed compound-engineering plugin version against `main` and recommend the update command (Claude Code only) |
-| [`/ce-release-notes`](./ce-release-notes.md) | Look up what shipped in recent compound-engineering plugin releases — summary or specific question with version citation |
-| [`/ce-report-bug`](./ce-report-bug.md) | Report a bug in the compound-engineering plugin — structured intake, automatic env gathering, GitHub issue creation |
+| [`/ce-demo-reel`](./ce-demo-reel.md) | 为 PR descriptions 捕获 visual evidence（GIF、terminal recording、screenshots）：与 test output 严格分离 |
+| [`/ce-promote`](./ce-promote.md) | 为已发布 feature 起草 user-facing announcement copy（X、changelog、LinkedIn、email）：可选 Spiral CLI 做 voice matching，未安装时提供轻量 editorial & social expertise，只生成 drafts |
+| [`/ce-resolve-pr-feedback`](./ce-resolve-pr-feedback.md) | 并行评估、修复并回复 PR review feedback，包括 nitpicks |
+| [`/ce-test-browser`](./ce-test-browser.md) | 只使用 `agent-browser`，在 PR / branch 影响的 pages 上做 end-to-end browser tests |
+| [`/ce-test-xcode`](./ce-test-xcode.md) | 用 XcodeBuildMCP 在 simulator 上 build 和 test iOS apps：screenshots、logs、human verification |
+| [`/ce-setup`](./ce-setup.md) | 诊断 environment、安装缺失工具、bootstrap project-local config：一个交互式 onboarding flow |
+| [`/ce-update`](./ce-update.md) | 对比已安装 compound-engineering plugin version 和 `main`，并推荐 update command（仅 Claude Code） |
+| [`/ce-release-notes`](./ce-release-notes.md) | 查询最近 compound-engineering plugin releases：summary 或带 version citation 的特定问题 |
+| [`/ce-report-bug`](./ce-report-bug.md) | 报告 compound-engineering plugin 的 bug：structured intake、automatic env gathering、GitHub issue creation |
 
 ---
 
-## See also
+## 另请参阅
 
-For the complete catalog of skills (including those without dedicated docs here), see [`plugins/compound-engineering/README.md`](../../plugins/compound-engineering/README.md). Each skill's authoritative runtime spec is in `plugins/compound-engineering/skills/<skill>/SKILL.md`.
+完整 skills catalog（包括这里没有独立文档的 skills）见 [`plugins/compound-engineering/README.md`](../../plugins/compound-engineering/README.md)。每个 skill 的权威 runtime spec 位于 `plugins/compound-engineering/skills/<skill>/SKILL.md`。

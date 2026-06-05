@@ -1,5 +1,5 @@
 ---
-title: "Stale local base contamination in multi-session branch creation"
+title: "多 session 创建分支时的 stale local base contamination"
 category: workflow
 date: 2026-04-27
 created: 2026-04-27
@@ -15,84 +15,84 @@ tags:
   - contamination
 ---
 
-# Stale local base contamination in multi-session branch creation
+# 多 session 创建分支时的 stale local base contamination
 
-## Problem
+## 问题
 
-When multiple agent sessions (Claude Code, Cursor, Codex, plus any humans) share one local clone, local `<default-branch>` can drift relative to its remote counterpart. Two specific drifts cause downstream pain:
+当多个 agent sessions（Claude Code、Cursor、Codex，加上人类）共享同一个 local clone 时，本地 `<default-branch>` 可能相对远端 counterpart 发生漂移。两类具体漂移会造成下游问题：
 
-1. **Local default behind remote.** Another session pushed and merged work; this session's local `main` doesn't know yet.
-2. **Local default ahead of remote with unpushed work.** Another session committed locally to `main`, or merged a feature branch into local `main`, before pushing — and never pushed those commits to `origin/main`.
+1. **Local default behind remote。** 另一个 session 已经 push 并 merge 了 work；当前 session 的本地 `main` 还不知道。
+2. **Local default ahead of remote with unpushed work。** 另一个 session 在 push 前向本地 `main` 提交，或把 feature branch merge 到本地 `main`，然后从未将这些 commits push 到 `origin/main`。
 
-When a session creates a feature branch from local `main` while drift type 2 holds, the new branch silently inherits the unpushed work. The eventual PR opens looking clean to the originating session but appears contaminated on GitHub. Resolving it requires force-push surgery during PR review.
+当存在第 2 类漂移时，如果某个 session 从本地 `main` 创建 feature branch，新分支会静默继承这些 unpushed work。最终打开的 PR 在发起 session 看起来干净，但在 GitHub 上显示为 contaminated。解决它需要在 PR review 期间做 force-push surgery。
 
-This came in as [issue #707](https://github.com/EveryInc/compound-engineering-plugin/issues/707).
+这来自 [issue #707](https://github.com/EveryInc/compound-engineering-plugin/issues/707)。
 
-## Why post-facto detection is the wrong tool
+## 为什么事后检测是错误工具
 
-The intuitive fix is to detect the contamination before pushing or before opening a PR. Two detection approaches were considered and rejected:
+直觉上的修复是在 push 前或打开 PR 前检测 contamination。曾考虑并拒绝了两种检测方案：
 
-### Approach A: surface foreign commit authors
+### 方案 A：显示 foreign commit authors
 
-Read `git log <base>..HEAD --pretty=format:'%h %ae %s'` and warn when any commit's author email differs from `git config user.email`.
+读取 `git log <base>..HEAD --pretty=format:'%h %ae %s'`，当任何 commit 的 author email 与 `git config user.email` 不同时警告。
 
-Catches the cross-author case (cherry-picks, teammate-authored work) but misses the dominant scenario: multi-agent setups where every session uses the same `user.email`. The check fires on intentional cherry-picks and stays silent on the actual contamination pattern.
+它能捕获 cross-author 场景（cherry-picks、teammate-authored work），但会漏掉主导场景：multi-agent setups 中每个 session 都使用相同的 `user.email`。该检查会对有意的 cherry-picks 触发，却对真正的 contamination pattern 保持沉默。
 
-### Approach B: cross-branch reachability
+### 方案 B：cross-branch reachability
 
-For each commit in `<base>..HEAD`, check whether it is reachable from any other `origin/*` ref. If yes, treat as suspect.
+对 `<base>..HEAD` 中的每个 commit，检查它是否可从其他 `origin/*` ref 到达。如果可以，就视为可疑。
 
-Authorship-agnostic, so it catches same-user contamination. But the signal it measures — "this commit is on another remote branch" — is the **defining characteristic** of stacked-PR workflows, where parent commits in the stack are intentionally shared with sibling branches. Tools like Graphite and git-spice rely on this. With GitHub-native stacked PRs moving toward general availability and likely broad adoption, the false-positive rate moves from "narrow population" to "majority of pushes for sophisticated users." The check would invert from useful signal to default noise.
+它与 authorship 无关，因此能捕获 same-user contamination。但它测量的信号——“这个 commit 位于另一个 remote branch 上”——正是 stacked-PR workflows 的**定义特征**，其中 stack 中的 parent commits 会有意与 sibling branches 共享。Graphite 和 git-spice 等工具依赖这一点。随着 GitHub-native stacked PRs 走向 general availability，并可能被广泛采用，false-positive rate 会从“窄人群”变成“高级用户大多数 push”。该检查会从有用信号反转为默认噪音。
 
-You can patch around it (parse stack metadata from PR base refs) but the patches multiply with every adjacent workflow (first push before PR exists, multi-level stacks, fork-based stacks). Each patch is a heuristic that will be wrong somewhere.
+可以围绕它打补丁（从 PR base refs 解析 stack metadata），但每个相邻 workflow（PR 存在前的首次 push、multi-level stacks、fork-based stacks）都会让补丁倍增。每个补丁都是某处会出错的 heuristic。
 
-## Solution
+## 解决方案
 
-Prevent at branch creation rather than detect at push or PR time.
+在 branch creation 时预防，而不是在 push 或 PR 时检测。
 
-`ce-commit-push-pr` Step 4 — the branch-creation path used when the user invokes the skill while on the default branch with working-tree changes — was changed from:
+`ce-commit-push-pr` Step 4，即用户在 default branch 且有 working-tree changes 时调用 skill 所使用的 branch-creation path，已从：
 
 ```bash
 git checkout -b <branch-name>
 ```
 
-to:
+改为：
 
 ```bash
 git fetch --no-tags origin <base>
 git checkout -b <branch-name> origin/<base>
 ```
 
-with a graceful fallback to the local-base form when the fetch fails (offline, restricted network, expired auth). The fallback is documented to the user so they know base freshness was not verified.
+当 fetch 失败（offline、restricted network、expired auth）时，会 graceful fallback 到 local-base 形式。fallback 会向用户说明，让他们知道 base freshness 未被验证。
 
-This makes the skill's branch-creation path safe by construction:
+这让 skill 的 branch-creation path 在构造上安全：
 
-- Drift type 1 (local behind remote): the new branch starts at fresh remote `<base>`, not stale local `<base>`.
-- Drift type 2 (local ahead of remote with unpushed work): unpushed local commits stay on local `<base>` (recoverable via reflog or branch ref); the new feature branch starts clean.
+- Drift type 1（local behind remote）：新分支从 fresh remote `<base>` 开始，而不是 stale local `<base>`。
+- Drift type 2（local ahead of remote with unpushed work）：unpushed local commits 留在 local `<base>` 上（可通过 reflog 或 branch ref 恢复）；新的 feature branch 干净开始。
 
-The principle generalizes cleanly to stacked PRs: when a user wants to stack on top of an open PR, the same `git fetch && git checkout -b <name> origin/<parent>` pattern works — `<parent>` is just a different ref. Nothing about prevention depends on detecting "is this commit suspicious."
+该原则也能干净推广到 stacked PRs：当用户想叠在一个 open PR 之上时，同样的 `git fetch && git checkout -b <name> origin/<parent>` pattern 可用，`<parent>` 只是另一个 ref。预防本身不依赖检测“这个 commit 是否可疑”。
 
-## What this does not cover
+## 不覆盖的范围
 
-- **Branches created outside the skill.** Users who run `git checkout -b` manually, or whose IDE creates branches without fetching, can still produce contaminated branches. The skill's path becomes safe; the user's general workflow is not. A pre-push hook (which the original reporter installed) covers this case — opt-in hooks remain a reasonable user-side mitigation.
-- **Already-contaminated branches.** Once a branch carries foreign commits, this change does nothing for it. Recovery is still manual: identify the foreign commits, drop them via interactive rebase or `git reset` to a clean base, force-push.
-- **Step 1 branch-creation paths with different semantics.** When the user is on the default branch with unpushed commits and asks to create a feature branch to "rescue" those commits, the desired behavior is to carry the local commits onto the new branch — opposite of the Step 4 case. Step 1's behavior is unchanged.
+- **在 skill 外创建的 branches。** 手动运行 `git checkout -b` 的用户，或 IDE 在不 fetch 的情况下创建 branches，仍可能产生 contaminated branches。skill 的路径变安全了；用户的一般 workflow 没有。pre-push hook（原 reporter 已安装）可覆盖该场景，opt-in hooks 仍是合理的 user-side mitigation。
+- **已经 contaminated 的 branches。** 一旦 branch 携带 foreign commits，此变更不会对它做任何事。恢复仍是手动流程：识别 foreign commits，通过 interactive rebase 或 `git reset` 把它们丢到 clean base，再 force-push。
+- **语义不同的 Step 1 branch-creation paths。** 当用户在 default branch 上有 unpushed commits，并请求创建 feature branch 来“拯救”这些 commits 时，期望行为是把本地 commits 带到新分支上，这与 Step 4 场景相反。Step 1 行为保持不变。
 
-## User-side mitigations
+## User-side mitigations（用户侧缓解措施）
 
-For workflows where branch creation happens outside the skill, recommend:
+对于在 skill 外创建 branch 的 workflows，建议：
 
-- `git switch -c <name> origin/<base>` instead of `git checkout -b <name> <base>`
-- A `git config --global alias.nb '!f() { git fetch origin "${2:-main}" && git switch -c "$1" "origin/${2:-main}"; }; f'` style alias
-- An opt-in pre-push hook that compares HEAD's parent chain against `origin/<base>` for unexpected commits — useful for individual users, but not shipped from this plugin because the cost of getting stacked-PR semantics right in a hook outweighs the benefit at the plugin level
+- 使用 `git switch -c <name> origin/<base>`，而不是 `git checkout -b <name> <base>`
+- 一个 `git config --global alias.nb '!f() { git fetch origin "${2:-main}" && git switch -c "$1" "origin/${2:-main}"; }; f'` 风格的 alias
+- 一个 opt-in pre-push hook，将 HEAD 的 parent chain 与 `origin/<base>` 比较以查找 unexpected commits；这对个体用户有用，但不由该 plugin 发布，因为在 hook 中正确处理 stacked-PR semantics 的成本超过 plugin level 的收益
 
-## Why we did not ship a detection check at all
+## 为什么完全没有发布 detection check
 
-The reporter framed their issue as "a pattern, not a request for a merge." Taking that at its word and acting on the structural signal — a real failure mode worth a permanent fix — produced this outcome:
+reporter 将他们的问题描述为“a pattern, not a request for a merge”。按这个说法认真对待，并基于 structural signal 行动，也就是把它视为值得永久修复的真实 failure mode，带来了以下结果：
 
-- One small preventive change in the skill that is safe by construction
-- A documented pattern with rationale for future readers
-- No behavioral prompt added to a heavy-traffic skill
-- No detection heuristic that risks being obsoleted by stacked PRs
+- skill 中一个小的 preventive change，且在构造上安全
+- 一个带有 rationale、供未来读者使用的 documented pattern
+- 没有给 high-traffic skill 增加 behavioral prompt
+- 没有引入可能被 stacked PRs 淘汰的 detection heuristic
 
-A detection check at push or PR time was not free even when scoped tightly: it adds a prompt to a frictionless workflow, false-positives on legitimate workflows that share commits across branches, and would require ongoing tuning as stacked-PR conventions evolve. Prevention at the right layer avoids all of that.
+即使严格限定范围，在 push 或 PR 时增加 detection check 也不是免费的：它会给 frictionless workflow 增加 prompt，会对跨 branches 共享 commits 的合法 workflows 产生 false-positives，并且会随着 stacked-PR conventions 演进而需要持续 tuning。在正确层级预防可以避免这一切。

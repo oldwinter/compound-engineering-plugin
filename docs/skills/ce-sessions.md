@@ -1,175 +1,175 @@
 # `ce-sessions`
 
-> Search and ask questions about your coding agent session history across Claude Code, Codex, and Cursor.
+> 跨 Claude Code、Codex 和 Cursor 搜索并询问你的 coding agent session history。
 
-`ce-sessions` is the **session-history search** skill. It's a thin user-facing entry point that dispatches `ce-session-historian` to search session files across all three major coding harnesses (Claude Code, Codex, Cursor) for context relevant to your question — what you worked on, what was tried before, how a problem was investigated, what happened recently, decisions made.
+`ce-sessions` 是 **session-history search** skill。它是轻量 user-facing entry point，会 dispatch `ce-session-historian`，在三大 coding harnesses（Claude Code、Codex、Cursor）的 session files 中搜索与你问题相关的 context：你做过什么、之前尝试过什么、问题如何调查、最近发生了什么、做过哪些 decisions。
 
-Useful when memory fades, when picking up work in a new session, when you suspect "we tried this before but I can't remember the result", or when reconstructing the path that led to a current state.
+当 memory fades、在新 session 中接上工作、怀疑 "we tried this before but I can't remember the result"，或需要重建导致当前状态的路径时，它很有用。
 
 ---
 
-## TL;DR
+## 摘要（TL;DR）
 
-| Question | Answer |
+| 问题 | 答案 |
 |----------|--------|
-| What does it do? | Searches your session history across Claude Code / Codex / Cursor for context relevant to a question |
-| When to use it | "What did we work on this week?", "What did I try before?", "How was X investigated?", "What did the agent decide about Y?" |
-| What it produces | A synthesized digest of relevant findings — what was tried, what didn't work, key decisions, related context |
-| Cross-platform | Reads sessions from `~/.claude/projects/`, `~/.codex/sessions/`, `~/.cursor/projects/` |
+| 它做什么？ | 跨 Claude Code / Codex / Cursor 搜索你的 session history，寻找与问题相关的 context |
+| 何时使用？ | "What did we work on this week?"、"What did I try before?"、"How was X investigated?"、"What did the agent decide about Y?" |
+| 产出什么？ | Relevant findings 的 synthesized digest：尝试过什么、什么没成功、关键 decisions、相关 context |
+| Cross-platform（跨平台） | 从 `~/.claude/projects/`、`~/.codex/sessions/`、`~/.cursor/projects/` 读取 sessions |
 
 ---
 
-## The Problem
+## 问题
 
-Coding agent session history is ephemeral by default:
+Coding agent session history 默认很 ephemeral：
 
-- **Memory fades between sessions** — the new session starts cold even when prior context is highly relevant
-- **Repeated investigations** — the same hypothesis gets tested twice because the first session's negative result was forgotten
-- **Cross-harness blindness** — work in Codex doesn't show up to a Claude Code agent, even on the same repo
-- **Branch-scoped context lost** — a discussion two weeks ago on the same branch is unreachable without tooling
-- **Knowing-it-happened isn't enough** — knowing "we tried this" without the *result* still leads to retrying it
+- **Memory fades between sessions**：即使 prior context 很相关，新 session 也会冷启动
+- **Repeated investigations**：同一个 hypothesis 会被测试两次，因为第一次 session 的 negative result 被忘了
+- **Cross-harness blindness**：Codex 中的工作不会出现在 Claude Code agent 面前，即使在同一个 repo 上
+- **Branch-scoped context lost**：两周前在同一 branch 上的讨论，没有 tooling 就不可达
+- **Knowing-it-happened isn't enough**：只知道 "we tried this" 但不知道 *result*，仍会导致重试
 
-## The Solution
+## 解决方案
 
-`ce-sessions` dispatches `ce-session-historian` — a specialized agent that reads session files across all three harness platforms, applies time and repo filters, extracts findings relevant to the user's question, and synthesizes a structured digest:
+`ce-sessions` dispatch `ce-session-historian`：一个 specialized agent，会读取三种 harness platforms 的 session files，应用 time 和 repo filters，提取与用户问题相关的 findings，并合成 structured digest：
 
-- What was tried before
-- What didn't work (and why)
-- Key decisions
-- Related context
+- 之前尝试过什么
+- 什么没成功（以及为什么）
+- Key decisions（关键 decisions）
+- Related context（相关 context）
 
-The agent operates outside the working directory (in the harness session-file directories) which orchestrator-level tools often can't access — that's why this is delegated rather than handled inline.
-
----
-
-## What Makes It Novel
-
-### 1. Cross-harness session reading
-
-`ce-session-historian` reads from all three locations the agent might have left context in:
-
-- `~/.claude/projects/` (Claude Code)
-- `~/.codex/sessions/` (Codex)
-- `~/.cursor/projects/` (Cursor)
-
-If you used Codex yesterday and Claude Code today, this skill finds yesterday's context. Single-harness tools don't.
-
-### 2. Question-driven synthesis, not raw transcript dump
-
-The agent doesn't return a flat list of session content. It synthesizes findings against the user's question with structured sections:
-
-- **What was tried before** — approaches the agent attempted, with outcomes
-- **What didn't work** — failed hypotheses with reasons
-- **Key decisions** — choices made in prior sessions and the reasoning
-- **Related context** — adjacent findings that bear on the question
-
-If no relevant prior sessions exist, the digest says so explicitly rather than fabricating findings.
-
-### 3. Branch-aware filtering
-
-The skill pre-resolves the current git branch and passes it to the agent so session searches can filter to work done on the same branch — usually what's most relevant when picking up work or reconstructing recent context. The pre-resolution uses the `!` backtick mechanism: if it resolves to a plain branch name, it's passed in; if it returns the literal command string (failed resolution), it's omitted and the agent derives the branch at runtime.
-
-### 4. Thin orchestrator, agent does the work
-
-The skill itself is a thin entry point — its job is to ask "what would you like to know?" if no question was provided, then dispatch the historian. The historian handles the actual search, time filtering, transcript parsing, and synthesis. This keeps the user-facing surface tiny while the heavy lifting stays in a specialist agent.
-
-### 5. Time-window control
-
-The historian accepts time hints in the question itself ("recently", "last week", "since the auth refactor", explicit dates). It resolves those to real time windows and applies them when filtering sessions. The default window is bounded so the agent doesn't read every session file ever — relevance is privileged over recall.
+Agent 在 working directory 外部运行（harness session-file directories 中），orchestrator-level tools 通常无法访问这些位置，因此这里 delegate 给 agent，而不是 inline 处理。
 
 ---
 
-## Quick Example
+## 新颖之处
 
-You're picking up work on a feature you started two weeks ago. You can't quite remember whether you settled on per-subscription mute state or per-user mute state, and you want to confirm before continuing. You invoke `/ce-sessions "did we decide where notification mute state lives?"`.
+### 1. Cross-harness session reading（跨 harness session 读取）
 
-The skill pre-resolves the branch (`tmchow/notification-mute`) and dispatches `ce-session-historian` with the question, current working directory, and branch hint.
+`ce-session-historian` 从 agent 可能留下 context 的三个 locations 读取：
 
-The historian searches sessions on this branch over the last 30 days across all three harness locations. It finds: 4 Claude Code sessions, 1 Codex session. It reads through them looking for evidence on the mute-state question. It returns a digest:
+- `~/.claude/projects/`（Claude Code）
+- `~/.codex/sessions/`（Codex）
+- `~/.cursor/projects/`（Cursor）
 
-- **Key decisions:** "Settled on per-subscription mute state (notification_subscription.mute_until) rather than per-user, per session 2026-04-22. Rationale: per-user would force a global mute across all notification types; users wanted per-type control."
-- **Related context:** "Earlier session considered a separate `mutes` table with subscription_id foreign keys. Rejected because the lifecycle is identical to the subscription itself."
+如果你昨天用 Codex、今天用 Claude Code，这个 skill 能找到昨天的 context。Single-harness tools 做不到。
 
-You have the answer. Continue from where you left off, with the previous decision context restored.
+### 2. Question-driven synthesis，而不是 raw transcript dump
 
----
+Agent 不会返回平铺的 session content list。它会围绕用户问题，把 findings 合成为 structured sections：
 
-## When to Reach For It
+- **What was tried before**：agent 尝试过的 approaches 和 outcomes
+- **What didn't work**：failed hypotheses 和 reasons
+- **Key decisions**：prior sessions 中做出的 choices 及 reasoning
+- **Related context**：与问题相关的 adjacent findings
 
-Reach for `ce-sessions` when:
+如果没有 relevant prior sessions，digest 会明确说明，而不是 fabricated findings。
 
-- You're picking up work and need context on what was decided / tried before
-- A new session can't see what an earlier session learned
-- You suspect "we tried this before but I can't remember"
-- You're reconstructing the path that led to a current state
-- The question is "when did we decide X" or "how did we investigate Y"
+### 3. Branch-aware filtering（branch 感知过滤）
 
-Skip `ce-sessions` when:
+Skill 会 pre-resolve current git branch 并传给 agent，让 session searches 可以 filter 到同一 branch 上做过的工作；这通常是接续工作或重建 recent context 时最相关的内容。Pre-resolution 使用 `!` backtick mechanism：如果 resolve 为 plain branch name，就传入；如果返回 literal command string（resolution failed），则省略，并由 agent 在 runtime derive branch。
 
-- The context lives in committed code or docs, not in agent sessions → just read the code/docs
-- You want general session metadata (count, timestamps, sizes) without semantic search → run `discover-sessions.sh` and `extract-metadata.py` from `plugins/compound-engineering/skills/ce-sessions/scripts/` directly
-- The question is about a single specific session you remember well — open the session file directly
+### 4. Thin orchestrator，agent 做重活
 
----
+Skill 本身是 thin entry point；它的工作是在没有提供 question 时询问 "what would you like to know?"，然后 dispatch historian。Historian 处理实际 search、time filtering、transcript parsing 和 synthesis。这样 user-facing surface 很小，heavy lifting 留给 specialist agent。
 
-## Use as Part of the Workflow
+### 5. Time-window control（时间窗口控制）
 
-`ce-sessions` is mostly invoked standalone, but interlocks with other skills:
-
-- **`/ce-compound` Phase 1 (Full mode)** — optionally invokes `ce-sessions` via the platform's skill-invocation primitive to search prior sessions for related context, folding findings into the new learning's "What Didn't Work" section
-- **`/ce-debug` Triage** — prior-attempt awareness; when the user indicates failed attempts, asking "what have you already tried" before investigating avoids repeating known-failed approaches
-
-This skill is the canonical entry point for session search across Claude Code, Codex, and Cursor; other skills invoke it via the platform's skill-invocation primitive when they need session-history context.
+Historian 接受 question 本身中的 time hints（"recently"、"last week"、"since the auth refactor"、explicit dates）。它会把这些解析成 real time windows，并在 filtering sessions 时应用。Default window 有边界，避免 agent 读取所有历史 session files；relevance 优先于 recall。
 
 ---
 
-## Use Standalone
+## 快速示例
 
-Most use is direct:
+你正在接续两周前开始的 feature。你不太记得当时是否决定把 notification mute state 放在 per-subscription 还是 per-user 上，想继续前确认。调用 `/ce-sessions "did we decide where notification mute state lives?"`。
 
-- **With a question** — `/ce-sessions "did we decide where notification mute state lives?"`
-- **Without a question** — `/ce-sessions` asks "what would you like to know about your session history?"
-- **Time-bounded** — the question can include time hints ("recently", "last week", "since the auth refactor")
-- **Topic-bounded** — the question can name a topic, file, or feature ("how was the migration tested", "what did we try for the N+1 query")
+Skill pre-resolves branch（`tmchow/notification-mute`），并把 question、current working directory 和 branch hint dispatch 给 `ce-session-historian`。
+
+Historian 在过去 30 天内，跨三个 harness locations 搜索此 branch 上的 sessions。它找到 4 个 Claude Code sessions、1 个 Codex session。它阅读这些 sessions，寻找 mute-state question 的 evidence。返回 digest：
+
+- **Key decisions（关键 decisions）:** "Settled on per-subscription mute state (notification_subscription.mute_until) rather than per-user, per session 2026-04-22. Rationale: per-user would force a global mute across all notification types; users wanted per-type control."
+- **Related context（相关 context）:** "Earlier session considered a separate `mutes` table with subscription_id foreign keys. Rejected because the lifecycle is identical to the subscription itself."
+
+你得到了答案。带着恢复的 previous decision context 继续工作。
 
 ---
 
-## Reference
+## 何时使用
 
-| Argument | Effect |
+在以下情况使用 `ce-sessions`：
+
+- 正在接续工作，需要知道之前决定或尝试过什么
+- 新 session 看不到 earlier session 学到的内容
+- 怀疑 "we tried this before but I can't remember"
+- 正在重建导致当前状态的路径
+- 问题是 "when did we decide X" 或 "how did we investigate Y"
+
+以下情况跳过 `ce-sessions`：
+
+- Context 位于 committed code 或 docs，而不是 agent sessions：直接读 code/docs
+- 只想要 general session metadata（count、timestamps、sizes），不需要 semantic search：直接运行 `plugins/compound-engineering/skills/ce-sessions/scripts/` 中的 `discover-sessions.sh` 和 `extract-metadata.py`
+- 你清楚记得某个 single specific session：直接打开 session file
+
+---
+
+## 作为工作流的一部分使用
+
+`ce-sessions` 大多 standalone 调用，但也与其他 skills interlock：
+
+- **`/ce-compound` Phase 1 (Full mode)**：可选地通过 platform 的 skill-invocation primitive 调用 `ce-sessions`，搜索 prior sessions 中的 related context，并把 findings fold 到新 learning 的 "What Didn't Work" section
+- **`/ce-debug` Triage**：prior-attempt awareness；当用户暗示已有失败尝试时，investigating 前先问 "what have you already tried"，避免重复 known-failed approaches
+
+此 skill 是跨 Claude Code、Codex 和 Cursor 搜索 sessions 的 canonical entry point；其他 skills 需要 session-history context 时，会通过 platform 的 skill-invocation primitive 调用它。
+
+---
+
+## 单独使用
+
+最常见的是直接使用：
+
+- **With a question（带 question）**：`/ce-sessions "did we decide where notification mute state lives?"`
+- **Without a question**：`/ce-sessions` 会问 "what would you like to know about your session history?"
+- **Time-bounded**：question 可以包含 time hints（"recently"、"last week"、"since the auth refactor"）
+- **Topic-bounded**：question 可以命名 topic、file 或 feature（"how was the migration tested"、"what did we try for the N+1 query"）
+
+---
+
+## 参考
+
+| 参数 | 效果 |
 |----------|--------|
-| _(empty)_ | Asks "what would you like to know?" |
-| `<question>` | Direct question to search history for |
-| `<topic>` | Topic to gather context on |
+| _(empty)_ | 询问 "what would you like to know?" |
+| `<question>` | 要搜索历史的 direct question |
+| `<topic>` | 要收集 context 的 topic |
 
-The skill pre-resolves the current git branch and uses it for branch filtering when it resolves cleanly. The orchestrator picks time windows from the question; the default is bounded (7 days).
-
----
-
-## FAQ
-
-**Does it work across Claude Code, Codex, and Cursor?**
-Yes — `ce-sessions` reads from `~/.claude/projects/`, `~/.codex/sessions/`, and `~/.cursor/projects/`. Cross-harness work shows up.
-
-**What does it return when there's no relevant prior session?**
-A "no relevant prior sessions" message in the digest. The skill doesn't fabricate findings to fill the digest.
-
-**How does it filter for relevance?**
-The skill uses the question to drive a relevance filter — repo, branch, and time window first, keyword match if branch turns up nothing. Up to five sessions are deep-dived; the rest are skipped. The synthesis subagent reads only the pre-extracted skeleton/error files, not the raw session JSONL.
-
-**Why does this skill exist instead of dispatching the historian agent directly?**
-The user-facing surface should ask the right question if one wasn't given, and the orchestrator handles branch pre-resolution, scan-window choice, deep-dive selection, and per-session extraction in main context where script invocation works portably. The synthesis-only `ce-session-historian` subagent receives pre-extracted file paths and produces prose findings — it cannot run the discovery pipeline itself, by design.
-
-**Can it read sessions from machines I'm not on?**
-No. It reads local session files only — `~/.claude/projects/` etc. Sessions on other machines aren't accessible.
-
-**Does it work for non-software questions?**
-The skill doesn't care about the topic — it searches whatever is in your session files. If you've used the agent for non-software work and want history on that, this skill works.
+Skill 会 pre-resolve current git branch；如果 cleanly resolve，就用于 branch filtering。Orchestrator 会从 question 中选择 time windows；default 有边界（7 days）。
 
 ---
 
-## See Also
+## 常见问题（FAQ）
 
-- [`ce-compound`](./ce-compound.md) — invokes `ce-sessions` (opt-in) during Full-mode capture for prior-context enrichment
-- [`ce-debug`](./ce-debug.md) — prior-attempt awareness uses similar context; ask the user about prior failed attempts when the signal is there
-- `plugins/compound-engineering/skills/ce-sessions/scripts/` — the underlying scripts (`discover-sessions.sh`, `extract-metadata.py`, `extract-skeleton.py`, `extract-errors.py`) that ce-sessions invokes; can be run directly when raw metadata or extraction output is needed without orchestration
+**它能跨 Claude Code、Codex 和 Cursor 工作吗？**
+可以。`ce-sessions` 从 `~/.claude/projects/`、`~/.codex/sessions/` 和 `~/.cursor/projects/` 读取。Cross-harness work 会被看到。
+
+**没有 relevant prior session 时返回什么？**
+Digest 中会有 "no relevant prior sessions" message。Skill 不会 fabricate findings 来填充 digest。
+
+**它如何 filter relevance？**
+Skill 用 question 驱动 relevance filter：先 repo、branch 和 time window；如果 branch 无结果，再 keyword match。最多 deep-dive 5 个 sessions；其余跳过。Synthesis subagent 只读取 pre-extracted skeleton/error files，不读取 raw session JSONL。
+
+**为什么这个 skill 存在，而不是直接 dispatch historian agent？**
+User-facing surface 应在没有问题时提出正确问题；orchestrator 负责 branch pre-resolution、scan-window choice、deep-dive selection 和 per-session extraction，这些在 main context 中调用 scripts 更 portable。Synthesis-only `ce-session-historian` subagent 接收 pre-extracted file paths 并产出 prose findings；它按设计不能自己运行 discovery pipeline。
+
+**能读取我不在使用的机器上的 sessions 吗？**
+不能。它只读取 local session files，例如 `~/.claude/projects/`。其他机器上的 sessions 不可访问。
+
+**它适用于非 software questions 吗？**
+Skill 不关心 topic；它搜索你 session files 中的任何内容。如果你用 agent 做过非软件工作，并想查相关历史，这个 skill 也能用。
+
+---
+
+## 另见（See Also）
+
+- [`ce-compound`](./ce-compound.md) - Full-mode capture 期间可 opt-in 调用 `ce-sessions` 做 prior-context enrichment
+- [`ce-debug`](./ce-debug.md) - prior-attempt awareness 使用类似 context；有 signal 时询问用户之前失败过什么尝试
+- `plugins/compound-engineering/skills/ce-sessions/scripts/` - ce-sessions 调用的 underlying scripts（`discover-sessions.sh`、`extract-metadata.py`、`extract-skeleton.py`、`extract-errors.py`）；需要 raw metadata 或 extraction output 且不需要 orchestration 时可直接运行

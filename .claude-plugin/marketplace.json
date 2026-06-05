@@ -5,13 +5,13 @@
     "url": "https://github.com/kieranklaassen"
   },
   "metadata": {
-    "description": "Plugin marketplace for Claude Code and Codex extensions",
+    "description": "面向 Claude Code 和 Codex extensions 的 plugin marketplace",
     "version": "1.0.2"
   },
   "plugins": [
     {
       "name": "compound-engineering",
-      "description": "AI-powered development tools that get smarter with every use. Make each unit of engineering work easier than the last.",
+      "description": "每次使用都会变得更聪明的 AI-powered development tools。让每个工程工作单元都比上一个更容易。",
       "author": {
         "name": "Kieran Klaassen",
         "url": "https://github.com/kieranklaassen",
@@ -31,7 +31,7 @@
     },
     {
       "name": "coding-tutor",
-      "description": "Personalized coding tutorials that build on your existing knowledge and use your actual codebase for examples. Includes spaced repetition quizzes to reinforce learning. Includes 3 commands and 1 skill.",
+      "description": "基于你的既有知识、并用你的真实 codebase 做示例的 personalized coding tutorials。包含 spaced repetition quizzes 来强化学习。包含 3 个 commands 和 1 个 skill。",
       "author": {
         "name": "Nityesh Agarwal"
       },

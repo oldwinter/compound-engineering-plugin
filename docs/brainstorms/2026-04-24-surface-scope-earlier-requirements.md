@@ -3,147 +3,151 @@ date: 2026-04-24
 topic: surface-scope-earlier
 ---
 
-# Surface Scope Earlier in ce-brainstorm and ce-plan
+# 在 ce-brainstorm 和 ce-plan 中更早 Surface Scope
 
-## Problem Frame
+## 问题框架
 
-Issue #676 (jrdncstr) reports that CE works well for greenfield/low-stakes work but becomes a burden in brownfield codebases: brainstorms and plans reach 300+ lines, artifacts are excessively defensive, rewrites persist, and PRs stay at 1000+ lines regardless of steering. He suggested a `--pragmatic` flag.
+Issue #676（jrdncstr）反馈：CE 对 greenfield/low-stakes work 很好用，但在 brownfield codebases 中会变成负担：brainstorms 和 plans 达到 300+ 行，artifacts 过度防御，rewrites 持续存在，不管怎么 steering，PRs 都保持 1000+ 行。他建议添加 `--pragmatic` flag。
 
-The surface suggestion (a mode or flag) is the wrong fix. **Scope under-visibility is the upstream cause; artifact density and PR diff size are downstream symptoms.** Both ce-brainstorm and ce-plan synthesize user input + agent inference into an interpretation, but the user doesn't see that synthesis until the doc lands. The user agrees to many individual things in dialogue but never sees the whole; the agent makes substantial inferences (especially in ce-plan solo invocation, where Phase 0.4 bootstrap is brief by design) and then writes against an unverified scope. Surprise at write-time means rework, and the rework looks like artifact bloat downstream.
+表层建议（mode 或 flag）不是正确 fix。**Scope under-visibility 是 upstream cause；artifact density 和 PR diff size 是 downstream symptoms。** ce-brainstorm 和 ce-plan 都会将 user input + agent inference synthesize 成 interpretation，但用户直到 doc 落地才看到该 synthesis。用户在 dialogue 中同意了许多单项内容，却从未看到整体；agent 做出大量 inferences（尤其在 ce-plan solo invocation 中，Phase 0.4 bootstrap 按设计很简短），然后基于 unverified scope 写文档。write-time 的 surprise 意味着 rework，而 rework 在下游看起来像 artifact bloat。
 
-**Working hypothesis:** fix the cause — surface the synthesis to the user before doc-write — and the symptoms abate. If they don't, density-control tools (calibrated exemplars, brevity passes for defensive sections) become a follow-up. Shipping them now alongside the cause fix would entangle attribution (which mechanism worked?), add maintenance surface for value that may not be needed, and chase symptoms before testing whether the cause fix dissolves them.
+**Working hypothesis：** 修复 cause，也就是在 doc-write 前向用户 surface synthesis，symptoms 就会缓解。如果没有缓解，density-control tools（calibrated exemplars、defensive sections 的 brevity passes）将成为 follow-up。现在把它们与 cause fix 一起发布会混淆 attribution（到底哪个机制有效？），为可能不需要的价值增加 maintenance surface，并在测试 cause fix 是否能消解症状前追逐症状。
 
-The fix lives in templates and phase additions — no new mode, no flag, no user-facing classification question. Scope tiers stay as-is.
+fix 位于 templates 和 phase additions 中：不新增 mode，不新增 flag，不新增 user-facing classification question。Scope tiers 保持不变。
 
-Related: [GitHub Issue #676](https://github.com/EveryInc/compound-engineering-plugin/issues/676)
-
----
-
-## Actors
-
-- A1. **ce-brainstorm agent**: generates requirements documents. Currently runs extensive pre-write dialogue but never surfaces a whole-scope synthesis before doc-write.
-- A2. **ce-plan agent**: generates implementation plans. Currently runs minimal interview in solo invocation (Phase 0.4 "keep it brief") and never surfaces synthesized scope before research or plan-write.
-- A3. **End-user developer**: pays the cognitive-debt cost when artifacts over-invest, the rework cost when scope was misinterpreted, and the review cost when PRs over-reach.
+Related（相关）：[GitHub Issue #676](https://github.com/EveryInc/compound-engineering-plugin/issues/676)
 
 ---
 
-## Requirements
+## 参与者
 
-### R1. ce-brainstorm synthesis summary
-
-Before Phase 3 (write requirements doc), ce-brainstorm surfaces a synthesis summary to the user. Fires for **all tiers** including Lightweight — the value is partly synthesis confirmation and partly a transition checkpoint ("about to write a doc") that gives the user permission to proceed or redirect.
-
-Structure:
-- **Stated** — what the user said directly (in prompt, prior conversation, dialogue answers, approach selection)
-- **Inferred** — what the agent assumed to fill gaps (scope boundaries the user never explicitly named, success criteria extrapolated from intent)
-- **Out of scope** — deliberately excluded items (adjacent work, refactors, nice-to-haves)
-
-Length: Lightweight gets one paragraph plus brief lists; Standard/Deep get a few paragraphs with explicit lists. Open prose prompt invites feedback: *"Does this match your intent? Tell me what to add, remove, redirect, or that I got wrong — or just confirm to proceed."*
-
-User can rebut even when the synthesis accurately reflects their stated answers (they may change their mind, surface new context, correct unstated assumptions). Soft-cut fires on **circularity** (same item revised twice), not iteration count — new-item revisions across rounds proceed without limit.
-
-Always embedded as the first section of the requirements doc. **Headless mode** (pipeline / `disable-model-invocation` context): skip the prompt and embed the synthesis with the **Inferred list omitted** — pipelines consume without human review, so propagating un-validated agent inferences as authoritative content is unsafe.
-
-### R2. ce-plan synthesis summary, invocation-context-aware
-
-Same Stated/Inferred/Out structure, prose, soft-cut, always-embed, and headless behavior as R1. Two timing variants:
-
-- **Solo invocation** (no upstream brainstorm doc): fires **after Phase 0.4 bootstrap, before Phase 1 research begins**. Catches scope misinterpretation before sub-agent dispatch is spent. Synthesis covers full breadth: problem frame, intended behavior, success criteria, in/out scope. The "Inferred" list is especially load-bearing here — Phase 0.4 makes substantial inferences from a brief interview.
-- **Brainstorm-sourced invocation**: fires **after Phase 1 research, before Phase 5.2 plan-write**. Brainstorm doc + R1 already validated WHAT. Synthesis focuses on plan-time decisions the brainstorm didn't make: which files/modules to touch (and not), which patterns extended vs. introduced new, test scope (which existing-but-untested code is in/out), and tangential refactor scope.
-
-State-machine guards (explicit in SKILL.md, not implicit):
-- Skip on Phase 0.1 fast paths (resume existing plan, deepen-intent) — synthesis is pre-write, doesn't apply when doc exists
-- Skip when Phase 0.4 routes out (ce-debug, ce-work, universal-planning) — agent left planning workflow
-- Solo variant skips when Phase 0.2 found a brainstorm doc (defers to brainstorm-sourced variant)
-
-Self-redirect support: if user surfaces "this is bigger than I thought, let me brainstorm first" or similar, agent stops, suggests the alternative skill, offers to load it in-session. No "do you want to brainstorm first?" question fires upfront — that would add friction in the common case.
-
-Graceful fallback: if origin brainstorm doc lacks the R1 synthesis section (older brainstorms, hand-written ones), R2 brainstorm-sourced runs as normal — its content is independent of origin synthesis presence.
-
-### R3. Anti-expansion clause in ce-plan
-
-Both tangential refactors and scope expansions go to a deferred-items list, not the active diff. Cleanup spotted in touched files → deferred. "While we're here, we could also..." → deferred. Adjacent improvements → deferred. Reinforces R2 by setting the default the synthesis surfaces.
+- A1. **ce-brainstorm agent**：生成 requirements documents。当前会进行大量 pre-write dialogue，但从不在 doc-write 前 surface whole-scope synthesis。
+- A2. **ce-plan agent**：生成 implementation plans。当前 solo invocation 中 interview 很少（Phase 0.4 "keep it brief"），并且从不在 research 或 plan-write 前 surface synthesized scope。
+- A3. **End-user developer**：当 artifacts over-invest 时支付 cognitive-debt cost，当 scope 被误解时支付 rework cost，当 PRs over-reach 时支付 review cost。
 
 ---
 
-## Acceptance Examples
+## 需求
 
-- AE1. **Covers R1.** Given a brainstorm task, ce-brainstorm surfaces a synthesis (Stated / Inferred / Out) before doc-write. The user can confirm, add, remove, redirect, or change their mind — even when the synthesis accurately reflects what they said in dialogue. The confirmed synthesis is embedded as the first section of the requirements doc. In headless mode, the synthesis embeds without the Inferred list and without prompting.
-- AE2. **Covers R2 (solo).** Given a /ce-plan invocation with no upstream brainstorm doc, after Phase 0.4 bootstrap and before Phase 1 research begins, the agent surfaces a full-breadth synthesis with explicit "Inferred" list. The user can correct ("actually I want the whole password reset feature, not just the link"), and research runs against the corrected scope.
-- AE3. **Covers R2 (brainstorm-sourced).** Given a /ce-plan invocation with a matching brainstorm doc, after Phase 1 research and before plan-write, the agent surfaces a plan-time-focused synthesis (which files will/won't be touched, which patterns extended, test scope, refactor scope). Brainstorm-validated WHAT is assumed and not re-stated.
+### R1. ce-brainstorm synthesis summary（synthesis 摘要）
 
----
+在 Phase 3（write requirements doc）前，ce-brainstorm 向用户 surface synthesis summary。对**所有 tiers**触发，包括 Lightweight；其价值一部分是 synthesis confirmation，另一部分是 transition checkpoint（"about to write a doc"），让用户有 permission proceed 或 redirect。
 
-## Success Criteria
+结构：
 
-**Directly validated outcomes** (this iteration tests these):
-- ce-brainstorm and ce-plan both surface scope synthesis before doc-write. Users have a clear opportunity to correct inferences, redirect, or confirm.
-- Solo ce-plan invocations specifically catch scope errors before research is spent.
-- Headless mode embeds synthesis (without Inferred) so a human PR reviewer can see what scope was auto-interpreted.
-- Greenfield protection: in-repo validation on this plugin's own current work shows no regression.
+- **Stated** — 用户直接说过的内容（prompt、prior conversation、dialogue answers、approach selection）
+- **Inferred** — agent 为填补 gaps 所作 assumptions（用户从未明确命名的 scope boundaries、从 intent 推导的 success criteria）
+- **Out of scope** — 有意排除的 items（adjacent work、refactors、nice-to-haves）
 
-**Expected downstream effects** (consequences of upstream cause-fix; not directly enforced or validated):
-- PR diff size resolves toward what the confirmed scope actually requires.
-- Rewrite frequency decreases because tangential refactors land in deferred items (R3) rather than the active diff.
-- Token spend on misdirected research decreases because solo ce-plan invocations catch scope errors before sub-agent dispatch.
-- Artifact density (defensive Outstanding Questions, placeholder template-tail sections) becomes proportional to confirmed-scope size — speculative, but a sufficient post-rollout signal to determine whether density-control tools (deferred — see Scope Boundaries) need to ship later.
+长度：Lightweight 使用一段 paragraph 加简短 lists；Standard/Deep 使用几段 paragraphs 和显式 lists。Open prose prompt 邀请 feedback：*"Does this match your intent? Tell me what to add, remove, redirect, or that I got wrong — or just confirm to proceed."*
 
-If these downstream effects do not materialize after Phase A ships, the diagnosis was wrong — that's a real signal, not a partial win. Treat post-rollout PR-size telemetry on jrdncstr's repo (or a comparable case) as the actual validation of the causal claim.
+即使 synthesis 准确反映了用户 stated answers，用户也可 rebut（他们可能改变主意、浮现新 context、修正 unstated assumptions）。soft-cut 基于**circularity**（同一 item 被 revised 两次）触发，而不是 iteration count；跨 rounds 的 new-item revisions 不设上限。
 
----
+始终作为 requirements doc 的第一 section embed。**Headless mode**（pipeline / `disable-model-invocation` context）：跳过 prompt，并 embed synthesis，但**省略 Inferred list**；pipelines 在没有 human review 的情况下消费，把 un-validated agent inferences 作为 authoritative content 传播是不安全的。
 
-## Scope Boundaries
+### R2. ce-plan synthesis summary（invocation-context-aware，感知调用上下文）
 
-- Not adding a new mode, flag, command, or user-facing classification question
-- Not changing existing Lightweight/Standard/Deep tier classification
-- Not adding diff-size budgets or PR-size gates (Goodhart concerns)
-- Not modifying ce-work or its handoff
-- Not duplicating ce-brainstorm dialogue inside ce-plan's solo synthesis (R2 solo is a synthesis checkpoint, not a brainstorm-style interview)
-- Not touching auto-deepening (Phase 5.3) — preserved as load-bearing depth
-- Not introducing automated validation for headless-mode embedded synthesis (human PR reviewer is the safety net; documented limitation)
-- Not extending ce-doc-review to validate synthesis sections
+与 R1 相同的 Stated/Inferred/Out structure、prose、soft-cut、always-embed 和 headless behavior。两个 timing variants：
 
-**Depth-calibration mechanisms deferred to follow-up:** an earlier draft of this brainstorm proposed calibrated tier exemplars, targeted brevity passes for defensive sections in ce-brainstorm, and brevity passes for plan template-tail sections. These are density-control tools — they target *output density* directly. Under the working hypothesis that scope under-visibility is the upstream cause, density should follow naturally from disciplined scope; shipping density-control tools alongside the cause fix would entangle attribution, add maintenance surface, and chase symptoms before testing whether the cause fix dissolves them. **Revisit only if post-rollout signals show density problems persist after this iteration ships.**
+- **Solo invocation**（没有 upstream brainstorm doc）：在 **Phase 0.4 bootstrap 之后、Phase 1 research 开始前**触发。它能在 sub-agent dispatch 开销发生前捕获 scope misinterpretation。Synthesis 覆盖完整 breadth：problem frame、intended behavior、success criteria、in/out scope。这里的 "Inferred" list 尤其 load-bearing，因为 Phase 0.4 会从 brief interview 中做大量 inferences。
+- **Brainstorm-sourced invocation**：在 **Phase 1 research 之后、Phase 5.2 plan-write 前**触发。Brainstorm doc + R1 已验证 WHAT。Synthesis 聚焦 brainstorm 未决定的 plan-time decisions：哪些 files/modules 会 touch（以及不会 touch）、哪些 patterns 被 extend vs. introduced new、test scope（existing-but-untested code 中哪些 in/out）、以及 tangential refactor scope。
 
----
+State-machine guards（在 SKILL.md 中显式，而不是隐式）：
 
-## Key Decisions
+- 在 Phase 0.1 fast paths（resume existing plan、deepen-intent）上 skip；synthesis 是 pre-write，不适用于 doc 已存在的情况
+- 当 Phase 0.4 routes out（ce-debug、ce-work、universal-planning）时 skip；agent 已离开 planning workflow
+- Solo variant 在 Phase 0.2 找到 brainstorm doc 时 skip（defer 到 brainstorm-sourced variant）
 
-- **Working hypothesis: scope under-visibility is the upstream cause; density is downstream.** Post-rollout signals are the actual validation. If real-user feedback surfaces density problems persisting despite synthesis discipline, density-control tools become a follow-up.
-- **Two distinct synthesis-summary mechanisms (R1, R2), not one shared one.** ce-brainstorm has substantial pre-write dialogue; its summary is shorter and serves as synthesis confirmation + transition checkpoint. ce-plan has minimal pre-write interview in solo mode; its summary fires earlier (pre-research) and is more elaborate. Same Stated/Inferred/Out structure, different timing and shape per skill.
-- **No "do you want to brainstorm first?" fork in ce-plan.** Explicit forks add friction to the common case. The synthesis lets users self-redirect when they recognize they need brainstorming.
-- **Solo ce-plan synthesis fires pre-research, not pre-write.** Pre-research catches scope errors when correction is cheap (no sub-agent dispatch spent).
-- **Brainstorm-sourced ce-plan synthesis fires pre-write, not pre-research.** Brainstorm validates WHAT; plan-time decisions emerge during research, so pre-write catches them.
-- **Stated/Inferred/Out is the load-bearing structure.** Neutral about input richness (works for one-line prompts and rich prior conversation alike); forces honesty about how much was assumed vs. agreed.
-- **Open prose, not AskUserQuestion.** Cite Interaction Rule 5(a) inline in SKILL.md to prevent future "fix" back to a menu — option sets would leak the agent's framing of valid corrections.
-- **Headless mode omits the "Inferred" list.** Pipelines consume without human review; propagating un-validated inferences as authoritative is unsafe.
-- **Soft-cut fires on circularity, not iteration count.** Revising different aspects of a wrong synthesis is exactly what the mechanism should support.
-- **Always embed synthesis as first section of doc.** Self-describing artifact for human PR reviewers; no auto-validation in headless (accepted limitation).
-- **Phased delivery: Phase A (ce-brainstorm) before Phase B (ce-plan).** Validates the simpler synthesis mechanism in the smaller surface first.
-- **Rejected: diff budgets** (Goodhart failure mode).
-- **Deferred: depth-calibration mechanisms** (calibrated exemplars + brevity passes). Revisit only if post-rollout signals show density problems persist.
+Self-redirect support：如果用户浮现 "this is bigger than I thought, let me brainstorm first" 或类似内容，agent 停止，建议 alternative skill，并提供在 session 中加载它。不在 upfront 询问 "do you want to brainstorm first?"，因为这会给 common case 增加 friction。
+
+Graceful fallback：如果 origin brainstorm doc 缺少 R1 synthesis section（旧 brainstorms、手写文档），R2 brainstorm-sourced 正常运行；其内容独立于 origin synthesis 是否存在。
+
+### R3. ce-plan 中的 anti-expansion clause
+
+tangential refactors 和 scope expansions 都进入 deferred-items list，而不是 active diff。Touched files 中发现 cleanup -> deferred。"While we're here, we could also..." -> deferred。Adjacent improvements -> deferred。通过设定 synthesis surface 的默认值来强化 R2。
 
 ---
 
-## Dependencies / Assumptions
+## 验收示例
 
-- Assumes ce-brainstorm Phase 2→3 boundary and ce-plan Phase 0.6→1.1 boundary and pre-Phase-5.2 boundary can accommodate new synthesis-summary phases without restructuring. Needs codebase verification during planning.
-- Assumes skill-isolation rules continue to forbid cross-skill references. Synthesis-summary template content will be duplicated between ce-brainstorm and ce-plan reference directories.
-- Assumes users will engage with the synthesis summary rather than skip past it. If users routinely confirm without reading, the mechanism degrades to invisible scope drift. Worth structuring the prompt to invite scanning ("look at the Inferred list — did I assume anything wrong?").
-- ce-plan Phase 0.3 (origin-doc carry-forward) must handle a brainstorm doc whose first section is the new synthesis. Verify pre-Phase-A; if incompatible, the relevant fix lands in Phase A alongside R1.
-
----
-
-## Outstanding Questions
-
-### Deferred to Planning
-
-- [Affects R1, R2][Technical] Exact wording of the synthesis-summary prompt template. Per learning #9 (`pass-paths-not-content-to-subagents.md`), phrasing matters more than meta-rules. Author during implementation; iterate if early manual validation shows drift.
-- [Affects R1, R2][Technical] Whether `synthesis-summary.md` content lives as one file per skill (with both solo and brainstorm-sourced variants in the ce-plan version) or split. Default: one file per skill, two clearly-labeled sections in ce-plan's version.
-- [Affects R2][Technical] Whether the solo-mode prompt uses a blocking question tool or chat-output-with-natural-interrupt. Tradeoff: blocking is more reliable but adds friction; natural interrupt is lower friction but easier to skip past. Decide during planning.
+- AE1. **Covers R1。** 给定 brainstorm task，ce-brainstorm 在 doc-write 前 surface synthesis（Stated / Inferred / Out）。用户可以 confirm、add、remove、redirect 或 change their mind，即使 synthesis 准确反映 dialogue 中所说内容。confirmed synthesis 作为 requirements doc 第一 section embed。headless mode 中，synthesis 无 prompt embed，且不含 Inferred list。
+- AE2. **Covers R2（solo）。** 给定没有 upstream brainstorm doc 的 /ce-plan invocation，在 Phase 0.4 bootstrap 后、Phase 1 research 开始前，agent surface full-breadth synthesis，并含显式 "Inferred" list。用户可以纠正（"actually I want the whole password reset feature, not just the link"），research 基于 corrected scope 运行。
+- AE3. **Covers R2（brainstorm-sourced）。** 给定匹配 brainstorm doc 的 /ce-plan invocation，在 Phase 1 research 后、plan-write 前，agent surface plan-time-focused synthesis（哪些 files 会/不会 touch、哪些 patterns 被 extend、test scope、refactor scope）。假设 brainstorm-validated WHAT 已成立，不重新陈述。
 
 ---
 
-## Next Steps
+## 成功标准
 
--> `/ce-plan` for implementation planning.
+**直接验证 outcomes（结果）**（本 iteration 测试这些）：
+
+- ce-brainstorm 和 ce-plan 都在 doc-write 前 surface scope synthesis。用户有清晰机会纠正 inferences、redirect 或 confirm。
+- Solo ce-plan invocations 会在 research 开销发生前专门捕获 scope errors。
+- Headless mode embeds synthesis（without Inferred），让 human PR reviewer 能看到 scope 是如何被 auto-interpreted 的。
+- Greenfield protection：在本 plugin 当前 work 上做 in-repo validation，显示无 regression。
+
+**预期 downstream effects（下游效果）**（upstream cause-fix 的后果；不直接 enforce 或 validate）：
+
+- PR diff size 会收敛到 confirmed scope 实际需要的规模。
+- rewrite frequency 下降，因为 tangential refactors 进入 deferred items（R3），而不是 active diff。
+- misdirected research 的 token spend 下降，因为 solo ce-plan invocations 会在 sub-agent dispatch 前捕获 scope errors。
+- Artifact density（defensive Outstanding Questions、placeholder template-tail sections）与 confirmed-scope size 成比例；这是 speculative，但足以作为 post-rollout signal，判断是否稍后需要发布 density-control tools（deferred，见 Scope Boundaries）。
+
+如果这些 downstream effects 在 Phase A 发布后没有出现，说明 diagnosis 是错的。这是真实 signal，不是 partial win。将 jrdncstr repo（或 comparable case）的 post-rollout PR-size telemetry 视为 causal claim 的实际 validation。
+
+---
+
+## 范围边界
+
+- 不添加新 mode、flag、command 或 user-facing classification question
+- 不改变现有 Lightweight/Standard/Deep tier classification
+- 不添加 diff-size budgets 或 PR-size gates（Goodhart concerns）
+- 不修改 ce-work 或其 handoff
+- 不在 ce-plan solo synthesis 中复制 ce-brainstorm dialogue（R2 solo 是 synthesis checkpoint，不是 brainstorm-style interview）
+- 不触碰 auto-deepening（Phase 5.3），保留其 load-bearing depth
+- 不为 headless-mode embedded synthesis 引入 automated validation（human PR reviewer 是 safety net；这是 documented limitation）
+- 不扩展 ce-doc-review 来 validate synthesis sections
+
+**Depth-calibration mechanisms deferred to follow-up：** 该 brainstorm 的早期草稿曾提出 calibrated tier exemplars、ce-brainstorm 中 defensive sections 的 targeted brevity passes，以及 plan template-tail sections 的 brevity passes。这些是 density-control tools，直接针对 *output density*。在 working hypothesis 中，scope under-visibility 是 upstream cause，density 应自然跟随 disciplined scope。将 density-control tools 与 cause fix 一起发布会混淆 attribution，增加 maintenance surface，并在测试 cause fix 是否能消解症状前追逐症状。**只有当 post-rollout signals 显示本 iteration 发布后 density problems 仍存在时，才 revisit。**
+
+---
+
+## 关键决策
+
+- **Working hypothesis：scope under-visibility 是 upstream cause；density 是 downstream。** Post-rollout signals 才是实际 validation。如果 real-user feedback 显示尽管 synthesis discipline 存在，density problems 仍持续，则 density-control tools 成为 follow-up。
+- **两个不同 synthesis-summary mechanisms（R1、R2），而不是一个共享机制。** ce-brainstorm 有大量 pre-write dialogue；summary 更短，作为 synthesis confirmation + transition checkpoint。ce-plan 在 solo mode 中 pre-write interview 很少；summary 更早触发（pre-research），也更详细。同样的 Stated/Inferred/Out structure，但每个 skill 的 timing 和 shape 不同。
+- **ce-plan 中没有 "do you want to brainstorm first?" fork。** 显式 forks 会给 common case 增加 friction。synthesis 让用户在意识到需要 brainstorming 时 self-redirect。
+- **Solo ce-plan synthesis 在 pre-research 触发，而不是 pre-write。** pre-research 能在 correction 成本低时捕获 scope errors（尚未花费 sub-agent dispatch）。
+- **Brainstorm-sourced ce-plan synthesis 在 pre-write 触发，而不是 pre-research。** Brainstorm 验证 WHAT；plan-time decisions 在 research 中浮现，因此 pre-write 捕获它们。
+- **Stated/Inferred/Out 是 load-bearing structure。** 它对 input richness 保持中立（one-line prompts 和 rich prior conversation 都适用），并迫使 agent 诚实说明有多少内容是 assumed，而不是 agreed。
+- **Open prose，而不是 AskUserQuestion。** 在 SKILL.md 中 inline 引用 Interaction Rule 5(a)，防止未来“修复”回 menu；option sets 会泄漏 agent 对 valid corrections 的 framing。
+- **Headless mode 省略 "Inferred" list。** Pipelines 在没有 human review 时消费；传播 un-validated inferences 为 authoritative 是不安全的。
+- **Soft-cut 基于 circularity，而不是 iteration count。** 修正错误 synthesis 的不同 aspects 正是该机制应支持的内容。
+- **始终将 synthesis embed 为 doc 第一 section。** 给 human PR reviewers 的 self-describing artifact；headless 中没有 auto-validation（接受的 limitation）。
+- **分阶段交付：Phase A（ce-brainstorm）先于 Phase B（ce-plan）。** 先在较小 surface 验证更简单的 synthesis mechanism。
+- **Rejected：diff budgets**（Goodhart failure mode，容易诱导指标投机）。
+- **Deferred：depth-calibration mechanisms**（calibrated exemplars + brevity passes，深度校准机制）。只有 post-rollout signals 显示 density problems 持续存在时才 revisit。
+
+---
+
+## 依赖与假设
+
+- 假设 ce-brainstorm Phase 2->3 boundary，以及 ce-plan Phase 0.6->1.1 boundary 和 pre-Phase-5.2 boundary，可容纳新的 synthesis-summary phases，而不需要 restructuring。planning 期间需要 codebase verification。
+- 假设 skill-isolation rules 继续禁止 cross-skill references。Synthesis-summary template content 会在 ce-brainstorm 和 ce-plan reference directories 之间 duplicate。
+- 假设用户会参与 synthesis summary，而不是跳过。如果用户例行 confirm without reading，该机制会退化为 invisible scope drift。值得将 prompt 构造成鼓励扫描（"look at the Inferred list — did I assume anything wrong?"）。
+- ce-plan Phase 0.3（origin-doc carry-forward）必须处理 first section 是新 synthesis 的 brainstorm doc。Phase A 前验证；如果不兼容，相关 fix 与 R1 一起落入 Phase A。
+
+---
+
+## 未决问题
+
+### 延后到 Planning 阶段
+
+- [Affects R1, R2][Technical] synthesis-summary prompt template 的精确 wording。根据 learning #9（`pass-paths-not-content-to-subagents.md`），phrasing matters more than meta-rules。implementation 期间编写；如果早期 manual validation 显示 drift，则迭代。
+- [Affects R1, R2][Technical] `synthesis-summary.md` content 是每个 skill 一个文件（ce-plan version 中同时包含 solo 和 brainstorm-sourced variants），还是拆分。默认：每个 skill 一个文件，在 ce-plan version 中有两个清晰标记 sections。
+- [Affects R2][Technical] solo-mode prompt 使用 blocking question tool，还是 chat-output-with-natural-interrupt。Tradeoff：blocking 更可靠但增加 friction；natural interrupt friction 更低但更容易被跳过。planning 期间决定。
+
+---
+
+## 下一步
+
+-> `/ce-plan` 进入 implementation planning（实现计划）。

@@ -1,31 +1,31 @@
-# Rails dev-server recipe (auto-detect fallback)
+# Rails dev-server recipe（Rails dev-server 配方，auto-detect fallback）
 
-Loaded when `detect-project-type.sh` returns `rails` and there is no `.claude/launch.json` to consult.
+当 `detect-project-type.sh` 返回 `rails`，且没有 `.claude/launch.json` 可查询时加载。
 
-## Signature
+## Signature（识别特征）
 
-- `bin/dev` exists and is executable
-- `Gemfile` exists
+- `bin/dev` 存在且 executable
+- `Gemfile` 存在
 
-## Start command
+## Start command（启动命令）
 
 ```bash
 bin/dev
 ```
 
-`bin/dev` is the Rails 7+ convention for "start everything" (web + assets watcher + optional workers). It is a one-liner script that invokes `foreman start -f Procfile.dev` under the hood, so `Procfile.dev` is the canonical place to read the *actual* command if `bin/dev` is missing or non-executable.
+`bin/dev` 是 Rails 7+ 的 "start everything"（web + assets watcher + optional workers）约定。它是一个 one-liner script，底层调用 `foreman start -f Procfile.dev`，因此如果 `bin/dev` 缺失或不可执行，`Procfile.dev` 是读取*实际* command 的 canonical place。
 
-## Port
+## Port（端口）
 
-Default: `3000`. Overrides follow the cascade in `references/dev-server-detection.md`:
-1. `Procfile.dev` `web:` line may contain `-p <n>`
-2. `config/puma.rb` may bind to a non-default port
-3. `.env` / `.env.development` `PORT=<n>`
-4. `AGENTS.md` / `CLAUDE.md` project instructions
+Default（默认）：`3000`。Overrides 遵循 `references/dev-server-detection.md` 中的 cascade：
+1. `Procfile.dev` 的 `web:` line 可能包含 `-p <n>`
+2. `config/puma.rb` 可能 bind 到 non-default port
+3. `.env` / `.env.development` 中的 `PORT=<n>`
+4. `AGENTS.md` / `CLAUDE.md` project instructions（项目说明）
 
-## Stub generation for `.claude/launch.json`
+## 为 `.claude/launch.json` 生成 stub
 
-When the user accepts "Save this as `.claude/launch.json`?", emit the Rails stub from `launch-json-schema.md`:
+当用户接受 "Save this as `.claude/launch.json`?" 时，emit `launch-json-schema.md` 中的 Rails stub：
 
 ```json
 {
@@ -41,10 +41,10 @@ When the user accepts "Save this as `.claude/launch.json`?", emit the Rails stub
 }
 ```
 
-If the cascade resolved a non-3000 port, substitute it in the stub's `port` field before writing.
+如果 cascade resolved 到非 3000 port，在写入前替换 stub 的 `port` 字段。
 
-## Common gotchas
+## Common gotchas（常见陷阱）
 
-- **Bundler path:** some machines require `bundle exec bin/dev`. If `bin/dev` fails with a load-path error, fall back to `bundle exec bin/dev`.
-- **Foreman vs overmind:** `Procfile` vs `Procfile.dev` often both exist. Rails' `bin/dev` resolves to `Procfile.dev`; if the project uses `overmind` explicitly, prefer `overmind start -f Procfile.dev` (see `dev-server-procfile.md`).
-- **SSL dev server:** `rails s` with `--ssl` changes the URL scheme. Polish's reachability probe uses `http://`; users with SSL dev servers should set `port` explicitly in `.claude/launch.json` and note the scheme in the checklist.
+- **Bundler path：** 有些机器需要 `bundle exec bin/dev`。如果 `bin/dev` 因 load-path error 失败，fallback 到 `bundle exec bin/dev`。
+- **Foreman vs overmind：** `Procfile` 和 `Procfile.dev` 经常同时存在。Rails 的 `bin/dev` resolves 到 `Procfile.dev`；如果项目明确使用 `overmind`，优先用 `overmind start -f Procfile.dev`（见 `dev-server-procfile.md`）。
+- **SSL dev server：** 带 `--ssl` 的 `rails s` 会改变 URL scheme。Polish 的 reachability probe 使用 `http://`；使用 SSL dev servers 的用户应在 `.claude/launch.json` 中显式设置 `port`，并在 checklist 中注明 scheme。

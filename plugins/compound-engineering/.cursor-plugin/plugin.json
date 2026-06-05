@@ -2,7 +2,7 @@
   "name": "compound-engineering",
   "displayName": "Compound Engineering",
   "version": "3.10.0",
-  "description": "AI-powered development tools for code review, research, design, and workflow automation.",
+  "description": "用于 code review、research、design 和 workflow automation 的 AI-powered development tools。",
   "author": {
     "name": "Kieran Klaassen",
     "email": "kieran@every.to",

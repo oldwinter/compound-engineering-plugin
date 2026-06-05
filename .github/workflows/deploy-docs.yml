@@ -1,4 +1,4 @@
-name: Deploy Documentation to GitHub Pages
+name: 部署文档到 GitHub Pages
 
 on:
   push:
@@ -26,14 +26,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Pages
+      - name: 设置 Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload artifact
+      - name: 上传 artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: 'plugins/compound-engineering/docs'
 
-      - name: Deploy to GitHub Pages
+      - name: 部署到 GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

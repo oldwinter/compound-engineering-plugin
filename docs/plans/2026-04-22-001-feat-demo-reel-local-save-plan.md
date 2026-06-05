@@ -1,210 +1,210 @@
 ---
-title: "feat(ce-demo-reel): Add local save as alternative to catbox upload"
+title: "feat(ce-demo-reel): 添加 local save 作为 catbox upload 的替代选项"
 type: feat
 status: active
 date: 2026-04-22
 origin: docs/brainstorms/2026-04-22-demo-reel-local-save-requirements.md
 ---
 
-# feat(ce-demo-reel): Add local save as alternative to catbox upload
+# feat(ce-demo-reel): 添加 local save 作为 catbox upload 的替代选项
 
-## Overview
+## 概览
 
-Add a destination choice to the ce-demo-reel upload flow: after capture, the user picks either "upload to catbox" (existing behavior) or "save locally" (new). Local save copies the final artifact to a stable OS-temp path with a descriptive filename. The catbox upload path is unchanged.
-
----
-
-## Problem Frame
-
-When ce-demo-reel captures evidence, local artifacts are deleted after uploading to catbox.moe. Users who want to keep evidence locally have no way to do so. (See origin: `docs/brainstorms/2026-04-22-demo-reel-local-save-requirements.md`)
+为 ce-demo-reel upload flow 添加 destination choice：capture 后，用户选择 "upload to catbox"（现有行为）或 "save locally"（新增）。Local save 会把 final artifact 复制到稳定的 OS-temp path，并使用 descriptive filename。catbox upload path 保持不变。
 
 ---
 
-## Requirements Trace
+## 问题框架
 
-- R1. After capture completes, ask the user whether to upload to catbox or save locally
-- R2. The question must present the captured artifact(s) and clearly describe both options
-- R3. When the user chooses local save, copy artifacts to `$TMPDIR/compound-engineering/ce-demo-reel/`; do not upload to catbox
-- R4. Create the destination directory if it does not exist
-- R5. Use a descriptive filename with branch name and timestamp to avoid collisions
-- R6. After saving, display the local file path(s) to the user
+当 ce-demo-reel 捕获 evidence 时，local artifacts 会在 upload 到 catbox.moe 后被删除。想要在本地保留 evidence 的用户没有办法做到。（See origin: `docs/brainstorms/2026-04-22-demo-reel-local-save-requirements.md`）
 
 ---
 
-## Scope Boundaries
+## 需求追踪
 
-- Catbox upload logic itself is unchanged — only the routing is new
-- No automatic git-add or commit of saved artifacts
-- No configurable save path — `$TMPDIR/compound-engineering/ce-demo-reel/` is the fixed default
-- No retroactive save of previously captured evidence
-
----
-
-## Context & Research
-
-### Relevant Code and Patterns
-
-- `plugins/compound-engineering/skills/ce-demo-reel/references/upload-and-approval.md` — the 5-step upload flow where the destination choice will be inserted
-- `plugins/compound-engineering/skills/ce-demo-reel/scripts/capture-demo.py` — pipeline script with `preview` and `upload` subcommands; will get a new `save-local` subcommand
-- `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md` — Step 8 delegates to `upload-and-approval.md`; Output section defines the return format
-
-### Institutional Learnings
-
-- **Script-first architecture** (`docs/solutions/skill-design/script-first-skill-architecture.md`): File manipulation (mkdir, copy, path generation) belongs in the Python script, not inline in SKILL.md
-- **Prefer Python over bash** (`docs/solutions/best-practices/prefer-python-over-bash-for-pipeline-scripts.md`): The `save-local` subcommand should be Python, consistent with the existing script
+- R1. Capture 完成后，询问用户 upload to catbox 还是 save locally
+- R2. 问题必须展示 captured artifact(s)，并清晰描述两个 options
+- R3. 当用户选择 local save 时，将 artifacts copy 到 `$TMPDIR/compound-engineering/ce-demo-reel/`；不要 upload to catbox
+- R4. 如果 destination directory 不存在，则创建它
+- R5. 使用包含 branch name 与 timestamp 的 descriptive filename，避免 collisions
+- R6. 保存后向用户显示 local file path(s)
 
 ---
 
-## Key Technical Decisions
+## 范围边界
 
-- **Destination choice replaces approval gate, not adds to it**: The existing Step 2 approval gate asks "use this / recapture / skip". The new flow asks "upload to catbox / save locally / recapture / skip" — a single merged question, not two sequential prompts.
-- **`save-local` as a script subcommand**: Per script-first architecture, the Python script handles directory creation, filename generation, and file copying. The SKILL.md orchestrates the choice and calls the script.
-- **Filename format**: `<branch>-<YYYYMMDD-HHMMSS>.<ext>` — branch provides context, timestamp prevents collisions. Branch name is sanitized (slashes to dashes, truncated to 60 chars).
-- **Output format for local save**: The existing output uses `URL: [public URL]`. For local saves, use `Path: [local path]` instead, so the caller can distinguish between the two.
-
----
-
-## Open Questions
-
-### Resolved During Planning
-
-- **Should preview upload still happen before the choice?** Yes — the user needs to see the artifact to decide. The preview is temporary (1h) and costs nothing if they choose local save.
-
-### Deferred to Implementation
-
-- **Exact branch-name sanitization regex**: Implementation detail; follow Python `re.sub` conventions.
+- Catbox upload logic 本身不变 -- 只新增 routing
+- 不自动 git-add 或 commit saved artifacts
+- 不支持 configurable save path -- `$TMPDIR/compound-engineering/ce-demo-reel/` 是固定 default
+- 不 retroactively save 过去 captured evidence
 
 ---
 
-## Implementation Units
+## 背景与调研
 
-- [ ] U1. **Add `save-local` subcommand to capture-demo.py**
+### 相关代码和模式
 
-**Goal:** Add a script subcommand that copies an artifact to a target directory with a descriptive filename.
+- `plugins/compound-engineering/skills/ce-demo-reel/references/upload-and-approval.md` -- 将插入 destination choice 的 5-step upload flow
+- `plugins/compound-engineering/skills/ce-demo-reel/scripts/capture-demo.py` -- 带 `preview` 和 `upload` subcommands 的 pipeline script；将新增 `save-local` subcommand
+- `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md` -- Step 8 delegate 到 `upload-and-approval.md`；Output section 定义 return format
 
-**Requirements:** R3, R4, R5, R6
+### 组织内 learnings
 
-**Dependencies:** None
+- **Script-first architecture**（`docs/solutions/skill-design/script-first-skill-architecture.md`）：File manipulation（mkdir、copy、path generation）属于 Python script，不应 inline 在 SKILL.md 中
+- **Prefer Python over bash**（`docs/solutions/best-practices/prefer-python-over-bash-for-pipeline-scripts.md`）：`save-local` subcommand 应使用 Python，与现有 script 一致
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-demo-reel/scripts/capture-demo.py`
+---
 
-**Approach:**
-- Add `save-local` subcommand accepting `--file` (artifact path), `--branch` (branch name), and `--output-dir` (target directory, defaults to `$TMPDIR/compound-engineering/ce-demo-reel/`)
-- Create output directory with `os.makedirs(exist_ok=True)`
-- Sanitize branch name: replace `/` with `-`, strip non-alphanumeric chars except `-`, truncate to 60 chars
-- Generate filename: `<sanitized-branch>-<YYYYMMDD-HHMMSS>.<ext>` where ext comes from the source file
-- Copy file with `shutil.copy2`
-- Print the final absolute path as the last line of output (matching the convention of `preview` and `upload` which print the URL as last line)
-- Register the subcommand in the argparse `main()` block
+## 关键技术决策
 
-**Patterns to follow:**
-- `cmd_preview` and `cmd_upload` in the same file — same structure, same error handling with `die()`
-- Argparse registration pattern at bottom of file
+- **Destination choice 替代 approval gate，而不是新增一个 gate**：现有 Step 2 approval gate 询问 "use this / recapture / skip"。新 flow 询问 "upload to catbox / save locally / recapture / skip" -- 一个合并的问题，而不是两个 sequential prompts。
+- **`save-local` 作为 script subcommand**：根据 script-first architecture，由 Python script 处理 directory creation、filename generation 和 file copying。SKILL.md 负责 orchestration choice 并调用 script。
+- **Filename format**：`<branch>-<YYYYMMDD-HHMMSS>.<ext>` -- branch 提供 context，timestamp 防止 collisions。Branch name 会 sanitize（slashes to dashes，truncated to 60 chars）。
+- **Output format for local save**：现有 output 使用 `URL: [public URL]`。对 local saves，改用 `Path: [local path]`，使 caller 可区分两者。
 
-**Test scenarios:**
-- Happy path: `save-local --file /tmp/demo.gif --branch feat/add-login` creates `$TMPDIR/compound-engineering/ce-demo-reel/feat-add-login-<timestamp>.gif` and prints the path
-- Happy path: `save-local --file /tmp/screenshot.png --branch main` creates `$TMPDIR/compound-engineering/ce-demo-reel/main-<timestamp>.png`
-- Edge case: branch with deep nesting `feat/team/subsystem/thing` sanitizes to `feat-team-subsystem-thing`
-- Edge case: branch name exceeding 60 chars is truncated
-- Edge case: output directory does not exist — created automatically
-- Error path: source file does not exist — exits with error message
+---
 
-**Verification:**
+## 开放问题
+
+### 规划期间已解决
+
+- **Should preview upload still happen before the choice?** 是 -- 用户需要看到 artifact 才能决定。preview 是 temporary（1h），如果选择 local save，不会有额外成本。
+
+### 延后到实现阶段
+
+- **Exact branch-name sanitization regex**：Implementation detail；遵循 Python `re.sub` conventions。
+
+---
+
+## 实现单元
+
+- [ ] U1. **向 capture-demo.py 添加 `save-local` subcommand**
+
+**目标:** 添加一个 script subcommand，将 artifact copy 到 target directory，并使用 descriptive filename。
+
+**需求:** R3, R4, R5, R6
+
+**依赖:** None
+
+**文件:**
+- 修改: `plugins/compound-engineering/skills/ce-demo-reel/scripts/capture-demo.py`
+
+**做法:**
+- 添加 `save-local` subcommand，接受 `--file`（artifact path）、`--branch`（branch name）和 `--output-dir`（target directory，默认 `$TMPDIR/compound-engineering/ce-demo-reel/`）
+- 用 `os.makedirs(exist_ok=True)` 创建 output directory
+- Sanitize branch name：将 `/` 替换为 `-`，剔除非 alphanumeric chars（保留 `-`），截断到 60 chars
+- 生成 filename：`<sanitized-branch>-<YYYYMMDD-HHMMSS>.<ext>`，ext 来自 source file
+- 用 `shutil.copy2` copy file
+- 将最终 absolute path 作为 output 的最后一行打印（匹配 `preview` 和 `upload` 打印 URL 作为最后一行的 convention）
+- 在 argparse `main()` block 中 register subcommand
+
+**遵循的模式:**
+- 同一文件中的 `cmd_preview` 和 `cmd_upload` -- 相同 structure，相同 `die()` error handling
+- 文件底部 argparse registration pattern
+
+**测试场景:**
+- 成功路径：`save-local --file /tmp/demo.gif --branch feat/add-login` 创建 `$TMPDIR/compound-engineering/ce-demo-reel/feat-add-login-<timestamp>.gif` 并打印 path
+- 成功路径：`save-local --file /tmp/screenshot.png --branch main` 创建 `$TMPDIR/compound-engineering/ce-demo-reel/main-<timestamp>.png`
+- 边界情况：deep nesting branch `feat/team/subsystem/thing` sanitize 为 `feat-team-subsystem-thing`
+- 边界情况：超过 60 chars 的 branch name 被截断
+- 边界情况：output directory 不存在 -- 自动创建
+- 错误路径：source file 不存在 -- 退出并输出 error message
+
+**验证:**
 - `python3 scripts/capture-demo.py save-local --file <test-gif> --branch test-branch` copies the file and prints the destination path
 
 ---
 
-- [ ] U2. **Update upload-and-approval.md to add destination choice**
+- [ ] U2. **更新 upload-and-approval.md 以添加 destination choice**
 
-**Goal:** Replace the current approval gate with a combined destination-choice question that includes the local save option.
+**目标:** 用包含 local save option 的 combined destination-choice question 替换当前 approval gate。
 
-**Requirements:** R1, R2
+**需求:** R1, R2
 
-**Dependencies:** U1
+**依赖:** U1
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-demo-reel/references/upload-and-approval.md`
+**文件:**
+- 修改: `plugins/compound-engineering/skills/ce-demo-reel/references/upload-and-approval.md`
 
-**Approach:**
-- Step 1 (preview upload) stays unchanged — user still sees a preview
-- Step 2 becomes "Destination Choice" instead of "Approval Gate"
-- The blocking question now offers 4 options:
-  1. **Upload to catbox (public URL)** — proceeds to Step 3 (promote to permanent, unchanged)
-  2. **Save locally** — runs `save-local` subcommand, skips Step 3, goes to cleanup
-  3. **Recapture** — unchanged behavior
-  4. **Proceed without evidence** — unchanged behavior
-- Add a new section "Step 3b: Local Save" that calls `python3 scripts/capture-demo.py save-local --file [ARTIFACT_PATH] --branch [BRANCH]`
-- Step 3b captures the printed path and uses it in the output
-- Step 5 (cleanup) remains the same — `[RUN_DIR]` is always removed since the artifact has been copied out
+**做法:**
+- Step 1（preview upload）保持不变 -- 用户仍会看到 preview
+- Step 2 从 "Approval Gate" 改为 "Destination Choice"
+- blocking question 现在提供 4 个 options：
+  1. **Upload to catbox (public URL)** -- 进入 Step 3（promote to permanent，不变）
+  2. **Save locally** -- 运行 `save-local` subcommand，跳过 Step 3，进入 cleanup
+  3. **Recapture** -- 行为不变
+  4. **Proceed without evidence** -- 行为不变
+- 添加新 section "Step 3b: Local Save"，调用 `python3 scripts/capture-demo.py save-local --file [ARTIFACT_PATH] --branch [BRANCH]`
+- Step 3b 捕获 printed path，并在 output 中使用
+- Step 5（cleanup）保持不变 -- `[RUN_DIR]` 总是移除，因为 artifact 已 copy 出去
 
-**Patterns to follow:**
-- Existing Step 2 approval gate structure (question wording, option format, platform blocking tool instructions)
-- Existing Step 3 promote structure (script invocation, output capture)
+**遵循的模式:**
+- 现有 Step 2 approval gate structure（question wording、option format、platform blocking tool instructions）
+- 现有 Step 3 promote structure（script invocation、output capture）
 
-**Test scenarios:**
-- Happy path: user selects "Save locally" -> `save-local` runs, local path displayed, `[RUN_DIR]` cleaned up
-- Happy path: user selects "Upload to catbox" -> existing promote flow runs unchanged
-- Happy path: user selects "Recapture" -> returns to tier execution as before
-- Integration: multiple static screenshots — each file is saved locally with the same branch prefix but unique timestamps
+**测试场景:**
+- 成功路径：用户选择 "Save locally" -> `save-local` runs，local path displayed，`[RUN_DIR]` cleaned up
+- 成功路径：用户选择 "Upload to catbox" -> existing promote flow runs unchanged
+- 成功路径：用户选择 "Recapture" -> returns to tier execution as before
+- 集成：multiple static screenshots -- 每个 file 都以同一 branch prefix 但 unique timestamps 保存本地
 
-**Verification:**
-- The approval gate question includes all 4 options with clear descriptions
-- "Save locally" branch calls the script and does not invoke catbox upload
-- "Upload to catbox" branch is functionally identical to the current behavior
-
----
-
-- [ ] U3. **Update SKILL.md output format for local saves**
-
-**Goal:** Extend the output contract to support local file paths alongside URLs.
-
-**Requirements:** R6
-
-**Dependencies:** U2
-
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md`
-
-**Approach:**
-- In the Output section, add `Path` as an alternative to `URL`:
-  - `URL: [public URL]` when uploaded to catbox (unchanged)
-  - `Path: [local file path]` when saved locally
-  - One of the two is present, never both
-- Update the note about `URL: "none"` to cover the local case: when saved locally, `URL` is `"none"` but `Path` is populated
-
-**Patterns to follow:**
-- Existing output block format in SKILL.md
-
-**Test scenarios:**
-- Happy path: local save produces output with `Path:` field and `URL: "none"`
-- Happy path: catbox upload produces output with `URL:` field and no `Path:` field (unchanged)
-
-**Verification:**
-- Output contract is clear about when `Path` vs `URL` is present
-- Callers (e.g., ce-commit-push-pr) can distinguish local from remote evidence
+**验证:**
+- approval gate question 包含 4 个 options，且 descriptions 清晰
+- "Save locally" branch 调用 script，且不 invoke catbox upload
+- "Upload to catbox" branch 与当前行为 functionally identical
 
 ---
 
-## System-Wide Impact
+- [ ] U3. **更新 SKILL.md output format 以支持 local saves**
 
-- **Interaction graph:** ce-commit-push-pr is the primary caller of ce-demo-reel. It currently expects a `URL` in the output to embed in PR descriptions. With local saves, it will receive `Path` instead — it should handle this gracefully (e.g., skip embedding or note that evidence is local-only).
-- **Error propagation:** If `save-local` fails (disk full, permission denied), the artifact still exists in `[RUN_DIR]`. The skill should report the error and offer to retry or fall back to catbox upload.
-- **Unchanged invariants:** The catbox preview/upload pipeline, tier selection, and capture logic are entirely untouched.
+**目标:** 扩展 output contract，使其同时支持 local file paths 与 URLs。
+
+**需求:** R6
+
+**依赖:** U2
+
+**文件:**
+- 修改: `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md`
+
+**做法:**
+- 在 Output section 中，将 `Path` 加为 `URL` 的 alternative：
+  - upload 到 catbox 时使用 `URL: [public URL]`（不变）
+  - saved locally 时使用 `Path: [local file path]`
+  - 两者只出现一个，绝不同时出现
+- 更新关于 `URL: "none"` 的 note 覆盖 local case：saved locally 时，`URL` 为 `"none"`，但 `Path` populated
+
+**遵循的模式:**
+- SKILL.md 中 existing output block format
+
+**测试场景:**
+- 成功路径：local save 产生带 `Path:` field 与 `URL: "none"` 的 output
+- 成功路径：catbox upload 产生带 `URL:` field 且无 `Path:` field 的 output（不变）
+
+**验证:**
+- Output contract 清楚说明何时存在 `Path` vs `URL`
+- Callers（例如 ce-commit-push-pr）可区分 local 与 remote evidence
 
 ---
 
-## Risks & Dependencies
+## 系统级影响
 
-| Risk | Mitigation |
+- **Interaction graph:** ce-commit-push-pr 是 ce-demo-reel 的主要 caller。它当前期望 output 中有 `URL` 用于嵌入 PR descriptions。Local saves 时，它会收到 `Path` -- 应该 graceful handle（例如 skip embedding 或注明 evidence is local-only）。
+- **Error propagation:** 如果 `save-local` 失败（disk full、permission denied），artifact 仍存在于 `[RUN_DIR]`。skill 应报告 error，并提供 retry 或 fallback to catbox upload。
+- **Unchanged invariants:** Catbox preview/upload pipeline、tier selection 和 capture logic 完全不变。
+
+---
+
+## 风险与依赖
+
+| 风险 | 缓解 |
 |------|------------|
-| ce-commit-push-pr doesn't handle `Path` output | Check how ce-commit-push-pr consumes demo-reel output; update if needed (but scoped out of this plan per scope boundaries) |
-| OS-temp files cleaned by system reboot | Acceptable — demo reel artifacts are transient; users can `mv` to repo if they want to commit |
+| ce-commit-push-pr 不处理 `Path` output | 检查 ce-commit-push-pr 如何消费 demo-reel output；如需要再更新（但按 scope boundaries 不在本 plan 内） |
+| OS-temp files 被 system reboot 清理 | 可接受 -- demo reel artifacts 是 transient；用户如果想 commit 可自行 `mv` 到 repo |
 
 ---
 
-## Sources & References
+## 来源与参考
 
-- **Origin document:** [docs/brainstorms/2026-04-22-demo-reel-local-save-requirements.md](docs/brainstorms/2026-04-22-demo-reel-local-save-requirements.md)
-- Related code: `plugins/compound-engineering/skills/ce-demo-reel/`
-- Learnings: `docs/solutions/skill-design/script-first-skill-architecture.md`, `docs/solutions/best-practices/prefer-python-over-bash-for-pipeline-scripts.md`
+- **Origin document（来源文档）:** [docs/brainstorms/2026-04-22-demo-reel-local-save-requirements.md](docs/brainstorms/2026-04-22-demo-reel-local-save-requirements.md)
+- 相关代码: `plugins/compound-engineering/skills/ce-demo-reel/`
+- Learnings（learnings）: `docs/solutions/skill-design/script-first-skill-architecture.md`, `docs/solutions/best-practices/prefer-python-over-bash-for-pipeline-scripts.md`

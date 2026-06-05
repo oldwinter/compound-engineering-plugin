@@ -1,5 +1,5 @@
 ---
-title: "End-to-end learnings from running the full CE pipeline on a substantial feature"
+title: "在 substantial feature 上完整运行 CE pipeline 的端到端经验"
 date: 2026-04-17
 category: best-practices
 module: plugins/compound-engineering
@@ -7,115 +7,115 @@ problem_type: best_practice
 component: development_workflow
 severity: medium
 applies_when:
-  - Running ce:brainstorm → ce:plan → ce:work → ce:review on any non-trivial feature (more than ~1 unit of implementation work)
-  - Orchestrating the full compound-engineering pipeline end-to-end in a single session
-  - Deciding when to insert document-review passes between pipeline stages
-  - Any feature that introduces a new user-facing flow, especially bulk actions or single-keystroke commitments
-  - Any time a research agent returns a confident architectural recommendation that would add a stage, schema field, or module
+  - 在任何 non-trivial feature（超过约 1 个 implementation unit）上运行 ce:brainstorm → ce:plan → ce:work → ce:review
+  - 在单个 session 中端到端编排完整 compound-engineering pipeline
+  - 决定何时在 pipeline stages 之间插入 document-review passes
+  - 任何引入新 user-facing flow 的 feature，尤其是 bulk actions 或 single-keystroke commitments
+  - 任何 research agent 返回 confident architectural recommendation，且会新增 stage、schema field 或 module
 tags: [compound-engineering, ce-pipeline, ce-brainstorm, ce-plan, ce-work, ce-review, document-review, workflow, hitl, pipeline-discipline]
 ---
 
-# End-to-end learnings from running the full CE pipeline on a substantial feature
+# 在 substantial feature 上完整运行 CE pipeline 得到的端到端经验
 
-## Context
+## 背景
 
-The compound-engineering pipeline is designed as a sequence of progressively more expensive stages: `ce:brainstorm` → `document-review` → `ce:plan` → `document-review` → `ce:work` → `ce:review` → `resolve-pr-feedback`. Each stage operates on a different artifact (requirements doc, plan doc, diff, PR) and applies a different lens (exploration, critique, execution, synthesis, defense).
+compound-engineering pipeline 被设计为一串成本逐渐升高的 stages：`ce:brainstorm` → `document-review` → `ce:plan` → `document-review` → `ce:work` → `ce:review` → `resolve-pr-feedback`。每个 stage 操作不同 artifact（requirements doc、plan doc、diff、PR），并施加不同 lens（exploration、critique、execution、synthesis、defense）。
 
-It is tempting, on a substantial feature, to collapse this sequence — jump from a rough idea to implementation, or skip document-review because the plan "looks right." A recent session ran the full pipeline end-to-end on a non-trivial feature: redesigning the Interactive mode of `ce:review` with a per-finding walk-through, a compact bulk-action preview, a four-option routing model, and defer-to-tracker integration.
+在 substantial feature 上，很容易想把这条 sequence 折叠掉：从 rough idea 直接跳到 implementation，或因为 plan "looks right" 而跳过 document-review。最近一次 session 在一个 non-trivial feature 上端到端运行了完整 pipeline：redesign `ce:review` 的 Interactive mode，加入 per-finding walk-through、compact bulk-action preview、four-option routing model，以及 defer-to-tracker integration。
 
-The cross-cutting insight from that run is that **the pipeline itself compounds**. Issues that would have been cheap to fix at brainstorm time became expensive in PR review; issues document-review caught at plan time would have corrupted implementation if they had slipped through. Each stage catches a different class of problem, and each cheaper stage eliminates issues before they become expensive ones downstream. The value of running the pipeline in full isn't process-for-its-own-sake — it is that the stages are not redundant. They find different things.
+那次 run 的 cross-cutting insight 是：**pipeline 本身会 compound**。brainstorm 阶段本来便宜的问题，到 PR review 时会变贵；document-review 在 plan 阶段抓住的问题，如果滑过去，会污染 implementation。每个 stage 抓不同类型的问题，且每个更便宜的 stage 会在问题进入 downstream 变贵之前消除它。完整运行 pipeline 的价值不是 process-for-its-own-sake，而是这些 stages 并不 redundant。它们发现不同东西。
 
-This document codifies the concrete patterns that surfaced repeatedly so future runs — by humans or agents — inherit the lessons instead of rediscovering them.
+本文档 codify 反复出现的 concrete patterns，使未来 runs，无论由 humans 还是 agents 执行，都能继承这些 lessons，而不是重新发现。
 
 ---
 
-## Guidance
+## 指导
 
-### 1. Sample actual evidence before accepting research-agent claims
+### 1. 接受 research-agent claims 前，sample actual evidence
 
-Research agents and sub-agents return confident conclusions. Treat those conclusions as hypotheses, not facts, whenever an architectural decision rides on them. "Did you check?" is the correct response to any recommendation framed as "our analysis shows..." when the downstream cost of being wrong is a new stage, a new schema, or a new module.
+Research agents 和 sub-agents 会返回 confident conclusions。只要 architectural decision 依赖这些 conclusions，就把它们当作 hypotheses，而不是 facts。任何以 "our analysis shows..." framing 的 recommendation，如果下游错误成本是 new stage、new schema 或 new module，正确反应都是 "Did you check?"
 
-The concrete practice:
+具体做法：
 
-- When a research agent recommends a structural intervention (new stage, new field, new module), name the specific artifacts the claim is derived from.
-- Sample 10-20 real artifacts across the relevant axes.
-- Compare what the sampled evidence actually shows to what the research claim asserts.
-- Update the intervention to match the evidence, not the claim.
+- 当 research agent 推荐 structural intervention（new stage、new field、new module）时，命名该 claim derived from 的 specific artifacts。
+- 沿 relevant axes sample 10-20 个 real artifacts。
+- 比较 sampled evidence 实际显示的内容与 research claim 声称的内容。
+- 让 intervention 匹配 evidence，而不是 claim。
 
-Sampled evidence is often directionally correct but mechanistically wrong — and the mechanism is what determines the fix.
+Sampled evidence 往往 directionally correct but mechanistically wrong，而 mechanism 决定 fix。
 
-### 2. Run document-review after brainstorm AND after plan
+### 2. Brainstorm 后和 plan 后都运行 document-review
 
-Document-review is not a single gate. It operates differently on requirements (is this the right problem, framed coherently?) than on plans (does this design hold together, and does it contradict its own scope?). Skipping either application is a different failure mode:
+Document-review 不是单一 gate。它在 requirements 上（is this the right problem, framed coherently?）和 plans 上（does this design hold together, and does it contradict its own scope?）的工作方式不同。跳过任一 application 都是不同 failure mode：
 
-- Skipping post-brainstorm doc-review: you plan the wrong thing.
-- Skipping post-plan doc-review: you implement a plan with internal contradictions.
+- 跳过 post-brainstorm doc-review：你会 plan the wrong thing。
+- 跳过 post-plan doc-review：你会 implement 带 internal contradictions 的 plan。
 
-Multiple doc-review personas routinely catch architectural contradictions — a unit that adds a schema field the plan's own scope boundary forbade, a feature whose framing undermines its stated goal. These are cheap catches at plan time, expensive in implementation, and nearly unfixable in PR review.
+多个 doc-review personas 经常抓到 architectural contradictions -- 一个 unit 添加 plan 自己 scope boundary 禁止的 schema field，或一个 feature framing 破坏其 stated goal。这些在 plan time 很便宜，在 implementation 中 expensive，在 PR review 中几乎无法修。
 
-### 3. Treat "trust the agent" UX options as rubber-stamp vectors
+### 3. 将 "trust the agent" UX options 视为 rubber-stamp vectors
 
-Any feature that offers a single-keystroke commit-a-lot action is a rubber-stamping risk, regardless of how well it is labeled. If the redesign's goal is *reducing* rubber-stamping, any such action needs a visible plan the user can inspect before executing.
+任何提供 single-keystroke commit-a-lot action 的 feature，都是 rubber-stamping risk，不管 label 写得多好。如果 redesign 目标是 *reducing* rubber-stamping，那么这类 action 需要 visible plan，用户可在执行前 inspect。
 
-The pattern:
+模式：
 
-- Compact preview grouped by action class (Applying / Filing / Skipping).
-- Proceed / Cancel gate before execution.
-- Preview is cheap to render and hard to misuse.
+- Compact preview grouped by action class（按 action class 分组的 compact preview：Applying / Filing / Skipping）。
+- execution 前 Proceed / Cancel gate。
+- Preview 便宜可 render，且难 misuse。
 
-This is the right surface for *reviewing a pre-computed plan*. It is explicitly the wrong surface for *per-item decisions* — a numbered list with per-item options looks efficient at low volume and collapses working memory at high volume.
+这是 *reviewing a pre-computed plan* 的正确 surface。它明确不是 *per-item decisions* 的正确 surface -- 带 per-item options 的 numbered list 在 low volume 时看起来高效，一到 high volume 就 collapse working memory。
 
-### 4. Distinguish bulk-preview ergonomics from per-item walk-through ergonomics
+### 4. 区分 bulk-preview ergonomics 与 per-item walk-through ergonomics
 
-Two different review modalities with different affordances:
+两种 review modalities 有不同 affordances：
 
-| Modality | Good for | Bad for |
+| Modality | 适合 | 不适合 |
 |---|---|---|
 | Bulk preview grouped by action | Reviewing a pre-computed plan | Making per-item decisions |
 | Per-item walk-through | Making per-item decisions | Reviewing dozens of items at once |
 
-Mixing the two — a numbered list with per-row options — feels dense and efficient until volume hits. Then it breaks. Decide which modality each surface is, and commit.
+混合两者 -- 带 per-row options 的 numbered list -- 在 volume 上来前显得 dense 且 efficient。一旦 volume 变大，它会坏掉。决定每个 surface 属于哪种 modality，然后 commit。
 
-### 5. Treat tool/platform caps as structural constraints
+### 5. 将 tool/platform caps 当作 structural constraints
 
-Cross-platform tool limits (e.g., the 4-option cap on `AskUserQuestion`) are not annoyances to route around. They force design decisions. Collapsing a 5-option set into 4 + a follow-up question is architecturally different from a 5-option set. Accept the cap early and design for it; do not fight it in implementation and pay for it later.
+Cross-platform tool limits（例如 `AskUserQuestion` 的 4-option cap）不是要绕过的 annoyances。它们强制 design decisions。把 5-option set collapse 成 4 + follow-up question，在 architecture 上不同于 5-option set。早接受 cap 并为它设计；不要在 implementation 中对抗它、之后付出代价。
 
-### 6. Never conflate two semantic meanings in one flag
+### 6. 永远不要在一个 flag 中混合两个 semantic meanings
 
-Flag names that read sensibly in one callsite can be silently wrong in another. The symptom is a flag whose definition ("is X available?") is consistent, but whose *use* answers two different questions ("can we invoke X?" vs. "should we offer X as an option?"). One flag cannot answer both correctly.
+在一个 callsite 中读起来合理的 flag name，可能在另一个 callsite 静默错误。症状是：flag definition（"is X available?"）一致，但其 *use* 回答两个不同问题（"can we invoke X?" vs. "should we offer X as an option?"）。一个 flag 无法同时正确回答两者。
 
-When a flag's meaning depends on the caller, split it (see Example 2 below).
+当 flag meaning 依赖 caller 时，split it（见 Example 2）。
 
-This pattern recurs in the codebase. Prior instances surfaced during the `batch_confirm` collapse in document-review (session history) — a three-tier routing was collapsed to two because the middle tier conflated "high confidence in the fix" with "needs user judgment." And in the signal-word tightening for plan deepening, where "strengthen" / "confidence gaps" as standalone trigger words conflated targeted-edit intent with holistic-deepening intent, producing false positives until tightened to require "deepen" explicitly.
+该 pattern 在 codebase 中反复出现。之前的 instances 包括 document-review 中 `batch_confirm` collapse（session history）-- 三层 routing 被 collapse 成两层，因为 middle tier 混淆了 "high confidence in the fix" 与 "needs user judgment"。以及 plan deepening 的 signal-word tightening 中，"strengthen" / "confidence gaps" 作为 standalone trigger words 混淆 targeted-edit intent 与 holistic-deepening intent，直到要求 explicit "deepen" 后才消除 false positives。
 
-### 7. Contract tests assert structure, not prose
+### 7. Contract tests assert structure，而不是 prose
 
-A contract test that pins exact wording becomes a tax on future copy improvements. Every wording refinement breaks the test even though the contract is intact. The philosophy is "regression guard, not authoring ossification."
+pin exact wording 的 contract test 会变成未来 copy improvements 的税。每次 wording refinement 都会破坏 test，即使 contract 完整。其 philosophy 是 "regression guard, not authoring ossification."
 
-Assert: file existence, required section headings, required tokens, regex on distinguishing words. Do not assert: sentence-level wording, punctuation, or phrasing that copy editors will legitimately touch. This parallels the structural-evaluation practice used in skill-creator evals, where assertion names map to concrete fields in the output JSON (`overlap_detected`, `update_not_create`) rather than subjective prose judgments.
+Assert：file existence、required section headings、required tokens、distinguishing words 的 regex。不要 assert：sentence-level wording、punctuation 或 copy editors 合理会触碰的 phrasing。这与 skill-creator evals 中的 structural-evaluation practice 一致，assertion names 映射到 output JSON 中的 concrete fields（`overlap_detected`、`update_not_create`），而不是 subjective prose judgments。
 
-### 8. Don't cite external plugins or tools in durable artifacts
+### 8. 不要在 durable artifacts 中引用 external plugins 或 tools
 
-External references may be useful *in dialogue* during brainstorming — "plugin X's review flow does Y, what if we did Z?" — but should not appear in requirements docs, plan docs, PR descriptions, or commit messages. Artifacts need to stand on their own.
+External references 在 brainstorming *dialogue* 中可能有用 -- "plugin X's review flow does Y, what if we did Z?" -- 但不应出现在 requirements docs、plan docs、PR descriptions 或 commit messages 中。Artifacts 需要自洽。
 
-- Dialogue: "X's design is interesting because..."
-- Artifact: re-frame the same insight in self-contained terms that do not depend on the reader knowing X.
+- Dialogue（对话）："X's design is interesting because..."
+- Artifact（产物）：将同一 insight re-frame 为 self-contained terms，不依赖 reader 知道 X。
 
-The cost of violating this is low-visibility: the artifact reads fine today, but a future reader (or re-user of the pattern) hits an unexplained proper noun with no resolution path.
+违反这一点的成本 low-visibility：artifact 今天读起来没问题，但 future reader（或 pattern re-user）会遇到 unexplained proper noun，且没有 resolution path。
 
-### 9. Skill bodies are product code — author them accordingly
+### 9. Skill bodies 是 product code，按此标准 author
 
-Skills are the instruction substrate for future dispatch. Violations in a skill being shipped propagate into every future invocation. The authoring rules that apply to agent definitions apply equally to skill bodies:
+Skills 是未来 dispatch 的 instruction substrate。被 shipped 的 skill 中的 violations 会传播到每次 future invocation。适用于 agent definitions 的 authoring rules 同样适用于 skill bodies：
 
-- Third-person agent voice ("What should the agent do?", not "What should I do?").
-- Front-load distinguishing words so truncated labels remain differentiable.
-- Rationale discipline: conditional and late-sequence blocks must explain *why*, not just *what*, because agents landing mid-skill need the reasoning to route correctly.
+- Third-person agent voice（"What should the agent do?"，而不是 "What should I do?"）。
+- Front-load distinguishing words，使 truncated labels 仍可区分。
+- Rationale discipline：conditional 与 late-sequence blocks 必须说明 *why*，而不只是 *what*，因为 agents 可能从 skill 中段落地，需要 reasoning 才能正确 route。
 
-### 10. Each pipeline stage catches a different class of issue
+### 10. 每个 pipeline stage 抓不同类型的问题
 
-Don't skip stages because "the previous one looked fine." The value distribution across stages:
+不要因为 "previous one looked fine" 就 skip stages。各 stages 的 value distribution：
 
-| Stage | Catches | Relative cost to fix |
+| Stage | 抓住的问题 | 相对修复成本 |
 |---|---|---|
 | Brainstorm | Wrong problem, wrong framing | Cheapest |
 | Doc-review (requirements) | Incoherent requirements, missing constraints | Cheap |
@@ -125,52 +125,52 @@ Don't skip stages because "the previous one looked fine." The value distribution
 | ce:review | Scope drift in implementation | Expensive |
 | PR review | Subtle semantic conflations (flags, schema, contracts) | Most expensive |
 
-The stages are not redundant. Each catches things the others structurally cannot.
+这些 stages 不 redundant。每个都抓其他 stages structurally cannot 的东西。
 
 ---
 
-## Why This Matters
+## 为什么重要
 
-- **Cheaper stages eliminate expensive bugs.** The `sink_available` conflation (Example 2) was caught in PR review; had it shipped, it would have been a user-visible bug in an interactive flow. A hypothetical new "Stage 5b synthesis-time rewrite pass" would have added a persistent stage and per-finding model dispatch to the pipeline had it not been caught at plan time by sampling real artifacts instead of accepting a research claim.
-- **Document-review finds contradictions authors miss.** The plan draft contained a unit that added a new field to merged findings — a schema change that contradicted the plan's own "no changes to the findings schema" scope boundary. The authors did not see this; multiple doc-review personas did. (session history: this same pattern appears across testing-addressed-gate, universal-planning, and the deepen-plan work — adversarial and scope-guardian reviewers consistently catch scope contradictions.)
-- **Rubber-stamping risk is invisible without a preview gate.** A compact preview is cheap to implement and hard to misuse. Its absence is invisible until an interactive flow has been rubber-stamped in production. This was the exact failure mode in an earlier LFG-autopilot session where 6 of 7 reviewers scored just below the 80 threshold on legitimately fixable issues and were auto-suppressed.
-- **Contract tests that ossify prose become a hidden tax on iteration.** Every future wording improvement triggers a false-positive test break, which trains contributors to either skip wording improvements or mechanically update tests without thinking. Neither is the intended outcome.
-- **Pipelines compound only if run in full.** Running brainstorm-then-work is not compound engineering. It is ad-hoc engineering with extra syntax. The compounding effect comes from stages catching each other's misses.
-
----
-
-## When to Apply
-
-- Running `ce:brainstorm` → `ce:plan` → `ce:work` → `ce:review` on any non-trivial feature (more than ~1 unit of implementation work).
-- Any feature that introduces a new user-facing flow, especially one with bulk actions, routing decisions, or single-keystroke commitments.
-- Any time a research agent or sub-agent returns a confident architectural recommendation that would add a stage, a schema field, or a module.
-- Any PR whose scope boundary is explicitly stated ("no changes to X schema", "no new stages") — doc-review both the requirements and the plan before implementation starts.
-- Any contract test or snapshot test being written against generated documentation.
-- Any flag whose name could plausibly answer more than one question.
-- Any skill body being authored or revised.
+- **Cheaper stages eliminate expensive bugs。** `sink_available` conflation（Example 2）在 PR review 中被抓到；如果 shipped，会成为 interactive flow 中的 user-visible bug。若不是在 plan time 通过 sample real artifacts 而不是接受 research claim 抓住，一个 hypothetical new "Stage 5b synthesis-time rewrite pass" 会给 pipeline 增加 persistent stage 与 per-finding model dispatch。
+- **Document-review finds contradictions authors miss。** plan draft 包含一个向 merged findings 添加 new field 的 unit -- 这是 schema change，违反 plan 自己的 "no changes to the findings schema" scope boundary。authors 没看到；多个 doc-review personas 看到了。（session history: 同样 pattern 出现在 testing-addressed-gate、universal-planning 和 deepen-plan work 中 -- adversarial 与 scope-guardian reviewers 一贯能抓 scope contradictions。）
+- **Rubber-stamping risk 没有 preview gate 时不可见。** Compact preview 实现便宜且难 misuse。缺失它在 interactive flow 已于 production 中 rubber-stamped 前不可见。这正是早期 LFG-autopilot session 的 failure mode：7 个 reviewers 中 6 个对 legitimately fixable issues 打分刚低于 80 threshold，随后被 auto-suppressed。
+- **Contract tests that ossify prose become a hidden tax on iteration。** 每个 future wording improvement 都触发 false-positive test break，训练 contributors 要么跳过 wording improvements，要么 mechanical update tests without thinking。两者都不是 intended outcome。
+- **Pipelines compound only if run in full。** Running brainstorm-then-work 不是 compound engineering。那只是带额外 syntax 的 ad-hoc engineering。compounding effect 来自 stages catching each other's misses。
 
 ---
 
-## Examples
+## 适用时机
 
-### Example 1: Sampling-over-assumption (Stage 5b → shared-template upgrade)
+- 在任何 non-trivial feature（超过约 1 个 implementation unit）上运行 `ce:brainstorm` → `ce:plan` → `ce:work` → `ce:review`。
+- 任何引入 new user-facing flow 的 feature，尤其是包含 bulk actions、routing decisions 或 single-keystroke commitments 的 feature。
+- 任何时候 research agent 或 sub-agent 返回 confident architectural recommendation，且该 recommendation 会添加 stage、schema field 或 module。
+- 任何 scope boundary 被明确写出的 PR（"no changes to X schema"、"no new stages"）-- implementation 前对 requirements 和 plan 都做 doc-review。
+- 任何针对 generated documentation 编写的 contract test 或 snapshot test。
+- 任何 flag name 可能 plausibly answer more than one question。
+- 任何正在 author 或 revise 的 skill body。
 
-**Before** — a research agent asserted "personas will not reliably produce R22-R25 framing." The plan drafted a new Stage 5b synthesis-time rewrite pass to enforce framing post-hoc via a new per-finding model dispatch.
+---
 
-**Intervention** — user pushback: "are you sure?" Sampled 15+ real review artifacts across 5 personas.
+## 示例
 
-**Sampled finding** — the research was directionally correct but mechanistically wrong. The actual issues were:
+### 示例 1：Sampling-over-assumption（Stage 5b → shared-template upgrade）
 
-- Null `why_it_matters` fields in `adversarial` and `api-contract` personas.
-- Code-structure-first framing (vs. impact-first) in `correctness` and `maintainability` personas.
+**Before（之前）** -- research agent 断言 "personas will not reliably produce R22-R25 framing." plan 起草了一个 new Stage 5b synthesis-time rewrite pass，通过新的 per-finding model dispatch post-hoc enforce framing。
 
-**After** — intervention changed from "new per-finding model-dispatch stage" to "one-file shared-template upgrade" (`references/subagent-template.md`). Smaller surface area, cheaper to implement, targets the actual failure modes. No new stage, no recurring per-review model cost.
+**Intervention（干预）** -- user pushback："are you sure?" Sampled 15+ real review artifacts across 5 personas。
 
-This mirrors a prior pattern (session history): in the `feat/plan-review-personas` work, a model-tiering assumption ("Codex probably ignores the `sonnet` param") was challenged with "are you sure other platforms ignore it?" Checking the converter code revealed `model: sonnet` was already propagated to all targets, flipping the design from Claude-Code-only to universal.
+**Sampled finding（抽样发现）** -- research directionally correct but mechanistically wrong。实际问题是：
 
-### Example 2: The `sink_available` split
+- `adversarial` 和 `api-contract` personas 中 Null `why_it_matters` fields。
+- `correctness` 和 `maintainability` personas 中 code-structure-first framing（vs. impact-first）。
 
-**Before** — one flag, used in two places with two different meanings:
+**After** -- intervention 从 "new per-finding model-dispatch stage" 变为 "one-file shared-template upgrade"（`references/subagent-template.md`）。surface area 更小、implementation 更便宜，并针对真实 failure modes。无 new stage，无 recurring per-review model cost。
+
+这映射一个 prior pattern（session history）：在 `feat/plan-review-personas` work 中，model-tiering assumption（"Codex probably ignores the `sonnet` param"）被 "are you sure other platforms ignore it?" 挑战。检查 converter code 后发现 `model: sonnet` 已传播到所有 targets，将 design 从 Claude-Code-only 翻转为 universal。
+
+### Example 2：拆分 `sink_available`
+
+**Before** -- 一个 flag，在两个地方有两个不同 meanings：
 
 ```
 # Detection output
@@ -191,9 +191,9 @@ if not sink_available:
     # which is NOT the same as "can we invoke the named tracker?"
 ```
 
-The bug: when `sink_available = false` for the named tracker but GitHub Issues via `gh` or the harness task primitive *would* work, Callsite B silently drops Defer even though a fallback sink is available.
+bug：当 named tracker 的 `sink_available = false`，但 GitHub Issues via `gh` 或 harness task primitive *would* work 时，Callsite B 会 silent drop Defer，即使 fallback sink available。
 
-**After** — two flags, one meaning each:
+**After** -- 两个 flags，各自一个 meaning：
 
 ```
 # Detection output
@@ -214,11 +214,11 @@ if not any_sink_available:
     omit_option_C()
 ```
 
-The two callsites now answer their respective questions correctly. A repo with no documented tracker but working `gh` correctly offers Defer with a generic label instead of silently suppressing.
+两个 callsites 现在正确回答各自问题。没有 documented tracker 但 `gh` 可用的 repo，会正确提供 generic label 的 Defer，而不是 silent suppress。
 
-### Example 3: Structural-vs-prose contract test assertion
+### 示例 3：Structural-vs-prose contract test assertion
 
-**Before:**
+**Before（之前）：**
 
 ```
 def test_release_notes_contract():
@@ -227,9 +227,9 @@ def test_release_notes_contract():
     assert "applied during the review" in doc
 ```
 
-Every rephrase of either sentence breaks the test, even when the contract is intact.
+任何 sentence rephrase 都会 break test，即使 contract 完整。
 
-**After:**
+**After（之后）：**
 
 ```
 def test_release_notes_contract():
@@ -249,13 +249,13 @@ def test_release_notes_contract():
         "must describe deferrals"
 ```
 
-Structural landmarks (file exists, section exists, token present) are the contract. Sentence-level wording is not. This matches the structural-evaluation style used in skill-creator evals, where assertion names map to concrete fields in output JSON (`overlap_detected`, `update_not_create`).
+Structural landmarks（file exists、section exists、token present）才是 contract。Sentence-level wording 不是。这与 skill-creator evals 中的 structural-evaluation style 匹配，assertion names 映射到 output JSON 中的 concrete fields（`overlap_detected`、`update_not_create`）。
 
-### Example 4: Preview gate for bulk "trust the agent" action
+### Example 4：为 bulk "trust the agent" action 添加 preview gate
 
-**Before** — an LFG-style routing option executes the full bulk plan on one keystroke. Looks efficient; is a rubber-stamp vector.
+**Before** -- 一个 LFG-style routing option 一键执行 full bulk plan。看起来 efficient；实际是 rubber-stamp vector。
 
-**After** — LFG presents a compact preview grouped by action class, then gates execution behind explicit Proceed/Cancel:
+**After** -- LFG 展示按 action class grouped 的 compact preview，然后用 explicit Proceed/Cancel gate 阻止执行：
 
 ```
 Review plan:
@@ -275,25 +275,25 @@ Skipping (1):
 [Proceed]  [Cancel]
 ```
 
-The plan is visible. Rubber-stamping is now an explicit, informed act rather than a side effect of UI design.
+plan visible。Rubber-stamping 现在是 explicit、informed act，而不是 UI design 的 side effect。
 
-### Example 5: External plugin references stay in dialogue
+### Example 5：External plugin references 留在 dialogue 中
 
-**Dialogue (acceptable):** "Plugin X's review flow groups findings by file, which works well for their navigation-driven use case. What if we grouped by action class instead, since our Interactive mode is decision-driven?"
+**Dialogue（acceptable，对话中可接受）：** "Plugin X's review flow groups findings by file, which works well for their navigation-driven use case. What if we grouped by action class instead, since our Interactive mode is decision-driven?"
 
-**Artifact (acceptable):** "Findings are grouped by action class (Applying / Filing / Skipping) because Interactive mode is decision-driven: the user's question at this surface is 'what is about to happen?', not 'where in the tree am I?'."
+**Artifact（acceptable，artifact 中可接受）：** "Findings are grouped by action class (Applying / Filing / Skipping) because Interactive mode is decision-driven: the user's question at this surface is 'what is about to happen?', not 'where in the tree am I?'."
 
-**Artifact (not acceptable):** "Findings are grouped by action class, similar to plugin X's review flow but adapted for our decision-driven Interactive mode."
+**Artifact（not acceptable，artifact 中不可接受）：** "Findings are grouped by action class, similar to plugin X's review flow but adapted for our decision-driven Interactive mode."
 
-The artifact version stands on its own without the external reference. A future reader does not need to know X to understand the design. *(auto memory [claude]: this rule was applied throughout the ce:review redesign session — the requirements doc, plan, and PR description all re-framed externally-inspired patterns in self-contained terms.)*
+artifact version 自洽，不依赖 external reference。future reader 不需要知道 X 才能理解 design。*(auto memory [claude]: this rule was applied throughout the ce:review redesign session — the requirements doc, plan, and PR description all re-framed externally-inspired patterns in self-contained terms.)*
 
 ---
 
-## Related
+## 相关
 
-- [research-agent-pipeline-separation.md](../skill-design/research-agent-pipeline-separation.md) — Establishes the brainstorm / plan / work stage separation. This learning extends downstream to doc-review, ce:review, and resolve-pr-feedback, and focuses on what issues surface at each stage rather than what research dispatches.
-- [compound-refresh-skill-improvements.md](../skill-design/compound-refresh-skill-improvements.md) — The 6-item skill review checklist is a natural companion for review-time prevention rules, particularly around cross-phase consistency and blind-user-question avoidance.
-- [beta-promotion-orchestration-contract.md](../skill-design/beta-promotion-orchestration-contract.md) — Contract-tests-enforce-orchestration-assumptions pattern for the ce:review surface; direct prior art for structural assertion philosophy.
-- [git-workflow-skills-need-explicit-state-machines.md](../skill-design/git-workflow-skills-need-explicit-state-machines.md) — Methodologically aligned ("state machine over prose" ≈ "structural assertions over prose"), different domain.
-- [pass-paths-not-content-to-subagents.md](../skill-design/pass-paths-not-content-to-subagents.md) — Companion for any subagent-template changes, particularly around instruction phrasing.
-- [codex-delegation-best-practices.md](codex-delegation-best-practices.md) — Canonical example of sampling-evidence-over-assumption at depth (6 evaluation iterations, empirical token measurement).
+- [research-agent-pipeline-separation.md](../skill-design/research-agent-pipeline-separation.md) -- 建立 brainstorm / plan / work stage separation。本 learning 向下游延伸到 doc-review、ce:review 和 resolve-pr-feedback，关注每个 stage surface 什么 issues，而不是 dispatch 哪些 research。
+- [compound-refresh-skill-improvements.md](../skill-design/compound-refresh-skill-improvements.md) -- 6-item skill review checklist 是 review-time prevention rules 的自然 companion，尤其是 cross-phase consistency 与 blind-user-question avoidance。
+- [beta-promotion-orchestration-contract.md](../skill-design/beta-promotion-orchestration-contract.md) -- ce:review surface 的 contract-tests-enforce-orchestration-assumptions pattern；structural assertion philosophy 的直接 prior art。
+- [git-workflow-skills-need-explicit-state-machines.md](../skill-design/git-workflow-skills-need-explicit-state-machines.md) -- 方法论一致（"state machine over prose" ≈ "structural assertions over prose"），domain 不同。
+- [pass-paths-not-content-to-subagents.md](../skill-design/pass-paths-not-content-to-subagents.md) -- subagent-template changes 的 companion，尤其涉及 instruction phrasing。
+- [codex-delegation-best-practices.md](codex-delegation-best-practices.md) -- sampling-evidence-over-assumption at depth 的 canonical example（6 evaluation iterations，empirical token measurement）。

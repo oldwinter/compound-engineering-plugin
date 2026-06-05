@@ -1,5 +1,5 @@
 ---
-title: "Beta skills framework: parallel skills with -beta suffix for safe rollouts"
+title: "Beta skills framework：使用 -beta 后缀的 parallel skills 实现安全 rollout"
 category: skill-design
 date: 2026-03-17
 module: plugins/compound-engineering/skills
@@ -10,26 +10,26 @@ tags:
   - skill-versioning
   - rollout-safety
 severity: medium
-description: "Pattern for trialing new skill versions alongside stable ones using a -beta suffix. Covers naming, plan file naming, internal references, and promotion path."
+description: "使用 -beta 后缀让新 skill versions 与 stable versions 并行试用的 pattern。覆盖命名、plan file 命名、internal references 和 promotion path。"
 related:
   - docs/solutions/skill-design/compound-refresh-skill-improvements.md
   - docs/solutions/skill-design/beta-promotion-orchestration-contract.md
 ---
 
-## Problem
+## 问题
 
-Core workflow skills like `ce-plan` are deeply chained (`ce-brainstorm` → `ce-plan` → `ce-work`) and orchestrated by `lfg` and `slfg`. Rewriting these skills risks breaking the entire workflow for all users simultaneously. There was no mechanism to let users trial new skill versions alongside stable ones.
+像 `ce-plan` 这样的核心 workflow skills 被深度串联（`ce-brainstorm` → `ce-plan` → `ce-work`），并由 `lfg` 和 `slfg` 编排。重写这些 skills 有可能同时破坏所有用户的整个 workflow。此前没有机制让用户在 stable versions 旁边试用新的 skill versions。
 
-Alternatives considered and rejected:
-- **Beta gate in SKILL.md** with config-driven routing (`beta: true` in `compound-engineering.local.md`): relies on prompt-level conditional routing which risks instruction blending, requires setup integration, and adds complexity to the skill files themselves.
-- **Pure router SKILL.md** with both versions in `references/`: adds file-read penalty and refactors stable skills unnecessarily.
-- **Separate beta plugin**: heavy infrastructure for a temporary need.
+曾考虑并拒绝的替代方案：
+- **SKILL.md 中的 Beta gate**，通过配置驱动 routing（`compound-engineering.local.md` 中的 `beta: true`）：依赖 prompt-level conditional routing，存在 instruction blending 风险，需要 setup integration，并给 skill 文件自身增加复杂度。
+- **Pure router SKILL.md**，两个版本都放在 `references/` 中：增加 file-read penalty，并不必要地重构 stable skills。
+- **单独的 beta plugin**：为临时需求引入过重基础设施。
 
-## Solution
+## 解决方案
 
-### Parallel skills with `-beta` suffix
+### 使用 `-beta` 后缀的 parallel skills
 
-Create separate skill directories alongside the stable ones. Each beta skill is a fully independent copy with its own frontmatter, instructions, and internal references.
+在 stable skills 旁边创建单独的 skill directories。每个 beta skill 都是完全独立的副本，拥有自己的 frontmatter、instructions 和 internal references。
 
 ```
 skills/
@@ -37,61 +37,61 @@ skills/
 └── ce-plan-beta/SKILL.md      # New version
 ```
 
-### Naming and frontmatter conventions
+### 命名与 frontmatter 约定
 
-- **Directory**: `<skill-name>-beta/`
-- **Frontmatter name**: `<skill-name>-beta` (e.g., `ce-plan-beta`)
-- **Description**: Write the intended stable description, then prefix with `[BETA]`. This ensures promotion is a simple prefix removal rather than a rewrite.
-- **`disable-model-invocation: true`**: Prevents the model from auto-triggering the beta skill. Users invoke it manually with the slash command. Remove this field when promoting to stable.
-- **Plan files**: Use `-beta-plan.md` suffix (e.g., `2026-03-17-001-feat-auth-flow-beta-plan.md`) to avoid clobbering stable plan files
+- **Directory（目录）**：`<skill-name>-beta/`
+- **Frontmatter name**：`<skill-name>-beta`（例如 `ce-plan-beta`）
+- **Description**：写预期的 stable description，然后加上 `[BETA]` 前缀。这样 promotion 时只需移除前缀，而不是重写。
+- **`disable-model-invocation: true`**：防止模型 auto-trigger beta skill。用户通过 slash command 手动调用。promotion 到 stable 时移除此字段。
+- **Plan files**：使用 `-beta-plan.md` 后缀（例如 `2026-03-17-001-feat-auth-flow-beta-plan.md`），避免覆盖 stable plan files
 
-### Internal references
+### Internal references（内部引用）
 
-Beta skills must reference other beta skills by their beta names. For example, if both `ce-plan` and `ce-code-review` have beta versions:
-- `ce-plan-beta` references `ce-code-review-beta` (not `ce-code-review`)
-- `ce-code-review-beta` references `ce-plan-beta` (not `ce-plan`)
+Beta skills 必须用 beta names 引用其他 beta skills。例如，如果 `ce-plan` 和 `ce-code-review` 都有 beta versions：
+- `ce-plan-beta` 引用 `ce-code-review-beta`（不是 `ce-code-review`）
+- `ce-code-review-beta` 引用 `ce-plan-beta`（不是 `ce-plan`）
 
-### What doesn't change
+### 不变项
 
-- Stable skills are completely untouched
-- `lfg`/`slfg` orchestration continues to use stable skills — no modification needed
-- `ce-brainstorm` still hands off to stable `ce-plan` — no modification needed
-- `ce-work` consumes plan files from either version (reads the file, doesn't care which skill wrote it)
+- Stable skills 完全不动
+- `lfg`/`slfg` orchestration 继续使用 stable skills，无需修改
+- `ce-brainstorm` 仍 hand off 给 stable `ce-plan`，无需修改
+- `ce-work` 可消费任一版本生成的 plan files（它读取文件，不关心哪个 skill 写的）
 
-### Tradeoffs
+### 取舍
 
-**Simplicity over seamless integration.** Beta skills exist as standalone, manually-invoked skills. They won't be auto-triggered by `ce-brainstorm` handoffs or `lfg`/`slfg` orchestration without further surgery to those skills, which isn't worth the complexity for a trial period.
+**Simplicity over seamless integration。** Beta skills 作为独立、手动调用的 skills 存在。除非进一步改造相关 skills，否则它们不会被 `ce-brainstorm` handoffs 或 `lfg`/`slfg` orchestration 自动触发；为了试用期付出这种复杂度不值得。
 
-**Intended usage pattern:** A user can run `/ce-plan` for the stable output, then run `/ce-plan-beta` on the same input to compare the two plan documents side by side. The `-beta-plan.md` suffix ensures both outputs coexist in `docs/plans/` without collision.
+**预期使用模式：** 用户可以先运行 `/ce-plan` 得到 stable output，再对同一输入运行 `/ce-plan-beta`，并排比较两个 plan documents。`-beta-plan.md` 后缀确保两个输出可在 `docs/plans/` 中共存而不冲突。
 
-## Promotion path
+## Promotion path（晋级路径）
 
-When the beta version is validated:
+当 beta version 被验证后：
 
-1. Replace stable `SKILL.md` content with beta skill content
-2. Restore stable frontmatter: remove `[BETA]` prefix from description, restore stable `name:`
-3. Remove `disable-model-invocation: true` so the model can auto-trigger it
-4. Update all internal references back to stable names
-5. Restore stable plan file naming (remove `-beta` from the convention)
-6. Delete the beta skill directory
-7. Update README.md: remove from Beta Skills section, verify counts
-8. Verify `lfg`/`slfg` work with the promoted skill
-9. Verify `ce-work` consumes plans from the promoted skill
+1. 用 beta skill content 替换 stable `SKILL.md` content
+2. 恢复 stable frontmatter：从 description 移除 `[BETA]` 前缀，恢复 stable `name:`
+3. 移除 `disable-model-invocation: true`，让模型可以 auto-trigger 它
+4. 将所有 internal references 改回 stable names
+5. 恢复 stable plan file naming（从约定中移除 `-beta`）
+6. 删除 beta skill directory
+7. 更新 README.md：从 Beta Skills section 移除，并验证 counts
+8. 验证 `lfg`/`slfg` 可配合 promoted skill 工作
+9. 验证 `ce-work` 可消费 promoted skill 生成的 plans
 
-If the beta skill changed its invocation contract, promotion must also update all orchestration callers in the same PR instead of relying on the stable default behavior. See [beta-promotion-orchestration-contract.md](./beta-promotion-orchestration-contract.md) for the concrete review-skill example.
+如果 beta skill 改变了 invocation contract，promotion 必须在同一个 PR 中更新所有 orchestration callers，而不是依赖 stable default behavior。具体 review-skill 示例见 [beta-promotion-orchestration-contract.md](./beta-promotion-orchestration-contract.md)。
 
-## Validation
+## 验证
 
-After creating a beta skill, search its SKILL.md for references to the stable skill name it replaces. Any occurrence of the stable name without `-beta` is a missed rename — it would cause output collisions or route to the wrong skill.
+创建 beta skill 后，在其 SKILL.md 中搜索它替代的 stable skill name。任何不带 `-beta` 的 stable name 都是漏改 rename，可能导致 output collisions 或 route 到错误 skill。
 
-Check for:
-- **Output file paths** that use the stable naming convention instead of the `-beta` variant
-- **Cross-skill references** that point to stable skill names instead of beta counterparts
-- **User-facing text** (questions, confirmations) that mentions stable paths or names
+检查：
+- **Output file paths** 是否使用 stable naming convention 而不是 `-beta` 变体
+- **Cross-skill references** 是否指向 stable skill names 而不是 beta counterparts
+- **User-facing text**（questions、confirmations）是否提到 stable paths 或 names
 
-## Prevention
+## 预防
 
-- When adding a beta skill, always use the `-beta` suffix consistently in directory name, frontmatter name, description, plan file naming, and all internal skill-to-skill references
-- After creating a beta skill, run the validation checks above to catch missed renames in file paths, user-facing text, and cross-skill references
-- Always test that stable skills are completely unaffected by the beta skill's existence
-- Keep beta and stable plan file suffixes distinct so outputs can coexist for comparison
+- 添加 beta skill 时，始终在 directory name、frontmatter name、description、plan file naming 以及所有 internal skill-to-skill references 中一致使用 `-beta` 后缀
+- 创建 beta skill 后，运行上面的 validation checks，捕获 file paths、user-facing text 和 cross-skill references 中漏改的 renames
+- 始终测试 stable skills 完全不受 beta skill 存在影响
+- 保持 beta 与 stable plan file suffixes 不同，让输出可共存以便比较

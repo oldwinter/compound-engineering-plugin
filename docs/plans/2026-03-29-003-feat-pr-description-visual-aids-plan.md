@@ -1,121 +1,126 @@
 ---
-title: "feat(git-commit-push-pr): Add conditional visual aids to PR descriptions"
+title: "feat(git-commit-push-pr): 为 PR descriptions 添加 conditional visual aids"
 type: feat
 status: completed
 date: 2026-03-29
 ---
 
-# feat(git-commit-push-pr): Add conditional visual aids to PR descriptions
+# feat(git-commit-push-pr): 为 PR descriptions 添加条件式 visual aids
 
-## Overview
+## 概览
 
-Add visual communication guidance to git-commit-push-pr's Step 6 so PR descriptions can include mermaid diagrams, ASCII art, or comparison tables when the change is complex enough to warrant them. Follows the same content-pattern-based conditional approach already used in ce:brainstorm (#437) and ce:plan (#440), adapted for the PR description surface where reviewers scan quickly rather than study deeply.
+向 git-commit-push-pr 的 Step 6 添加 visual communication guidance，使 PR descriptions 在变更复杂到值得使用视觉辅助时，可以包含 mermaid diagrams、ASCII art 或 comparison tables。它遵循 ce:brainstorm（#437）和 ce:plan（#440）已经使用的同一 content-pattern-based conditional approach，并适配 PR description 这个 reviewers 快速扫读而不是深入研读的表面。
 
-## Problem Frame
+## 问题框架
 
-Complex PRs with architectural changes, user flow modifications, or multi-component interactions currently get text-only descriptions. Even when the PR was built from a plan that contains visual aids, those visuals don't carry through to the PR description. Reviewers must reconstruct the mental model from prose alone.
+涉及 architectural changes、user flow modifications 或 multi-component interactions 的复杂 PRs 目前只有 text-only descriptions。即便 PR 来自包含 visual aids 的 plan，这些视觉内容也不会传递到 PR description。Reviewers 必须只靠 prose 重建 mental model。
 
-PR #442 demonstrates this: a cross-target change with a 6-row decision matrix (which it did include as a markdown table) and multi-component interaction patterns. But for PRs involving workflow changes, data flow modifications, or component architecture shifts, the description has no guidance to include flow diagrams or interaction diagrams that would dramatically improve reviewer comprehension.
+PR #442 展示了这一点：它是 cross-target change，包含 6-row decision matrix（确实作为 markdown table 包含了）和 multi-component interaction patterns。但对于涉及 workflow changes、data flow modifications 或 component architecture shifts 的 PRs，description 没有 guidance 要求包含 flow diagrams 或 interaction diagrams，而这些图能显著改善 reviewer comprehension。
 
-The gap: ce:brainstorm and ce:plan both now produce visual aids when content warrants it, but the downstream PR description -- the artifact reviewers actually see first -- has no equivalent guidance.
+gap 在于：ce:brainstorm 和 ce:plan 现在都会在内容值得时生成 visual aids，但下游 PR description，也就是 reviewers 实际最先看到的 artifact，没有等价 guidance。
 
-## Requirements Trace
+## 需求追踪
 
-- R1. The skill includes guidance for when visual aids genuinely improve a PR description
-- R2. Visual aids are conditional on content patterns (what the PR changes), not on PR size alone -- a small PR that changes a complex workflow may warrant a diagram; a large mechanical refactor may not
-- R3. The trigger bar is higher than ce:brainstorm or ce:plan -- PR descriptions are scanned by reviewers, not studied deeply
-- R4. Three visual aid types: mermaid flow/interaction diagrams, ASCII annotated flows, and markdown tables (tables already partially covered by the existing "Markdown tables for data" writing principle)
-- R5. Within generated PR descriptions, visual aids are placed inline at the point of relevance, not in a separate section
-- R6. The existing Step 6 structure, sizing table, writing principles, and state machine flow of the skill remain intact
+- R1. skill 包含 guidance，说明何时 visual aids 能真正改善 PR description
+- R2. Visual aids 基于 content patterns（PR 改了什么）有条件出现，而不是只看 PR size；一个小 PR 如果改变复杂 workflow，也可能值得 diagram；大型 mechanical refactor 可能不需要
+- R3. trigger bar 高于 ce:brainstorm 或 ce:plan；PR descriptions 是给 reviewers 扫读，不是深入研读
+- R4. 三种 visual aid types：mermaid flow/interaction diagrams、ASCII annotated flows 和 markdown tables（tables 已被现有 "Markdown tables for data" writing principle 部分覆盖）
+- R5. 在 generated PR descriptions 中，visual aids 放在 relevance 所在位置 inline，而不是单独 section
+- R6. skill 现有 Step 6 structure、sizing table、writing principles 和 state machine flow 保持不变
 
-## Scope Boundaries
+## 范围边界
 
-- Not adding visual aids to every PR -- the guidance is conditional with explicit skip criteria
-- Not changing the sizing table or other Step 6 subsections
-- Not touching Steps 1-5 or Steps 7-8 (the state machine structure must be preserved per institutional learnings)
-- Not adding plan/brainstorm document extraction -- this is about the PR diff, not upstream artifacts
+- 不为每个 PR 添加 visual aids；guidance 是 conditional，并有显式 skip criteria
+- 不修改 sizing table 或其他 Step 6 subsections
+- 不触碰 Steps 1-5 或 Steps 7-8（根据 institutional learnings，必须保留 state machine structure）
+- 不添加 plan/brainstorm document extraction；这里关注 PR diff，而不是 upstream artifacts
 
-## Context & Research
+## 上下文与研究
 
-### Relevant Code and Patterns
+### 相关代码与模式
 
-- `plugins/compound-engineering/skills/git-commit-push-pr/SKILL.md` -- the skill to modify; Step 6 spans lines 187-333 with subsections: Detect base branch, Gather branch scope, Sizing the change, Writing principles, Numbering and references, Compound Engineering badge
-- `plugins/compound-engineering/skills/ce-brainstorm/SKILL.md` (lines 223-249) -- visual communication pattern: "When to include / When to skip" table, format selection, prose-is-authoritative rule
-- `plugins/compound-engineering/skills/ce-plan/SKILL.md` (lines 581-612) -- plan-readability visual aids following the same structural pattern, with disambiguation from Section 3.4
-- Existing "Markdown tables for data" writing principle (line 280) -- already covers one visual medium (tables for before/after and trade-off data); the new guidance extends to mermaid and ASCII
+- `plugins/compound-engineering/skills/git-commit-push-pr/SKILL.md` -- 待修改 skill；Step 6 覆盖 lines 187-333，含 subsections：Detect base branch、Gather branch scope、Sizing the change、Writing principles、Numbering and references、Compound Engineering badge
+- `plugins/compound-engineering/skills/ce-brainstorm/SKILL.md`（lines 223-249）-- visual communication pattern："When to include / When to skip" table、format selection、prose-is-authoritative rule
+- `plugins/compound-engineering/skills/ce-plan/SKILL.md`（lines 581-612）-- plan-readability visual aids，遵循相同 structural pattern，并与 Section 3.4 disambiguation
+- 现有 "Markdown tables for data" writing principle（line 280）-- 已覆盖一种 visual medium（before/after 和 trade-off data 的 tables）；新 guidance 扩展到 mermaid 和 ASCII
 
-### Institutional Learnings
+### 组织内经验
 
-- The git-commit-push-pr skill is structured as a state machine with explicit transition checks. Changes must be strictly additive to the PR body composition phase -- do not alter or reorder git state checks (see `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`)
-- GitHub renders mermaid code blocks natively in PR descriptions (supported since 2022)
-- No existing learnings about mermaid gotchas or diagram generation failures in docs/solutions/
-- Prose-is-authoritative is an established invariant across brainstorm and document-review skills
+- git-commit-push-pr skill 被构造为带 explicit transition checks 的 state machine。变更必须严格 additive 到 PR body composition phase；不要 alter 或 reorder git state checks（见 `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`）
+- GitHub 在 PR descriptions 中原生渲染 mermaid code blocks（自 2022 年支持）
+- docs/solutions/ 中没有关于 mermaid gotchas 或 diagram generation failures 的现有 learnings
+- Prose-is-authoritative 是 brainstorm 和 document-review skills 中已建立的 invariant
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **Insertion point: new `#### Visual communication` subsection after Writing principles (after line 290), before Numbering and references (line 292)**: This extends the writing guidance rather than the sizing logic. The sizing table determines description *depth*; visual aids are about *medium*. Placing here preserves the flow: size the description -> write it following principles -> add visual aids when warranted -> handle numbering -> add badge.
+- **插入点：Writing principles 后新增 `#### Visual communication` subsection（line 290 后），位于 Numbering and references（line 292）之前**：这扩展 writing guidance，而不是 sizing logic。sizing table 决定 description *depth*；visual aids 关乎 *medium*。放在这里保留 flow：size the description -> write it following principles -> add visual aids when warranted -> handle numbering -> add badge。
 
-- **Higher trigger bar than sibling skills**: PR descriptions are a scanning surface, not a studying surface. ce:brainstorm triggers on "multi-step user workflow" and ce:plan triggers on "4+ units with non-linear dependencies." PR triggers should reflect what makes a *reviewer's job harder without a visual* -- architectural changes touching 3+ interacting components, workflow/pipeline changes with non-obvious flow, state or mode changes. The "When to skip" list should explicitly reinforce that small/simple changes (already handled by the sizing table) never get diagrams.
+- **比 sibling skills 更高的 trigger bar**：PR descriptions 是 scanning surface，不是 studying surface。ce:brainstorm 会在 "multi-step user workflow" 触发，ce:plan 会在 "4+ units with non-linear dependencies" 触发。PR triggers 应反映什么会让 *reviewer's job harder without a visual*：触及 3+ interacting components 的 architectural changes、带 non-obvious flow 的 workflow/pipeline changes、state 或 mode changes。"When to skip" list 应显式强化 small/simple changes（已由 sizing table 处理）永不需要 diagrams。
 
-- **Extend beyond the existing "Markdown tables for data" principle**: The existing bullet at line 280 covers tables for performance data and trade-offs. The new Visual communication subsection incorporates table format guidance within its own format selection list (consistent with sibling skills' self-contained pattern) and extends coverage to mermaid flow diagrams and ASCII interaction diagrams. The existing bullet stays as-is.
+- **超出现有 "Markdown tables for data" principle**：line 280 的现有 bullet 覆盖 performance data 和 trade-offs 的 tables。新的 Visual communication subsection 在自身 format selection list 中纳入 table format guidance（与 sibling skills 的 self-contained pattern 一致），并扩展到 mermaid flow diagrams 和 ASCII interaction diagrams。现有 bullet 保持原样。
 
-- **Self-contained format selection, consistent with sibling skills**: Skills can't reference each other's guidance. Restate the format framework (mermaid default with TB direction, ASCII for annotated flows, markdown tables for comparisons) with PR-appropriate calibration. Keep diagrams smaller than plan/brainstorm -- 5-10 nodes typical for a PR description, up to 15 only for genuinely complex changes.
+- **Self-contained format selection，与 sibling skills 一致**：Skills 不能引用彼此的 guidance。重述 format framework（mermaid default with TB direction、ASCII for annotated flows、markdown tables for comparisons），并按 PR 场景校准。保持 diagrams 比 plan/brainstorm 更小：PR description 通常 5-10 nodes，只有真正复杂变更才到 15。
 
-## Open Questions
+## 未决问题
 
-### Resolved During Planning
+### Planning 期间已解决
 
-- **Should the description update workflow (DU-3) also get visual aid guidance?** Yes. DU-3 says "write a new description following the writing principles in Step 6." Since visual communication guidance is part of Step 6's writing guidance, DU-3 inherits it automatically through the existing reference. No separate addition needed.
-- **Should we extract plan/brainstorm visuals into PR descriptions?** No. The PR description should be derived from the branch diff, not from upstream artifacts. If the diff shows a workflow change, the PR description should diagram the workflow based on what the diff reveals.
+- **description update workflow（DU-3）是否也需要 visual aid guidance？** 是。DU-3 写着 "write a new description following the writing principles in Step 6." 由于 visual communication guidance 是 Step 6 writing guidance 的一部分，DU-3 会通过现有 reference 自动继承。无需单独添加。
+- **是否应将 plan/brainstorm visuals extract 到 PR descriptions？** 否。PR description 应从 branch diff 派生，而不是从 upstream artifacts 派生。如果 diff 显示 workflow change，PR description 应基于 diff 展示的内容绘制 workflow。
 
-### Deferred to Implementation
+### 推迟到 Implementation
 
-- Mermaid node count thresholds start at 5-10 typical, up to 15 for genuinely complex changes (per Key Technical Decisions). These are starting values -- monitor initial output and adjust if diagrams are too sparse or too dense
+- Mermaid node count thresholds 以 5-10 typical、真正复杂变更最多 15 开始（按 Key Technical Decisions）。这些是初始值，需观察初始输出，并在 diagrams 太稀疏或太密集时调整
 
-## Implementation Units
+## 实现单元
 
-- [x] **Unit 1: Add visual communication subsection to Step 6**
+- [x] **Unit 1：向 Step 6 添加 visual communication subsection**
 
-**Goal:** Add a `#### Visual communication` subsection to Step 6 with conditional inclusion guidance following the established "When to include / When to skip" pattern.
+**目标：** 向 Step 6 添加 `#### Visual communication` subsection，使用已建立的 "When to include / When to skip" pattern 提供 conditional inclusion guidance。
 
-**Requirements:** R1, R2, R3, R4, R5, R6
+**需求：** R1, R2, R3, R4, R5, R6
 
-**Dependencies:** None
+**依赖：** 无
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/git-commit-push-pr/SKILL.md`
+**文件：**
 
-**Approach:**
-- Insert the new subsection after the Writing principles section (after line 290) and before Numbering and references (line 292)
-- Use the same structural template as ce:brainstorm and ce:plan: opening conditional principle, "When to include" table, "When to skip" list, format selection guidance, prose-is-authoritative rule, verification instruction
-- Adapt triggers for PR-specific content patterns: architectural changes with 3+ components, workflow/pipeline changes, state/mode introduction, data model changes with entity relationships
-- Calibrate to PR scanning context: higher bar for inclusion, smaller diagrams (5-10 nodes typical), explicit skip for small/simple changes
-- Reference the existing "Markdown tables for data" writing principle for table guidance rather than duplicating it
+- 修改：`plugins/compound-engineering/skills/git-commit-push-pr/SKILL.md`
 
-**Patterns to follow:**
-- `plugins/compound-engineering/skills/ce-brainstorm/SKILL.md` lines 223-249 (visual communication section structure)
-- `plugins/compound-engineering/skills/ce-plan/SKILL.md` lines 581-612 (plan-readability visual aids)
+**做法：**
 
-**Test scenarios:**
-- Happy path: The new subsection is syntactically valid markdown with correct heading level (`####`) matching sibling subsections in Step 6
-- Happy path: The "When to include" table has PR-appropriate triggers (not copy-pasted from brainstorm/plan)
-- Happy path: The "When to skip" list explicitly covers small/simple changes to reinforce the sizing table
-- Edge case: The existing "Markdown tables for data" writing principle at line 280 remains unchanged
-- Integration: DU-3 inherits the new guidance through its existing "following the writing principles in Step 6" reference without any changes to the DU-3 section
+- 在 Writing principles section 后（line 290 后）、Numbering and references（line 292）前插入新 subsection
+- 使用与 ce:brainstorm 和 ce:plan 相同的 structural template：opening conditional principle、"When to include" table、"When to skip" list、format selection guidance、prose-is-authoritative rule、verification instruction
+- 适配 PR-specific content patterns 的 triggers：带 3+ components 的 architectural changes、workflow/pipeline changes、state/mode introduction、带 entity relationships 的 data model changes
+- 按 PR scanning context 校准：更高 inclusion bar、更小 diagrams（5-10 nodes typical）、显式 skip small/simple changes
+- 引用现有 "Markdown tables for data" writing principle 作为 table guidance，而不是复制它
 
-**Verification:**
-- The SKILL.md file has a new `#### Visual communication` subsection between Writing principles and Numbering and references
-- The subsection follows the same structural pattern as ce:brainstorm lines 223-249 (conditional principle, When to include table, When to skip list, format selection, verification)
-- The triggers are calibrated for PR descriptions (higher bar than plan/brainstorm)
-- No changes outside of Step 6's description writing guidance area
-- `bun test` passes (if any frontmatter or structure tests exist for this skill)
+**遵循的模式：**
 
-## System-Wide Impact
+- `plugins/compound-engineering/skills/ce-brainstorm/SKILL.md` lines 223-249（visual communication section structure）
+- `plugins/compound-engineering/skills/ce-plan/SKILL.md` lines 581-612（plan-readability visual aids）
 
-- **Interaction graph:** The description update workflow (DU-3) references Step 6's writing principles and inherits the new guidance automatically. No other skills reference git-commit-push-pr's internal guidance.
-- **Unchanged invariants:** Steps 1-5 (git state machine), Step 7 (PR creation/update), Step 8 (reporting) are not touched. The sizing table, numbering/references, and badge sections within Step 6 are not modified.
+**测试场景：**
 
-## Risks & Dependencies
+- 正常路径：新 subsection 是 syntactically valid markdown，heading level（`####`）与 Step 6 的 sibling subsections 匹配
+- 正常路径："When to include" table 包含 PR-appropriate triggers（不是从 brainstorm/plan copy-paste）
+- 正常路径："When to skip" list 明确覆盖 small/simple changes，以强化 sizing table
+- 边界情况：line 280 的现有 "Markdown tables for data" writing principle 保持不变
+- 集成：DU-3 通过现有 "following the writing principles in Step 6" reference 继承新 guidance，不需要修改 DU-3 section
+
+**验证：**
+
+- SKILL.md file 在 Writing principles 与 Numbering and references 之间有新的 `#### Visual communication` subsection
+- 该 subsection 遵循 ce:brainstorm lines 223-249 的同一 structural pattern（conditional principle、When to include table、When to skip list、format selection、verification）
+- triggers 按 PR descriptions 校准（bar 高于 plan/brainstorm）
+- Step 6 description writing guidance area 之外没有变更
+- `bun test` passes（如果该 skill 存在 frontmatter 或 structure tests）
+
+## 系统级影响
+
+- **Interaction graph（交互图）:** description update workflow（DU-3）引用 Step 6 writing principles，并自动继承新 guidance。没有其他 skills 引用 git-commit-push-pr 的 internal guidance。
+- **Unchanged invariants（不变 invariant）:** Steps 1-5（git state machine）、Step 7（PR creation/update）、Step 8（reporting）不触碰。Step 6 中的 sizing table、numbering/references 和 badge sections 不修改。
+
+## 风险与依赖
 
 | Risk | Mitigation |
 |------|------------|
@@ -123,9 +128,9 @@ The gap: ce:brainstorm and ce:plan both now produce visual aids when content war
 | Mermaid diagrams don't render in all PR viewing contexts (email, Slack previews) | Mermaid source is readable as text fallback; TB direction keeps source narrow |
 | Diagram accuracy -- no code to validate against | Verification instruction (same as sibling skills) to check diagram matches the diff |
 
-## Sources & References
+## 来源与参考
 
-- Related PRs: #437 (brainstorm visual aids), #440 (plan visual aids)
-- Related plans: `docs/plans/2026-03-29-001-feat-brainstorm-visual-aids-plan.md`, `docs/plans/2026-03-29-002-feat-plan-visual-aids-plan.md`
-- Institutional learning: `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`
-- GitHub mermaid support: confirmed natively in PR descriptions since 2022
+- Related PRs（相关 PR）：#437（brainstorm visual aids）、#440（plan visual aids）
+- Related plans（相关 plan）：`docs/plans/2026-03-29-001-feat-brainstorm-visual-aids-plan.md`, `docs/plans/2026-03-29-002-feat-plan-visual-aids-plan.md`
+- Institutional learning（组织经验）：`docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`
+- GitHub mermaid support（GitHub mermaid 支持）：自 2022 年起已确认在 PR descriptions 中原生支持

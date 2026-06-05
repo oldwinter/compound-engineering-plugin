@@ -1,14 +1,14 @@
 # `ce-plan`
 
-> Establish the guardrails an implementation needs — decisions, units, files, tests, scope, risks — without prescribing the actual code or step-by-step choreography. Plans capture the **WHAT**; the implementing agent figures out the **HOW**.
+> 建立 implementation 所需的 guardrails：decisions、units、files、tests、scope、risks；但不规定实际代码或 step-by-step choreography。Plans 捕获 **WHAT**；implementing agent 判断 **HOW**。
 
-`ce-plan` produces plans that are **decision documents with execution guardrails**, not implementation choreography. The plan captures what decisions have been made, what scope is in or out, what atomic units of work exist, what files each unit touches, what test scenarios must pass, and what risks need mitigation. It does **not** pre-write code, exact API signatures, or step-by-step shell command sequences — those are for the implementing agent (`ce-work`, another AI agent, or a human) to determine when code is in front of them.
+`ce-plan` 产出的 plans 是 **带 execution guardrails 的 decision documents**，不是 implementation choreography。Plan 捕获已经做出的 decisions、scope in/out、atomic units of work、每个 unit 触及的 files、必须通过的 test scenarios，以及需要 mitigation 的 risks。它**不会**预写 code、exact API signatures 或 step-by-step shell command sequences；这些应由 implementing agent（`ce-work`、另一个 AI agent 或 human）在面对代码时决定。
 
-This separation matters. Plans that pre-write implementation tend to be wrong by the time you implement them: signatures don't compile, choreography is stale, micro-steps obscure the real decisions. Plans that capture guardrails stay portable for weeks or months and respect the judgment the implementer brings at execution time.
+这种 separation 很重要。预写 implementation 的 plans 往往在真正实现时已经错误：signatures 不 compile，choreography 过期，micro-steps 掩盖真正的 decisions。捕获 guardrails 的 plans 可以在数周或数月内保持 portable，并尊重 implementer 在 execution time 带来的 judgment。
 
-It works for any multi-step task where structure helps — software features, refactors, bug fixes, study plans, research workflows, event planning, even things like annual hot-water-tank maintenance. The same engine; the same U-ID stability; the same right-sized template.
+它适用于任何需要 structure 的 multi-step task：software features、refactors、bug fixes、study plans、research workflows、event planning，甚至 annual hot-water-tank maintenance。相同的 engine、相同的 U-ID stability、相同的 right-sized template。
 
-This is the third step in the compound-engineering ideation chain:
+这是 compound-engineering ideation chain 的第三步：
 
 ```text
 /ce-ideate         /ce-brainstorm      /ce-plan             /ce-work
@@ -17,119 +17,119 @@ This is the third step in the compound-engineering ideation chain:
                                         this?"
 ```
 
-But it stands alone just as well — many teams reach for `ce-plan` directly with a requirements doc, GitHub issue, PRD, rough description, or non-software multi-step task.
+但它也非常适合 standalone 使用。很多 teams 会直接拿 requirements doc、GitHub issue、PRD、rough description 或 non-software multi-step task 来调用 `ce-plan`。
 
 ---
 
-## TL;DR
+## 摘要（TL;DR）
 
-| Question | Answer |
+| 问题 | 答案 |
 |----------|--------|
-| What does it do? | Researches context, captures decisions and scope, breaks work into atomic units with stable IDs, enumerates test scenarios per unit, and auto-strengthens weak sections via a confidence check |
-| When to use it | Requirements ready and execution guardrails needed; solo planning when the task is clear; non-software multi-step tasks (study plans, research, maintenance, events, trips) |
-| What it produces | Plan in `docs/plans/YYYY-MM-DD-NNN-<type>-<name>-plan.md` |
-| What's next | `/ce-work`, create a tracked issue, open in Proof for review, or pause |
-| Distinguishing | Guardrails over choreography (WHAT, not HOW); U-IDs (stable); origin tracing (R/A/F/AE → U); test scenarios per unit; automatic deepening; multi-agent research |
+| 它做什么？ | Research context，捕获 decisions 和 scope，把 work 拆成带 stable IDs 的 atomic units，为每个 unit 枚举 test scenarios，并通过 confidence check 自动 strengthen weak sections |
+| 何时使用？ | Requirements 已 ready，需要 execution guardrails；task 清晰时做 solo planning；non-software multi-step tasks（study plans、research、maintenance、events、trips） |
+| 产出什么？ | `docs/plans/YYYY-MM-DD-NNN-<type>-<name>-plan.md` 中的 plan |
+| 下一步 | `/ce-work`、创建 tracked issue、在 Proof 中打开 review，或 pause |
+| 区分点 | Guardrails over choreography（WHAT，不是 HOW）；U-IDs（stable）；origin tracing（R/A/F/AE -> U）；每 unit 的 test scenarios；automatic deepening；multi-agent research |
 
 ---
 
-## The Problem
+## 问题
 
-Plans written by humans (or AI without structure) tend to fail in predictable ways:
+Humans（或没有 structure 的 AI）写的 plans 往往以可预测方式失败：
 
-- **Renumbering chaos** — refactor the unit list and every reference in the issue, PR, and conversation is now wrong
-- **Vague test "scenarios"** — "test the new behavior" tells the implementer nothing
-- **Forgotten origin context** — the brainstorm decided this was for a specific actor, but the plan never mentions them
-- **Half-resolved questions** — "TBD: figure out caching strategy" sitting in the plan months later
-- **Implementation choreography** — exact method signatures, micro-steps, or shell sequences pre-written, then wrong by the time implementation actually starts
-- **No depth check** — the author has no signal whether the plan is grounded enough to execute
+- **Renumbering chaos**：重构 unit list 后，issue、PR 和 conversation 中每个 reference 都错了
+- **Vague test "scenarios"**："test the new behavior" 对 implementer 没有帮助
+- **Forgotten origin context**：brainstorm 决定了具体 actor，但 plan 从未提及
+- **Half-resolved questions**：`TBD: figure out caching strategy` 在 plan 里放几个月
+- **Implementation choreography**：exact method signatures、micro-steps 或 shell sequences 被预写，等 implementation 开始时已经错了
+- **No depth check**：author 不知道 plan 是否 grounded 到足以 execute
 
-## The Solution
+## 解决方案
 
-`ce-plan` separates **WHAT decisions need to be honored** from **HOW to satisfy them in code**:
+`ce-plan` 分离 **需要被遵守的 WHAT decisions** 与 **如何在 code 中满足它们的 HOW**：
 
-- The plan captures decisions, scope boundaries, atomic units, files, test scenarios, and risks — the shape and constraints of execution
-- It does not pre-write code, exact API signatures, or step-by-step shell choreography — those decisions are deferred to the implementing agent at execution time
-- Stable U-IDs survive reordering, splitting, and deletion — so blocker references and PR mentions stay valid across plan edits
-- Plan-decisions are traceable back to origin (R-IDs from brainstorm; AE-IDs cited in test scenarios)
-- Research runs in parallel before structuring (repo, learnings, framework docs, best practices, spec flow)
-- A confidence check runs automatically after writing the plan and dispatches targeted sub-agents to strengthen weak sections
-- Planning-time vs implementation-time questions are explicitly separated — no fake certainty
-
----
-
-## What Makes It Novel
-
-### 1. Guardrails over choreography — WHAT, not HOW
-
-Plans capture decisions and constraints, not code: decisions made (with rationale), scope boundaries, atomic units of work, files touched, test scenarios that must pass, and risks needing mitigation. Plans deliberately exclude exact method signatures, framework-specific syntax, step-by-step shell sequences, and pseudo-code dressed up as implementation specification. The implementing agent reads the plan, sees the guardrails, and figures out HOW to satisfy them with code in front of them. **Decisions belong in the plan; implementation choices belong at execution time.**
-
-> Why? Plans that pre-write implementation are brittle: pre-committed signatures don't compile, choreographed steps go stale, and they rob the implementer of judgment that should be made with current context. Plans that stick to guardrails stay portable across weeks of code change, across implementer (human or AI), and across edits during deepening.
-
-This is also what makes the same engine work for non-software tasks. A hot-water-tank-maintenance plan has decisions, units, files-equivalent (which valves, which manuals), test scenarios ("verify no leaks after refill"), and risks — but no code. The frame transfers cleanly.
-
-### 2. U-IDs — implementation units have stable, never-renumbered identifiers
-
-Each unit's heading is `- U1. **Name**`, `- U2. **Name**`, etc. The stability rule: never renumber existing IDs after reordering, splitting, or deleting. Splits keep the original U-ID on the original concept; new units take the next unused number; deletions leave gaps (gaps are fine, never backfilled).
-
-This matters because `ce-work` references units by U-ID across plan edits. Renumbering during a deepening pass silently breaks every blocker reference, every PR description that cites a unit, and every downstream conversation. The stability rule prevents that class of bug.
-
-### 3. Origin tracing — R/A/F/AE IDs from brainstorm flow through the plan
-
-When the plan is sourced from a `ce-brainstorm` requirements doc, identifiers flow through: Requirements (R-IDs) trace into the plan's Requirements section; Actors (A-IDs) carry forward when they affect behavior or permissions; Key Flows (F-IDs) cite into implementation units that realize them; Acceptance Examples (AE-IDs) cite into test scenarios that enforce them (`Covers AE3. <scenario>`). Every section of the origin doc is verified against the plan before finalization. Nothing silently drops.
-
-### 4. Test scenarios per unit, in named categories
-
-Every feature-bearing unit enumerates test scenarios from each applicable category — happy path, edge cases (boundaries, empty/nil, concurrency), error/failure paths (invalid input, downstream failures, permissions), and integration (cross-layer behaviors mocks alone won't prove). Each scenario names the input, action, and expected outcome — specific enough that the implementer doesn't have to invent coverage.
-
-### 5. Confidence check and automatic deepening
-
-After the plan is written, `ce-plan` automatically scores sections against checklists with risk-weighted bonuses, picks the top weak sections, dispatches targeted sub-agents to strengthen them (correctness reviewer for implementation units, data integrity guardian for migrations, architecture strategist for key technical decisions), and synthesizes findings back into the plan. Auto mode integrates findings directly; interactive mode (when you ask to deepen an existing plan) presents findings for accept/reject. The expensive moment to discover a thin section is during execution, not during planning.
-
-### 6. Multi-agent research, in parallel
-
-Phase 1 always runs local research in parallel — repo-research-analyst (technology, architecture, patterns) and learnings-researcher (institutional memory from `docs/solutions/`), plus spec-flow-analyzer (edge-case completeness for Standard/Deep plans) and optional Slack research. External research is then decided **by intent**, not a single on/off switch: an explicit request ("research competitors", "best practices from the web", "which library") always runs and overrides strong local patterns, while implicit signals (thin local patterns, or an unsettled external option set the recommendations depend on) can trigger it too. The intent routes the agent — framework-docs-researcher and best-practices-researcher for *how to build it well* (implementation-guidance), web-researcher for *what options or prior art exist* (landscape/competitor scans); mixed requests run the landscape scan first, then docs on the shortlist.
-
-### 7. Universal planning — same engine for non-software work
-
-The guardrails-not-choreography frame transfers cleanly across domains. Real (non-hypothetical) uses include annual hot-water-tank maintenance, study plans, trip planning, research workflows, and event planning. The non-software path skips the software-specific confidence check, but U-IDs, dependency ordering, scope boundaries, test/verification scenarios, and the right-sized template all carry over unchanged.
-
-Universal planning also distinguishes two **dispositions**. *Plan-seeking* tasks (trip, study curriculum, event) produce a saved plan — the artifact is the deliverable. *Answer-seeking* tasks are investigative or analytical questions ("how often does X happen — is it a big deal?", "how does our approach compare to Y?") where the *answer* is the deliverable and no one wants a plan file. For those, `ce-plan` doesn't bail and doesn't write a document: it states a brief, right-sized plan-of-attack in chat — working scaffold that both steers the agent and shows the human the approach — then executes it (research and synthesis, never code) and delivers the answer. The plan is spoken in the language of the question, not the language of the skill; internal machinery stays hidden while caveats that affect trust in the answer are always surfaced. Only genuinely trivial single-fact lookups skip planning entirely and get answered outright.
+- Plan 捕获 decisions、scope boundaries、atomic units、files、test scenarios 和 risks：也就是 execution 的 shape 和 constraints
+- 它不预写 code、exact API signatures 或 step-by-step shell choreography；这些 decisions 推迟到 execution time，由 implementing agent 决定
+- Stable U-IDs 经得起 reordering、splitting 和 deletion；blocker references 与 PR mentions 在 plan edits 后仍有效
+- Plan decisions 可 trace 回 origin（brainstorm 中的 R-IDs；test scenarios 中引用的 AE-IDs）
+- Structuring 前并行运行 research（repo、learnings、framework docs、best practices、spec flow）
+- 写完 plan 后自动运行 confidence check，并分派 targeted sub-agents strengthen weak sections
+- Planning-time 与 implementation-time questions 明确分离；不制造 fake certainty
 
 ---
 
-## Quick Example
+## 新颖之处
 
-You invoke `ce-plan` with a requirements doc from `ce-brainstorm`. The skill detects the origin, uses it as primary input, and verifies no resolve-before-planning blockers remain.
+### 1. Guardrails over choreography：WHAT，不是 HOW
 
-It dispatches research in parallel — repo analyst, learnings researcher — and detects strong local patterns with no external comparison requested, so it skips external research (an explicit "research competitors" or "best practices from the web" request would have overridden that and run a landscape or implementation-guidance scan instead). A spec-flow analyzer runs to surface edge cases. The brainstorm-sourced scoping synthesis surfaces a tier-shaped summary (prose, bullets, or mix depending on plan depth and what communicates best) plus zero or more "Call outs" — the plan-time forks where another reasonable agent might choose differently (e.g., "mute state stored on the subscription, not the user"). Confirm or redirect; the auto-proceed skip only fires for Lightweight plans with no forks worth flagging — Standard and Deep plans always get the explicit checkpoint.
+Plans 捕获 decisions 和 constraints，而不是 code：已经做出的 decisions（含 rationale）、scope boundaries、atomic units of work、touched files、必须通过的 test scenarios、需要 mitigation 的 risks。Plans 刻意排除 exact method signatures、framework-specific syntax、step-by-step shell sequences 和伪装成 implementation specification 的 pseudo-code。Implementing agent 读取 plan，看到 guardrails，然后面对 code 判断 HOW。**Decisions 属于 plan；implementation choices 属于 execution time。**
 
-The plan is written. The confidence check then runs automatically — it identifies that `Risks & Dependencies` is thin on the mute-leak risk and that one unit's test scenarios miss permission edge cases, dispatches a data-integrity reviewer and a correctness reviewer, and synthesizes their findings back into the plan. The plan is stamped with a `deepened:` date.
+> Why? 预写 implementation 的 plans 很脆弱：提前 commit 的 signatures 不 compile，choreographed steps 会 stale，还会剥夺 implementer 应在 current context 下做出的 judgment。坚持 guardrails 的 plans 能跨数周 code change、跨 implementer（human 或 AI）、跨 deepening edits 保持 portable。
 
-Document review then runs in headless mode. The cheap minimum dispatches (coherence + feasibility) since the plan has origin set and touches no high-stakes domains; `safe_auto` fixes (a typo, a broken cross-reference) apply silently. Remaining findings surface as a one-line summary above the post-generation menu — e.g., `Doc review applied 2 fixes. 3 decisions, 1 FYI remain.` The menu surfaces: start `/ce-work`, run deeper doc review (when actionable findings remain), create a tracked issue, open in Proof for HITL review, or pause.
+这也让同一个 engine 能用于 non-software tasks。Hot-water-tank-maintenance plan 也有 decisions、units、files-equivalent（哪些 valves、哪些 manuals）、test scenarios（"verify no leaks after refill"）和 risks，只是没有 code。这个 frame 可以干净迁移。
+
+### 2. U-IDs：implementation units 拥有 stable、never-renumbered identifiers
+
+每个 unit heading 是 `- U1. **Name**`、`- U2. **Name**` 等。Stability rule：reordering、splitting 或 deleting 后，永远不要 renumber existing IDs。Splits 会把 original U-ID 保留在 original concept 上；new units 使用下一个 unused number；deletions 留 gaps（gaps 没问题，永不 backfill）。
+
+这很重要，因为 `ce-work` 会在 plan edits 之间用 U-ID reference units。Deepening pass 中 renumber 会静默破坏每个 blocker reference、每个引用 unit 的 PR description，以及每段 downstream conversation。Stability rule 防止这类 bug。
+
+### 3. Origin tracing：brainstorm 中的 R/A/F/AE IDs 流入 plan
+
+当 plan 来源于 `ce-brainstorm` requirements doc 时，identifiers 会继续流动：Requirements（R-IDs）trace 到 plan 的 Requirements section；Actors（A-IDs）在影响 behavior 或 permissions 时 carry forward；Key Flows（F-IDs）引用到实现它们的 implementation units；Acceptance Examples（AE-IDs）引用到 enforce 它们的 test scenarios（`Covers AE3. <scenario>`）。Finalization 前会用 plan 验证 origin doc 的每个 section。没有内容会 silently drop。
+
+### 4. 每个 unit 的 test scenarios，按 named categories 组织
+
+每个 feature-bearing unit 都会从适用类别中枚举 test scenarios：happy path、edge cases（boundaries、empty/nil、concurrency）、error/failure paths（invalid input、downstream failures、permissions）和 integration（仅 mocks 无法证明的 cross-layer behaviors）。每个 scenario 都命名 input、action 和 expected outcome，具体到 implementer 不必发明 coverage。
+
+### 5. Confidence check and automatic deepening（confidence check 与 automatic deepening）
+
+Plan 写完后，`ce-plan` 会自动按 checklists 给 sections 打分，带 risk-weighted bonuses，选择最弱 sections，分派 targeted sub-agents strengthen 它们（implementation units 用 correctness reviewer，migrations 用 data integrity guardian，key technical decisions 用 architecture strategist），并把 findings synthesis 回 plan。Auto mode 直接整合 findings；interactive mode（当你要求 deepen existing plan 时）会展示 findings 供 accept/reject。发现 thin section 的昂贵时刻应在 planning，而不是 execution。
+
+### 6. 并行 multi-agent research
+
+Phase 1 总是并行运行 local research：repo-research-analyst（technology、architecture、patterns）和 learnings-researcher（来自 `docs/solutions/` 的 institutional memory），加上 spec-flow-analyzer（Standard/Deep plans 的 edge-case completeness）和 optional Slack research。External research 由 **intent** 决定，而不是一个单一开关：明确请求（"research competitors"、"best practices from the web"、"which library"）总会运行，并覆盖 strong local patterns；implicit signals（local patterns thin，或 recommendations 依赖的 external option set 未定）也可触发。Intent 决定 agent 路由：framework-docs-researcher 和 best-practices-researcher 负责 *how to build it well*（implementation-guidance），web-researcher 负责 *what options or prior art exist*（landscape/competitor scans）；mixed requests 先运行 landscape scan，再对 shortlist 查 docs。
+
+### 7. Universal planning：同一个 engine 用于 non-software work
+
+Guardrails-not-choreography frame 可以干净跨 domains。真实（非 hypothetical）用途包括 annual hot-water-tank maintenance、study plans、trip planning、research workflows 和 event planning。Non-software path 跳过 software-specific confidence check，但 U-IDs、dependency ordering、scope boundaries、test/verification scenarios 和 right-sized template 都保留。
+
+Universal planning 还区分两种 **dispositions**。*Plan-seeking* tasks（trip、study curriculum、event）产出 saved plan；artifact 就是 deliverable。*Answer-seeking* tasks 是 investigative 或 analytical questions（"how often does X happen — is it a big deal?"、"how does our approach compare to Y?"），此时 *answer* 才是 deliverable，没有人想要 plan file。对这些任务，`ce-plan` 不会 bail，也不会写文档：它在 chat 中说明简短、right-sized plan-of-attack，作为引导 agent 并展示 approach 的 working scaffold，然后执行（research and synthesis，never code）并交付 answer。Plan 会用问题自身的语言表达，而不是 skill 的语言；internal machinery 保持隐藏，但影响 answer trust 的 caveats 必须 surface。只有真正 trivial 的 single-fact lookups 会完全跳过 planning，直接回答。
 
 ---
 
-## When to Reach For It
+## 快速示例
 
-Reach for `ce-plan` when:
+你用 `ce-brainstorm` 产出的 requirements doc 调用 `ce-plan`。Skill 检测 origin，把它作为 primary input，并确认没有 resolve-before-planning blockers。
 
-- You have a requirements doc from `ce-brainstorm` ready
-- You have a GitHub issue, PRD, or feature description that's clear enough
-- The work is multi-step and benefits from sequencing, dependency ordering, and scope boundaries
-- You want test or verification scenarios enumerated before execution
-- You're picking up a stale plan and want it deepened (use "deepen the plan" or "deepening pass")
-- The task is **non-software but multi-step** — study plan, event, trip, maintenance routine, research workflow, personal project
+它并行分派 research：repo analyst、learnings researcher；发现 strong local patterns 且没有请求 external comparison，于是跳过 external research（明确的 "research competitors" 或 "best practices from the web" 会 override 并运行 landscape 或 implementation-guidance scan）。Spec-flow analyzer 运行以浮现 edge cases。Brainstorm-sourced scoping synthesis 会输出 tier-shaped summary（prose、bullets 或混合，取决于 plan depth 和沟通效果），以及零个或多个 "Call outs"：plan-time forks 中另一个 reasonable agent 可能不同选择的位置（例如 "mute state stored on the subscription, not the user"）。用户 confirm 或 redirect；auto-proceed skip 只对没有值得 flag 的 forks 的 Lightweight plans 触发；Standard 和 Deep plans 总是有 explicit checkpoint。
 
-Skip `ce-plan` when:
+Plan 写入。Confidence check 随后自动运行：它发现 `Risks & Dependencies` 对 mute-leak risk 描述较薄，且某 unit 的 test scenarios 缺少 permission edge cases，于是分派 data-integrity reviewer 和 correctness reviewer，并把 findings synthesis 回 plan。Plan 加盖 `deepened:` date。
 
-- The task is genuinely one-step (just do it; or `ce-work` for direct execution)
-- The product or outcome isn't yet decided → `ce-brainstorm` first
-- The bug has a known root cause and an obvious fix → `ce-debug` or just fix it
+Document review 随后以 headless mode 运行。因为 plan 设置了 origin 且不触及 high-stakes domains，cheap minimum dispatches（coherence + feasibility）；`safe_auto` fixes（typo、broken cross-reference）静默应用。Remaining findings 作为 one-line summary 出现在 post-generation menu 上方，例如：`Doc review applied 2 fixes. 3 decisions, 1 FYI remain.` Menu 提供：start `/ce-work`、在有 actionable findings 时运行 deeper doc review、创建 tracked issue、在 Proof 中打开 HITL review，或 pause。
 
 ---
 
-## Use as Part of the Chained Workflow
+## 何时使用
+
+在以下情况使用 `ce-plan`：
+
+- 有来自 `ce-brainstorm` 的 requirements doc ready
+- 有足够清晰的 GitHub issue、PRD 或 feature description
+- Work 是 multi-step，并受益于 sequencing、dependency ordering 和 scope boundaries
+- 想在 execution 前枚举 test 或 verification scenarios
+- 正在接手 stale plan，想 deepen 它（使用 "deepen the plan" 或 "deepening pass"）
+- Task 是 **non-software but multi-step**：study plan、event、trip、maintenance routine、research workflow、personal project
+
+以下情况跳过 `ce-plan`：
+
+- Task 真正 one-step（直接做；或用 `ce-work` 直接 execution）
+- Product 或 outcome 尚未决定 -> 先 `ce-brainstorm`
+- Bug 有 known root cause 且 fix obvious -> `ce-debug` 或直接修
+
+---
+
+## 作为链式工作流的一部分使用
 
 ```text
 /ce-ideate          (optional)
@@ -155,77 +155,77 @@ Skip `ce-plan` when:
 /ce-compound        — capture the learning
 ```
 
-The handoff from `ce-plan` to `ce-work` is concrete: `ce-work` reads U-IDs, file paths, scope boundaries, and test scenarios — then determines the actual implementation. The plan tells the implementer **what must be true** when the unit is done; the implementer figures out **how to make it true**. This division is what makes plans portable across implementer and across time.
+从 `ce-plan` 到 `ce-work` 的 handoff 很具体：`ce-work` 读取 U-IDs、file paths、scope boundaries 和 test scenarios，然后决定 actual implementation。Plan 告诉 implementer unit 完成时 **what must be true**；implementer 判断 **how to make it true**。这个分工让 plans 能跨 implementer 和时间保持 portable。
 
 ---
 
-## Use Standalone
+## 单独使用
 
-Many people reach for `ce-plan` directly when they already have what to do — for software and equally often for non-software multi-step tasks.
+很多人在已经知道要做什么时直接使用 `ce-plan`；software 和 non-software multi-step tasks 都很常见。
 
-**Software:**
+**Software（软件）：**
 
-- **From a GitHub issue** — `/ce-plan https://github.com/.../issues/1234` (or paste the issue body)
-- **From a PRD** — `/ce-plan` with the PRD path; the planning bootstrap reads it as origin
-- **From a rough idea** — `/ce-plan "add background email digest at 8am UTC"` runs the bootstrap; the synthesis lets you correct scope before research dispatches
-- **Re-deepening an existing plan** — `/ce-plan deepen the auth-rewrite plan` — interactive mode where agents present findings one by one for accept/reject
-- **Cross-repo planning** — `/ce-plan "fix the busyblock bug in cli-printing-press"` from a different repo; the cross-repo target is announced and the plan lands in the target's `docs/plans/`
+- **From a GitHub issue**：`/ce-plan https://github.com/.../issues/1234`（或粘贴 issue body）
+- **From a PRD**：带 PRD path 调用 `/ce-plan`；planning bootstrap 会把它作为 origin 读取
+- **From a rough idea**：`/ce-plan "add background email digest at 8am UTC"` 运行 bootstrap；synthesis 让你在 research dispatch 前纠正 scope
+- **Re-deepening an existing plan**：`/ce-plan deepen the auth-rewrite plan`；interactive mode 中 agents 逐条展示 findings 供 accept/reject
+- **Cross-repo planning**：从另一个 repo 调用 `/ce-plan "fix the busyblock bug in cli-printing-press"`；会 announce cross-repo target，plan 落在 target 的 `docs/plans/`
 
-**Non-software (universal-planning mode):**
+**Non-software（非软件，universal-planning mode）:**
 
-- **Maintenance tasks** — annual hot-water-tank maintenance, with verification at each unit
-- **Study plans** — phased units with prerequisites and per-unit knowledge checks
-- **Trip planning** — bookings, packing, daily itinerary, contingency boundaries
-- **Research workflows** — literature gathering, synthesis, drafting phases with explicit deliverables
-- **Event planning** — venue, vendors, agenda, day-of run-of-show, follow-ups
-- **Personal projects** — workshop build-outs, home renovations
+- **Maintenance tasks**：annual hot-water-tank maintenance，每个 unit 有 verification
+- **Study plans**：带 prerequisites 和 per-unit knowledge checks 的 phased units
+- **Trip planning（旅行规划）**：bookings、packing、daily itinerary、contingency boundaries
+- **Research workflows**：literature gathering、synthesis、drafting phases，带 explicit deliverables
+- **Event planning（活动规划）**：venue、vendors、agenda、day-of run-of-show、follow-ups
+- **Personal projects（个人项目）**：workshop build-outs、home renovations
 
-In universal-planning mode, the U-IDs, dependency ordering, scope boundaries, and right-sized template all carry over. The software-specific confidence check is skipped; everything else runs the same way.
+在 universal-planning mode 中，U-IDs、dependency ordering、scope boundaries 和 right-sized template 都保留。Software-specific confidence check 会跳过；其他流程相同。
 
 ---
 
-## Reference
+## 参考
 
-| Argument | Effect |
+| 参数 | 效果 |
 |----------|--------|
-| _(empty)_ | Asks for the task description |
-| `<feature description>` | Solo planning; runs the bootstrap |
+| _(empty)_ | 询问 task description |
+| `<feature description>` | Solo planning；运行 bootstrap |
 | `<requirements doc path>` | Origin-sourced planning |
-| `<plan path>` | Resume offer (or deepen, if intent matches) |
-| `deepen the plan` / `deepening pass` | Re-deepen fast path (interactive mode) |
-| `<bug description>` | Routes to `ce-debug` suggestion menu |
-| `<task in another repo>` | Cross-repo announcement, plan lands in target |
-| `output:html` | Write the plan as a single self-contained HTML file instead of markdown. Exclusive — the plan is `.md` OR `.html`, never both. Default is markdown. Set `plan_output: html` in `.compound-engineering/config.local.yaml` to make HTML the default. Pipeline mode (LFG, `disable-model-invocation`) always forces markdown so downstream automation gets a stable text shape. |
+| `<plan path>` | Resume offer（或 intent 匹配时 deepen） |
+| `deepen the plan` / `deepening pass` | Re-deepen fast path（interactive mode） |
+| `<bug description>` | 路由到 `ce-debug` suggestion menu |
+| `<task in another repo>` | Cross-repo announcement，plan 落在 target |
+| `output:html` | 将 plan 写成单个 self-contained HTML file，而不是 markdown。互斥：plan 是 `.md` 或 `.html`，绝不两者同时生成。Default 是 markdown。设置 `.compound-engineering/config.local.yaml` 中的 `plan_output: html` 可让 HTML 成为 default。Pipeline mode（LFG、`disable-model-invocation`）始终强制 markdown，以便 downstream automation 获得 stable text shape。 |
 
 ---
 
-## FAQ
+## 常见问题（FAQ）
 
-**Doesn't a plan tell you HOW to build something?**
-Not in `ce-plan`'s framing. The plan tells you what must be honored — decisions, scope, units, files, tests, risks. It deliberately does not pre-write code, exact API signatures, or step-by-step shell choreography. The implementing agent figures out HOW with code in front of them. This separation keeps plans portable, prevents brittle pre-commitments, and respects the judgment the implementer brings at execution time. It's also what lets the same engine plan a software refactor, a hot-water-tank maintenance, and a 6-week study plan with the same structural rigor.
+**Plan 不应该告诉你 HOW to build something 吗？**
+在 `ce-plan` 的 framing 中不是。Plan 告诉你必须被遵守的内容：decisions、scope、units、files、tests、risks。它刻意不预写 code、exact API signatures 或 step-by-step shell choreography。Implementing agent 面对 code 判断 HOW。这个 separation 让 plans portable，防止脆弱的 pre-commitments，并尊重 implementer 在 execution time 带来的 judgment。它也让同一个 engine 能以相同 structural rigor 规划 software refactor、hot-water-tank maintenance 和 6-week study plan。
 
-**Why U-IDs instead of just numbered units?**
-Numbering breaks when units are reordered, split, or deleted — every reference in the issue, PR, and downstream conversation becomes wrong. U-IDs are stable: reorder leaves them in place, splits keep the original on the original concept, deletes leave gaps. `ce-work`'s blocker references work across plan edits because of this.
+**为什么用 U-IDs，而不是普通 numbered units？**
+Units reorder、split 或 delete 时，普通 numbering 会断；issue、PR 和 downstream conversation 中每个 reference 都变错。U-IDs 稳定：reorder 保持不变，splits 把 original ID 留给 original concept，deletes 留 gaps。`ce-work` 的 blocker references 因此能跨 plan edits 工作。
 
-**Why does the confidence check run automatically?**
-The expensive moment to discover a thin section is during execution, not during planning. Auto-deepening dispatches targeted research while research context is still warm — much cheaper than re-research weeks later when implementation surfaces a missed risk.
+**为什么 confidence check 自动运行？**
+发现 thin section 的昂贵时刻应该在 planning，而不是 execution。Auto-deepening 会在 research context 仍 warm 时分派 targeted research；比几周后 implementation 发现 missed risk 再重新 research 更便宜。
 
-**What if I want to keep the existing plan and just review it?**
-Use the deepen-intent fast path: `/ce-plan deepen <plan>`. It runs in interactive mode — agents present findings one by one for accept/reject. The user has surgical control over which changes integrate.
+**如果我想保留 existing plan，只 review 它怎么办？**
+使用 deepen-intent fast path：`/ce-plan deepen <plan>`。它以 interactive mode 运行；agents 逐条展示 findings 供 accept/reject。用户可以 surgical control 哪些 changes integrate。
 
-**What about implementation code in the plan?**
-Disallowed by default. Pseudo-code and DSL grammars are permitted in High-Level Technical Design when they communicate the **shape** of the solution, framed explicitly as **directional guidance, not implementation specification**. Exact method signatures, imports, framework-specific syntax, and step-by-step shell sequences do not belong in plans.
+**Plan 里可以有 implementation code 吗？**
+默认不允许。Pseudo-code 和 DSL grammars 可以在 High-Level Technical Design 中使用，但必须用于传达 solution **shape**，并明确标注为 **directional guidance, not implementation specification**。Exact method signatures、imports、framework-specific syntax 和 step-by-step shell sequences 不属于 plans。
 
-**Is it really useful for non-software plans?**
-Yes — and it's increasingly common. Universal-planning preserves the U-ID concept, dependency ordering, right-sized template, and guardrails-not-choreography frame. Real uses include hot-water-tank maintenance, study plans, trip planning, research workflows, and event planning.
+**它真的适合 non-software plans 吗？**
+是，而且越来越常见。Universal-planning 保留 U-ID concept、dependency ordering、right-sized template 和 guardrails-not-choreography frame。真实用途包括 hot-water-tank maintenance、study plans、trip planning、research workflows 和 event planning。
 
 ---
 
-## See Also
+## 另见（See Also）
 
-- [`ce-brainstorm`](./ce-brainstorm.md) — produce the requirements doc that becomes the plan's origin
-- [`ce-ideate`](./ce-ideate.md) — upstream "what to even work on" ideation
-- [`ce-work`](./ce-work.md) — execute the plan U-ID by U-ID
-- [`ce-doc-review`](./ce-doc-review.md) — persona-based review of the plan
-- [`ce-debug`](./ce-debug.md) — bug-shaped prompts route here
-- [`ce-strategy`](./ce-strategy.md) — anchor plans to documented product strategy
+- [`ce-brainstorm`](./ce-brainstorm.md) - 产出成为 plan origin 的 requirements doc
+- [`ce-ideate`](./ce-ideate.md) - 上游 "what to even work on" ideation
+- [`ce-work`](./ce-work.md) - 按 U-ID 执行 plan
+- [`ce-doc-review`](./ce-doc-review.md) - plan 的 persona-based review
+- [`ce-debug`](./ce-debug.md) - bug-shaped prompts 路由到这里
+- [`ce-strategy`](./ce-strategy.md) - 将 plans 锚定到 documented product strategy

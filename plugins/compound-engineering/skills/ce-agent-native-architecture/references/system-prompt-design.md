@@ -1,13 +1,13 @@
 <overview>
-How to write system prompts for prompt-native agents. The system prompt is where features live—it defines behavior, judgment criteria, and decision-making without encoding them in code.
+如何为 prompt-native agents 编写 system prompts。system prompt 是 features 存在的地方；它定义 behavior、judgment criteria 和 decision-making，而不把它们编码进 code。
 </overview>
 
 <principle name="features-in-prompts">
-## Features Are Prompt Sections
+## Features 是 Prompt Sections
 
-Each feature is a section of the system prompt that tells the agent how to behave.
+每个 feature 都是 system prompt 的一个 section，用来告诉 agent 如何 behave。
 
-**Traditional approach:** Feature = function in codebase
+**传统做法：** Feature = codebase 中的 function
 ```typescript
 function processFeedback(message) {
   const category = categorize(message);
@@ -17,7 +17,7 @@ function processFeedback(message) {
 }
 ```
 
-**Prompt-native approach:** Feature = section in system prompt
+**Prompt-native 做法：** Feature = system prompt 中的 section
 ```markdown
 ## Feedback Processing
 
@@ -37,9 +37,9 @@ Use your judgment. Context matters.
 </principle>
 
 <structure>
-## System Prompt Structure
+## System Prompt 结构
 
-A well-structured prompt-native system prompt:
+结构良好的 prompt-native system prompt：
 
 ```markdown
 # Identity
@@ -75,11 +75,11 @@ You are [Name], [brief identity statement].
 </structure>
 
 <principle name="guide-not-micromanage">
-## Guide, Don't Micromanage
+## 引导，而不是 Micromanage
 
-Tell the agent what to achieve, not exactly how to do it.
+告诉 agent 要达成什么，而不是精确规定如何做。
 
-**Micromanaging (bad):**
+**Micromanaging（bad，过度规定）：**
 ```markdown
 When creating a summary:
 1. Use exactly 3 bullet points
@@ -89,7 +89,7 @@ When creating a summary:
 5. End with a colon if there are sub-points
 ```
 
-**Guiding (good):**
+**Guiding（good，引导）：**
 ```markdown
 When creating summaries:
 - Be concise but complete
@@ -99,21 +99,21 @@ When creating summaries:
 The goal is clarity, not consistency.
 ```
 
-Trust the agent's intelligence. It knows how to communicate.
+信任 agent 的 intelligence。它知道如何沟通。
 </principle>
 
 <principle name="judgment-criteria">
-## Define Judgment Criteria, Not Rules
+## 定义 Judgment Criteria，而不是 Rules
 
-Instead of rules, provide criteria for making decisions.
+提供 decision-making criteria，而不是 rules。
 
-**Rules (rigid):**
+**Rules（rigid，僵硬规则）：**
 ```markdown
 If the message contains "bug", set importance to 4.
 If the message contains "crash", set importance to 5.
 ```
 
-**Judgment criteria (flexible):**
+**Judgment criteria（flexible，灵活判断标准）：**
 ```markdown
 ## Importance Rating
 
@@ -131,11 +131,11 @@ Examples:
 </principle>
 
 <principle name="context-windows">
-## Work With Context Windows
+## 配合 Context Windows 工作
 
-The agent sees: system prompt + recent messages + tool results. Design for this.
+agent 看到的是：system prompt + recent messages + tool results。按这个事实设计。
 
-**Use conversation history:**
+**使用 conversation history：**
 ```markdown
 ## Message Processing
 
@@ -145,7 +145,7 @@ When processing messages:
 3. Don't ask questions you already have answers to
 ```
 
-**Acknowledge agent limitations:**
+**承认 agent limitations：**
 ```markdown
 ## Memory Limitations
 
@@ -157,7 +157,7 @@ You don't persist memory between restarts. Use the memory server:
 </principle>
 
 <example name="feedback-bot">
-## Example: Complete System Prompt
+## 示例：完整 System Prompt
 
 ```markdown
 # R2-C2 Feedback Bot
@@ -222,29 +222,29 @@ Before processing any message:
 </example>
 
 <iteration>
-## Iterating on System Prompts
+## 迭代 System Prompts
 
-Prompt-native development means rapid iteration:
+Prompt-native development 意味着 rapid iteration：
 
-1. **Observe** agent behavior in production
-2. **Identify** gaps: "It's not rating video feedback high enough"
-3. **Add guidance**: "Video walkthroughs are gold—always rate them 4-5"
-4. **Deploy** (just edit the prompt file)
-5. **Repeat**
+1. **Observe（观察）** production 中的 agent behavior
+2. **Identify（识别）** gaps："It's not rating video feedback high enough"
+3. **Add guidance（补充指导）**："Video walkthroughs are gold—always rate them 4-5"
+4. **Deploy**（只需编辑 prompt file）
+5. **Repeat（重复）**
 
-No code changes. No recompilation. Just prose.
+没有 code changes。没有 recompilation。只有 prose。
 </iteration>
 
 <checklist>
-## System Prompt Checklist
+## System Prompt 检查清单
 
-- [ ] Clear identity statement
-- [ ] Core behaviors that always apply
-- [ ] Features as separate sections
-- [ ] Judgment criteria instead of rigid rules
-- [ ] Examples for ambiguous cases
-- [ ] Explicit boundaries (what NOT to do)
-- [ ] Tone guidance
-- [ ] Tool usage guidance (when to use each)
-- [ ] Memory/context handling
+- [ ] 清晰的 identity statement
+- [ ] 始终适用的 core behaviors
+- [ ] features 作为独立 sections
+- [ ] 使用 judgment criteria，而不是 rigid rules
+- [ ] ambiguous cases 的 examples
+- [ ] explicit boundaries（明确边界：what NOT to do）
+- [ ] Tone guidance（语气指导）
+- [ ] Tool usage guidance（tool 使用指导：何时使用各 tool）
+- [ ] Memory/context handling（memory / context 处理）
 </checklist>

@@ -1,18 +1,18 @@
 <overview>
-Architectural patterns for building agent-native systems. These patterns emerge from the five core principles: Parity, Granularity, Composability, Emergent Capability, and Improvement Over Time.
+用于构建 agent-native systems 的 architectural patterns。这些 patterns 来自五个 core principles：Parity、Granularity、Composability、Emergent Capability 和 Improvement Over Time。
 
-Features are outcomes achieved by agents operating in a loop, not functions you write. Tools are atomic primitives. The agent applies judgment; the prompt defines the outcome.
+Features 是 agents 在 loop 中运行后达成的 outcomes，不是你编写的 functions。Tools 是 atomic primitives。agent 应用 judgment；prompt 定义 outcome。
 
-See also:
-- [files-universal-interface.md](./files-universal-interface.md) for file organization and context.md patterns
-- [agent-execution-patterns.md](./agent-execution-patterns.md) for completion signals and partial completion
-- [product-implications.md](./product-implications.md) for progressive disclosure and approval patterns
+另见：
+- [files-universal-interface.md](./files-universal-interface.md)：file organization 和 context.md patterns
+- [agent-execution-patterns.md](./agent-execution-patterns.md)：completion signals 和 partial completion
+- [product-implications.md](./product-implications.md)：progressive disclosure 和 approval patterns
 </overview>
 
 <pattern name="event-driven-agent">
-## Event-Driven Agent Architecture
+## Event-Driven Agent Architecture（事件驱动 Agent Architecture）
 
-The agent runs as a long-lived process that responds to events. Events become prompts.
+agent 作为 long-lived process 运行并响应 events。Events 变成 prompts。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -31,13 +31,13 @@ The agent runs as a long-lived process that responds to events. Events become pr
                    (restart)       (list_items)
 ```
 
-**Key characteristics:**
-- Events (messages, webhooks, timers) trigger agent turns
-- Agent decides how to respond based on system prompt
-- Tools are primitives for IO, not business logic
-- State persists between events via data tools
+**Key characteristics（关键特征）：**
+- Events（messages、webhooks、timers）触发 agent turns
+- Agent 基于 system prompt 决定如何 respond
+- Tools 是 IO primitives，不是 business logic
+- State 通过 data tools 在 events 之间 persist
 
-**Example: Discord feedback bot**
+**Example（示例）：Discord feedback bot**
 ```typescript
 // Event source
 client.on("messageCreate", (message) => {
@@ -63,9 +63,9 @@ Use your judgment about importance and categorization.
 </pattern>
 
 <pattern name="two-layer-git">
-## Two-Layer Git Architecture
+## Two-Layer Git Architecture（双层 Git Architecture）
 
-For self-modifying agents, separate code (shared) from data (instance-specific).
+对 self-modifying agents，将 code（shared）与 data（instance-specific）分开。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -93,17 +93,17 @@ For self-modifying agents, separate code (shared) from data (instance-specific).
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Why this works:**
-- Code and site are version controlled (GitHub)
-- Raw data stays local (instance-specific)
-- Site is generated from data, so reproducible
-- Automatic rollback via git history
+**为什么这有效：**
+- Code 和 site 受 version control 管理（GitHub）
+- Raw data 保持 local（instance-specific）
+- Site 从 data 生成，因此 reproducible
+- 通过 git history automatic rollback
 </pattern>
 
 <pattern name="multi-instance">
-## Multi-Instance Branching
+## Multi-Instance Branching（多实例分支）
 
-Each agent instance gets its own branch while sharing core code.
+每个 agent instance 有自己的 branch，同时共享 core code。
 
 ```
 main                        # Shared features, bug fixes
@@ -112,15 +112,15 @@ main                        # Shared features, bug fixes
 └── instance/research-bot   # Research assistant
 ```
 
-**Change flow:**
-| Change Type | Work On | Then |
+**Change flow（变更流）：**
+| Change Type（变更类型） | Work On（在哪工作） | Then（然后） |
 |-------------|---------|------|
 | Core features | main | Merge to instance branches |
 | Bug fixes | main | Merge to instance branches |
 | Instance config | instance branch | Done |
 | Instance data | instance branch | Done |
 
-**Sync tools:**
+**Sync tools（同步 tools）：**
 ```typescript
 tool("self_deploy", "Pull latest from main, rebuild, restart", ...)
 tool("sync_from_instance", "Merge from another instance", ...)
@@ -129,9 +129,9 @@ tool("propose_to_main", "Create PR to share improvements", ...)
 </pattern>
 
 <pattern name="site-as-output">
-## Site as Agent Output
+## Site as Agent Output（将 Site 作为 Agent Output）
 
-The agent generates and maintains a website as a natural output, not through specialized site tools.
+agent 将生成和维护 website 作为 natural output，而不是通过 specialized site tools。
 
 ```
 Discord Message
@@ -147,7 +147,7 @@ Git commit + push triggers deployment
 Site updates automatically
 ```
 
-**Key insight:** Don't build site generation tools. Give the agent file tools and teach it in the prompt how to create good sites.
+**Key insight（关键洞察）：** 不要构建 site generation tools。给 agent file tools，并在 prompt 中教它如何创建 good sites。
 
 ```markdown
 ## Site Management
@@ -167,9 +167,9 @@ You decide the structure. Make it good.
 </pattern>
 
 <pattern name="approval-gates">
-## Approval Gates Pattern
+## Approval Gates Pattern（Approval Gates 模式）
 
-Separate "propose" from "apply" for dangerous operations.
+对 dangerous operations，将 "propose" 与 "apply" 分开。
 
 ```typescript
 // Pending changes stored separately
@@ -199,21 +199,21 @@ tool("apply_pending", async () => {
 });
 ```
 
-**What requires approval:**
-- src/*.ts (agent code)
-- package.json (dependencies)
-- system prompt changes
+**需要 approval 的内容：**
+- src/*.ts (agent code，agent 代码)
+- package.json (dependencies，依赖)
+- system prompt changes（system prompt 变更）
 
-**What doesn't:**
-- data/* (instance data)
-- site/* (generated content)
-- docs/* (documentation)
+**不需要 approval 的内容：**
+- data/* (instance data，实例数据)
+- site/* (generated content，生成内容)
+- docs/* (documentation，文档)
 </pattern>
 
 <pattern name="unified-agent-architecture">
-## Unified Agent Architecture
+## Unified Agent Architecture（统一 Agent Architecture）
 
-One execution engine, many agent types. All agents use the same orchestrator but with different configurations.
+一个 execution engine，多个 agent types。所有 agents 使用相同 orchestrator，但 configurations 不同。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -234,7 +234,7 @@ One execution engine, many agent types. All agents use the same orchestrator but
     - read_file          - web_search         - analyze_image
 ```
 
-**Implementation:**
+**Implementation（实现）：**
 
 ```swift
 // All agents use the same orchestrator
@@ -283,22 +283,22 @@ struct ChatAgent {
 }
 ```
 
-**Benefits:**
-- Consistent lifecycle management across all agent types
-- Automatic checkpoint/resume (critical for mobile)
-- Shared tool protocol
-- Easy to add new agent types
-- Centralized error handling and logging
+**Benefits（收益）：**
+- 所有 agent types 共享 consistent lifecycle management
+- Automatic checkpoint/resume（对 mobile 很 critical）
+- Shared tool protocol（共享 tool 协议）
+- 容易添加 new agent types
+- Centralized error handling and logging（集中式 error handling 和 logging）
 </pattern>
 
 <pattern name="agent-to-ui-communication">
-## Agent-to-UI Communication
+## Agent-to-UI Communication（Agent 到 UI 通信）
 
-When agents take actions, the UI should reflect them immediately. The user should see what the agent did.
+当 agents 执行 actions 时，UI 应立即 reflect。user 应该看到 agent 做了什么。
 
-**Pattern 1: Shared Data Store (Recommended)**
+**Pattern 1：Shared Data Store（推荐）**
 
-Agent writes through the same service the UI observes:
+Agent 通过 UI observe 的同一个 service 写入：
 
 ```swift
 // Shared service
@@ -333,9 +333,9 @@ struct FeedView: View {
 }
 ```
 
-**Pattern 2: File System Observation**
+**Pattern 2：File System Observation（文件系统观察）**
 
-For file-based data, watch the file system:
+对 file-based data，watch file system：
 
 ```swift
 class ResearchWatcher: ObservableObject {
@@ -360,9 +360,9 @@ tool("write_file", { path, content }) -> {
 }
 ```
 
-**Pattern 3: Event Bus (Cross-Component)**
+**Pattern 3：Event Bus（跨 Component）**
 
-For complex apps with multiple independent components:
+用于有多个 independent components 的 complex apps：
 
 ```typescript
 // Shared event bus
@@ -389,7 +389,7 @@ function FeedView() {
 }
 ```
 
-**What to avoid:**
+**What to avoid（要避免的做法）：**
 
 ```swift
 // BAD: UI doesn't observe agent changes
@@ -406,20 +406,20 @@ struct FeedView: View {
 </pattern>
 
 <pattern name="model-tier-selection">
-## Model Tier Selection
+## Model Tier Selection（Model 层级选择）
 
-Different agents need different intelligence levels. Use the cheapest model that achieves the outcome.
+不同 agents 需要不同 intelligence levels。使用能达成 outcome 的最便宜 model。
 
-| Agent Type | Recommended Tier | Reasoning |
+| Agent Type（Agent 类型） | Recommended Tier（推荐层级） | Reasoning（理由） |
 |------------|-----------------|-----------|
-| Chat/Conversation | Balanced | Fast responses, good reasoning |
-| Research | Balanced | Tool loops, not ultra-complex synthesis |
-| Content Generation | Balanced | Creative but not synthesis-heavy |
-| Complex Analysis | Powerful | Multi-document synthesis, nuanced judgment |
-| Profile/Onboarding | Powerful | Photo analysis, complex pattern recognition |
-| Simple Queries | Fast/Haiku | Quick lookups, simple transformations |
+| Chat/Conversation | Balanced | Fast responses，good reasoning |
+| Research | Balanced | Tool loops，不是 ultra-complex synthesis |
+| Content Generation | Balanced | Creative，但不是 synthesis-heavy |
+| Complex Analysis | Powerful | Multi-document synthesis，nuanced judgment |
+| Profile/Onboarding | Powerful | Photo analysis，complex pattern recognition |
+| Simple Queries | Fast/Haiku | Quick lookups，simple transformations |
 
-**Implementation:**
+**Implementation（实现）：**
 
 ```swift
 enum ModelTier {
@@ -456,23 +456,23 @@ let lookupConfig = AgentConfig(
 )
 ```
 
-**Cost optimization strategies:**
-- Start with balanced tier, only upgrade if quality insufficient
-- Use fast tier for tool-heavy loops where each turn is simple
-- Reserve powerful tier for synthesis tasks (comparing multiple sources)
-- Consider token limits per turn to control costs
+**Cost optimization strategies（成本优化策略）：**
+- 从 balanced tier 开始，只有 quality insufficient 时才 upgrade
+- 对每 turn 很简单的 tool-heavy loops 使用 fast tier
+- 将 powerful tier 留给 synthesis tasks（comparing multiple sources）
+- 考虑 per turn token limits 来控制 costs
 </pattern>
 
 <design_questions>
-## Questions to Ask When Designing
+## Questions to Ask When Designing（设计时要问的问题）
 
-1. **What events trigger agent turns?** (messages, webhooks, timers, user requests)
-2. **What primitives does the agent need?** (read, write, call API, restart)
-3. **What decisions should the agent make?** (format, structure, priority, action)
-4. **What decisions should be hardcoded?** (security boundaries, approval requirements)
-5. **How does the agent verify its work?** (health checks, build verification)
-6. **How does the agent recover from mistakes?** (git rollback, approval gates)
-7. **How does the UI know when agent changes state?** (shared store, file watching, events)
-8. **What model tier does each agent type need?** (fast, balanced, powerful)
-9. **How do agents share infrastructure?** (unified orchestrator, shared tools)
+1. **哪些 events trigger agent turns？**（messages、webhooks、timers、user requests）
+2. **agent 需要哪些 primitives？**（read、write、call API、restart）
+3. **哪些 decisions 应由 agent 做？**（format、structure、priority、action）
+4. **哪些 decisions 应 hardcoded？**（security boundaries、approval requirements）
+5. **agent 如何 verify its work？**（health checks、build verification）
+6. **agent 如何从 mistakes 中 recover？**（git rollback、approval gates）
+7. **UI 如何知道 agent 改变了 state？**（shared store、file watching、events）
+8. **每种 agent type 需要什么 model tier？**（fast、balanced、powerful）
+9. **agents 如何共享 infrastructure？**（unified orchestrator、shared tools）
 </design_questions>

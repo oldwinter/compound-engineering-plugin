@@ -1,94 +1,94 @@
 ---
-title: "feat: promote ce:plan-beta and deepen-plan-beta to stable"
+title: "feat: 将 ce:plan-beta 和 deepen-plan-beta 提升为 stable"
 type: feat
 status: completed
 date: 2026-03-23
 ---
 
-# Promote ce:plan-beta and deepen-plan-beta to stable
+# Promote ce:plan-beta and deepen-plan-beta to stable（提升到 stable）
 
-## Overview
+## 概览
 
-Replace the stable `ce:plan` and `deepen-plan` skills with their validated beta counterparts, following the documented 9-step promotion path from `docs/solutions/skill-design/beta-skills-framework.md`.
+用经过验证的 beta counterparts 替换 stable `ce:plan` 和 `deepen-plan` skills，遵循 `docs/solutions/skill-design/beta-skills-framework.md` 中记录的 9-step promotion path。
 
-## Problem Statement
+## 问题陈述
 
-The beta versions of `ce:plan` and `deepen-plan` have been tested and are ready for promotion. They currently sit alongside the stable versions as separate skill directories with `disable-model-invocation: true`, meaning users must invoke them manually. Promotion makes them the default for all workflows including `lfg`/`slfg` orchestration.
+`ce:plan` 和 `deepen-plan` 的 beta versions 已经测试完毕，准备 promotion。它们目前作为独立 skill directories 与 stable versions 并存，并带有 `disable-model-invocation: true`，意味着用户必须手动调用它们。Promotion 会让它们成为所有 workflows 的默认版本，包括 `lfg`/`slfg` orchestration。
 
-## Proposed Solution
+## 建议方案
 
-Follow the beta-skills-framework promotion checklist exactly, applied to both skill pairs simultaneously.
+严格遵循 beta-skills-framework promotion checklist，并同时应用到两组 skill pairs。
 
-## Implementation Plan
+## 实施计划
 
-### Phase 1: Replace stable SKILL.md content with beta content
+### Phase 1：用 beta content 替换 stable SKILL.md content
 
-**Files to modify:**
+**待修改文件：**
 
-1. **`skills/ce-plan/SKILL.md`** -- Replace entire content with `skills/ce-plan-beta/SKILL.md`
-2. **`skills/deepen-plan/SKILL.md`** -- Replace entire content with `skills/deepen-plan-beta/SKILL.md`
+1. **`skills/ce-plan/SKILL.md`** -- 用 `skills/ce-plan-beta/SKILL.md` 替换全部内容
+2. **`skills/deepen-plan/SKILL.md`** -- 用 `skills/deepen-plan-beta/SKILL.md` 替换全部内容
 
-### Phase 2: Restore stable frontmatter and remove beta markers
+### Phase 2：恢复 stable frontmatter 并移除 beta markers
 
-**In promoted `skills/ce-plan/SKILL.md`:**
+**在 promoted `skills/ce-plan/SKILL.md` 中：**
 
-- Change `name: ce:plan-beta` to `name: ce:plan`
-- Remove `[BETA] ` prefix from description
-- Remove `disable-model-invocation: true` line
+- 将 `name: ce:plan-beta` 改为 `name: ce:plan`
+- 从 description 移除 `[BETA] ` 前缀
+- 移除 `disable-model-invocation: true` 行
 
-**In promoted `skills/deepen-plan/SKILL.md`:**
+**在 promoted `skills/deepen-plan/SKILL.md` 中：**
 
-- Change `name: deepen-plan-beta` to `name: deepen-plan`
-- Remove `[BETA] ` prefix from description
-- Remove `disable-model-invocation: true` line
+- 将 `name: deepen-plan-beta` 改为 `name: deepen-plan`
+- 从 description 移除 `[BETA] ` 前缀
+- 移除 `disable-model-invocation: true` 行
 
-### Phase 3: Update all internal references from beta to stable names
+### Phase 3：将所有 internal references 从 beta names 更新为 stable names
 
-**In promoted `skills/ce-plan/SKILL.md`:**
+**在 promoted `skills/ce-plan/SKILL.md` 中：**
 
-- All references to `/deepen-plan-beta` become `/deepen-plan`
-- All references to `ce:plan-beta` become `ce:plan` (in headings, prose, etc.)
-- All references to `-beta-plan.md` file suffix become `-plan.md`
-- Example filenames using `-beta-plan.md` become `-plan.md`
+- 所有 `/deepen-plan-beta` references 改为 `/deepen-plan`
+- 所有 `ce:plan-beta` references 改为 `ce:plan`（headings、prose 等）
+- 所有 `-beta-plan.md` file suffix references 改为 `-plan.md`
+- 使用 `-beta-plan.md` 的示例 filenames 改为 `-plan.md`
 
-**In promoted `skills/deepen-plan/SKILL.md`:**
+**在 promoted `skills/deepen-plan/SKILL.md` 中：**
 
-- All references to `ce:plan-beta` become `ce:plan`
-- All references to `deepen-plan-beta` become `deepen-plan`
-- Scratch directory paths: `deepen-plan-beta` becomes `deepen-plan`
+- 所有 `ce:plan-beta` references 改为 `ce:plan`
+- 所有 `deepen-plan-beta` references 改为 `deepen-plan`
+- Scratch directory paths：`deepen-plan-beta` 改为 `deepen-plan`
 
-### Phase 4: Clean up ce-work-beta cross-reference
+### Phase 4：清理 ce-work-beta cross-reference
 
-**In `skills/ce-work-beta/SKILL.md` (line 450):**
+**在 `skills/ce-work-beta/SKILL.md`（line 450）中：**
 
-- Remove `ce:plan-beta or ` from the text so it reads just `ce:plan`
+- 从文本中移除 `ce:plan-beta or `，使其只读作 `ce:plan`
 
-### Phase 5: Delete beta skill directories
+### Phase 5：删除 beta skill directories
 
-- Delete `skills/ce-plan-beta/` directory entirely
-- Delete `skills/deepen-plan-beta/` directory entirely
+- 完整删除 `skills/ce-plan-beta/` directory
+- 完整删除 `skills/deepen-plan-beta/` directory
 
-### Phase 6: Update README.md
+### Phase 6：更新 README.md
 
-**In `plugins/compound-engineering/README.md`:**
+**在 `plugins/compound-engineering/README.md` 中：**
 
-1. **Update `ce:plan` description** in the Workflow Commands table (line 81): Change from `Create implementation plans` to `Transform features into structured implementation plans grounded in repo patterns`
-2. **Update `deepen-plan` description** in the Utility Commands table (line 93): Description already says `Stress-test plans and deepen weak sections with targeted research` which matches the beta -- verify and keep
-3. **Remove the entire Beta Skills section** (lines 156-165): The `### Beta Skills` heading, explanatory paragraph, table with `ce:plan-beta` and `deepen-plan-beta` rows, and the "To test" line
-4. **Update skill count**: Currently `40+` in the Components table. Removing 2 beta directories decreases the count. Verify with `bun run release:validate` and update if needed
+1. **更新 Workflow Commands table 中的 `ce:plan` description**（line 81）：从 `Create implementation plans` 改为 `Transform features into structured implementation plans grounded in repo patterns`
+2. **更新 Utility Commands table 中的 `deepen-plan` description**（line 93）：Description 已经是 `Stress-test plans and deepen weak sections with targeted research`，与 beta 匹配，验证并保留
+3. **移除整个 Beta Skills section**（lines 156-165）：`### Beta Skills` heading、解释段落、包含 `ce:plan-beta` 和 `deepen-plan-beta` rows 的表格，以及 "To test" 行
+4. **更新 skill count**：Components table 中目前是 `40+`。移除 2 个 beta directories 会降低 count。用 `bun run release:validate` 验证并按需更新
 
-### Phase 7: Validation
+### Phase 7：验证
 
-1. **Search for remaining `-beta` references**: Grep all files under `plugins/compound-engineering/` for leftover `plan-beta` strings -- every hit is a bug, except historical entries in `CHANGELOG.md` which are expected and must not be modified
-2. **Run `bun run release:validate`**: Check plugin/marketplace consistency, skill counts
-3. **Run `bun test`**: Ensure converter tests still pass (they use skill names as fixtures)
-4. **Verify `lfg`/`slfg` references**: Confirm they reference stable `/ce:plan` and `/deepen-plan` (they already do -- no change needed)
-5. **Verify `ce:brainstorm` handoff**: Confirms it hands off to stable `/ce:plan` (already does -- no change needed)
-6. **Verify `ce:work` compatibility**: Plans from promoted skills use `-plan.md` suffix, same as before
+1. **搜索残留 `-beta` references**：Grep `plugins/compound-engineering/` 下所有文件中的 `plan-beta` strings；每个命中都是 bug，但 `CHANGELOG.md` 中的历史 entries 是预期命中，不要修改
+2. **运行 `bun run release:validate`**：检查 plugin/marketplace 一致性和 skill counts
+3. **运行 `bun test`**：确保 converter tests 仍通过（它们使用 skill names 作为 fixtures）
+4. **验证 `lfg`/`slfg` references**：确认它们引用 stable `/ce:plan` 和 `/deepen-plan`（它们已经如此，无需修改）
+5. **验证 `ce:brainstorm` handoff**：确认它 hand off 到 stable `/ce:plan`（已经如此，无需修改）
+6. **验证 `ce:work` compatibility**：promoted skills 生成的 plans 使用 `-plan.md` suffix，与之前一致
 
-## Files Changed
+## 已改文件
 
-| File | Action | Notes |
+| File | Action | Notes（说明） |
 |------|--------|-------|
 | `skills/ce-plan/SKILL.md` | Replace | Beta content with stable frontmatter |
 | `skills/deepen-plan/SKILL.md` | Replace | Beta content with stable frontmatter |
@@ -97,9 +97,9 @@ Follow the beta-skills-framework promotion checklist exactly, applied to both sk
 | `skills/ce-work-beta/SKILL.md` | Edit | Remove `ce:plan-beta or` reference at line 450 |
 | `README.md` | Edit | Remove Beta Skills section, verify counts and descriptions |
 
-## Files NOT Changed (verified safe)
+## 未改文件（已验证安全）
 
-These files reference stable `ce:plan` or `deepen-plan` and require **no changes** because stable names are preserved:
+这些文件引用 stable `ce:plan` 或 `deepen-plan`，因为 stable names 被保留，所以**无需修改**：
 
 - `skills/lfg/SKILL.md` -- calls `/ce:plan` and `/deepen-plan`
 - `skills/slfg/SKILL.md` -- calls `/ce:plan` and `/deepen-plan`
@@ -114,19 +114,19 @@ These files reference stable `ce:plan` or `deepen-plan` and require **no changes
 - `agents/review/code-simplicity-reviewer.md` -- references `/ce:plan`
 - `plugin.json` / `marketplace.json` -- no individual skill listings
 
-## Acceptance Criteria
+## 验收标准
 
-- [ ] `skills/ce-plan/SKILL.md` contains the beta planning approach (decision-first, phase-structured)
-- [ ] `skills/deepen-plan/SKILL.md` contains the beta deepening approach (selective stress-test, risk-weighted)
-- [ ] No `disable-model-invocation` in either promoted skill
-- [ ] No `[BETA]` prefix in either description
-- [ ] No remaining `-beta` references in any file under `plugins/compound-engineering/`
-- [ ] `skills/ce-plan-beta/` and `skills/deepen-plan-beta/` directories deleted
-- [ ] README Beta Skills section removed
-- [ ] `bun run release:validate` passes
-- [ ] `bun test` passes
+- [ ] `skills/ce-plan/SKILL.md` contains the beta planning approach（包含 beta planning approach：decision-first、phase-structured）
+- [ ] `skills/deepen-plan/SKILL.md` contains the beta deepening approach（包含 beta deepening approach：selective stress-test、risk-weighted）
+- [ ] No `disable-model-invocation` in either promoted skill（两个 promoted skill 都不包含该字段）
+- [ ] No `[BETA]` prefix in either description（两个 description 都没有 `[BETA]` prefix）
+- [ ] No remaining `-beta` references in any file under `plugins/compound-engineering/`（该目录下不再有 `-beta` references）
+- [ ] `skills/ce-plan-beta/` and `skills/deepen-plan-beta/` directories deleted（两个 beta directories 已删除）
+- [ ] README Beta Skills section removed（README 的 Beta Skills section 已移除）
+- [ ] `bun run release:validate` passes（通过）
+- [ ] `bun test` passes（通过）
 
-## Sources
+## 来源
 
-- **Promotion checklist:** `docs/solutions/skill-design/beta-skills-framework.md` (steps 1-9)
-- **Versioning rules:** `docs/solutions/plugin-versioning-requirements.md` (no manual version bumps)
+- **Promotion checklist（promotion checklist）:** `docs/solutions/skill-design/beta-skills-framework.md`（steps 1-9）
+- **Versioning rules（versioning 规则）:** `docs/solutions/plugin-versioning-requirements.md`（no manual version bumps）

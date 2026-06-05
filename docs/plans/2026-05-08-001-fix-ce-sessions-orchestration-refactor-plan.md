@@ -1,127 +1,127 @@
 ---
-title: "fix: Refactor session-history orchestration to avoid subagent Skill-tool deadlock"
+title: "fix: 重构 session-history orchestration，避免 subagent Skill-tool deadlock"
 type: fix
 status: completed
 date: 2026-05-08
 ---
 
-# fix: Refactor session-history orchestration to avoid subagent Skill-tool deadlock
+# fix: 重构 session-history orchestration，避免 subagent Skill-tool deadlock
 
-## Summary
+## 摘要
 
-Move all session-history orchestration logic out of the `ce-session-historian` subagent and into the `ce-sessions` skill (main context), where the Skill tool is permitted. The agent shrinks to synthesis-only — receives pre-extracted file paths in `mktemp` scratch space, returns findings prose. `ce-compound` Phase 1 delegates session-history work to the `ce-sessions` skill via the platform's skill-invocation primitive (`Skill` in Claude Code, equivalent on other targets) instead of dispatching the historian directly. Closes #794.
-
----
-
-## Problem Frame
-
-`ce-session-historian` is dispatched as a subagent by `/ce-compound` Phase 1 and `/ce-sessions`, and its first concrete action is `Skill(ce-session-inventory)`. Claude Code does not permit subagents to invoke the `Skill` tool ([anthropics/claude-code#38719](https://github.com/anthropics/claude-code/issues/38719)) — the call hangs at `Initializing…` indefinitely, eventually surfacing to the orchestrator as a spurious "user doesn't want to proceed with this tool use" rejection. Empirically confirmed in #794: same skill, same args, same machine, only the dispatch context differs (orchestrator works; subagent hangs). The fix is structural, not a workaround — remove every code path that has a subagent calling `Skill`.
+将所有 session-history orchestration 逻辑从 `ce-session-historian` subagent 移到 `ce-sessions` skill（main context）中，因为这里允许使用 Skill tool。该 agent 缩小为仅负责 synthesis：接收 `mktemp` scratch 空间中预提取出的文件路径，并返回 findings prose。`ce-compound` Phase 1 不再直接 dispatch historian，而是通过平台的 skill-invocation primitive（Claude Code 中是 `Skill`，其他 target 使用等价机制）把 session-history 工作委托给 `ce-sessions` skill。关闭 #794。
 
 ---
 
-## Requirements
+## 问题框架
 
-- R1. `/ce-sessions [question]` and `/ce-compound` Phase 1 with session history opted in must complete successfully on Claude Code without hanging at `Initializing…` or surfacing a spurious user-denial error.
-- R2. No subagent in the post-refactor session-history flow may invoke the `Skill` tool. The full orchestration must run in main conversation context.
-- R3. Existing session-history capabilities must be preserved: cross-platform discovery (Claude Code, Codex, Cursor), branch and keyword filtering, scan-window widening logic, top-5 deep-dive cap, skeleton + errors extraction modes, time-budget discipline.
-- R4. The change must not regress non-Claude-Code targets (Codex, Cursor, Gemini, OpenCode, Pi, Kiro). All script invocations must use cross-platform-portable patterns (bare relative paths, no `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}`).
-- R5. `bun run release:validate` and `bun test` must pass after the refactor.
-- R6. Issue #794 closes on merge.
+`ce-session-historian` 会被 `/ce-compound` Phase 1 和 `/ce-sessions` 作为 subagent dispatch，它的第一个具体动作是 `Skill(ce-session-inventory)`。Claude Code 不允许 subagents 调用 `Skill` tool（[anthropics/claude-code#38719](https://github.com/anthropics/claude-code/issues/38719)）。这个调用会无限停在 `Initializing…`，最终在 orchestrator 侧表现为伪造的 "user doesn't want to proceed with this tool use" 拒绝。#794 中已做经验确认：同一个 skill、同一组 args、同一台机器，唯一差异是 dispatch context（orchestrator 可运行；subagent 会卡住）。修复必须是结构性的，而不是 workaround：移除所有让 subagent 调用 `Skill` 的 code path。
 
 ---
 
-## Scope Boundaries
+## 需求
 
-- Verifying or fixing the same architectural pattern on Codex/Cursor — not confirmed to exhibit the same subagent-Skill-tool limit. If it surfaces, follow-up work.
-- Renaming `ce-session-historian` to reflect its synthesis-only role — cosmetic; increases blast radius (legacy-cleanup registries, conversion writers, test fixtures).
-- Adding new session-history features (larger `head:N`, new extraction modes, additional output schemas beyond current behavior) — preserve existing capabilities, no feature additions.
-- Fixing Claude Code's platform-level subagent restriction — not our code.
-
----
-
-## Context & Research
-
-### Relevant Code and Patterns
-
-- `plugins/compound-engineering/skills/ce-sessions/SKILL.md` — currently a thin wrapper that dispatches `ce-session-historian`; will be rewritten as the orchestrator.
-- `plugins/compound-engineering/agents/ce-session-historian.agent.md` — currently instructs `Skill(ce-session-inventory)` and `Skill(ce-session-extract)` (lines 102-108); will be refactored to synthesis-only.
-- `plugins/compound-engineering/skills/ce-session-inventory/scripts/{discover-sessions.sh,extract-metadata.py}` — scripts move into `ce-sessions/scripts/`.
-- `plugins/compound-engineering/skills/ce-session-extract/scripts/{extract-skeleton.py,extract-errors.py}` — scripts move into `ce-sessions/scripts/`.
-- `plugins/compound-engineering/skills/ce-compound/SKILL.md` Phase 1 lines 175-198 — historian-dispatch block; replaced with semantic-prose invocation of `ce-sessions` via the platform's skill-invocation primitive.
-- `plugins/compound-engineering/skills/ce-clean-gone-branches/SKILL.md` line 17, `ce-resolve-pr-feedback/SKILL.md` line 45, `ce-optimize/SKILL.md` lines 272/315/324 — established `bash scripts/<name>` portable invocation pattern (slash-invoked skills, no `context: fork`, no platform variables).
-- `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` line 57 — established semantic-prose convention for one skill invoking another: *"Invoke the `ce-X` skill via the platform's skill-invocation primitive (`Skill` in Claude Code, `Skill` in Codex, the equivalent on Gemini/Pi)"*. ce-compound's delegation to ce-sessions follows this exact form.
-- `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md` lines 109-117 — clearest mirror for `mktemp -d -t <prefix>-XXXXXX` per-run-throwaway scratch pattern.
-- `plugins/compound-engineering/skills/ce-plan/references/deepening-workflow.md` lines 170-177 — pattern for capturing absolute scratch path and threading it into a subagent dispatch prompt.
-- `tests/session-history-scripts.test.ts` lines 4-19 — `INVENTORY_SCRIPTS_DIR` and `EXTRACT_SCRIPTS_DIR` constants and the `scriptsDirFor()` dispatcher; collapse into a single `SCRIPTS_DIR` pointing at `ce-sessions/scripts/`.
-- `tests/skills/ce-plan-handoff-routing.test.ts` — pattern for the regression test (read agent file at module load, regex assertions against body content).
-- `src/utils/legacy-cleanup.ts` — `STALE_SKILL_DIRS` (line 22, "Removed skills (no replacement)" cluster around line 89) and `LEGACY_ONLY_SKILL_DESCRIPTIONS` (line 253).
-- `src/data/plugin-legacy-artifacts.ts` lines 18-237 — `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"].skills[]`, sorted alphabetically.
-- `docs/skills/ce-sessions.md` lines 110, 175-176 — links to deleted skill directories; will 404 after deletion.
-
-### Institutional Learnings
-
-- `docs/solutions/skill-design/pass-paths-not-content-to-subagents.md` — directly applicable. Establishes orchestrator-does-discovery / subagent-does-reading split, file-mediated handoff via paths, and the empirical finding that per-item walk vs. bulk-find-then-filter affects tool call counts. The synthesis subagent should still be invocable in some standalone form (see Open Questions).
-- `docs/solutions/skill-design/script-first-skill-architecture.md` — reinforces the move: classification rules stay in scripts as single source of truth; do not duplicate them into the synthesis agent's prose. Script produces, model presents.
-- `docs/solutions/skill-design/compound-refresh-skill-improvements.md` Solution #5 — subagents use native file-search/read tools (e.g., Read in Claude Code), not shell `cat`. The synthesis-only historian must use Read for the scratch-dir files.
-- `docs/solutions/skill-design/research-agent-pipeline-separation.md` — foreground vs. background dispatch placement is deliberate. The current `/ce-compound` Phase 1 historian dispatch is foreground because session files live outside CWD. After this refactor, that rationale shifts (the orchestrator skill handles the access in main context); document the new placement explicitly.
-- `docs/solutions/skill-design/post-menu-routing-belongs-inline.md` — load-bearing logic must live where it will reliably execute, not where it will silently fail to load. Reinforces moving orchestration from the agent (subagent context where Skill is unreachable) to the skill (main context).
-- `docs/solutions/best-practices/ce-pipeline-end-to-end-learnings.md` — synthesis subagents must cite actual evidence, not vibe-summarize. Carries over to the new agent's output schema.
-
-### External References
-
-- [anthropics/claude-code#38719](https://github.com/anthropics/claude-code/issues/38719) — closed but the architectural limit is current. Subagents cannot invoke the Skill tool.
+- R1. `/ce-sessions [question]` 以及选择 session history 的 `/ce-compound` Phase 1 必须能在 Claude Code 上成功完成，不会卡在 `Initializing…`，也不会浮现伪造的用户拒绝错误。
+- R2. 重构后的 session-history flow 中，任何 subagent 都不得调用 `Skill` tool。完整 orchestration 必须运行在 main conversation context。
+- R3. 必须保留现有 session-history 能力：跨平台发现（Claude Code、Codex、Cursor）、branch 和 keyword filtering、scan-window widening 逻辑、top-5 deep-dive cap、skeleton + errors extraction modes、time-budget discipline。
+- R4. 不得让非 Claude Code targets（Codex、Cursor、Gemini、OpenCode、Pi、Kiro）回退。所有 script invocation 必须使用跨平台可移植模式（bare relative paths，不使用 `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}`）。
+- R5. 重构后 `bun run release:validate` 和 `bun test` 必须通过。
+- R6. 合并后关闭 issue #794。
 
 ---
 
-## Key Technical Decisions
+## 范围边界
 
-- **Move scripts into `ce-sessions/scripts/` with bare relative-path invocations (`bash scripts/<name>`)**: This is the documented portable pattern in repo AGENTS.md and is empirically used by three existing slash-invoked skills (`ce-clean-gone-branches`, `ce-resolve-pr-feedback`, `ce-optimize`). Avoids `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` (Claude-Code-only) and the `${CLAUDE_SKILL_DIR:-.}` fallback (assumes other targets set CWD to skill dir, unverified). U2 Verification includes a marketplace-install smoke test to confirm runtime CWD resolution actually works on a non-`--plugin-dir` install, since the plugin AGENTS.md "Permission gate" caveat warns the runtime Bash tool may not resolve relative paths from the skill dir — the existing slash-command precedents argue against that warning, but verifying empirically before merge is cheap insurance.
-- **`ce-compound` delegates to `ce-sessions` via the platform's skill-invocation primitive — semantic prose form, not a literal `Skill(...)` call**: Per the established convention in `ce-plan/references/plan-handoff.md` line 57 and plugin AGENTS.md "Cross-Platform Reference Rules" ("prefer semantic wording such as 'load the `ce-doc-review` skill' rather than slash syntax"). The semantic prose lets each target's converter route to its native primitive (`Skill` in Claude Code, equivalent on Codex/Gemini/Pi). A literal `Skill(ce-sessions, ...)` tool-call expression in the SKILL.md body would propagate Claude-Code-specific syntax to non-Claude targets when the skill ships verbatim through the converters. The architecture's central assumption — that the platform's skill-invocation primitive works from inside an executing skill body, not just from a direct slash command — is empirically verified by the current planning workflow itself: ce-plan invokes ce-doc-review via that primitive from its own skill body and the call resolves cleanly.
-- **Synthesis subagent receives file paths in dispatch prompt; reads via the platform's native file-read tool (Read in Claude Code)**: Per `pass-paths-not-content-to-subagents` precedent. Inventory output (small) flows through main-context tool results because the orchestrator needs it for filter/rank judgment. Per-session skeleton/errors output is written *directly to scratch files* by the extraction scripts (via a new `--output PATH` arg added in U2) — extraction content never round-trips through main-context tool results. This is what makes the synthesizer subagent earn its keep: with extraction bytes isolated to its subagent context, the orchestrator's working state stays lean (just paths + small inventory + final findings prose).
-- **Drop the agent's "Conversational mode" framing**: The current agent file advertises two modes (compound enrichment, conversational), but no caller invokes the agent without going through `/ce-sessions` or `/ce-compound` today. Removing the dual-mode framing simplifies the synthesis-only spec. If conversational direct dispatch is needed later, it can be reintroduced with explicit standalone-mode wiring.
-- **Add the deleted skills to all three legacy-cleanup lookups**: `STALE_SKILL_DIRS` in `src/utils/legacy-cleanup.ts`, `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"].skills[]` in `src/data/plugin-legacy-artifacts.ts`, and `LEGACY_ONLY_SKILL_DESCRIPTIONS` (also in `legacy-cleanup.ts`). The descriptions map is required because these skills have no current ce-* replacement — `loadLegacyFingerprints` falls back to that map for ownership fingerprinting on upgrade.
-- **Preserve `/ce-compound` Phase 1 wall-clock parallelism via dispatch ordering**: The current Phase 1 dispatches three background research subagents in parallel and the historian in foreground concurrently — explicitly designed so the historian "runs while the background agents work, adding no wall-clock time." A naive replacement that issues the skill-invocation primitive call to `ce-sessions` *before* the parallel block would serialize ce-sessions in front of the research subagents, regressing wall-clock time materially. The fix: launch the three background research subagents first (Context Analyzer, Solution Extractor, Related Docs Finder), *then* issue the skill-invocation primitive call to `ce-sessions`. The synchronous skill call blocks ce-compound's main-context turn until ce-sessions returns, but the already-dispatched background subagents continue running in parallel underneath — the same wall-clock benefit as today, just with a different concurrency primitive. U4 Approach specifies this ordering explicitly so the implementer doesn't have to rederive it.
+- 验证或修复 Codex/Cursor 上的同一架构模式：尚未确认它们存在同样的 subagent-Skill-tool 限制。如果出现，另做 follow-up。
+- 重命名 `ce-session-historian` 以反映它的 synthesis-only 角色：这只是 kosmetics，并会增加 blast radius（legacy-cleanup registries、conversion writers、test fixtures）。
+- 新增 session-history features（更大的 `head:N`、新的 extraction modes、当前行为之外的 additional output schemas）：只保留既有能力，不加 feature。
+- 修复 Claude Code 的平台级 subagent 限制：这不是我们的代码。
 
 ---
 
-## Open Questions
+## 上下文与调研
 
-### Resolved During Planning
+### 相关代码与模式
 
-- **Cross-platform script path resolution**: Use bare `bash scripts/<name>` (resolved by codebase precedent — `ce-clean-gone-branches`, `ce-resolve-pr-feedback`, `ce-optimize` all do this in slash-invoked skill bodies portably).
-- **Where scripts live**: `ce-sessions/scripts/` as the single home (resolved by scope dialogue — `ce-session-inventory` and `ce-session-extract` get deleted; their script directories collapse into the orchestrator skill that now uses them directly).
-- **Skill-from-skill-body invocation legitimacy**: Empirically verified — the current session's `/ce-plan` Phase 5.3.8 invoked `Skill(ce-doc-review, "mode:headless ...")` from inside the running ce-plan skill body, and the call resolved cleanly with three reviewer agents dispatched and findings returned. No deadlock, no `Initializing…` hang. This pins down what #794's empirical confirmation table left ambiguous: "main session" includes any non-subagent context, including a currently-executing skill body.
-- **Skill-to-skill invocation form**: Use semantic prose ("Invoke the `ce-sessions` skill via the platform's skill-invocation primitive (`Skill` in Claude Code, equivalent on other targets)") per `plan-handoff.md` line 57 and plugin AGENTS.md "Cross-Platform Reference Rules". Literal `Skill(ce-sessions, ...)` syntax in the SKILL.md body would propagate Claude-Code-specific surface to non-Claude targets when the skill ships verbatim through the converters.
-- **Inventory through main context vs. files**: Through main context. Inventory output is small (~30-50KB for a real-world session count) and the orchestrator needs to reason over it for selection. Per-session skeleton/errors output bypasses main context entirely via a new `--output PATH` arg added to the extract scripts in U2 — extraction content writes directly to scratch and never round-trips through orchestrator tool results.
-- **README skill-count update**: Not required. Counts use `38+` / `50+` `+` suffix (verified via research). `ce-session-inventory` and `ce-session-extract` are not listed in the skill table (agent-facing primitives, intentionally hidden from user-facing inventory).
-- **plugin.json description count update**: Not required. All three plugin.json variants (Claude, Cursor, Codex) have count-free descriptions (verified via research).
+- `plugins/compound-engineering/skills/ce-sessions/SKILL.md`：目前只是一个 thin wrapper，会 dispatch `ce-session-historian`；将改写为 orchestrator。
+- `plugins/compound-engineering/agents/ce-session-historian.agent.md`：目前指示 `Skill(ce-session-inventory)` 和 `Skill(ce-session-extract)`（lines 102-108）；将重构为 synthesis-only。
+- `plugins/compound-engineering/skills/ce-session-inventory/scripts/{discover-sessions.sh,extract-metadata.py}`：scripts 移入 `ce-sessions/scripts/`。
+- `plugins/compound-engineering/skills/ce-session-extract/scripts/{extract-skeleton.py,extract-errors.py}`：scripts 移入 `ce-sessions/scripts/`。
+- `plugins/compound-engineering/skills/ce-compound/SKILL.md` Phase 1 lines 175-198：historian-dispatch block；替换为通过平台 skill-invocation primitive 对 `ce-sessions` 的 semantic-prose invocation。
+- `plugins/compound-engineering/skills/ce-clean-gone-branches/SKILL.md` line 17、`ce-resolve-pr-feedback/SKILL.md` line 45、`ce-optimize/SKILL.md` lines 272/315/324：已建立的 `bash scripts/<name>` portable invocation pattern（slash-invoked skills、没有 `context: fork`、没有 platform variables）。
+- `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` line 57：一个 skill 调用另一个 skill 的既有 semantic-prose convention：*"Invoke the `ce-X` skill via the platform's skill-invocation primitive (`Skill` in Claude Code, `Skill` in Codex, the equivalent on Gemini/Pi)"*。ce-compound 对 ce-sessions 的 delegation 遵循这个形式。
+- `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md` lines 109-117：`mktemp -d -t <prefix>-XXXXXX` per-run throwaway scratch pattern 的最清晰镜像。
+- `plugins/compound-engineering/skills/ce-plan/references/deepening-workflow.md` lines 170-177：捕获 absolute scratch path 并将其传入 subagent dispatch prompt 的模式。
+- `tests/session-history-scripts.test.ts` lines 4-19：`INVENTORY_SCRIPTS_DIR`、`EXTRACT_SCRIPTS_DIR` 常量和 `scriptsDirFor()` dispatcher；折叠成指向 `ce-sessions/scripts/` 的单一 `SCRIPTS_DIR`。
+- `tests/skills/ce-plan-handoff-routing.test.ts`：regression test 模式（module load 时读 agent file，用 regex assertions 检查 body content）。
+- `src/utils/legacy-cleanup.ts`：`STALE_SKILL_DIRS`（line 22，line 89 附近的 "Removed skills (no replacement)" cluster）和 `LEGACY_ONLY_SKILL_DESCRIPTIONS`（line 253）。
+- `src/data/plugin-legacy-artifacts.ts` lines 18-237：`EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"].skills[]`，按字母排序。
+- `docs/skills/ce-sessions.md` lines 110、175-176：指向将被删除的 skill directories 的链接；删除后会 404。
 
-### Deferred to Implementation
+### 组织内 learnings
 
-- **Scratch file naming convention**: Probably `{session-id}.skeleton.txt` and `{session-id}.errors.txt`, but exact naming is decided when writing `ce-sessions/SKILL.md`.
-- **Tail-extract conditional logic placement**: Currently the agent decides whether to follow up `head:200` skeleton with a `tail:50` extract on apparently-incomplete sessions. After the refactor, this judgment lives in ce-sessions (orchestrator). Specific implementation — pre-extract everything proactively, or check head output and re-run for tail — to decide during write.
-- **Errors-mode extraction triggering**: Currently the agent decides selectively per session. Either ce-sessions decides upfront and pre-extracts, or the synthesizer signals back what additional extracts it wants. Defer to implementation; simplest path is "ce-sessions extracts skeleton always, errors only when scan window suggests dead-end value" using existing per-session signals.
-- **Standalone-mode dispatch path for the synthesis agent**: Per `pass-paths-not-content-to-subagents` precedent, sub-agents should remain dispatchable directly. After dropping conversational mode, decide whether the synthesis agent's body should still document a "no paths block in dispatch → return 'no relevant prior sessions'" fallback. Likely yes (defensive against future direct-dispatch use cases); confirm during write.
+- `docs/solutions/skill-design/pass-paths-not-content-to-subagents.md`：直接适用。它确立了 orchestrator-does-discovery / subagent-does-reading split、通过 paths 做 file-mediated handoff，以及 per-item walk vs. bulk-find-then-filter 会影响 tool call 数量的经验发现。synthesis subagent 仍应以某种 standalone form 可被调用（见 Open Questions）。
+- `docs/solutions/skill-design/script-first-skill-architecture.md`：强化这次移动：classification rules 留在 scripts 中作为 single source of truth；不要把它们重复进 synthesis agent 的 prose。Script 产出，model 负责呈现。
+- `docs/solutions/skill-design/compound-refresh-skill-improvements.md` Solution #5：subagents 使用 native file-search/read tools（例如 Claude Code 中的 Read），而不是 shell `cat`。synthesis-only historian 必须用 Read 读取 scratch-dir files。
+- `docs/solutions/skill-design/research-agent-pipeline-separation.md`：foreground vs. background dispatch placement 是刻意设计。当前 `/ce-compound` Phase 1 historian dispatch 是 foreground，因为 session files 位于 CWD 外部。重构后这个理由改变（orchestrator skill 在 main context 处理访问）；要明确记录新的 placement。
+- `docs/solutions/skill-design/post-menu-routing-belongs-inline.md`：load-bearing logic 必须放在会可靠执行的位置，而不是可能静默加载失败的位置。这强化了把 orchestration 从 agent（subagent context 中 Skill 不可达）移到 skill（main context）的决定。
+- `docs/solutions/best-practices/ce-pipeline-end-to-end-learnings.md`：synthesis subagents 必须引用真实 evidence，而不是 vibe-summarize。这会继承到新 agent 的 output schema。
+
+### 外部参考
+
+- [anthropics/claude-code#38719](https://github.com/anthropics/claude-code/issues/38719)：已关闭，但架构限制仍然成立。Subagents 不能调用 Skill tool。
 
 ---
 
-## Alternative Approaches Considered
+## 关键技术决策
 
-Three architectural shapes were on the table for closing #794. The chosen approach (move all orchestration into `ce-sessions`, reshape the agent to synthesis-only) is the broadest of the three; this section documents why the narrower options were rejected.
-
-- **Option A — Refactor the agent to invoke scripts directly via Bash from subagent context** (issue #794's "Suggested resolution path 1"). Smallest possible diff: change two `Skill(ce-session-inventory)` and `Skill(ce-session-extract)` calls in the agent body to their underlying `bash scripts/discover-sessions.sh ...` and `python3 scripts/extract-skeleton.py ...` invocations. The agent runs cleanly as a subagent until it hits Skill; Bash from a subagent is unrestricted. **Rejected because**: this option runs into the same script-path-resolution problem we navigated for `ce-sessions`, but without the same answer available. Slash-invoked *skills* have an established sibling-`scripts/` convention (ce-clean-gone-branches, ce-resolve-pr-feedback, ce-optimize) that runtime Bash resolves portably. *Agents* in this plugin do not have an analogous convention — agent files live flat under `agents/` with no sibling `scripts/` dir, and no other agent in the plugin invokes scripts via Bash from its body. To make Option A work, the agent would need either (a) a Claude-Code-only `${CLAUDE_PLUGIN_ROOT}` reference (R4 regression), or (b) a new agent-side sidecar-scripts convention (the codex converter's `collectReferencedSidecarDirs` mechanism could carry it, but the rest of the plugin doesn't follow this pattern, so we'd be establishing it for one agent). The chosen approach instead reuses the slash-command `<skill>/scripts/` convention that's already cross-platform-portable and exercised by three existing skills.
-
-- **Option B — Have the orchestrator pre-fetch inventory and pass it into the subagent's dispatch prompt** (issue #794's "Suggested resolution path 2"). Orchestrator runs `ce-session-inventory` once, includes the JSONL inventory in the historian's dispatch prompt; the historian still does selection + per-session extraction. **Rejected because**: the historian iteratively runs `ce-session-extract` once per selected session (up to 5 calls per run), and each of those is a Skill-tool call in the current architecture — Option B fixes the inventory call but leaves the per-session extract calls hanging on the same subagent-Skill-tool deadlock. Pre-fetching all sessions' extraction content upfront defeats the selection logic (you'd extract sessions before deciding which 5 to deep-dive). The full fix requires moving every Skill-tool call out of subagent context, which is what the chosen approach does.
-
-- **Option C (chosen) — Move all orchestration into the `ce-sessions` skill (main context); reshape the agent to synthesis-only that reads pre-extracted scratch files.** Closes the deadlock structurally — no Skill-tool call ever originates from subagent context. ce-sessions is itself a slash-command skill, so it inherits the established `<skill>/scripts/` cross-platform-portable invocation pattern. The synthesis-only agent becomes a clean handoff point: receives file paths, reads via native file-read tool, returns prose findings. The breadth of the change is the trade-off — six implementation units versus two for Option A — but each unit is independently meaningful work (script home consolidation, orchestrator promotion, agent simplification, ce-compound delegation refactor, regression test, cleanup of the now-callerless wrapping skills). The forcing function was #794's specific deadlock, but the broader refactor closes other latent issues at the same time: removes two `user-invocable: false` skills that were essentially script holders, simplifies the agent's responsibility surface, and makes the orchestration testable from main context where slash-creator's eval workflow can exercise it.
-
-A fourth option — **delete the synthesis subagent entirely and have the orchestrator synthesize inline** — was raised in review. Rejected because: with the `--output PATH` arg adopted on extract scripts (U2), the synthesizer's specific value is *context isolation*. Extraction content lands in the synthesizer's subagent context (via Read), not in the orchestrator's context. Deleting the synthesizer would force the orchestrator to Read the scratch files itself, putting all extraction bytes in main-context tool results — exactly the cumulative growth the `--output PATH` change exists to avoid. The synthesizer earns its keep specifically because the file-mediated handoff is clean.
+- **将 scripts 移入 `ce-sessions/scripts/`，并使用 bare relative-path invocations（`bash scripts/<name>`）**：这是 repo AGENTS.md 中记录的 portable pattern，且三个现有 slash-invoked skills（`ce-clean-gone-branches`、`ce-resolve-pr-feedback`、`ce-optimize`）已在实践中使用。避免 `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}`（Claude-Code-only）以及 `${CLAUDE_SKILL_DIR:-.}` fallback（假设其他 targets 会把 CWD 设为 skill dir，未验证）。U2 Verification 包含 marketplace-install smoke test，用来确认非 `--plugin-dir` install 中 runtime CWD resolution 真实可用；plugin AGENTS.md 的 "Permission gate" caveat 警告 runtime Bash tool 可能不会从 skill dir 解析 relative paths，而现有 slash-command precedents 与该警告相反，所以 merge 前做一次经验验证是低成本保险。
+- **`ce-compound` 通过平台 skill-invocation primitive 委托给 `ce-sessions`，使用 semantic prose，而不是字面 `Skill(...)` call**：遵循 `ce-plan/references/plan-handoff.md` line 57 的既有 convention，以及 plugin AGENTS.md "Cross-Platform Reference Rules"（"prefer semantic wording such as 'load the `ce-doc-review` skill' rather than slash syntax"）。Semantic prose 让每个 target 的 converter 路由到其 native primitive（Claude Code 中是 `Skill`，Codex/Gemini/Pi 上是等价机制）。如果在 SKILL.md body 中写字面 `Skill(ce-sessions, ...)` tool-call expression，会在 skill 通过 converters 原样发往非 Claude targets 时传播 Claude-Code-specific syntax。该架构的核心假设是：平台的 skill-invocation primitive 可从正在执行的 skill body 内工作，而不只限直接 slash command。当前 planning workflow 已经经验验证了这一点：ce-plan 从自身 skill body 内调用 ce-doc-review，并成功 resolve。
+- **Synthesis subagent 在 dispatch prompt 中接收 file paths，并通过平台 native file-read tool（Claude Code 中的 Read）读取**：遵循 `pass-paths-not-content-to-subagents` 先例。Inventory output（较小）通过 main-context tool results 流转，因为 orchestrator 需要用它做 filter/rank judgment。每个 session 的 skeleton/errors output 会由 extraction scripts 直接写入 scratch files（通过 U2 新增的 `--output PATH` arg），extraction content 不会往返 main-context tool results。这就是 synthesizer subagent 的价值：extraction bytes 隔离在它的 subagent context 中，orchestrator 的 working state 保持轻量（只有 paths + 小 inventory + final findings prose）。
+- **删除 agent 的 "Conversational mode" framing**：当前 agent file 宣称有两种模式（compound enrichment、conversational），但今天没有 caller 绕过 `/ce-sessions` 或 `/ce-compound` 直接调用该 agent。去掉 dual-mode framing 会简化 synthesis-only spec。如果后续需要 conversational direct dispatch，可以通过明确的 standalone-mode wiring 重新引入。
+- **把被删除的 skills 加入全部三个 legacy-cleanup lookups**：`src/utils/legacy-cleanup.ts` 中的 `STALE_SKILL_DIRS`、`src/data/plugin-legacy-artifacts.ts` 中的 `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"].skills[]`，以及 `legacy-cleanup.ts` 中的 `LEGACY_ONLY_SKILL_DESCRIPTIONS`。descriptions map 是必须的，因为这些 skills 没有当前 ce-* replacement；`loadLegacyFingerprints` 会 fallback 到该 map 进行 upgrade ownership fingerprinting。
+- **通过 dispatch ordering 保留 `/ce-compound` Phase 1 wall-clock parallelism**：当前 Phase 1 会并行 dispatch 三个 background research subagents，并同时以前景方式运行 historian，设计目的明确写着 historian "runs while the background agents work, adding no wall-clock time." 如果天真地在 parallel block 之前调用 ce-sessions skill-invocation primitive，会把 ce-sessions 串行放在 research subagents 前面，显著回退 wall-clock time。修复方式：先启动三个 background research subagents（Context Analyzer、Solution Extractor、Related Docs Finder），再发起对 `ce-sessions` 的 skill-invocation primitive call。同步的 skill call 会阻塞 ce-compound 的 main-context turn 直到 ce-sessions 返回，但已经 dispatch 的 background subagents 会在底层继续并行运行，因此保留现有 wall-clock benefit。U4 Approach 明确指定该顺序，避免 implementer 重新推导。
 
 ---
 
-## High-Level Technical Design
+## 待解决问题
 
-> *This illustrates the intended approach and is directional guidance for review, not implementation specification. The implementing agent should treat it as context, not code to reproduce.*
+### 规划期间已解决
+
+- **Cross-platform script path resolution**：使用 bare `bash scripts/<name>`（由 codebase precedent 解决：`ce-clean-gone-branches`、`ce-resolve-pr-feedback`、`ce-optimize` 都在 slash-invoked skill bodies 中可移植地使用它）。
+- **Scripts 放在哪里**：`ce-sessions/scripts/` 作为单一 home（由 scope dialogue 解决：`ce-session-inventory` 和 `ce-session-extract` 会删除；它们的 script directories 折叠进现在直接使用这些 scripts 的 orchestrator skill）。
+- **Skill-from-skill-body invocation legitimacy**：经验验证已完成：当前 session 的 `/ce-plan` Phase 5.3.8 从正在运行的 ce-plan skill body 内调用 `Skill(ce-doc-review, "mode:headless ...")`，调用成功 resolve，并 dispatch 三个 reviewer agents 后返回 findings。没有 deadlock，也没有 `Initializing…` hang。这明确了 #794 的经验确认表里留下的歧义："main session" 包括任何 non-subagent context，也包括当前正在执行的 skill body。
+- **Skill-to-skill invocation form**：按 `plan-handoff.md` line 57 和 plugin AGENTS.md "Cross-Platform Reference Rules" 使用 semantic prose（"Invoke the `ce-sessions` skill via the platform's skill-invocation primitive (`Skill` in Claude Code, equivalent on other targets)"）。在 SKILL.md body 中写字面 `Skill(ce-sessions, ...)` syntax，会在 skill 通过 converters 原样发往非 Claude targets 时传播 Claude-Code-specific surface。
+- **Inventory through main context vs. files**：通过 main context。Inventory output 很小（真实 session count 下约 30-50KB），orchestrator 需要基于它做 selection。每个 session 的 skeleton/errors output 则通过 U2 新增的 extract scripts `--output PATH` arg 完全绕开 main context：extraction content 直接写入 scratch，永不往返 orchestrator tool results。
+- **README skill-count update**：不需要。Counts 使用 `38+` / `50+` 的 `+` suffix（已研究验证）。`ce-session-inventory` 和 `ce-session-extract` 不在 skill table 中（agent-facing primitives，有意从 user-facing inventory 隐藏）。
+- **plugin.json description count update**：不需要。三个 plugin.json variants（Claude、Cursor、Codex）description 都不含计数（已研究验证）。
+
+### 推迟到实现阶段
+
+- **Scratch file naming convention**：大概率使用 `{session-id}.skeleton.txt` 和 `{session-id}.errors.txt`，但 exact naming 在写 `ce-sessions/SKILL.md` 时决定。
+- **Tail-extract conditional logic placement**：目前 agent 会判断是否在 `head:200` skeleton 后对看似不完整的 sessions 跟进 `tail:50` extract。重构后这个判断放在 ce-sessions（orchestrator）中。具体实现是主动 pre-extract everything，还是检查 head output 后再 tail re-run，留到 implementation 期间决定。
+- **Errors-mode extraction triggering**：目前 agent 会按 session selective 地决定。可以由 ce-sessions upfront 决定并 pre-extract，也可以让 synthesizer signal 它需要额外 extracts。先推迟；最简单路径是 "ce-sessions extracts skeleton always, errors only when scan window suggests dead-end value"，使用现有 per-session signals。
+- **Standalone-mode dispatch path for the synthesis agent**：按 `pass-paths-not-content-to-subagents` precedent，sub-agents 应保持可直接 dispatch。删除 conversational mode 后，需要决定 synthesis agent body 是否仍记录 "no paths block in dispatch → return 'no relevant prior sessions'" fallback。大概率需要（防御未来 direct-dispatch use cases）；写的时候确认。
+
+---
+
+## 已考虑的替代方案
+
+我们讨论过三种架构形态来关闭 #794。所选方案（把所有 orchestration 移入 `ce-sessions`，把 agent 改为 synthesis-only）是三者中范围最广的；本节记录为什么较窄选项被拒绝。
+
+- **Option A：把 agent 重构为在 subagent context 里通过 Bash 直接调用 scripts**（issue #794 的 "Suggested resolution path 1"）。最小 diff：把 agent body 中的两个 `Skill(ce-session-inventory)` 和 `Skill(ce-session-extract)` 调用改成底层 `bash scripts/discover-sessions.sh ...` 和 `python3 scripts/extract-skeleton.py ...` invocations。agent 作为 subagent 可正常运行，直到撞上 Skill；subagent 中的 Bash 不受限制。**拒绝原因**：这个方案遇到同样的 script-path-resolution 问题，但没有同样的答案。Slash-invoked *skills* 有成熟的 sibling-`scripts/` convention（ce-clean-gone-branches、ce-resolve-pr-feedback、ce-optimize），runtime Bash 能可移植解析。这个 plugin 中的 *agents* 没有类似 convention：agent files 平铺在 `agents/` 下，没有 sibling `scripts/` dir，plugin 内也没有其他 agent 从 body 中通过 Bash 调用 scripts。要让 Option A 工作，agent 需要 (a) Claude-Code-only `${CLAUDE_PLUGIN_ROOT}` reference（R4 regression），或 (b) 新建 agent-side sidecar-scripts convention（codex converter 的 `collectReferencedSidecarDirs` 机制可以携带它，但 plugin 其他部分不遵循该模式，所以会为一个 agent 建立新 convention）。所选方案改为复用已被三个 existing skills 演练过的 slash-command `<skill>/scripts/` convention。
+
+- **Option B：让 orchestrator 预取 inventory 并把它传入 subagent 的 dispatch prompt**（issue #794 的 "Suggested resolution path 2"）。orchestrator 跑一次 `ce-session-inventory`，把 JSONL inventory 放进 historian 的 dispatch prompt；historian 仍负责 selection + per-session extraction。**拒绝原因**：historian 会对每个 selected session 迭代运行 `ce-session-extract`（每次最多 5 次调用），而当前架构中这些也是 Skill-tool call。Option B 只修复 inventory call，仍留下 per-session extract calls 卡在同一个 subagent-Skill-tool deadlock。预先抓取所有 sessions 的 extraction content 会破坏 selection logic（你会在决定哪 5 个需要 deep-dive 前就 extract sessions）。完整修复必须把每个 Skill-tool call 都移出 subagent context，也就是所选方案。
+
+- **Option C（所选）：把所有 orchestration 移入 `ce-sessions` skill（main context）；把 agent 改造成 synthesis-only，读取预提取的 scratch files。** 结构性关闭 deadlock：任何 Skill-tool call 都不会源自 subagent context。ce-sessions 自身是 slash-command skill，因此继承既有 `<skill>/scripts/` cross-platform-portable invocation pattern。synthesis-only agent 成为干净的 handoff point：接收 file paths、通过 native file-read tool 读取、返回 prose findings。代价是改动范围更大：六个 implementation units，而 Option A 只需要两个。但每个 unit 都是独立有意义的工作（script home consolidation、orchestrator promotion、agent simplification、ce-compound delegation refactor、regression test、清理 now-callerless wrapping skills）。#794 的具体 deadlock 是 forcing function，但更大的重构还顺手关闭其他 latent issues：删除两个本质上只是 script holders 的 `user-invocable: false` skills，简化 agent 的责任面，并让 orchestration 在 main context 中更可测试，使 slash-creator 的 eval workflow 能覆盖它。
+
+第四种选项是 **彻底删除 synthesis subagent，让 orchestrator inline synthesis**，review 中提出过。拒绝原因：采用 extract scripts `--output PATH` arg（U2）后，synthesizer 的具体价值是 *context isolation*。Extraction content 通过 Read 进入 synthesizer 的 subagent context，而不是 orchestrator context。删除 synthesizer 会迫使 orchestrator 自己 Read scratch files，使所有 extraction bytes 进入 main-context tool results，这正是 `--output PATH` change 想避免的累积增长。synthesizer 的价值就在于 file-mediated handoff 干净。
+
+---
+
+## 高层技术设计
+
+> *这说明预期 approach，是给 review 的方向性指导，不是 implementation specification。实现 agent 应把它当作 context，而不是要复写的代码。*
 
 ```
 BEFORE (broken on Claude Code subagent context)
@@ -168,325 +168,326 @@ AFTER (Skill tool only invoked from main context)
   findings prose returned to /ce-sessions  →  returned to /ce-compound  →  folded into doc
 ```
 
-The bug is structurally gone because no subagent ever invokes the Skill tool. Every `Skill(...)` call sits in main conversation context, which is the verified-working path.
+该 bug 结构性消失，因为 subagent 不再调用 Skill tool。每个 `Skill(...)` call 都位于 main conversation context，而这是已验证可工作的路径。
 
 ---
 
-## Implementation Units
+## 实现单元
 
-### U1. Move scripts into `ce-sessions/scripts/` and repoint test paths
+### U1. 将 scripts 移入 `ce-sessions/scripts/` 并重定向 test paths
 
-**Goal:** Relocate the four extraction scripts to their new home under `ce-sessions/scripts/` as a pure file move, with the test suite updated to find them at the new location. After this unit, the scripts are at the new path and the script test suite passes against the new path; nothing else has changed yet.
+**目标：** 将四个 extraction scripts relocation 到 `ce-sessions/scripts/` 下作为纯文件移动，并更新 test suite 让它在新位置找到它们。完成本 unit 后，scripts 位于新路径，script test suite 针对新路径通过；其他行为尚不改变。
 
-**Requirements:** R3, R5
+**需求：** R3, R5
 
-**Dependencies:** None
+**依赖：** 无
 
-**Files:**
-- Move: `plugins/compound-engineering/skills/ce-session-inventory/scripts/discover-sessions.sh` → `plugins/compound-engineering/skills/ce-sessions/scripts/discover-sessions.sh`
-- Move: `plugins/compound-engineering/skills/ce-session-inventory/scripts/extract-metadata.py` → `plugins/compound-engineering/skills/ce-sessions/scripts/extract-metadata.py`
-- Move: `plugins/compound-engineering/skills/ce-session-extract/scripts/extract-skeleton.py` → `plugins/compound-engineering/skills/ce-sessions/scripts/extract-skeleton.py`
-- Move: `plugins/compound-engineering/skills/ce-session-extract/scripts/extract-errors.py` → `plugins/compound-engineering/skills/ce-sessions/scripts/extract-errors.py`
-- Modify: `tests/session-history-scripts.test.ts` (collapse `INVENTORY_SCRIPTS_DIR` and `EXTRACT_SCRIPTS_DIR` constants into a single `SCRIPTS_DIR` pointing at the new path; simplify or remove the `scriptsDirFor()` dispatcher per how the tests reference it)
+**文件：**
+- 移动：`plugins/compound-engineering/skills/ce-session-inventory/scripts/discover-sessions.sh` → `plugins/compound-engineering/skills/ce-sessions/scripts/discover-sessions.sh`
+- 移动：`plugins/compound-engineering/skills/ce-session-inventory/scripts/extract-metadata.py` → `plugins/compound-engineering/skills/ce-sessions/scripts/extract-metadata.py`
+- 移动：`plugins/compound-engineering/skills/ce-session-extract/scripts/extract-skeleton.py` → `plugins/compound-engineering/skills/ce-sessions/scripts/extract-skeleton.py`
+- 移动：`plugins/compound-engineering/skills/ce-session-extract/scripts/extract-errors.py` → `plugins/compound-engineering/skills/ce-sessions/scripts/extract-errors.py`
+- 修改：`tests/session-history-scripts.test.ts`（将 `INVENTORY_SCRIPTS_DIR` 和 `EXTRACT_SCRIPTS_DIR` constants 折叠为指向新路径的单一 `SCRIPTS_DIR`；按 tests 引用方式简化或删除 `scriptsDirFor()` dispatcher）
 
-**Approach:**
-- Pure file move via `git mv` to preserve blame.
-- Scripts have no internal cross-references between each other (verified — `discover-sessions.sh` does not call `extract-metadata.py` directly; the pipe is composed in skill body), so no script content changes are required.
-- Test path update is mechanical: the constants live at `tests/session-history-scripts.test.ts` lines 4-19 per research findings.
+**方法：**
+- 通过 `git mv` 做纯文件移动以保留 blame。
+- Scripts 彼此没有 internal cross-references（已验证：`discover-sessions.sh` 不直接调用 `extract-metadata.py`；pipe 在 skill body 中组合），所以 script content 不需要改。
+- Test path update 是机械的：research findings 显示 constants 位于 `tests/session-history-scripts.test.ts` lines 4-19。
 
-**Patterns to follow:**
-- Co-located scripts under `<skill>/scripts/` directory — same pattern as `ce-clean-gone-branches/scripts/`, `ce-optimize/scripts/`, `ce-resolve-pr-feedback/scripts/`.
+**遵循模式：**
+- `<skill>/scripts/` 目录下的 co-located scripts：与 `ce-clean-gone-branches/scripts/`、`ce-optimize/scripts/`、`ce-resolve-pr-feedback/scripts/` 相同。
 
-**Test scenarios:**
-- Test expectation: `tests/session-history-scripts.test.ts` continues to pass after path constant updates. No test cases themselves need behavioral changes — fixtures in `tests/fixtures/session-history/` stay put.
-- Integration: `git log --follow` on each script preserves history through the move.
+**测试场景：**
+- 测试预期：path constant update 后，`tests/session-history-scripts.test.ts` 继续通过。Test cases 本身不需要 behavior changes；`tests/fixtures/session-history/` fixtures 保持不变。
+- 集成：每个 script 的 `git log --follow` 能在移动后保留 history。
 
-**Verification:**
-- `bun test tests/session-history-scripts.test.ts` passes.
-- The four scripts exist at `plugins/compound-engineering/skills/ce-sessions/scripts/` and no longer exist at their old paths.
+**验证：**
+- `bun test tests/session-history-scripts.test.ts` 通过。
+- 四个 scripts 存在于 `plugins/compound-engineering/skills/ce-sessions/scripts/`，且不再存在于旧路径。
 
 ---
 
-### U2. Rewrite `ce-sessions/SKILL.md` as the full session-history orchestrator
+### U2. 将 `ce-sessions/SKILL.md` 改写为完整 session-history orchestrator
 
-**Goal:** Replace the current 32-line thin-wrapper SKILL.md with a full orchestrator that discovers sessions, filters/ranks, extracts content to a `mktemp` scratch dir, dispatches the synthesis-only historian, and returns findings text. After this unit, `/ce-sessions` invoked directly and `ce-sessions` invoked from another skill (e.g., from `ce-compound` Phase 1) both run the new flow.
+**目标：** 将当前 32 行 thin-wrapper SKILL.md 替换为完整 orchestrator：发现 sessions、filter/rank、extract content 到 `mktemp` scratch dir、dispatch synthesis-only historian，并返回 findings text。完成本 unit 后，直接调用 `/ce-sessions`，以及从另一个 skill（例如 `ce-compound` Phase 1）调用 `ce-sessions`，都会运行新 flow。
 
-**Requirements:** R1, R2, R3, R4
+**需求：** R1, R2, R3, R4
 
-**Dependencies:** U1 (scripts must exist at the new location before SKILL.md references them)
+**依赖：** U1（scripts 必须先位于新位置，SKILL.md 才能引用它们）
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-sessions/SKILL.md` (full rewrite)
-- Modify: `plugins/compound-engineering/skills/ce-sessions/scripts/extract-skeleton.py` (add `--output PATH` arg; when set, write output to the named file instead of stdout, and emit a one-line `{"_meta": ..., "wrote": "<path>", "bytes": N}` status to stdout)
-- Modify: `plugins/compound-engineering/skills/ce-sessions/scripts/extract-errors.py` (same `--output PATH` treatment, parallel API)
-- Modify: `tests/session-history-scripts.test.ts` (add coverage for the new `--output PATH` mode on both extract scripts: file is written, status line is emitted on stdout, original stdout-mode behavior preserved when flag is omitted)
+**文件：**
+- 修改：`plugins/compound-engineering/skills/ce-sessions/SKILL.md`（full rewrite）
+- 修改：`plugins/compound-engineering/skills/ce-sessions/scripts/extract-skeleton.py`（新增 `--output PATH` arg；设置时将 output 写入指定文件而不是 stdout，并向 stdout emit 一行 `{"_meta": ..., "wrote": "<path>", "bytes": N}` status）
+- 修改：`plugins/compound-engineering/skills/ce-sessions/scripts/extract-errors.py`（同样支持 `--output PATH`，parallel API）
+- 修改：`tests/session-history-scripts.test.ts`（为两个 extract scripts 的新 `--output PATH` mode 增加 coverage：file 被写入、stdout emit status line、未传 flag 时保留原 stdout-mode behavior）
 
-**Approach:**
-- **Frontmatter:** keep `name: ce-sessions`, update `description` to reflect orchestrator role (longer than current; under 1024 chars per `tests/frontmatter.test.ts`).
-- **Pre-resolved git branch** (existing): keep the `!`-backtick `git rev-parse --abbrev-ref HEAD` line that the current SKILL.md uses; the orchestrator passes branch into selection logic and (when relevant) into the synthesis dispatch prompt.
-- **Step 1 — Discover and inventory:** invoke the discover-then-extract-metadata pipeline using the **exact same shape as the current `ce-session-inventory/SKILL.md` line 27-31** — null-delimited xargs hardening preserved verbatim:
+**方法：**
+- **Frontmatter:** 保留 `name: ce-sessions`，更新 `description` 以反映 orchestrator role（比当前更长；按 `tests/frontmatter.test.ts` 保持在 1024 chars 内）。
+- **Pre-resolved git branch**（existing）：保留当前 SKILL.md 使用的 `!`-backtick `git rev-parse --abbrev-ref HEAD` line；orchestrator 将 branch 传入 selection logic，并在相关时传入 synthesis dispatch prompt。
+- **Step 1 — Discover and inventory:** 使用与当前 `ce-session-inventory/SKILL.md` line 27-31 **完全同形**的 discover-then-extract-metadata pipeline，并原样保留 null-delimited xargs hardening：
   ```
   bash scripts/discover-sessions.sh <repo> <days> [--platform <platform>] \
     | tr '\n' '\0' \
     | xargs -0 python3 scripts/extract-metadata.py --cwd-filter <repo>
   ```
-  The `tr '\n' '\0' | xargs -0` segment is load-bearing — it converts newline-delimited file paths to null-delimited args so `extract-metadata.py` runs in batch mode (positional file args). Dropping it would silently regress to single-file stdin mode and produce wrong output. Receive JSONL inventory in main context. Document the time-range mapping table (1 day / 7 days / 30 days / 90 days) ported from the current historian agent so the orchestrator owns scan-window selection.
-- **Step 2 — Filter and rank:** port the historian's branch filter, keyword-filter (re-invoke discover/extract pipeline with `--keyword K1,K2,...`), scan-window enforcement, current-session exclusion, and top-5 deep-dive cap into the orchestrator. Same logic, different host.
-- **Step 3 — Scratch dir:** `mktemp -d -t ce-sessions-XXXXXX` → capture absolute path; thread into Step 4 and Step 5.
-- **Step 4 — Per-session extraction (file-mediated, no stdout round-trip):** for each selected session, invoke the extraction scripts with their new `--output` flag so content writes directly to the scratch file:
+  `tr '\n' '\0' | xargs -0` segment 是 load-bearing：它把 newline-delimited file paths 转成 null-delimited args，使 `extract-metadata.py` 以 batch mode（positional file args）运行。删除它会静默回退到 single-file stdin mode 并产出错误 output。main context 接收 JSONL inventory。把当前 historian agent 中的 time-range mapping table 移植过来，让 orchestrator 拥有 scan-window selection。
+- **Step 2 — Filter and rank:** 将 historian 的 branch filter、keyword-filter（用 `--keyword K1,K2,...` 重新调用 discover/extract pipeline）、scan-window enforcement、current-session exclusion、top-5 deep-dive cap 移植到 orchestrator。同样逻辑，不同 host。
+- **Step 3 — Scratch dir:** `mktemp -d -t ce-sessions-XXXXXX` → 捕获 absolute path；传入 Step 4 和 Step 5。
+- **Step 4 — Per-session extraction（file-mediated，无 stdout round-trip）：** 对每个 selected session，用新增 `--output` flag 调用 extraction scripts，使 content 直接写入 scratch file：
   ```
   python3 scripts/extract-skeleton.py --output "$SCRATCH/{session-id}.skeleton.txt" < <file>
   ```
-  The script returns only a short status line on stdout (bytes written, parse errors); the bulk extraction content never lands in main-context tool results. Conditional tail extract and errors extract (also `--output`-aware) follow the existing historian heuristics. The new `--output` flag is additive — when omitted, scripts behave exactly as before, preserving existing test coverage and any manual / agent-driven invocations.
-- **Step 5 — Dispatch synthesis subagent:** dispatch `ce-session-historian` via the platform's subagent primitive (omit `mode` parameter so user permission settings apply). Pass: problem topic, scratch dir absolute path, list of `{path, platform, branch, ts, ...}` per selected session, output schema. Run on the mid-tier model (e.g., `model: "sonnet"` in Claude Code) per the existing dispatch convention.
-- **Step 6 — Return findings:** return the synthesizer's text output to the caller verbatim, or "no relevant prior sessions" when discovery / keyword filter returns zero.
+  Script 只在 stdout 返回短 status line（bytes written、parse errors）；bulk extraction content 不进入 main-context tool results。Conditional tail extract 和 errors extract（也支持 `--output`）遵循现有 historian heuristics。新增 `--output` flag 是 additive：未传时 scripts 行为与原来完全一致，保留现有 test coverage 和任何 manual / agent-driven invocations。
+- **Step 5 — Dispatch synthesis subagent:** 通过平台 subagent primitive dispatch `ce-session-historian`（省略 `mode` 参数，让用户 permission settings 生效）。传入：problem topic、scratch dir、每个 selected session 的 `{path, platform, branch, ts, ...}` list、output schema。按现有 dispatch convention 使用 mid-tier model（例如 Claude Code 中的 `model: "sonnet"`）。
+- **Step 6 — Return findings:** 将 synthesizer 的 text output 原样返回给 caller；如果 discovery / keyword filter 返回零结果，则返回 "no relevant prior sessions"。
 
-**Execution note:** SKILL.md changes are not directly testable by `bun test` — use `/skill-creator` per AGENTS.md ("Validating Agent and Skill Changes") to evaluate behavior against the test scenarios below.
+**执行说明：** SKILL.md changes 无法被 `bun test` 直接测试；按 AGENTS.md（"Validating Agent and Skill Changes"）使用 `/skill-creator` 针对下面 test scenarios evaluate behavior。
 
-**Patterns to follow:**
-- `plugins/compound-engineering/skills/ce-clean-gone-branches/SKILL.md` lines 14-22 — bash script invocation with `__NONE__` sentinel handling pattern.
-- `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md` lines 109-117 — `mktemp -d -t <prefix>-XXXXXX` per-run-throwaway pattern.
-- `plugins/compound-engineering/skills/ce-plan/references/deepening-workflow.md` lines 170-177 — capture absolute scratch path; thread it into a subagent dispatch prompt.
-- Cross-platform user-interaction blocks per repo AGENTS.md "Cross-Platform User Interaction" section (when ce-sessions asks for the question if invoked without args — current SKILL.md already handles this).
+**遵循模式：**
+- `plugins/compound-engineering/skills/ce-clean-gone-branches/SKILL.md` lines 14-22：带 `__NONE__` sentinel handling pattern 的 bash script invocation。
+- `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md` lines 109-117：`mktemp -d -t <prefix>-XXXXXX` 每次运行临时 scratch pattern。
+- `plugins/compound-engineering/skills/ce-plan/references/deepening-workflow.md` lines 170-177：捕获 absolute scratch path；将它传入 subagent dispatch prompt。
+- 按 repo AGENTS.md "Cross-Platform User Interaction" section 做 cross-platform user-interaction blocks（ce-sessions 在无 args 调用时询问 question；当前 SKILL.md 已处理）。
 
-**Test scenarios:**
-- Happy path: invoke `/ce-sessions "did we decide where notification mute state lives"` against a fixture-backed Claude Code session store → orchestrator runs discover + extract-metadata, picks ≤ 5 sessions, extracts skeletons to scratch via `--output`, dispatches synthesizer → returns prose findings.
-- Edge case (Empty inventory): no session files in scan window → orchestrator returns "no relevant prior sessions" without dispatching synthesizer or creating scratch dir.
-- Edge case (Zero keyword matches): branch filter returns zero, keyword filter returns `files_matched: 0` → orchestrator returns "no relevant prior sessions" without dispatching synthesizer.
-- Edge case (Scan widening): narrow scan returns zero, request implies longer history → orchestrator widens window per the time-range table, re-invokes discover, retries selection.
-- Error path (Parse errors): inventory `_meta` reports `parse_errors > 0` → orchestrator notes partial in the dispatch prompt and proceeds; synthesizer flags partial in findings.
-- Error path (Script `--output` write fails): scratch path unwriteable (disk full, permission) → script returns non-zero, orchestrator surfaces clear error to user, does not dispatch synthesizer.
-- Integration (No subagent Skill calls): grep the runtime trace — no `Skill(...)` tool call originates from the dispatched historian.
-- Integration (Skill primitive from skill body): invoking `ce-sessions` from inside `ce-compound`'s skill body via the platform's skill-invocation primitive returns findings text without hanging. Already empirically validated by the current `ce-plan → ce-doc-review` invocation path; this scenario locks the verification in for ce-compound's specific call-site.
-- Integration (Script invocation from runtime Bash): `bash scripts/discover-sessions.sh` and `python3 scripts/extract-skeleton.py --output ...` resolve correctly when ce-sessions runs as a slash-invoked skill on a marketplace-cached install (not `--plugin-dir`). This addresses the contradiction between repo-root AGENTS.md ("relative paths resolve to skill dir on all platforms") and plugin AGENTS.md "Permission gate" ("runtime Bash CWD is user's project, not skill dir").
-- Cumulative context check: invoke `/ce-sessions` against a 5-session fixture → after run completes, the orchestrator's tool-result bytes attributable to extraction content are bounded by the script status lines (a few hundred bytes total), not the skeleton/errors content itself.
+**测试场景：**
+- 正常路径：对 fixture-backed Claude Code session store 调用 `/ce-sessions "did we decide where notification mute state lives"` → orchestrator 运行 discover + extract-metadata，选择 ≤ 5 sessions，通过 `--output` 把 skeletons 提取到 scratch，dispatch synthesizer → 返回 prose findings。
+- 边界情况（Empty inventory）：scan window 内没有 session files → orchestrator 返回 "no relevant prior sessions"，不 dispatch synthesizer，也不创建 scratch dir。
+- 边界情况（Zero keyword matches）：branch filter 结果为零，keyword filter 返回 `files_matched: 0` → orchestrator 返回 "no relevant prior sessions"，不 dispatch synthesizer。
+- 边界情况（Scan widening）：narrow scan 返回零，request 暗示 longer history → orchestrator 按 time-range table 扩大 window，重新调用 discover，重试 selection。
+- 错误路径（Parse errors）：inventory `_meta` 报告 `parse_errors > 0` → orchestrator 在 dispatch prompt 中注明 partial 并继续；synthesizer 在 findings 中标记 partial。
+- 错误路径（Script `--output` write fails）：scratch path 不可写（disk full、permission）→ script 返回 non-zero，orchestrator 向 user 明确 surface error，不 dispatch synthesizer。
+- 集成（No subagent Skill calls）：grep runtime trace，确认没有 `Skill(...)` tool call 源自 dispatched historian。
+- 集成（Skill primitive from skill body）：从 `ce-compound` 的 skill body 内通过平台 skill-invocation primitive 调用 `ce-sessions`，能无 hang 返回 findings text。当前 `ce-plan → ce-doc-review` invocation path 已经经验验证此场景；这里将它锁定到 ce-compound 的具体 call-site。
+- 集成（Script invocation from runtime Bash）：当 ce-sessions 作为 slash-invoked skill 在 marketplace-cached install（不是 `--plugin-dir`）中运行时，`bash scripts/discover-sessions.sh` 和 `python3 scripts/extract-skeleton.py --output ...` 可正确 resolve。这处理 repo-root AGENTS.md（"relative paths resolve to skill dir on all platforms"）和 plugin AGENTS.md "Permission gate"（"runtime Bash CWD is user's project, not skill dir"）之间的矛盾。
+- Cumulative context check：对 5-session fixture 调用 `/ce-sessions` → run 完成后，orchestrator 的 tool-result bytes 中归因于 extraction content 的部分受限于 script status lines（总计几百 bytes），而不是 skeleton/errors content 本身。
 
-**Verification:**
-- `/skill-creator` eval against the test scenarios above passes.
-- `bun test tests/frontmatter.test.ts` passes (description length, ce- prefix, no angle brackets, etc.).
-- `bun test tests/skill-shell-safety.test.ts` passes (any new `!`-backtick pre-resolution lines are safety-compliant).
-- `bun test tests/session-history-scripts.test.ts` covers both stdout-mode (existing behavior) and `--output PATH` mode for the modified extract scripts.
-- **Marketplace-install smoke test** (manual): on a fresh install via `/plugin install` (not `--plugin-dir`), invoke `/ce-sessions "what did we work on this week"` and confirm the orchestrator's `bash scripts/...` invocations resolve. If they fail with `No such file or directory`, the cross-platform-portable-relative-path assumption is wrong and the architecture must shift to `${CLAUDE_SKILL_DIR}` + pinned `allowed-tools` (Claude-Code-only path; treats R4 as a known regression). Fail-fast is preferable to shipping a broken release.
-
----
-
-### U3. Refactor `ce-session-historian.agent.md` to synthesis-only
-
-**Goal:** Strip the agent down to synthesis: it receives problem topic + extracted file paths in the dispatch prompt, reads files via the native file-read tool (Read in Claude Code), and returns prose findings per the existing output schema. All `Skill(...)` invocations and orchestration logic (discovery, selection, extraction primitives, time-range mapping) are removed — those now live in `ce-sessions`.
-
-**Requirements:** R1, R2, R3
-
-**Dependencies:** U2 (the orchestrator's dispatch shape determines the agent's input contract; they must agree)
-
-**Files:**
-- Modify: `plugins/compound-engineering/agents/ce-session-historian.agent.md` (substantial rewrite)
-
-**Approach:**
-- **Drop:** the "Extraction Primitives" section (lines 100-108), the "Methodology" Steps 1 / 3 / 4 / 5 (orchestration now in ce-sessions), the time-range mapping table, the branch-filter and keyword-filter rules, the deep-dive cap, and all `Skill(ce-session-inventory)` / `Skill(ce-session-extract)` / "Invoke them through the Skill tool" prose.
-- **Drop:** the "two modes" framing (compound enrichment + conversational) at lines 11-13 — no actual caller dispatches the agent in a mode that bypasses the orchestrator. Single-purpose framing replaces it.
-- **Keep:** the Guardrails section (no thinking-block leakage, never read whole session files into context, technical content not personal content, fail-fast on access errors).
-- **Keep:** Step 6's synthesis methodology (Investigation journey, User corrections, Decisions and rationale, Error patterns, Evolution across sessions, Cross-tool blind spots, Staleness caveat).
-- **Keep:** the output format (caller-supplied schema honored; default header line otherwise).
-- **Add:** input-contract section documenting the dispatch prompt shape — `{problem_topic, scratch_dir, [{path, platform, branch?, ts, ...}], output_schema}`. Agent reads each `path` using the native file-read tool; never reads source session files directly.
-- **Add:** standalone fallback per `docs/solutions/skill-design/pass-paths-not-content-to-subagents.md` — when dispatch prompt arrives without paths, return "no relevant prior sessions" rather than attempting any Skill or Bash discovery (defensive against future direct-dispatch).
-
-**Execution note:** Use `/skill-creator` for behavioral testing per AGENTS.md. The plugin agent definition caches at session start, so iterative testing requires either skill-creator's content-injection workflow or a fresh session.
-
-**Patterns to follow:**
-- `docs/solutions/skill-design/compound-refresh-skill-improvements.md` Solution #5 — subagents use native file-read tools, not shell.
-- Output schema prose (default and caller-supplied) — port verbatim from current agent's Output section.
-
-**Test scenarios:**
-- Happy path: dispatch prompt with problem topic + 3 valid scratch paths → agent reads each via Read, synthesizes per output schema, returns prose findings within time budget.
-- Edge case (Empty paths): dispatch prompt with empty paths array → agent returns "no relevant prior sessions" without invoking any tools.
-- Edge case (Caller-supplied schema): dispatch prompt names a custom output schema → agent honors that schema verbatim, omits its own header.
-- Error path (Unreadable file): one path returns Read error → agent notes partial extraction, synthesizes from the rest.
-- Integration (No Skill calls): trace agent's tool-call list — no `Skill(...)` calls. Caught by U5 regression test.
-- Integration (Cross-tool synthesis): paths span Claude Code + Codex + Cursor → synthesis includes Cross-tool blind spots when genuinely informative.
-
-**Verification:**
-- Static: agent file does not contain `Skill(ce-session-inventory)`, `Skill(ce-session-extract)`, or "Invoke them through the Skill tool" prose. Locked in by U5.
-- `/skill-creator` eval covers the test scenarios above.
+**验证：**
+- 针对上述 test scenarios 的 `/skill-creator` eval 通过。
+- `bun test tests/frontmatter.test.ts` 通过（description length、ce- prefix、no angle brackets 等）。
+- `bun test tests/skill-shell-safety.test.ts` 通过（任何新的 `!`-backtick pre-resolution lines 都符合 safety）。
+- `bun test tests/session-history-scripts.test.ts` 覆盖 modified extract scripts 的 stdout-mode（existing behavior）和 `--output PATH` mode。
+- **Marketplace-install smoke test**（manual）：通过 `/plugin install` fresh install（不是 `--plugin-dir`）后，调用 `/ce-sessions "what did we work on this week"` 并确认 orchestrator 的 `bash scripts/...` invocations 能 resolve。如果失败并报 `No such file or directory`，说明 cross-platform-portable-relative-path assumption 错误，架构必须转向 `${CLAUDE_SKILL_DIR}` + pinned `allowed-tools`（Claude-Code-only path；把 R4 当作已知 regression）。Fail-fast 优于发布 broken release。
 
 ---
 
-### U4. Update `ce-compound/SKILL.md` Phase 1 to delegate to `ce-sessions` via the skill-invocation primitive
+### U3. 将 `ce-session-historian.agent.md` 重构为 synthesis-only
 
-**Goal:** Replace the direct historian-dispatch block in `ce-compound` Phase 1 with a delegation to the `ce-sessions` skill, invoked via the platform's skill-invocation primitive. Receive findings text; existing fold-into-doc flow in Phase 2 is preserved unchanged. Wall-clock parallelism with the other Phase 1 research subagents is preserved by ordering the invocation correctly.
+**目标：** 将 agent 缩减为 synthesis：它接收 problem topic + dispatch prompt 中的 extracted file paths，使用 native file-read tool（Claude Code 中的 Read）读取 files，并按现有 output schema 返回 prose findings。删除所有 `Skill(...)` invocations 和 orchestration logic（discovery、selection、extraction primitives、time-range mapping）；这些现在都位于 `ce-sessions`。
 
-**Requirements:** R1, R4, R6
+**需求：** R1, R2, R3
 
-**Dependencies:** U2 (ce-sessions orchestrator must exist and work), U3 (the historian agent — invoked transitively by ce-sessions — must be refactored)
+**依赖：** U2（orchestrator 的 dispatch shape 决定 agent 的 input contract；两者必须一致）
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-compound/SKILL.md` (Phase 1 historian-dispatch block, lines 175-198)
+**文件：**
+- 修改：`plugins/compound-engineering/agents/ce-session-historian.agent.md`（substantial rewrite）
 
-**Approach:**
-- **Replace** the "Session Historian (foreground, after launching the above — only if the user opted in)" block with a delegation to `ce-sessions`. Use the **established semantic-prose convention** per `ce-plan/references/plan-handoff.md` line 57 and plugin AGENTS.md "Cross-Platform Reference Rules":
+**方法：**
+- **删除：** "Extraction Primitives" section（lines 100-108）、"Methodology" Steps 1 / 3 / 4 / 5（orchestration now in ce-sessions）、time-range mapping table、branch-filter 和 keyword-filter rules、deep-dive cap、以及所有 `Skill(ce-session-inventory)` / `Skill(ce-session-extract)` / "Invoke them through the Skill tool" prose。
+- **删除：** lines 11-13 的 "two modes" framing（compound enrichment + conversational）：今天没有实际 caller 用绕过 orchestrator 的 mode dispatch agent。替换为 single-purpose framing。
+- **保留：** Guardrails section（no thinking-block leakage、never read whole session files into context、technical content not personal content、fail-fast on access errors）。
+- **保留：** Step 6 的 synthesis methodology（Investigation journey、User corrections、Decisions and rationale、Error patterns、Evolution across sessions、Cross-tool blind spots、Staleness caveat）。
+- **保留：** output format（尊重 caller-supplied schema；否则使用 default header line）。
+- **添加：** input-contract section，记录 dispatch prompt shape：`{problem_topic, scratch_dir, [{path, platform, branch?, ts, ...}], output_schema}`。Agent 使用 native file-read tool 读取每个 `path`；永不直接读取 source session files。
+- **添加：** 按 `docs/solutions/skill-design/pass-paths-not-content-to-subagents.md` 增加 standalone fallback：当 dispatch prompt 没有 paths 时，返回 "no relevant prior sessions"，而不是尝试任何 Skill 或 Bash discovery（防御 future direct-dispatch）。
+
+**执行说明：** 按 AGENTS.md 使用 `/skill-creator` 做 behavioral testing。Plugin agent definition 会在 session start 时缓存，因此 iterative testing 需要 skill-creator 的 content-injection workflow 或新 session。
+
+**遵循模式：**
+- `docs/solutions/skill-design/compound-refresh-skill-improvements.md` Solution #5：subagents 使用 native file-read tools，而不是 shell。
+- Output schema prose（default 和 caller-supplied）：从当前 agent 的 Output section 原样移植。
+
+**测试场景：**
+- 正常路径：dispatch prompt 带 problem topic + 3 个有效 scratch paths → agent 用 Read 读取每个 path，按 output schema synthesize，并在 time budget 内返回 prose findings。
+- 边界情况（Empty paths）：dispatch prompt 带空 paths array → agent 不调用任何 tools，返回 "no relevant prior sessions"。
+- 边界情况（Caller-supplied schema）：dispatch prompt 指定 custom output schema → agent 原样尊重该 schema，省略自己的 header。
+- 错误路径（Unreadable file）：一个 path Read error → agent 标注 partial extraction，并从其余 files synthesize。
+- 集成（No Skill calls）：trace agent 的 tool-call list，确认没有 `Skill(...)` calls。由 U5 regression test 捕获。
+- 集成（Cross-tool synthesis）：paths 跨 Claude Code + Codex + Cursor → 当确有信息价值时，synthesis 包含 Cross-tool blind spots。
+
+**验证：**
+- 静态检查：agent file 不包含 `Skill(ce-session-inventory)`、`Skill(ce-session-extract)` 或 "Invoke them through the Skill tool" prose。由 U5 锁定。
+- `/skill-creator` eval 覆盖上述 test scenarios。
+
+---
+
+### U4. 更新 `ce-compound/SKILL.md` Phase 1，通过 skill-invocation primitive 委托给 `ce-sessions`
+
+**目标：** 将 `ce-compound` Phase 1 中的 direct historian-dispatch block 替换为对 `ce-sessions` skill 的 delegation，通过平台 skill-invocation primitive 调用。接收 findings text；Phase 2 中现有 fold-into-doc flow 保持不变。通过正确排序 invocation 保留与其他 Phase 1 research subagents 的 wall-clock parallelism。
+
+**需求：** R1, R4, R6
+
+**依赖：** U2（ce-sessions orchestrator 必须存在且可工作）、U3（由 ce-sessions 间接调用的 historian agent 必须已重构）
+
+**文件：**
+- 修改：`plugins/compound-engineering/skills/ce-compound/SKILL.md`（Phase 1 historian-dispatch block，lines 175-198）
+
+**方法：**
+- **Replace** "Session Historian (foreground, after launching the above — only if the user opted in)" block 为对 `ce-sessions` 的 delegation。按 `ce-plan/references/plan-handoff.md` line 57 和 plugin AGENTS.md "Cross-Platform Reference Rules" 使用**既有 semantic-prose convention**：
   > *Invoke the `ce-sessions` skill via the platform's skill-invocation primitive (`Skill` in Claude Code, `Skill` in Codex, the equivalent on Gemini/Pi), passing the problem topic and time window as the skill argument.*
+  > 中文含义：通过平台的 skill-invocation primitive 调用 `ce-sessions` skill（Claude Code 和 Codex 中是 `Skill`，Gemini/Pi 使用等价机制），并把 problem topic 和 time window 作为 skill argument 传入。
 
-  Do **not** write a literal `Skill(ce-sessions, ...)` tool-call expression in the SKILL.md body — that propagates Claude-Code-specific syntax to non-Claude targets when the skill ships verbatim through the converters (R4 regression).
-- **Specify dispatch ordering explicitly to preserve wall-clock parallelism**: the current Phase 1 design dispatches three background research subagents (`Context Analyzer`, `Solution Extractor`, `Related Docs Finder`) and a foreground historian *concurrently* — explicitly designed so the foreground call "runs while the background agents work, adding no wall-clock time" (current SKILL.md line 105). The new ordering: **launch the three background research subagents first; then issue the skill-invocation primitive call to `ce-sessions`.** The skill call is synchronous from `ce-compound`'s main-context turn (it blocks until ce-sessions returns), but the already-dispatched background subagents continue running in parallel underneath — so the wall-clock benefit is preserved even though the concurrency primitive shifted from "foreground subagent" to "synchronous skill call." Document this rationale inline in the rewritten Phase 1 prose so future refactors don't re-invert it.
-- **Carry the dispatch payload forward**: pre-resolved branch (already pre-resolved at lines 25-27), problem topic (one sentence per existing dispatch shape), explicit time window (default 7 days), and the existing single-line filter rule. ce-sessions parses these out of the skill argument string.
-- **Preserve Phase 1 contract** per `pass-paths-not-content-to-subagents.md` and ce-pipeline-end-to-end-learnings:
-  - Conditional invocation (skip when user declined session history; skipped entirely in lightweight mode) — preserved.
-  - Text-only return — preserved.
-  - Fold-into-doc behavior in Phase 2 (sections 222-227 of current SKILL.md) — unchanged.
+  不要在 SKILL.md body 里写字面 `Skill(ce-sessions, ...)` tool-call expression，因为这会在 skill 通过 converters 原样发送给非 Claude targets 时传播 Claude-Code-specific syntax（R4 regression）。
+- **明确指定 dispatch ordering 以保留 wall-clock parallelism**：当前 Phase 1 设计会 dispatch 三个 background research subagents（`Context Analyzer`、`Solution Extractor`、`Related Docs Finder`）并同时运行 foreground historian，明确目的是让 historian "runs while the background agents work, adding no wall-clock time"（current SKILL.md line 105）。新顺序：**先 launch 三个 background research subagents；再发出对 `ce-sessions` 的 skill-invocation primitive call。** Skill call 对 `ce-compound` main-context turn 来说是 synchronous（会 block 直到 ce-sessions 返回），但已经 dispatch 的 background subagents 会在底层继续并行运行，因此即使 concurrency primitive 从 "foreground subagent" 变成 "synchronous skill call"，wall-clock benefit 仍得以保留。在重写的 Phase 1 prose 中内联记录该 rationale，避免后续 refactor 重新倒置顺序。
+- **Carry the dispatch payload forward**：pre-resolved branch（lines 25-27 已预先 resolve）、problem topic（按现有 dispatch shape 用一句话）、显式 time window（默认 7 days）、以及现有 single-line filter rule。ce-sessions 从 skill argument string 中解析这些信息。
+- **Preserve Phase 1 contract**，按 `pass-paths-not-content-to-subagents.md` 和 ce-pipeline-end-to-end-learnings：
+  - Conditional invocation（用户拒绝 session history 时 skip；lightweight mode 中完全跳过）保留。
+  - Text-only return 保留。
+  - Phase 2 的 fold-into-doc behavior（当前 SKILL.md sections 222-227）不变。
 
-**Patterns to follow:**
-- `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` line 57 — the canonical semantic-prose form for one skill invoking another. Mirror that exact phrasing structure.
-- Existing Phase 1 dispatch-prompt template at current lines 182-198 — reuse the "tight prompt" discipline (single-line filter rule, explicit time window, problem topic as one sentence).
+**遵循模式：**
+- `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` line 57：一个 skill 调用另一个 skill 的 canonical semantic-prose form。镜像该 phrasing structure。
+- 当前 lines 182-198 的 Phase 1 dispatch-prompt template：复用 "tight prompt" discipline（single-line filter rule、explicit time window、problem topic as one sentence）。
 
-**Test scenarios:**
-- Happy path: `/ce-compound` Full mode, user opts into session history → background research subagents launch, then ce-compound delegates to ce-sessions and receives findings → folds into "What Didn't Work" / "Context" sections.
-- Wall-clock check: `/ce-compound` Full mode with session history opt-in → end-to-end runtime is approximately `max(ce-sessions, slowest background subagent)`, not their sum. Measurable by comparing against today's foreground-subagent baseline on a fixture-backed run.
-- Edge case (User declines session history): Phase 1 does not invoke ce-sessions; existing Phase 1 parallel research (Context Analyzer, Solution Extractor, Related Docs Finder) runs unchanged.
-- Edge case (Lightweight mode): session-history follow-up question is not asked; ce-sessions is not invoked.
-- Edge case ("no relevant prior sessions" returned): findings string equals the no-results sentinel → Phase 2 fold-in is skipped per existing logic.
-- Integration (No subagent Skill calls): the historian dispatched transitively by ce-sessions runs in subagent context but never invokes Skill (locked by U5 regression test).
-- Integration (Cross-platform conversion): after `bun convert --to codex|cursor|gemini`, the converted ce-compound's Phase 1 prose still describes the skill invocation in terms each target's primitive can route to — semantic prose survives conversion intact, while a literal `Skill(ce-sessions, ...)` would have leaked Claude-Code-specific syntax.
+**测试场景：**
+- 正常路径：`/ce-compound` Full mode，user 选择 session history → background research subagents launch，然后 ce-compound delegate 给 ce-sessions 并收到 findings → fold into "What Didn't Work" / "Context" sections。
+- Wall-clock 检查：`/ce-compound` Full mode 且 session history opt-in → end-to-end runtime 约等于 `max(ce-sessions, slowest background subagent)`，而不是两者之和。可通过在 fixture-backed run 上与今天 foreground-subagent baseline 对比测量。
+- 边界情况（User declines session history）：Phase 1 不 invoke ce-sessions；现有 Phase 1 parallel research（Context Analyzer、Solution Extractor、Related Docs Finder）不变。
+- 边界情况（Lightweight mode）：不询问 session-history follow-up question；不 invoke ce-sessions。
+- 边界情况（返回 "no relevant prior sessions"）：findings string 等于 no-results sentinel → Phase 2 fold-in 按现有逻辑 skip。
+- 集成（No subagent Skill calls）：由 ce-sessions 间接 dispatch 的 historian 在 subagent context 中运行，但永不 invoke Skill（由 U5 regression test 锁定）。
+- 集成（Cross-platform conversion）：`bun convert --to codex|cursor|gemini` 后，converted ce-compound 的 Phase 1 prose 仍以每个 target primitive 可路由的方式描述 skill invocation。Semantic prose 能完整 survive conversion，而字面 `Skill(ce-sessions, ...)` 会泄漏 Claude-Code-specific syntax。
 
-**Verification:**
-- `/skill-creator` eval of `/ce-compound` against a fixture-backed session store passes.
-- The rewritten Phase 1 block in ce-compound/SKILL.md contains the semantic-prose form (matching the plan-handoff.md line 57 shape) and does NOT contain a literal `Skill(ce-sessions, ...)` tool-call expression.
-- The dispatch block no longer contains `Agent(ce-session-historian)` or `Task ce-session-historian` direct calls.
-
----
-
-### U5. Add regression test against the agent file body
-
-**Goal:** Lock in the no-`Skill(...)`-from-subagent invariant with a static test that fails if the agent file is reverted to the old shape. This prevents future edits from accidentally reintroducing the deadlock.
-
-**Requirements:** R2
-
-**Dependencies:** U3 (the agent must already be refactored before the test asserts the new shape)
-
-**Files:**
-- Create: `tests/skills/ce-session-historian-no-skill-tool.test.ts`
-
-**Approach:**
-- Read `plugins/compound-engineering/agents/ce-session-historian.agent.md` at module load via `readFileSync`.
-- Three assertions:
-  1. `expect(body).not.toMatch(/Skill\(\s*["'`]?ce-session-inventory/)` — no `Skill(ce-session-inventory)` invocation in any quote style.
-  2. `expect(body).not.toMatch(/Skill\(\s*["'`]?ce-session-extract/)` — no `Skill(ce-session-extract)` invocation.
-  3. `expect(body).not.toMatch(/Invoke them through the Skill tool/i)` — prose fingerprint of the broken pattern.
-
-**Patterns to follow:**
-- `tests/skills/ce-plan-handoff-routing.test.ts` — read SKILL.md once at module load, regex-anchor scope, iterate expected fragments. Shape: same.
-
-**Test scenarios:**
-- Happy path: test passes against the refactored agent (post-U3) file.
-- Regression check: locally revert the agent to its current (broken) state — test fails. This is the value the test is buying.
-
-**Verification:**
-- `bun test tests/skills/ce-session-historian-no-skill-tool.test.ts` passes against post-U3 state.
+**验证：**
+- `/skill-creator` eval of `/ce-compound` against a fixture-backed session store 通过。
+- 重写后的 ce-compound/SKILL.md Phase 1 block 包含 semantic-prose form（匹配 plan-handoff.md line 57 shape），且不包含字面 `Skill(ce-sessions, ...)` tool-call expression。
+- Dispatch block 不再包含 `Agent(ce-session-historian)` 或 `Task ce-session-historian` direct calls。
 
 ---
 
-### U6. Cleanup: delete unused skills, register them as legacy, fix doc broken links
+### U5. 添加针对 agent file body 的 regression test
 
-**Goal:** Remove `ce-session-inventory` and `ce-session-extract` (now callerless), register them in all three legacy-cleanup lookups so existing flat-installs sweep on upgrade, and fix the now-broken cross-references in user-facing docs.
+**目标：** 用静态 test 锁定 no-`Skill(...)`-from-subagent invariant；如果 agent file 被回退到旧形态，test 会失败。防止后续 edits 意外重新引入 deadlock。
 
-**Requirements:** R5, R6
+**需求：** R2
 
-**Dependencies:** U1 (scripts moved out of these skill dirs), U2 (no caller invokes them anymore), U3 (agent no longer invokes them)
+**依赖：** U3（agent 必须先被重构，test 才能 assert 新形态）
 
-**Files:**
-- Delete: `plugins/compound-engineering/skills/ce-session-inventory/` (directory and all contents — only `SKILL.md` remains since scripts moved in U1)
-- Delete: `plugins/compound-engineering/skills/ce-session-extract/` (same)
-- Modify: `src/utils/legacy-cleanup.ts` — add `ce-session-inventory` and `ce-session-extract` to `STALE_SKILL_DIRS` (in the "Removed skills (no replacement)" cluster) and to `LEGACY_ONLY_SKILL_DESCRIPTIONS` (with the verbatim `description:` strings copied from the deleted skills' frontmatter)
-- Modify: `src/data/plugin-legacy-artifacts.ts` — add `ce-session-inventory` and `ce-session-extract` to `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"].skills[]`, alphabetically sorted
-- Modify: `docs/skills/ce-sessions.md` — fix broken `See Also` links at lines 110, 175-176; either rewrite to point at `ce-sessions/scripts/<script>` or remove the entries (these are agent-facing primitives that are no longer separate user-discoverable skills, so removal is the cleaner option)
+**文件：**
+- 创建：`tests/skills/ce-session-historian-no-skill-tool.test.ts`
 
-**Approach:**
-- Delete the two skill directories last, after U1-U4 land. Per repo AGENTS.md "removing a skill" checklist, the registry updates ride in the same commit as the directory deletions.
-- Insert `ce-session-extract` and `ce-session-inventory` alphabetically in `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"].skills[]` — likely between `ce-reproduce-bug` / `ce-review` for inventory and `ce-review-beta` / `ce-update` for extract per research.
-- For `LEGACY_ONLY_SKILL_DESCRIPTIONS`, copy the frontmatter `description:` strings from the deleted skills before deletion. The strings are the ownership-fingerprint proofs per the file's docstring.
-- For `docs/skills/ce-sessions.md`: lines 110, 175-176 link to deleted skill directories. Removing the bullets is cleaner than rewriting (the user-facing doc shouldn't direct readers at internal-only skill dirs that no longer exist).
+**方法：**
+- 在 module load 时通过 `readFileSync` 读取 `plugins/compound-engineering/agents/ce-session-historian.agent.md`。
+- 三个 assertions：
+  1. `expect(body).not.toMatch(/Skill\(\s*["'`]?ce-session-inventory/)`：任何 quote style 下都没有 `Skill(ce-session-inventory)` invocation。
+  2. `expect(body).not.toMatch(/Skill\(\s*["'`]?ce-session-extract/)`：没有 `Skill(ce-session-extract)` invocation。
+  3. `expect(body).not.toMatch(/Invoke them through the Skill tool/i)`：broken pattern 的 prose fingerprint 不存在。
 
-**Patterns to follow:**
-- `src/utils/legacy-cleanup.ts` "Removed skills (no replacement)" comment block at line 89 — established cluster for the new entries.
-- `src/utils/legacy-cleanup.ts` `LEGACY_ONLY_SKILL_DESCRIPTIONS` entries (lines 253-284) — keep the alphabetical sort and the verbatim-description discipline.
-- `src/data/plugin-legacy-artifacts.ts` skills array — alphabetical sort, comment-free entries.
+**遵循模式：**
+- `tests/skills/ce-plan-handoff-routing.test.ts`：module load 时读 SKILL.md，一次性 regex-anchor scope，iterate expected fragments。形状相同。
 
-**Test scenarios:**
-- Test expectation: none — pure cleanup, no new behavior to test. Existing `tests/legacy-registry-invariants.test.ts` will pass by construction (deleted directories no longer match current-skill names).
-- Verification (Registry tests): existing `tests/legacy-registry-invariants.test.ts`, `tests/legacy-cleanup.test.ts`, and `tests/plugin-legacy-artifacts.test.ts` continue to pass.
-- Verification (Marketplace parity): `bun run release:validate` passes.
-- Verification (Broken links): the modified `docs/skills/ce-sessions.md` contains no markdown links to `../../plugins/compound-engineering/skills/ce-session-inventory/` or `../../plugins/compound-engineering/skills/ce-session-extract/`.
+**测试场景：**
+- 正常路径：针对 refactored agent（post-U3）file，test 通过。
+- 回归检查：本地把 agent revert 到当前（broken）状态，test 失败。这就是该 test 购买的价值。
 
-**Verification:**
-- `bun test` passes.
-- `bun run release:validate` passes.
-- `plugins/compound-engineering/skills/ce-session-inventory/` and `plugins/compound-engineering/skills/ce-session-extract/` no longer exist on disk.
+**验证：**
+- `bun test tests/skills/ce-session-historian-no-skill-tool.test.ts` 针对 post-U3 state 通过。
 
 ---
 
-## System-Wide Impact
+### U6. Cleanup：删除 unused skills，注册为 legacy，并修复 doc broken links
 
-- **Interaction graph:**
-  - `/ce-sessions` (user-facing slash) → ce-sessions skill orchestrator → ce-session-historian synthesis subagent → return findings.
-  - `/ce-compound` Phase 1 → background research subagents launched first (Context Analyzer / Solution Extractor / Related Docs Finder) → then ce-sessions invoked via the platform's skill-invocation primitive → ce-sessions orchestrator → historian → return findings → folded into doc Phase 2.
-  - The historian agent has only one type of caller after the refactor (the ce-sessions orchestrator). Direct dispatch via `Agent(ce-session-historian)` is not a supported pattern — the agent's standalone-fallback returns "no relevant prior sessions" gracefully.
-- **Error propagation:**
-  - Script execution errors (permission, missing files) surface to the orchestrator via non-zero exit codes; orchestrator reports the issue to the user and stops, per existing fail-fast guardrail.
-  - Synthesizer Read errors on individual files → noted as partial extraction in findings; remaining files still synthesized.
-- **State lifecycle risks:**
-  - `mktemp -d` scratch dir is per-run throwaway. OS handles cleanup. No explicit cleanup required, but a one-line `rm -rf "$SCRATCH"` at end-of-skill is harmless and makes intent explicit.
-  - Plugin agent and skill caching at session start (per repo AGENTS.md "Validating Agent and Skill Changes"): testing during dev requires either `/skill-creator` content-injection or a fresh session — the in-session cache won't reflect file edits.
-- **API surface parity:**
-  - ce-compound's delegation to ce-sessions uses the established semantic-prose convention (per `ce-plan/references/plan-handoff.md` line 57 and plugin AGENTS.md "Cross-Platform Reference Rules"), not a literal `Skill(ce-sessions, ...)` tool-call expression. This avoids leaking Claude-Code-specific syntax to Codex/Cursor/Gemini/OpenCode/Pi/Kiro when the skill ships verbatim through the converters. Each target's converter routes the semantic prose to its native primitive at install time.
-  - Cross-platform conversion writers (`src/converters/claude-to-codex.ts`, `claude-to-gemini.ts`, etc.) handle agent and skill content as opaque text and copy script directories under `<skill>/scripts/` already. The script move and skill deletion should round-trip cleanly through every target writer per the legacy-cleanup machinery in U6.
-- **Integration coverage:**
-  - End-to-end: `/ce-compound` Full mode with session history opt-in completes without hangs (the headline test for issue #794 closure).
-  - End-to-end: `/ce-sessions` with a question completes without hangs.
-  - Cross-platform: `bun test` covers script behavior; the SKILL.md / agent.md changes are validated via `/skill-creator`.
-- **Unchanged invariants:**
-  - Cross-platform session discovery (Claude Code, Codex, Cursor) — script behavior unchanged.
-  - Output schemas (default historian header; caller-supplied schema honored verbatim) — preserved.
-  - Time-range table, branch filter, keyword filter, top-5 deep-dive cap — moved from agent to orchestrator but logic preserved.
-  - `/ce-compound` Phase 2 fold-in behavior — unchanged.
-  - `/ce-sessions` user-facing question prompt for empty argument — preserved.
+**目标：** 删除现在 callerless 的 `ce-session-inventory` 和 `ce-session-extract`，将它们登记进所有三个 legacy-cleanup lookups，让现有 flat-installs 在 upgrade 时 sweep，并修复 user-facing docs 中现在会断的 cross-references。
+
+**需求：** R5, R6
+
+**依赖：** U1（scripts 已移出这些 skill dirs）、U2（没有 caller 再 invoke 它们）、U3（agent 不再 invoke 它们）
+
+**文件：**
+- Delete（删除）: `plugins/compound-engineering/skills/ce-session-inventory/`（directory and all contents；U1 移动 scripts 后只剩 `SKILL.md`）
+- Delete（删除）: `plugins/compound-engineering/skills/ce-session-extract/`（同上）
+- Modify（修改）: `src/utils/legacy-cleanup.ts`：将 `ce-session-inventory` 和 `ce-session-extract` 加入 `STALE_SKILL_DIRS`（"Removed skills (no replacement)" cluster）以及 `LEGACY_ONLY_SKILL_DESCRIPTIONS`（使用被删除 skills frontmatter 中逐字复制的 `description:` strings）
+- Modify（修改）: `src/data/plugin-legacy-artifacts.ts`：将 `ce-session-inventory` 和 `ce-session-extract` 加入 `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"].skills[]`，按字母排序
+- Modify（修改）: `docs/skills/ce-sessions.md`：修复 lines 110、175-176 的 broken `See Also` links；可改指向 `ce-sessions/scripts/<script>` 或直接删除 entries（这些是 agent-facing primitives，不再是单独 user-discoverable skills，所以删除更干净）
+
+**方法：**
+- 最后删除两个 skill directories，在 U1-U4 land 之后。按 repo AGENTS.md "removing a skill" checklist，registry updates 与 directory deletions 放在同一 commit。
+- 在 `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"].skills[]` 中按字母插入 `ce-session-extract` 和 `ce-session-inventory`；根据 research，大概分别位于 `ce-review-beta` / `ce-update` 和 `ce-reproduce-bug` / `ce-review` 附近。
+- 对 `LEGACY_ONLY_SKILL_DESCRIPTIONS`，删除前从 skills frontmatter 复制 `description:` strings。按该 file docstring，这些 strings 是 ownership-fingerprint proofs。
+- 对 `docs/skills/ce-sessions.md`：lines 110、175-176 指向将被删除的 skill directories。删除 bullets 比重写更干净（user-facing doc 不应把读者引到不再存在的 internal-only skill dirs）。
+
+**遵循模式：**
+- `src/utils/legacy-cleanup.ts` line 89 的 "Removed skills (no replacement)" comment block：新 entries 的既有 cluster。
+- `src/utils/legacy-cleanup.ts` `LEGACY_ONLY_SKILL_DESCRIPTIONS` entries（lines 253-284）：保持 alphabetical sort 和 verbatim-description discipline。
+- `src/data/plugin-legacy-artifacts.ts` skills array：alphabetical sort，不加 comment。
+
+**测试场景：**
+- 测试预期：无。纯 cleanup，不新增待测 behavior。现有 `tests/legacy-registry-invariants.test.ts` 会通过（deleted directories 不再 match current-skill names）。
+- 验证（Registry tests）：现有 `tests/legacy-registry-invariants.test.ts`、`tests/legacy-cleanup.test.ts` 和 `tests/plugin-legacy-artifacts.test.ts` 继续通过。
+- 验证（Marketplace parity）：`bun run release:validate` 通过。
+- 验证（Broken links）：modified `docs/skills/ce-sessions.md` 不包含指向 `../../plugins/compound-engineering/skills/ce-session-inventory/` 或 `../../plugins/compound-engineering/skills/ce-session-extract/` 的 markdown links。
+
+**验证：**
+- `bun test` 通过。
+- `bun run release:validate` 通过。
+- `plugins/compound-engineering/skills/ce-session-inventory/` 和 `plugins/compound-engineering/skills/ce-session-extract/` 不再存在于磁盘。
 
 ---
 
-## Risks & Dependencies
+## 系统级影响
 
-| Risk | Mitigation |
+- **交互图：**
+  - `/ce-sessions`（user-facing slash）→ ce-sessions skill orchestrator → ce-session-historian synthesis subagent → 返回 findings。
+  - `/ce-compound` Phase 1 → 先 launch background research subagents（Context Analyzer / Solution Extractor / Related Docs Finder）→ 再通过平台 skill-invocation primitive 调用 ce-sessions → ce-sessions orchestrator → historian → 返回 findings → folded into doc Phase 2。
+  - 重构后 historian agent 只有一种 caller（ce-sessions orchestrator）。通过 `Agent(ce-session-historian)` 直接 dispatch 不是 supported pattern；agent 的 standalone fallback 会优雅返回 "no relevant prior sessions"。
+- **错误传播：**
+  - Script execution errors（permission、missing files）通过 non-zero exit codes surface 给 orchestrator；orchestrator 按现有 fail-fast guardrail 向 user 报告问题并停止。
+  - Synthesizer 对个别 files 的 Read errors → 在 findings 中注明 partial extraction；仍从其余 files synthesize。
+- **状态生命周期风险：**
+  - `mktemp -d` scratch dir 是 per-run throwaway。OS 负责 cleanup。不需要显式 cleanup，但 skill 末尾的一行 `rm -rf "$SCRATCH"` 无害且能表达意图。
+  - Plugin agent 和 skill 会在 session start 时缓存（见 repo AGENTS.md "Validating Agent and Skill Changes"）：dev 期间测试需要 `/skill-creator` content-injection 或 fresh session；当前 session cache 不会反映 file edits。
+- **API surface parity（API surface parity，API 表面对等性）：**
+  - ce-compound 对 ce-sessions 的 delegation 使用既有 semantic-prose convention（见 `ce-plan/references/plan-handoff.md` line 57 和 plugin AGENTS.md "Cross-Platform Reference Rules"），不是字面 `Skill(ce-sessions, ...)` tool-call expression。这样避免在 skill 通过 converters 原样发往 Codex/Cursor/Gemini/OpenCode/Pi/Kiro 时泄漏 Claude-Code-specific syntax。每个 target 的 converter 在 install time 路由 semantic prose 到 native primitive。
+  - Cross-platform conversion writers（`src/converters/claude-to-codex.ts`、`claude-to-gemini.ts` 等）将 agent 和 skill content 作为 opaque text 处理，并且已会复制 `<skill>/scripts/` 下的 script directories。按 U6 的 legacy-cleanup machinery，script move 和 skill deletion 应能 cleanly round-trip 到每个 target writer。
+- **集成覆盖：**
+  - End-to-end：选择 session history opt-in 的 `/ce-compound` Full mode 完成且无 hangs（issue #794 closure 的 headline test）。
+  - End-to-end：带 question 的 `/ce-sessions` 完成且无 hangs。
+  - Cross-platform：`bun test` 覆盖 script behavior；SKILL.md / agent.md changes 通过 `/skill-creator` 验证。
+- **不变的 invariants：**
+  - Cross-platform session discovery（Claude Code、Codex、Cursor）：script behavior 不变。
+  - Output schemas（default historian header；caller-supplied schema 原样尊重）：保留。
+  - Time-range table、branch filter、keyword filter、top-5 deep-dive cap：从 agent 移到 orchestrator，但逻辑保留。
+  - `/ce-compound` Phase 2 fold-in behavior：不变。
+  - `/ce-sessions` 面向 user 的 empty argument question prompt：保留。
+
+---
+
+## 风险与依赖
+
+| 风险 | 缓解措施 |
 |------|------------|
-| Plugin agent and skill definitions cache at session start; in-session edits do not propagate (per repo AGENTS.md). Iterative testing during dev would test stale content. | Use `/skill-creator`'s eval workflow per AGENTS.md "Validating Agent and Skill Changes". Restart sessions only when skill-creator can't isolate the variable. |
-| Subtle behavioral drift moving methodology from subagent to orchestrator — judgment calls (when to widen, what keywords to derive) execute in main context (opus / orchestrator) rather than subagent (sonnet historian). | Port the methodology rules verbatim from agent to orchestrator. Document the model-tier shift explicitly in ce-sessions/SKILL.md so future refactors don't introduce silent drift. |
-| Cross-platform script-path resolution in slash-invoked skills — repo-root AGENTS.md says relative paths resolve to skill dir on all platforms; plugin AGENTS.md "Permission gate" warns runtime Bash CWD is user's project. The contradiction is unresolved in docs. | U2 Verification includes a marketplace-install smoke test (not `--plugin-dir`) that invokes `/ce-sessions` and confirms `bash scripts/...` resolves. If it fails, fall back to `${CLAUDE_SKILL_DIR}` + pinned `allowed-tools` (treats R4 as a known regression and triggers a follow-up plan to address other targets). Existing precedents (ce-clean-gone-branches, ce-resolve-pr-feedback, ce-optimize) argue the relative-path form works, but verifying empirically before merge is cheap insurance. |
-| `/ce-compound` Phase 1 wall-clock parallelism could regress if the skill-invocation primitive call to ce-sessions is issued *before* the parallel background research subagents launch. | U4 Approach pins the dispatch ordering explicitly: launch background research subagents first, then invoke ce-sessions. Background subagents continue running underneath the synchronous skill call. U4 Test scenarios include a wall-clock comparison against the current foreground baseline. |
-| Legacy-cleanup descriptions map (`LEGACY_ONLY_SKILL_DESCRIPTIONS`) requires verbatim historical `description:` strings. | Copy the strings from the deleted skills' frontmatter before the deletion lands. Both strings are short and stable. |
+| Plugin agent and skill definitions cache at session start; in-session edits do not propagate（见 repo AGENTS.md）。Dev 期间 iterative testing 可能测到 stale content。 | 按 AGENTS.md "Validating Agent and Skill Changes" 使用 `/skill-creator` eval workflow。只有 skill-creator 不能隔离变量时才重启 sessions。 |
+| 将 methodology 从 subagent 移到 orchestrator 可能产生细微 behavior drift：judgment calls（何时 widen、derive 哪些 keywords）在 main context（opus / orchestrator）而不是 subagent（sonnet historian）执行。 | 从 agent 原样移植 methodology rules。在 ce-sessions/SKILL.md 中明确记录 model-tier shift，避免未来 refactor 引入 silent drift。 |
+| Slash-invoked skills 中的跨平台 script-path resolution：repo-root AGENTS.md 称 relative paths 在所有平台从 skill dir resolve；plugin AGENTS.md "Permission gate" 警告 runtime Bash CWD 是 user project 而非 skill dir。docs 中存在矛盾。 | U2 Verification 包含 marketplace-install smoke test（非 `--plugin-dir`），调用 `/ce-sessions` 并确认 `bash scripts/...` 可 resolve。如果失败，fallback 到 `${CLAUDE_SKILL_DIR}` + pinned `allowed-tools`（把 R4 当作 known regression，并触发 follow-up plan 处理其他 targets）。现有 precedents（ce-clean-gone-branches、ce-resolve-pr-feedback、ce-optimize）说明 relative-path form 应可工作，但 merge 前经验验证是低成本保险。 |
+| 如果在 parallel background research subagents launch 之前发起 ce-sessions skill-invocation primitive call，`/ce-compound` Phase 1 wall-clock parallelism 会回退。 | U4 Approach 明确 pin dispatch ordering：先 launch background research subagents，再 invoke ce-sessions。Background subagents 会在同步 skill call 底层继续运行。U4 Test scenarios 包含与当前 foreground baseline 的 wall-clock comparison。 |
+| Legacy-cleanup descriptions map（`LEGACY_ONLY_SKILL_DESCRIPTIONS`）要求逐字历史 `description:` strings。 | 删除前从 deleted skills frontmatter 复制 strings。两个 strings 都短且稳定。 |
 
 ---
 
-## Documentation / Operational Notes
+## 文档与运行说明
 
-- **Skill documentation sync** (`docs/skills/ce-sessions.md`): the high-level user-facing description ("Search and ask questions about your coding agent session history") is unchanged. The "How it works" mechanics shifted (orchestration moved from agent to skill), but the doc's level of abstraction does not surface that detail. Edits in U6 are minimal — fix broken `See Also` links to deleted skill dirs. No sync to mechanics-level prose required.
-- **Stable/Beta sync**: neither `ce-sessions` nor `ce-session-historian` has a `-beta` counterpart. No sync action.
-- **CHANGELOG / release**: release-please owns this; do not hand-edit. The conventional commit prefix `fix(ce-sessions): ` (or `fix(session-history): `) classifies correctly per AGENTS.md.
-- **Rollout**: standard merge-to-main; no migration or feature-flag needed. The bug is currently breaking session-history features on Claude Code; fix lands clean.
+- **Skill documentation sync**（`docs/skills/ce-sessions.md`）：高层 user-facing description（"Search and ask questions about your coding agent session history"）不变。"How it works" mechanics 发生变化（orchestration 从 agent 移到 skill），但 doc 的抽象层级不 surface 这些细节。U6 中只做最小 edit：修复指向 deleted skill dirs 的 broken `See Also` links。不需要同步 mechanics-level prose。
+- **Stable/Beta sync**：`ce-sessions` 和 `ce-session-historian` 都没有 `-beta` counterpart。不需要 sync action。
+- **CHANGELOG / release**：release-please 负责；不要手改。Conventional commit prefix `fix(ce-sessions): `（或 `fix(session-history): `）会按 AGENTS.md 正确分类。
+- **Rollout**：标准 merge-to-main；不需要 migration 或 feature-flag。该 bug 当前正在破坏 Claude Code 上的 session-history features；fix 可 clean land。
 
 ---
 
-## Sources & References
+## 来源与参考
 
-- **Origin issue**: [EveryInc/compound-engineering-plugin#794](https://github.com/EveryInc/compound-engineering-plugin/issues/794) — `ce-session-historian` deadlocks under Claude Code: subagent cannot invoke `Skill(ce-session-inventory)`.
-- **Upstream tracker**: [anthropics/claude-code#38719](https://github.com/anthropics/claude-code/issues/38719) — Allow subagents to invoke skills for parallel workflow execution (closed; architectural limit current).
-- **Institutional learnings**:
+- **原始 issue**：[EveryInc/compound-engineering-plugin#794](https://github.com/EveryInc/compound-engineering-plugin/issues/794)：`ce-session-historian` 在 Claude Code 下 deadlock：subagent 不能 invoke `Skill(ce-session-inventory)`。
+- **上游 tracker**：[anthropics/claude-code#38719](https://github.com/anthropics/claude-code/issues/38719)：Allow subagents to invoke skills for parallel workflow execution（已关闭；架构限制仍然存在）。
+- **组织内 learnings**：
   - `docs/solutions/skill-design/pass-paths-not-content-to-subagents.md`
   - `docs/solutions/skill-design/script-first-skill-architecture.md`
   - `docs/solutions/skill-design/compound-refresh-skill-improvements.md`
   - `docs/solutions/skill-design/research-agent-pipeline-separation.md`
   - `docs/solutions/skill-design/post-menu-routing-belongs-inline.md`
   - `docs/solutions/best-practices/ce-pipeline-end-to-end-learnings.md`
-- **Repo conventions**:
-  - `plugins/compound-engineering/AGENTS.md` — Plugin Maintenance, Skill Compliance Checklist, Permission gate on extracted scripts (clarifies `!` pre-resolution scope).
-  - Repo-root `AGENTS.md` — Plugin Maintenance, Adding a New Plugin, Script Path References in Skills, Plugin Maintenance "removing a skill" cleanup-registry checklist.
-- **Pattern precedents**:
-  - `plugins/compound-engineering/skills/ce-clean-gone-branches/SKILL.md`, `ce-resolve-pr-feedback/SKILL.md`, `ce-optimize/SKILL.md` — bare relative-path script invocations from slash-invoked skill bodies.
-  - `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` line 57 — semantic-prose convention for one skill invoking another, mirrored by ce-compound's delegation to ce-sessions.
-  - `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md`, `ce-plan/references/deepening-workflow.md`, `ce-work-beta/references/codex-delegation-workflow.md` — `mktemp -d` scratch + path-to-subagent patterns.
-  - `tests/skills/ce-plan-handoff-routing.test.ts` — regression test pattern for the new U5 test.
+- **Repo 约定**：
+  - `plugins/compound-engineering/AGENTS.md`：Plugin Maintenance、Skill Compliance Checklist、Permission gate on extracted scripts（说明 `!` pre-resolution scope）。
+  - Repo-root `AGENTS.md`：Plugin Maintenance、Adding a New Plugin、Script Path References in Skills、Plugin Maintenance 中的 "removing a skill" cleanup-registry checklist。
+- **Pattern 先例**：
+  - `plugins/compound-engineering/skills/ce-clean-gone-branches/SKILL.md`、`ce-resolve-pr-feedback/SKILL.md`、`ce-optimize/SKILL.md`：slash-invoked skill bodies 中的 bare relative-path script invocations。
+  - `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` line 57：一个 skill 调用另一个 skill 的 semantic-prose convention，ce-compound 对 ce-sessions 的 delegation 会镜像它。
+  - `plugins/compound-engineering/skills/ce-demo-reel/SKILL.md`、`ce-plan/references/deepening-workflow.md`、`ce-work-beta/references/codex-delegation-workflow.md`：`mktemp -d` scratch + path-to-subagent patterns。
+  - `tests/skills/ce-plan-handoff-routing.test.ts`：新 U5 test 的 regression test pattern。

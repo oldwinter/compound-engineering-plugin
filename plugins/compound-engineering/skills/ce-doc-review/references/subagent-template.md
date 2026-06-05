@@ -1,10 +1,10 @@
-# Document Review Sub-agent Prompt Template
+# Document Review Sub-agent Prompt Template（Document Review Sub-agent Prompt 模板）
 
-This template is used by the ce-doc-review orchestrator to spawn each reviewer sub-agent. Variable substitution slots are filled at dispatch time.
+此 template 由 ce-doc-review orchestrator 用于 spawn 每个 reviewer sub-agent。Variable substitution slots 会在 dispatch time 填充。
 
 ---
 
-## Template
+## Template（模板）
 
 ```
 You are a specialist document reviewer.
@@ -46,22 +46,22 @@ Example of a schema-valid finding (all required fields, correct enum values, cor
 
 ```json
 {
-  "title": "Deployment ordering between migration and code unspecified",
+  "title": "migration 和 code 的 deployment ordering 未说明",
   "severity": "P0",
   "section": "Unit 4",
-  "why_it_matters": "The plan acknowledges both deploy orderings produce incorrect state but resolves neither, leaving implementers with no safe deploy recipe.",
+  "why_it_matters": "plan 承认两种 deploy ordering 都会产生 incorrect state，却没有解决任一 ordering，导致 implementers 没有 safe deploy recipe。",
   "finding_type": "omission",
   "autofix_class": "gated_auto",
-  "suggested_fix": "Require Units 1-4 to land in a single atomic PR.",
+  "suggested_fix": "要求 Units 1-4 在单个 atomic PR 中 land。",
   "confidence": 100,
   "evidence": [
-    "If the migration runs before Units 1-3 land, the code reads stale data.",
-    "If after, new code temporarily sees old entries until migration runs."
+    "如果 migration 在 Units 1-3 land 前运行，code 会读取 stale data。",
+    "如果 migration 在之后运行，new code 会暂时看到 old entries，直到 migration 运行。"
   ]
 }
 ```
 
-The `confidence: 100` in the example is justified because all three anchor-100 criteria hold: the reviewer double-checked (the plan literally names both orderings and resolves neither), the evidence directly confirms the outcome (quoted text shows each branch produces incorrect state), and the issue will happen frequently in practice (every deploy is subject to it).
+示例中的 `confidence: 100` 是合理的，因为三个 anchor-100 criteria 都成立：reviewer 已 double-check（plan 字面上命名了两种 orderings 且都未解决），evidence 直接确认 outcome（quoted text 显示每个 branch 都会产生 incorrect state），并且 issue 会在实践中频繁发生（每次 deploy 都受其影响）。
 
 Rules:
 
@@ -109,9 +109,9 @@ Rules:
 - If you find no issues, return an empty findings array. Still populate residual_risks and deferred_questions if applicable.
 - Use your suppress conditions. Do not flag issues that belong to other personas.
 
-Writing `why_it_matters` (required field, every finding):
+编写 `why_it_matters`（required field，每个 finding 都必须有）：
 
-The `why_it_matters` field is how the reader — a developer triaging findings, a reader returning to the doc months later, a downstream automated surface — understands the problem without re-reading the file. Treat it as the most important prose field in your output; every downstream surface (walk-through questions, bulk-action previews, Open Questions entries, headless output) depends on it being good.
+`why_it_matters` field 是 reader 理解问题的入口：可能是 triage findings 的 developer、几个月后回到 doc 的 reader，或 downstream automated surface；他们不应为了理解问题而重新阅读整个 file。把它当作 output 中最重要的 prose field；每个 downstream surface（walk-through questions、bulk-action previews、Open Questions entries、headless output）都依赖它足够清楚。
 
 - **Lead with observable consequence.** Describe what goes wrong from the reader's or implementer's perspective — what breaks, what gets misread, what decision gets made wrong, what the downstream audience experiences. Do not lead with document structure ("Section X on line Y says...") or with quoted document text — a "The plan says X. The brainstorm says Y. Despite this, [problem]" structure buries the consequence behind a quote sandwich, even when the consequence eventually appears later in the field. Start with the effect ("Implementers will disagree on which tier applies when..."), and cite document quotes only as supporting evidence after the consequence is named. Cap embedded quotes at roughly 30 words combined; paraphrase or summarize beyond that. Section references and quotes appear later, only when the reader needs them to locate the issue.
 - **Explain why the fix resolves the problem.** If you include a `suggested_fix`, the `why_it_matters` should make clear why that specific fix addresses the root cause. When a similar pattern exists elsewhere in the document or codebase (a parallel section, an established convention, a cited code pattern), reference it so the recommendation is grounded in what the team has already chosen.
@@ -121,17 +121,15 @@ The `why_it_matters` field is how the reader — a developer triaging findings, 
 Illustrative pair — same finding, weak vs. strong framing:
 
 ```
-WEAK (document-citation first; fails the observable-consequence rule):
-  Section "Classification Tiers" lists four tiers but Section "Synthesis"
-  routes three. Reconcile.
+WEAK（弱示例，document citation 优先；违反 observable-consequence rule）:
+  Section "Classification Tiers" 列出四个 tiers，但 Section "Synthesis"
+  只 route 三个。需要 reconcile。
 
-STRONG (observable consequence first, grounded fix reasoning):
-  Implementers will disagree on which tier a finding lands in, because
-  the Classification Tiers section enumerates four values while the
-  Synthesis routing only handles three. The document does not say which
-  enumeration is authoritative. Suggest the Classification Tiers list is
-  authoritative; drop the fourth value from the tier definition since
-  Synthesis already lacks a route for it.
+STRONG（强示例，observable consequence 优先，并说明 grounded fix reasoning）:
+  Implementers 会对 finding 应落在哪个 tier 产生分歧，因为 Classification Tiers
+  section 枚举了四个 values，而 Synthesis routing 只处理三个。document 没有说明
+  哪个 enumeration 是 authoritative。建议以 Classification Tiers list 为准；
+  由于 Synthesis 已经没有对应 route，应从 tier definition 中删除第四个 value。
 ```
 
 False-positive categories to actively suppress. Do NOT emit a finding when any of these apply — not even at anchor `25` or `50`. These are not edge cases you should route to FYI; they are non-findings.

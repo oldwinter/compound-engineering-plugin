@@ -1,62 +1,62 @@
-# CONCEPTS.md vocabulary rules
+# CONCEPTS.md vocabulary rules（词汇规则）
 
-`CONCEPTS.md` defines the words that mean something specific in this codebase — substrate that `docs/solutions/` and AGENTS.md can cite without redefinition. Lives at the repo root. Terms enter two ways — accretion and seeding (below) — and the file is created the first time either path produces a qualifying entry.
+`CONCEPTS.md` 定义在此 codebase 中具有特定含义的词汇，是 `docs/solutions/` 和 AGENTS.md 无需重新定义即可引用的 substrate。文件位于 repo root。Terms 通过两种方式进入：accretion 和 seeding（见下文）；任一路径首次产生 qualifying entry 时创建该文件。
 
-## How terms enter: accretion and seeding
+## Terms 如何进入：accretion 和 seeding
 
-Two paths populate the file, and they cover different gaps:
+两条路径会填充此文件，并覆盖不同 gaps：
 
-- **Accretion** — a learning surfaces a term whose meaning wasn't obvious, so it gets defined. This reliably catches *peripheral* terms, because friction is what surfaces them.
-- **Seeding** — a run proactively defines the **core domain nouns** of the area it is working in. This catches the *stable-central* terms accretion never reaches: the nouns a system is built around rarely break, so they rarely appear in a learning, yet they are exactly what a reader needs to orient. Without seeding, the file fills with peripheral mechanics and never names what the project is about.
+- **Accretion** — 某个 learning 暴露了含义并不 obvious 的 term，因此将其定义。这能可靠捕获 *peripheral* terms，因为 friction 会让它们浮现。
+- **Seeding** — 某次 run 主动定义其工作区域的 **core domain nouns**。这会捕获 accretion 永远触及不到的 *stable-central* terms：系统围绕其构建的 nouns 很少出错，因此很少出现在 learning 中，但它们恰恰是读者 orient 所需的内容。没有 seeding，文件会填满 peripheral mechanics，却永远不说明项目本身是什么。
 
-### Seed goal
+### Seed goal（seed 目标）
 
-Define the core domain nouns the area's **declared domain model** exposes that meet the qualifying bar (see "What earns a slot"). The codebase sets the count: seed every term that genuinely qualifies, none added to reach a number and none pulled from beyond the declared model to inflate one. A small domain yields a few; a large one, more. The bound is the **source** (the declared domain model of the area in scope — schema, core types, primary models, top-level domain docs — not a full-codebase trawl) and the **bar** (the same "a new engineer would need this defined" test), never a fixed quantity.
+定义该区域 **declared domain model** 暴露出的、达到 qualifying bar 的 core domain nouns（见 "What earns a slot"）。数量由 codebase 决定：seed 每个真正 qualifies 的 term，不为了凑数量而添加，也不从 declared model 之外拉取内容来膨胀数量。小 domain 产出少量 terms；大 domain 产出更多。边界是 **source**（scope 内区域的 declared domain model：schema、core types、primary models、top-level domain docs，而不是 full-codebase trawl）和 **bar**（同一个 "a new engineer would need this defined" 测试），绝不是固定数量。
 
-### Scope of a seed
+### Scope of a seed（seed 范围）
 
-- A **scoped run** — a learning capture, or a refresh narrowed to an area — seeds only that area's core nouns, and defines only terms it actually investigated against code. It does not reach for repo-wide nouns it never touched.
-- A **repo-wide bootstrap** — an explicit "create CONCEPTS.md" request — seeds the whole project's declared domain model. This is the only path that produces a coherent "what is this project" glossary; a scoped run cannot, and should not pretend to.
+- **Scoped run** — learning capture，或收窄到某个区域的 refresh — 只 seed 该区域的 core nouns，并且只定义它实际对照 code 调查过的 terms。它不会去拿从未接触过的 repo-wide nouns。
+- **Repo-wide bootstrap** — 明确的 "create CONCEPTS.md" request — seed 整个项目的 declared domain model。这是唯一会产出 coherent "what is this project" glossary 的路径；scoped run 做不到，也不应假装能做到。
 
-## Be opinionated
+## Be opinionated（明确取舍）
 
-When the team uses several words for the same concept, pick the best one and retire the rest. Record retired synonyms as aliases on the entry (see "Per entry"). Settled distinctions go to the Flagged ambiguities tail. The glossary is not a record of all words the team has ever used — it is the team's agreed-upon vocabulary.
+当团队用多个词表示同一概念时，选择最佳词并 retire 其余词。将 retired synonyms 作为 aliases 记录在 entry 上（见 "Per entry"）。Settled distinctions 放到末尾的 Flagged ambiguities。Glossary 不是团队曾经用过的所有词的记录，而是团队 agreed-upon vocabulary。
 
-## The file stands on its own
+## The file stands on its own（文件应能独立成立）
 
-Each entry teaches its concept to a reader with no access to anything else — no codebase, no PR history, no architecture meetings, no Slack. This rules out:
+每个 entry 都要能向无法访问其他内容的读者解释其 concept：没有 codebase、没有 PR history、没有 architecture meetings、没有 Slack。这排除了：
 
-- Implementation specifics (file paths, class names, function signatures, table names, library calls)
-- Status fields, dates, owners on the entries
-- Examples or current-config values drawn from the code — specific thresholds, counts, or enum values that will change. State the behavior, not the number: "each skill sets its own actionable threshold" rather than "surfaces at 50, fixes at 75."
-- Links to PRs, issues, channels, or roadmap milestones
-- Version-specific claims ("currently uses X; migrating to Y")
+- Implementation specifics（实现细节：file paths、class names、function signatures、table names、library calls）
+- Entries 上的 status fields、dates、owners
+- 来自 code 的 examples 或 current-config values：会变化的 specific thresholds、counts 或 enum values。说明 behavior，而不是 number：写 "each skill sets its own actionable threshold"，而不是 "surfaces at 50, fixes at 75."
+- 指向 PRs、issues、channels 或 roadmap milestones 的 links
+- Version-specific claims（版本特定 claim："currently uses X; migrating to Y"）
 
-Cross-references between entries within `CONCEPTS.md` are fine — they resolve internally. General programming vocabulary (caches, queues, jobs, sessions) and everyday domain English need no redefinition either. But if an entry leans on another *project-specific* term to make sense, that term must be defined here too — an undefined project-specific sibling is itself a candidate to add.
+`CONCEPTS.md` 内 entries 之间的 cross-references 可以使用，因为它们能 internally resolve。General programming vocabulary（caches、queues、jobs、sessions）和 everyday domain English 也不需要重新定义。但如果某个 entry 依赖另一个 *project-specific* term 才能讲通，那个 term 也必须在这里定义；未定义的 project-specific sibling 本身就是候选新增项。
 
-## What earns a slot
+## What earns a slot（什么值得占一个条目）
 
-A term qualifies when its meaning here is precise enough that a new engineer would need it defined to follow conversations, tickets, or code. General programming vocabulary does not belong, even when used heavily.
+当某个 term 在这里的含义足够精确，以至于 new engineer 需要定义才能理解 conversations、tickets 或 code，它就 qualifies。General programming vocabulary 不属于这里，即使用得很多也一样。
 
-## Per entry
+## Per entry（单个条目）
 
-Definition is one sentence — what the term means in this domain, what makes it distinct from neighbors. A term with non-obvious behavioral rules (lifecycle, cancellation semantics, ownership invariants) earns a second paragraph for those rules — never for elaborating the definition itself.
+Definition 是一句话：该 term 在此 domain 中是什么意思，是什么让它不同于相邻概念。带有 non-obvious behavioral rules（lifecycle、cancellation semantics、ownership invariants）的 term 可以有第二段说明这些 rules，但绝不用于展开 definition 本身。
 
-When retired synonyms exist, list them as an aliases line directly under the definition: *Avoid: Booking, appointment*. Entities typically need more depth than value types; status concepts may need transition notes.
+当存在 retired synonyms 时，在 definition 正下方用 aliases line 列出：*Avoid: Booking, appointment*。Entities 通常比 value types 需要更多深度；status concepts 可能需要 transition notes。
 
-## Relationships (optional)
+## Relationships（可选）
 
-When relationships between entries carry load-bearing meaning (ownership, cardinality, lifecycle dependencies that span entries), capture them in a `## Relationships` section near the top of the file or its cluster. Skip when entries stand on their own without structural context — relationships are a lift for domains where structure is part of what makes terms meaningful, not a routine section.
+当 entries 之间的 relationships 承载 load-bearing meaning（ownership、cardinality、跨 entries 的 lifecycle dependencies）时，在文件或 cluster 顶部附近用 `## Relationships` section 捕获它们。当 entries 不依赖 structural context 也能独立成立时，跳过该 section；relationships 只适用于 structure 是 terms meaningful 的一部分的 domains，不是 routine section。
 
-## Organization
+## Organization（组织方式）
 
-Cluster concepts by domain relationship — entities with their states, processes with their stages — so a reader sees structure without effort. A flat list works when the file is small. Reshape as the file grows.
+按 domain relationship cluster concepts：entities 与其 states，processes 与其 stages，让读者轻松看到 structure。文件较小时 flat list 也可行。随着文件增长重塑结构。
 
-## Flagged ambiguities (tail of file)
+## Flagged ambiguities（文件末尾的歧义记录）
 
-When two terms were used interchangeably and the team settled on a distinction, record the resolution as a one-line note: *"'account' had been used for both Customer and User — these are distinct."* This section is the audit trail for opinions the team has formed.
+当两个 terms 曾被 interchangeable 使用，而团队已确定 distinction 时，用 one-line note 记录 resolution：*"'account' had been used for both Customer and User — these are distinct."* 此 section 是团队已形成 opinions 的 audit trail。
 
-## One illustrative entry — the shape, not a template
+## 一个 illustrative entry：展示 shape，不是 template
 
 ```
 ## Booking

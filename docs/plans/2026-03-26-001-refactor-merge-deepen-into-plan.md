@@ -1,324 +1,324 @@
 ---
-title: "refactor: Merge deepen-plan into ce:plan as automatic confidence check"
+title: "refactor: 将 deepen-plan 合并进 ce:plan，作为 automatic confidence check"
 type: refactor
 status: completed
 date: 2026-03-26
 origin: docs/brainstorms/2026-03-26-merge-deepen-into-plan-requirements.md
 ---
 
-# Merge deepen-plan into ce:plan as automatic confidence check
+# 将 deepen-plan 合并进 ce:plan，作为 automatic confidence check
 
-## Overview
+## 概览
 
-Absorb the deepen-plan skill's confidence-gap evaluation and targeted research agent dispatching into ce:plan as an automatic post-write phase. Remove deepen-plan as a standalone skill. The user no longer decides whether to deepen — the agent evaluates and reports what it's strengthening.
+把 deepen-plan skill 的 confidence-gap evaluation 和 targeted research agent dispatching 吸收到 ce:plan 中，作为 automatic post-write phase。移除 standalone skill 形态的 deepen-plan。用户不再决定是否 deepen -- agent 会自行评估并报告它正在 strengthening 什么。
 
-## Problem Frame
+## 问题框架
 
-The ce:plan and deepen-plan skills form a sequential workflow where the user is offered a choice ("want to deepen?") that they can't evaluate better than the agent can. When deepen-plan runs, it already self-gates (skips Lightweight, scores confidence gaps before acting). The user decision adds friction without adding value. (see origin: docs/brainstorms/2026-03-26-merge-deepen-into-plan-requirements.md)
+ce:plan 和 deepen-plan skills 组成了 sequential workflow，其中用户会被提供一个选择（"want to deepen?"），但这件事 agent 比用户更能评估。deepen-plan 运行时已经 self-gates（skips Lightweight，acting 前先 scores confidence gaps）。用户决策增加 friction，却不增加 value。（see origin: docs/brainstorms/2026-03-26-merge-deepen-into-plan-requirements.md）
 
-## Requirements Trace
+## 需求追踪
 
-- R1. ce:plan automatically evaluates and deepens its own output after the initial plan is written, without asking the user for approval
-- R2. When deepening runs, ce:plan reports what sections it's strengthening and why (transparency without requiring a decision)
-- R3. Deepening is skipped for Lightweight plans unless high-risk topics are detected
-- R4. For Standard and Deep plans, ce:plan scores confidence gaps using checklist-first, risk-weighted scoring; if no gaps exceed threshold, reports "confidence check passed" and moves on
-- R5. When gaps are found, ce:plan dispatches targeted research agents to strengthen only the weak sections
-- R6. deepen-plan is removed as standalone command; re-deepening is handled through ce:plan resume mode with the same confidence-gap evaluation (doesn't force deepening unless user explicitly requests it)
-- R7. The "Run deepen-plan" post-generation option is removed; post-generation options become simpler
+- R1. ce:plan 在 initial plan 写完后自动 evaluates and deepens its own output，不向用户请求 approval
+- R2. deepening 运行时，ce:plan 报告它在 strengthening 哪些 sections，以及为什么（transparency without requiring a decision）
+- R3. Lightweight plans 默认 skip deepening，除非检测到 high-risk topics
+- R4. 对 Standard 和 Deep plans，ce:plan 用 checklist-first、risk-weighted scoring 给 confidence gaps 打分；如果没有 gaps 超过 threshold，则报告 "confidence check passed" 并继续
+- R5. 发现 gaps 时，ce:plan dispatches targeted research agents，只 strengthen weak sections
+- R6. deepen-plan 作为 standalone command 被移除；re-deepening 通过 ce:plan resume mode 用相同 confidence-gap evaluation 处理（除非用户显式请求，否则不强制 deepening）
+- R7. 移除 "Run deepen-plan" post-generation option；post-generation options 更简单
 
-## Scope Boundaries
+## 范围边界
 
-- This does not change what deepening does — only where it lives and who decides to run it
-- Deepen-plan's separate-file `-deepened` option is dropped — ce:plan always writes in-place, and automatic deepening has no reason to create a separate file
-- The confidence scoring checklist, agent mapping table, and synthesis rules are transplanted from deepen-plan, not rewritten
-- No changes to ce:brainstorm or ce:work
-- The planning boundary (no code, no commands) is preserved
-- Historical docs referencing deepen-plan are not updated — they are historical records
+- 不改变 deepening 做什么 -- 只改变它在哪里运行，以及谁决定运行
+- 丢弃 deepen-plan 的 separate-file `-deepened` option -- ce:plan 始终 in-place 写入，automatic deepening 没有理由创建 separate file
+- confidence scoring checklist、agent mapping table 和 synthesis rules 从 deepen-plan 移植，而不是重写
+- 不修改 ce:brainstorm 或 ce:work
+- 保留 planning boundary（no code, no commands）
+- 不更新引用 deepen-plan 的 historical docs -- 它们是 historical records
 
-## Context & Research
+## 背景与调研
 
-### Relevant Code and Patterns
+### 相关代码和模式
 
-- `plugins/compound-engineering/skills/ce-plan/SKILL.md` — 6 phases (0-5). Phase 5 has sub-phases: 5.1 (Review), 5.2 (Write), 5.3 (Post-gen options). The new confidence check inserts between 5.2 and 5.3
-- `plugins/compound-engineering/skills/deepen-plan/SKILL.md` — 409 lines, 7 phases (0-6). Phases 0-5 contain the logic to absorb; Phase 6 and Post-Enhancement Options are replaced by ce:plan's own post-gen flow
-- `plugins/compound-engineering/skills/lfg/SKILL.md` — Step 3 conditionally invokes deepen-plan. Must be removed
-- `plugins/compound-engineering/skills/slfg/SKILL.md` — Step 3 conditionally invokes deepen-plan. Must be removed
-- Skills are auto-discovered from filesystem (no registry in plugin.json). Deleting the directory removes the skill
-- The `deepened: YYYY-MM-DD` frontmatter field in plan templates signals that a plan was substantively strengthened
+- `plugins/compound-engineering/skills/ce-plan/SKILL.md` -- 6 phases（0-5）。Phase 5 有 sub-phases：5.1（Review）、5.2（Write）、5.3（Post-gen options）。新的 confidence check 插入到 5.2 和 5.3 之间
+- `plugins/compound-engineering/skills/deepen-plan/SKILL.md` -- 409 lines，7 phases（0-6）。Phases 0-5 包含需要吸收的 logic；Phase 6 和 Post-Enhancement Options 由 ce:plan 自己的 post-gen flow 替代
+- `plugins/compound-engineering/skills/lfg/SKILL.md` -- Step 3 conditionally invokes deepen-plan。必须移除
+- `plugins/compound-engineering/skills/slfg/SKILL.md` -- Step 3 conditionally invokes deepen-plan。必须移除
+- Skills 从 filesystem auto-discovered（plugin.json 中无 registry）。删除 directory 即删除 skill
+- plan templates 中的 `deepened: YYYY-MM-DD` frontmatter field 表示 plan 已被 substantive strengthened
 
-### Institutional Learnings
+### 组织内 learnings
 
-- `docs/solutions/skill-design/beta-skills-framework.md` — The workflow chain is `ce:brainstorm` -> `ce:plan` -> `deepen-plan` -> `ce:work`, orchestrated by lfg and slfg. When removing a skill, all callers must be updated atomically in one PR
-- `docs/solutions/skill-design/beta-promotion-orchestration-contract.md` — Treat the merge as an orchestration contract change. Update every workflow that invokes deepen-plan in the same PR to avoid a broken intermediate state
-- `docs/solutions/plugin-versioning-requirements.md` — Do not manually bump versions. Update README counts and tables. Run `bun run release:validate`
+- `docs/solutions/skill-design/beta-skills-framework.md` -- workflow chain 是 `ce:brainstorm` -> `ce:plan` -> `deepen-plan` -> `ce:work`，由 lfg 和 slfg orchestrate。移除 skill 时，所有 callers 必须在同一个 PR 中 atomic update
+- `docs/solutions/skill-design/beta-promotion-orchestration-contract.md` -- 将该 merge 视为 orchestration contract change。同一个 PR 中更新所有 invokes deepen-plan 的 workflows，避免 broken intermediate state
+- `docs/solutions/plugin-versioning-requirements.md` -- 不手动 bump versions。更新 README counts and tables。运行 `bun run release:validate`
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **New Phase 5.3 (Confidence Check and Deepening):** Insert between current 5.2 (Write Plan File) and current 5.3 (Post-Generation Options, renumbered to 5.4). This is the minimal structural change — only one sub-phase renumbers. Rationale: deepening operates on the written plan, so it must follow 5.2, and the user should see post-gen options only after deepening completes or is skipped
-- **Resume mode fast path for re-deepening:** When ce:plan detects an existing complete plan and the user's request is specifically about deepening, it short-circuits to Phase 5.3 directly (skipping Phases 1-4). Rationale: re-running the full planning workflow to re-deepen would be 3-5x more expensive than the old standalone deepen-plan. The fast path preserves efficiency
-- **Pipeline mode behavior:** Deepening runs in pipeline/disable-model-invocation mode using the same gate logic (Standard/Deep AND high-risk or confidence gaps). Rationale: lfg/slfg step 3 already had equivalent conditional logic; this preserves the same behavior internally
-- **Remove ultrathink auto-deepen clause:** Line 625 of ce:plan currently auto-runs deepen-plan on ultrathink. This becomes redundant since every plan run now auto-evaluates deepening. Removing it prevents double-deepening
-- **Scratch space:** Artifact-backed research uses `.context/compound-engineering/ce-plan/deepen/` with per-run subdirectory. Rationale: follows AGENTS.md namespace convention for ce-plan
+- **New Phase 5.3 (Confidence Check and Deepening，新 Phase 5.3)：** 插入到当前 5.2（Write Plan File）和当前 5.3（Post-Generation Options，renumbered to 5.4）之间。这是最小 structural change -- 只有一个 sub-phase renumber。Rationale：deepening 作用于已经 written 的 plan，因此必须跟在 5.2 后；用户只应在 deepening completes or is skipped 后看到 post-gen options
+- **Resume mode fast path for re-deepening（resume 模式 re-deepening 快速路径）：** 当 ce:plan 检测到 existing complete plan，且用户 request specifically about deepening 时，直接 short-circuit 到 Phase 5.3（跳过 Phases 1-4）。Rationale：重新运行完整 planning workflow 来 re-deepen 会比旧 standalone deepen-plan 贵 3-5x。fast path 保留效率
+- **Pipeline mode behavior:** Deepening 在 pipeline/disable-model-invocation mode 中使用相同 gate logic 运行（Standard/Deep AND high-risk or confidence gaps）。Rationale：lfg/slfg step 3 已有等价 conditional logic；这里把相同行为内置保存
+- **Remove ultrathink auto-deepen clause:** ce:plan 当前 line 625 会在 ultrathink 上 auto-runs deepen-plan。现在每次 plan run 都会 auto-evaluates deepening，因此该 clause redundant。移除它可以避免 double-deepening
+- **Scratch space:** Artifact-backed research 使用 `.context/compound-engineering/ce-plan/deepen/`，并为每次 run 建 subdirectory。Rationale：遵循 AGENTS.md namespace convention for ce-plan
 
-## Open Questions
+## 开放问题
 
-### Resolved During Planning
+### 规划期间已解决
 
-- **Where does the confidence check phase land?** As Phase 5.3, between Write (5.2) and Post-gen Options (renumbered 5.4). Minimal structural change
-- **How does resume mode distinguish incomplete plan from re-deepen request?** Fast path: if the plan appears complete (all sections present, units defined, status: active) and the user's request is specifically about deepening, skip to Phase 5.3. Otherwise resume normal editing
-- **Does deepening run in pipeline mode?** Yes, with the same gate logic. Pipeline mode already skips interactive questions; deepening doesn't ask questions, only reports
-- **What replaces deepen-plan in post-gen options?** Nothing — the list shrinks by one. If auto-evaluation passed, the plan is adequately grounded. Users who disagree can re-invoke ce:plan with explicit deepening instructions
-- **What about failed or empty agent results during deepening?** Preserve deepen-plan's Phase 4.2 fallback: "if an artifact is missing or clearly malformed, re-run that agent or fall back to direct-mode reasoning"
+- **confidence check phase 放在哪里？** 作为 Phase 5.3，位于 Write（5.2）和 Post-gen Options（renumbered 5.4）之间。Minimal structural change
+- **resume mode 如何区分 incomplete plan 和 re-deepen request？** Fast path：如果 plan 看起来 complete（all sections present, units defined, status: active）且用户 request specifically about deepening，则 skip 到 Phase 5.3。否则 resume normal editing
+- **deepening 是否在 pipeline mode 中运行？** 是，使用相同 gate logic。Pipeline mode 已经 skips interactive questions；deepening 不提问，只报告
+- **post-gen options 中什么替代 deepen-plan？** 不替代 -- list shrink by one。如果 auto-evaluation passed，plan 已充分 grounded。不同意的用户可以用 explicit deepening instructions 重新 invoke ce:plan
+- **deepening 期间 failed or empty agent results 怎么办？** 保留 deepen-plan 的 Phase 4.2 fallback："if an artifact is missing or clearly malformed, re-run that agent or fall back to direct-mode reasoning"
 
-### Deferred to Implementation
+### 延后到实现阶段
 
-- Exact wording of the transparency status message (R2) — best determined when writing the actual Phase 5.3 content
-- Whether the deepen-plan Introduction section's distinction between `document-review` and `deepen-plan` should be preserved somewhere in ce:plan — likely as a brief note in Phase 5.3
+- transparency status message（R2）的 exact wording -- 写实际 Phase 5.3 content 时决定最好
+- deepen-plan Introduction section 中 `document-review` 和 `deepen-plan` 的区别是否应在 ce:plan 中保留 -- 可能作为 Phase 5.3 中的 brief note
 
-## Implementation Units
+## 实现单元
 
-- [ ] **Unit 1: Modify ce:plan SKILL.md — add Phase 5.3, update Phase 0.1, update post-gen options, update template**
+- [ ] **Unit 1：修改 ce:plan SKILL.md -- 添加 Phase 5.3，更新 Phase 0.1、post-gen options 和 template**
 
-  **Goal:** Absorb deepen-plan's confidence-gap evaluation and targeted research into ce:plan as the new Phase 5.3. Update Phase 0.1 for re-deepen fast path. Renumber current Phase 5.3 to 5.4 and simplify it. Update plan template frontmatter comment.
+  **目标:** 将 deepen-plan 的 confidence-gap evaluation 和 targeted research 吸收到 ce:plan 中，作为新的 Phase 5.3。更新 Phase 0.1 以支持 re-deepen fast path。将当前 Phase 5.3 renumber 为 5.4 并 simplify。更新 plan template frontmatter comment。
 
-  **Requirements:** R1, R2, R3, R4, R5, R6, R7
+  **需求:** R1, R2, R3, R4, R5, R6, R7
 
-  **Dependencies:** None
+  **依赖:** None
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/skills/ce-plan/SKILL.md`
+  **文件:**
+  - 修改: `plugins/compound-engineering/skills/ce-plan/SKILL.md`
 
-  **Approach:**
+  **做法:**
 
-  *Phase 5.3 (Confidence Check and Deepening):*
-  - Insert new sub-phase between current 5.2 and 5.3
-  - Transplant from deepen-plan (not rewrite):
-    - Phase 0.2-0.3 gating logic (Lightweight skip, risk profile assessment) → becomes the gate at the top of 5.3
-    - Phase 1 plan structure parsing → becomes a step within 5.3 (lighter version since ce:plan already knows its own structure)
-    - Phase 2 confidence scoring (the full checklist from deepen-plan lines 119-200) → transplanted wholesale
-    - Phase 3 deterministic section-to-agent mapping (lines 208-248) → transplanted wholesale
-    - Phase 3.2 agent prompt shape → transplanted
-    - Phase 3.3 execution mode decision (direct vs artifact-backed) → transplanted
-    - Phase 4 research execution (direct and artifact-backed modes) → transplanted
-    - Phase 5 synthesis and rewrite rules → transplanted
-    - Phase 6 final checks → merged into ce:plan's existing Phase 5.1 review logic
-  - Add transparency reporting (R2): before dispatching agents, report what sections are being strengthened and why. Example: "Strengthening [Key Technical Decisions, System-Wide Impact] — decision rationale is thin and cross-boundary effects aren't mapped"
-  - Add "confidence check passed" path (R4): when no gaps exceed threshold, report and proceed to 5.4
-  - Add pipeline mode note: deepening runs in pipeline mode using the same gate logic, no user interaction needed
-  - Update scratch space path to `.context/compound-engineering/ce-plan/deepen/`
-  - Transplant scratch cleanup logic from deepen-plan Phase 6 (lines 383-385): after the plan is safely written, clean up the temporary scratch directory. This is especially important since auto-deepening means users may never be aware artifacts were created
+*Phase 5.3（Confidence Check and Deepening，confidence check 与 deepening）：*
+  - 在当前 5.2 和 5.3 之间插入 new sub-phase
+  - 从 deepen-plan 移植（not rewrite）：
+    - Phase 0.2-0.3 gating logic（Lightweight skip, risk profile assessment）-> 变成 5.3 顶部的 gate
+    - Phase 1 plan structure parsing -> 变成 5.3 内的一个 step（lighter version，因为 ce:plan 已知道自己的 structure）
+- Phase 2 confidence scoring（the full checklist from deepen-plan lines 119-200）-> 整体移植
+- Phase 3 deterministic section-to-agent mapping（lines 208-248）-> 整体移植
+- Phase 3.2 agent prompt shape -> 移植
+- Phase 3.3 execution mode decision（direct vs artifact-backed）-> 移植
+- Phase 4 research execution（direct and artifact-backed modes）-> 移植
+- Phase 5 synthesis and rewrite rules -> 移植
+- Phase 6 final checks -> merged into ce:plan's existing Phase 5.1 review logic（并入 ce:plan 现有 Phase 5.1 review logic）
+  - 添加 transparency reporting（R2）：dispatching agents 前报告哪些 sections 正在 strengthened，以及原因。Example："Strengthening [Key Technical Decisions, System-Wide Impact] -- decision rationale is thin and cross-boundary effects aren't mapped"
+  - 添加 "confidence check passed" path（R4）：当没有 gaps 超过 threshold 时，报告并 proceed to 5.4
+  - 添加 pipeline mode note：deepening 在 pipeline mode 中使用相同 gate logic 运行，无需 user interaction
+  - 更新 scratch space path 为 `.context/compound-engineering/ce-plan/deepen/`
+  - 移植 deepen-plan Phase 6（lines 383-385）的 scratch cleanup logic：plan safely written 后清理 temporary scratch directory。auto-deepening 意味着 users 可能完全不知道 artifacts 被创建，这一点尤其重要
 
-  *Phase 0.1 (Resume mode fast path):*
-  - Add: when ce:plan detects an existing complete plan and the user's request is specifically about deepening or strengthening, short-circuit to Phase 5.3 directly
-  - "Complete plan" detection: all major sections present, implementation units defined, `status: active`
-  - Deepen-request detection: user's input contains signal words like "deepen", "strengthen", "confidence", "gaps", or explicitly says to re-deepen the plan. Normal editing requests (e.g., "update the test scenarios") should NOT trigger the fast path
-  - Preserve existing resume behavior for incomplete plans
-  - If plan already has `deepened: YYYY-MM-DD` and no explicit user request to re-deepen, apply the same confidence-gap evaluation (R6 — doesn't force deepening)
+*Phase 0.1（Resume mode fast path，resume 快速路径）：*
+  - 添加：当 ce:plan 检测到 existing complete plan 且用户 request specifically about deepening or strengthening 时，直接 short-circuit 到 Phase 5.3
+- "Complete plan" detection（complete plan 检测）：all major sections present, implementation units defined, `status: active`
+  - Deepen-request detection：user input 包含 signal words，如 "deepen"、"strengthen"、"confidence"、"gaps"，或明确要求 re-deepen the plan。Normal editing requests（例如 "update the test scenarios"）不应触发 fast path
+  - 保留 existing resume behavior for incomplete plans
+  - 如果 plan 已有 `deepened: YYYY-MM-DD` 且没有 explicit user request to re-deepen，则应用相同 confidence-gap evaluation（R6 -- doesn't force deepening）
 
-  *Phase 5.4 (Post-Generation Options, was 5.3):*
-  - Remove option 2 ("Run `/deepen-plan`") and its handler
-  - Remove the ultrathink auto-deepen clause (line 625)
-  - Renumber remaining options (1-6 instead of 1-7)
+*Phase 5.4（Post-Generation Options，原 5.3）：*
+  - 移除 option 2（"Run `/deepen-plan`"）及其 handler
+  - 移除 ultrathink auto-deepen clause（line 625）
+- 重新编号 remaining options（1-6 instead of 1-7）
 
-  *Plan template frontmatter:*
-  - Change comment on `deepened:` line from "set later by deepen-plan" to "set when confidence check substantively strengthens the plan"
+*Plan template frontmatter（plan template frontmatter，plan template 的 frontmatter）：*
+  - 将 `deepened:` line 的 comment 从 "set later by deepen-plan" 改为 "set when confidence check substantively strengthens the plan"
 
-  **Patterns to follow:**
-  - deepen-plan SKILL.md is the source of truth for all transplanted content
-  - ce:plan's existing sub-phase structure (numbered sub-phases within Phase 5)
-  - ce:plan's existing pipeline mode handling (line 589)
+  **遵循的模式:**
+  - deepen-plan SKILL.md 是所有 transplanted content 的 source of truth
+  - ce:plan 的 existing sub-phase structure（numbered sub-phases within Phase 5）
+  - ce:plan 的 existing pipeline mode handling（line 589）
 
-  **Test scenarios:**
-  - Fresh Lightweight plan → Phase 5.3 gates and skips deepening, reports "confidence check passed"
-  - Fresh Standard plan with thin decisions → Phase 5.3 identifies gaps, reports what it's strengthening, dispatches agents, updates plan
-  - Fresh Standard plan with strong confidence → Phase 5.3 evaluates and reports "confidence check passed"
-  - Pipeline mode (lfg/slfg) → deepening runs automatically with same gate logic, no interactive questions
-  - Resume mode with explicit deepen request → fast-paths to Phase 5.3
-  - Resume mode without deepen request → normal plan editing flow
+  **测试场景:**
+- Fresh Lightweight plan -> Phase 5.3 gate 并 skip deepening，报告 "confidence check passed"
+- Fresh Standard plan with thin decisions -> Phase 5.3 identifies gaps，报告正在 strengthening 的内容，dispatches agents，updates plan
+- Fresh Standard plan with strong confidence（confidence 强的 Standard plan）-> Phase 5.3 evaluates and reports "confidence check passed"
+  - Pipeline mode（lfg/slfg）-> deepening 自动运行 with same gate logic，无 interactive questions
+- Resume mode with explicit deepen request（带 explicit deepen request 的 resume mode）-> fast-paths to Phase 5.3
+- Resume mode without deepen request（没有 deepen request 的 resume mode）-> normal plan editing flow
 
-  **Verification:**
-  - Phase 5.3 contains the complete confidence scoring checklist from deepen-plan
-  - Phase 5.3 contains the complete section-to-agent mapping from deepen-plan
-  - Phase 0.1 has the re-deepen fast path
-  - No references to `/deepen-plan` remain in ce:plan SKILL.md
-  - The ultrathink clause is gone
-  - Plan template frontmatter comment is updated
-
----
-
-- [ ] **Unit 2: Delete deepen-plan skill directory**
-
-  **Goal:** Remove the deepen-plan skill from the plugin
-
-  **Requirements:** R6
-
-  **Dependencies:** Unit 1 (ce:plan must absorb the logic before it's deleted)
-
-  **Files:**
-  - Delete: `plugins/compound-engineering/skills/deepen-plan/SKILL.md` (entire `deepen-plan/` directory)
-
-  **Approach:**
-  - Delete the directory `plugins/compound-engineering/skills/deepen-plan/`
-  - Skills are auto-discovered from filesystem, so no registry update needed
-
-  **Verification:**
-  - `plugins/compound-engineering/skills/deepen-plan/` no longer exists
-  - No `deepen-plan` skill appears when listing skills
+  **验证:**
+- Phase 5.3 包含来自 deepen-plan 的 complete confidence scoring checklist
+- Phase 5.3 包含来自 deepen-plan 的 complete section-to-agent mapping
+- Phase 0.1 包含 re-deepen fast path
+- ce:plan SKILL.md 中不再有 `/deepen-plan` references
+- ultrathink clause 已移除
+- Plan template frontmatter comment 已更新
 
 ---
 
-- [ ] **Unit 3: Update lfg and slfg orchestrators**
+- [ ] **Unit 2：删除 deepen-plan skill directory**
 
-  **Goal:** Remove deepen-plan step from both orchestration skills since ce:plan now handles it internally
+  **目标:** 从 plugin 中移除 deepen-plan skill
 
-  **Requirements:** R1, R6
+  **需求:** R6
 
-  **Dependencies:** Unit 1
+  **依赖:** Unit 1（ce:plan must absorb the logic before it's deleted）
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/skills/lfg/SKILL.md`
-  - Modify: `plugins/compound-engineering/skills/slfg/SKILL.md`
+  **文件:**
+  - 删除: `plugins/compound-engineering/skills/deepen-plan/SKILL.md`（entire `deepen-plan/` directory）
 
-  **Approach:**
+  **做法:**
+- 删除 directory `plugins/compound-engineering/skills/deepen-plan/`
+  - Skills 从 filesystem auto-discovered，因此无需 registry update
 
-  *lfg:*
-  - Remove step 3 (lines 16-20: conditional deepen-plan invocation and its GATE)
-  - Renumber steps 4-9 to 3-8
-  - Update the opening instruction to remove reference to step 3 plan verification
-  - Keep step 2 (`/ce:plan`) and its GATE unchanged — ce:plan now handles deepening internally
-
-  *slfg:*
-  - Remove step 3 (lines 14-17: conditional deepen-plan invocation)
-  - Renumber step 4 to 3 (`/ce:work`)
-  - Renumber steps 5-10 to 4-9
-  - Keep step 2 (`/ce:plan`) unchanged
-
-  **Patterns to follow:**
-  - lfg's existing step structure with GATE markers
-  - slfg's existing phase structure (Sequential, Parallel, Autofix, Finalize)
-
-  **Verification:**
-  - No references to `deepen-plan` or `deepen` in lfg or slfg
-  - Step numbers are sequential with no gaps
-  - lfg flow is: optional ralph-loop → ce:plan (with GATE) → ce:work (with GATE) → ce:review mode:autofix → todo-resolve → test-browser → feature-video → DONE. Preserve the existing GATE after ce:work
-  - slfg flow is: optional ralph-loop → ce:plan → ce:work (swarm) → parallel ce:review mode:report-only + test-browser → ce:review mode:autofix → todo-resolve → feature-video → DONE
+  **验证:**
+- `plugins/compound-engineering/skills/deepen-plan/` no longer exists
+  - listing skills 时不再出现 `deepen-plan` skill
 
 ---
 
-- [ ] **Unit 4: Update peripheral references**
+- [ ] **Unit 3：更新 lfg 和 slfg orchestrators**
 
-  **Goal:** Remove stale deepen-plan references from README, AGENTS.md, learnings-researcher, and document-review
+  **目标:** 从两个 orchestration skills 中移除 deepen-plan step，因为 ce:plan 现在内部处理 deepening
 
-  **Requirements:** R6, R7
+  **需求:** R1, R6
 
-  **Dependencies:** Unit 2
+  **依赖:** Unit 1
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/README.md`
-  - Modify: `plugins/compound-engineering/AGENTS.md`
-  - Modify: `plugins/compound-engineering/agents/research/ce-learnings-researcher.agent.md`
-  - Modify: `plugins/compound-engineering/skills/document-review/SKILL.md`
+  **文件:**
+  - 修改: `plugins/compound-engineering/skills/lfg/SKILL.md`
+  - 修改: `plugins/compound-engineering/skills/slfg/SKILL.md`
 
-  **Approach:**
+  **做法:**
 
-  *README.md:*
-  - Remove `/deepen-plan` row from the Core Workflow table
-  - Update the `/ce:plan` description to mention that it includes automatic confidence checking
-  - Verify skill count in the Components table still says "40+" (removing 1 skill, adding 0)
+*lfg（lfg orchestrator）：*
+  - 移除 step 3（lines 16-20：conditional deepen-plan invocation and its GATE）
+- 将 steps 4-9 重新编号为 3-8
+  - 更新 opening instruction，移除对 step 3 plan verification 的 reference
+  - 保持 step 2（`/ce:plan`）及其 GATE 不变 -- ce:plan 现在内部处理 deepening
 
-  *AGENTS.md:*
-  - Line 116: Replace `/deepen-plan` example with another valid skill (e.g., `/ce:compound` or `/changelog`)
+*slfg（slfg orchestrator）：*
+  - 移除 step 3（lines 14-17：conditional deepen-plan invocation）
+- 将 step 4 重新编号为 3（`/ce:work`）
+- 将 steps 5-10 重新编号为 4-9
+  - 保持 step 2（`/ce:plan`）不变
 
-  *learnings-researcher.md:*
-  - Remove the `/deepen-plan` integration point line. The deepening behavior is now inside ce:plan, which already invokes learnings-researcher in Phase 1.1. The Phase 5.3 agent mapping also includes learnings-researcher for "Context & Research" gaps, so the integration is preserved
+  **遵循的模式:**
+- lfg 的 existing step structure with GATE markers（带 GATE markers 的现有 step 结构）
+- slfg 的 existing phase structure（Sequential, Parallel, Autofix, Finalize）
 
-  *document-review SKILL.md:*
-  - Line 196: Update the "do not modify" caller list — remove both `deepen-plan-beta` and `ce-plan-beta` (both are stale beta names). Update to the current accurate callers: `ce-brainstorm`, `ce-plan`
-
-  **Verification:**
-  - No references to `deepen-plan` or `/deepen-plan` in any of these files
-  - README Core Workflow table has one fewer row
-  - `bun run release:validate` passes
+  **验证:**
+  - lfg 或 slfg 中没有 `deepen-plan` 或 `deepen` references
+- Step numbers sequential with no gaps（step 编号连续无缺口）
+  - lfg flow 是：optional ralph-loop -> ce:plan（with GATE）-> ce:work（with GATE）-> ce:review mode:autofix -> todo-resolve -> test-browser -> feature-video -> DONE。Preserve existing GATE after ce:work
+  - slfg flow 是：optional ralph-loop -> ce:plan -> ce:work（swarm）-> parallel ce:review mode:report-only + test-browser -> ce:review mode:autofix -> todo-resolve -> feature-video -> DONE
 
 ---
 
-- [ ] **Unit 5: Update converter and writer tests**
+- [ ] **Unit 4：更新 peripheral references（外围引用）**
 
-  **Goal:** Replace deepen-plan references in test data with another skill name so tests still validate slash-command remapping behavior
+  **目标:** 从 README、AGENTS.md、learnings-researcher 和 document-review 中移除 stale deepen-plan references
 
-  **Requirements:** R6
+  **需求:** R6, R7
 
-  **Dependencies:** Unit 2
+  **依赖:** Unit 2
 
-  **Files:**
-  - Modify: `tests/codex-writer.test.ts`
-  - Modify: `tests/codex-converter.test.ts`
-  - Modify: `tests/droid-converter.test.ts`
-  - Modify: `tests/copilot-converter.test.ts`
-  - Modify: `tests/pi-converter.test.ts`
-  - Modify: `tests/review-skill-contract.test.ts`
+  **文件:**
+  - 修改: `plugins/compound-engineering/README.md`
+  - 修改: `plugins/compound-engineering/AGENTS.md`
+  - 修改: `plugins/compound-engineering/agents/research/ce-learnings-researcher.agent.md`
+  - 修改: `plugins/compound-engineering/skills/document-review/SKILL.md`
 
-  **Approach:**
-  - In each test file, replace `deepen-plan` in test input data and expected output with another existing skill name that has the same structural properties (a non-`ce:` prefixed skill with a hyphenated name). Good candidates: `reproduce-bug`, `git-commit`, or `todo-resolve`
-  - `review-skill-contract.test.ts` line 157: update the test description from "deepen-plan reviewer" to match whichever skill name replaces it (or update to reflect what the test actually validates — it tests `data-migration-expert` agent content)
-  - No converter source code changes needed — repo research confirmed no hardcoded deepen-plan references in `src/`
+  **做法:**
 
-  **Patterns to follow:**
-  - Existing test data structure in each file
-  - Use a consistent replacement skill name across all test files for clarity
+*README.md（README）：*
+- 从 Core Workflow table 移除 `/deepen-plan` row
+- 更新 `/ce:plan` description，说明其包含 automatic confidence checking
+- 验证 Components table 中 skill count 仍为 "40+"（removing 1 skill, adding 0）
 
-  **Test scenarios:**
-  - All existing test assertions pass with the replacement skill name
-  - Slash-command remapping behavior is still validated for each target (Codex, Droid, Copilot, Pi)
+*AGENTS.md（agent 约定）：*
+- Line 116：将 `/deepen-plan` example 替换为另一个 valid skill（e.g., `/ce:compound` or `/changelog`）
 
-  **Verification:**
+*learnings-researcher.md（learnings researcher）：*
+  - Remove the `/deepen-plan` integration point line（移除 `/deepen-plan` integration point 行）。deepening behavior 现在位于 ce:plan 内部，而 ce:plan 已在 Phase 1.1 invokes learnings-researcher。Phase 5.3 agent mapping 也为 "Context & Research" gaps 包含 learnings-researcher，因此 integration preserved
+
+*document-review SKILL.md（document-review skill）：*
+- Line 196：更新 "do not modify" caller list -- 移除 `deepen-plan-beta` 和 `ce-plan-beta`（both are stale beta names）。更新为 current accurate callers：`ce-brainstorm`, `ce-plan`
+
+  **验证:**
+  - 这些文件中没有 `deepen-plan` 或 `/deepen-plan` references
+  - README Core Workflow table 少一行
+- `bun run release:validate` passes
+
+---
+
+- [ ] **Unit 5：更新 converter 和 writer tests**
+
+  **目标:** 将 test data 中的 deepen-plan references 替换为另一个 skill name，使 tests 仍能验证 slash-command remapping behavior
+
+  **需求:** R6
+
+  **依赖:** Unit 2
+
+  **文件:**
+  - 修改: `tests/codex-writer.test.ts`
+  - 修改: `tests/codex-converter.test.ts`
+  - 修改: `tests/droid-converter.test.ts`
+  - 修改: `tests/copilot-converter.test.ts`
+  - 修改: `tests/pi-converter.test.ts`
+  - 修改: `tests/review-skill-contract.test.ts`
+
+  **做法:**
+  - 在每个 test file 中，将 test input data 和 expected output 中的 `deepen-plan` 替换为另一个具有相同 structural properties 的 existing skill name（non-`ce:` prefixed skill with a hyphenated name）。Good candidates：`reproduce-bug`、`git-commit` 或 `todo-resolve`
+  - `review-skill-contract.test.ts` line 157：将 test description 从 "deepen-plan reviewer" 更新为 replacement skill name（或更新为反映该 test 实际验证内容 -- 它测试 `data-migration-expert` agent content）
+  - 不需要 converter source code changes -- repo research confirmed no hardcoded deepen-plan references in `src/`
+
+  **遵循的模式:**
+- 每个 file 中的 existing test data structure
+  - 为 clarity，在所有 test files 中使用 consistent replacement skill name
+
+  **测试场景:**
+  - 所有 existing test assertions 使用 replacement skill name 仍 pass
+  - 每个 target（Codex、Droid、Copilot、Pi）仍验证 slash-command remapping behavior
+
+  **验证:**
   - `bun test` passes
-  - No references to `deepen-plan` in any test file
+  - test files 中没有 `deepen-plan` references
 
 ---
 
-- [ ] **Unit 6: Validate plugin consistency**
+- [ ] **Unit 6：验证 plugin consistency**
 
-  **Goal:** Ensure the skill removal doesn't break plugin metadata or marketplace consistency
+  **目标:** 确认 skill removal 不会破坏 plugin metadata 或 marketplace consistency
 
-  **Requirements:** R6
+  **需求:** R6
 
-  **Dependencies:** Units 1-5
+  **依赖:** Units 1-5
 
-  **Files:**
-  - Read (validation only): `plugins/compound-engineering/.claude-plugin/plugin.json`
-  - Read (validation only): `.claude-plugin/marketplace.json`
+  **文件:**
+- Read（validation only，仅验证读取）: `plugins/compound-engineering/.claude-plugin/plugin.json`
+- Read（validation only，仅验证读取）: `.claude-plugin/marketplace.json`
 
-  **Approach:**
-  - Run `bun run release:validate` to check consistency
-  - Run `bun test` to confirm all tests pass
-  - Verify no remaining references to `deepen-plan` in active skill files (historical docs excluded)
+  **做法:**
+- 运行 `bun run release:validate` 检查 consistency
+- 运行 `bun test` 确认所有 tests pass
+- 验证 active skill files 中没有 remaining `deepen-plan` references（historical docs excluded）
 
-  **Verification:**
+  **验证:**
   - `bun run release:validate` passes
   - `bun test` passes
-  - `grep -r "deepen-plan" plugins/compound-engineering/skills/` returns no results
-  - `grep -r "deepen-plan" plugins/compound-engineering/agents/` returns no results
-  - `grep -r "deepen-plan" plugins/compound-engineering/README.md` returns no results
-  - Note: CHANGELOG.md and historical docs in `docs/plans/`, `docs/brainstorms/`, `docs/solutions/` will still contain deepen-plan references — these are historical records and should not be updated
+- `grep -r "deepen-plan" plugins/compound-engineering/skills/` returns no results
+- `grep -r "deepen-plan" plugins/compound-engineering/agents/` returns no results
+- `grep -r "deepen-plan" plugins/compound-engineering/README.md` returns no results
+  - Note: CHANGELOG.md 和 historical docs in `docs/plans/`, `docs/brainstorms/`, `docs/solutions/` 仍会包含 deepen-plan references -- 这些是 historical records，不应更新
 
-## System-Wide Impact
+## 系统级影响
 
-- **Interaction graph:** ce:plan's Phase 5.3 dispatches the same research and review agents that deepen-plan used. The agent contracts are unchanged — only the caller changes. lfg and slfg lose a step but gain nothing new since ce:plan handles deepening internally
-- **Error propagation:** If agent dispatch fails during Phase 5.3, the fallback from deepen-plan Phase 4.2 is preserved: re-run the agent or fall back to direct-mode reasoning. The plan is still written to disk even if deepening partially fails
-- **State lifecycle risks:** The `deepened:` frontmatter field continues to be set only when substantive changes are made. Plans that were deepened by the old standalone deepen-plan retain their `deepened:` date — no migration needed
-- **API surface parity:** The converter tests use deepen-plan as sample data for slash-command remapping. After updating to a different skill name, all target converters (Codex, Droid, Copilot, Pi) continue to validate the same remapping behavior
-- **Integration coverage:** The atomic update of all callers (lfg, slfg, ce:plan, README, AGENTS.md, learnings-researcher, document-review) in one PR prevents a broken intermediate state (per learnings from beta-promotion-orchestration-contract.md)
+- **Interaction graph:** ce:plan 的 Phase 5.3 dispatches 与 deepen-plan 曾使用的相同 research and review agents。agent contracts 不变 -- 只有 caller 改变。lfg 和 slfg 少一个 step，但没有新增内容，因为 ce:plan 内部处理 deepening
+- **Error propagation:** 如果 Phase 5.3 中 agent dispatch 失败，保留 deepen-plan Phase 4.2 fallback：re-run the agent 或 fall back to direct-mode reasoning。即使 deepening partial fails，plan 仍会 written to disk
+- **State lifecycle risks:** `deepened:` frontmatter field 仍只在 substantive changes made 时设置。由旧 standalone deepen-plan deepened 的 plans 保留其 `deepened:` date -- 无需 migration
+- **API surface parity:** converter tests 使用 deepen-plan 作为 slash-command remapping 的 sample data。更新为不同 skill name 后，所有 target converters（Codex、Droid、Copilot、Pi）继续验证相同 remapping behavior
+- **Integration coverage:** 同一个 PR 中 atomic update 所有 callers（lfg、slfg、ce:plan、README、AGENTS.md、learnings-researcher、document-review），防止 broken intermediate state（per learnings from beta-promotion-orchestration-contract.md）
 
-## Risks & Dependencies
+## 风险与依赖
 
-- **Risk: Phase 5.3 content size.** Absorbing ~300 lines of deepen-plan logic into ce:plan makes it significantly longer (~950+ lines). Mitigation: the content is self-contained in one sub-phase and can be extracted to a reference file if token pressure becomes an issue
-- **Risk: Converter test fragility.** Changing test input data could reveal implicit assumptions in converter logic. Mitigation: repo research confirmed no hardcoded deepen-plan references in `src/`. The tests use it as generic sample data
-- **Risk: Orphaned scratch directories.** Existing `.context/compound-engineering/deepen-plan/` directories from prior runs will not be cleaned up. Mitigation: these are ephemeral scratch files with no functional impact; not worth special handling
+- **Risk: Phase 5.3 content size.** 把约 300 行 deepen-plan logic 吸收到 ce:plan，会让它显著变长（约 950+ lines）。Mitigation：content self-contained in one sub-phase；如果 token pressure 成为问题，可抽到 reference file
+- **Risk: Converter test fragility.** 改变 test input data 可能暴露 converter logic 的 implicit assumptions。Mitigation：repo research confirmed no hardcoded deepen-plan references in `src/`。tests 只是把它作为 generic sample data
+- **Risk: Orphaned scratch directories.** prior runs 中 existing `.context/compound-engineering/deepen-plan/` directories 不会被清理。Mitigation：这些是 ephemeral scratch files，没有 functional impact；不值得 special handling
 
-## Sources & References
+## 来源与参考
 
-- **Origin document:** [docs/brainstorms/2026-03-26-merge-deepen-into-plan-requirements.md](docs/brainstorms/2026-03-26-merge-deepen-into-plan-requirements.md)
-- Deepen-plan source: `plugins/compound-engineering/skills/deepen-plan/SKILL.md`
-- Ce:plan source: `plugins/compound-engineering/skills/ce-plan/SKILL.md`
-- Learnings: `docs/solutions/skill-design/beta-skills-framework.md`, `docs/solutions/skill-design/beta-promotion-orchestration-contract.md`, `docs/solutions/plugin-versioning-requirements.md`
+- **Origin document（来源文档）：** [docs/brainstorms/2026-03-26-merge-deepen-into-plan-requirements.md](docs/brainstorms/2026-03-26-merge-deepen-into-plan-requirements.md)
+- Deepen-plan source（deepen-plan 来源）：`plugins/compound-engineering/skills/deepen-plan/SKILL.md`
+- Ce:plan source（ce:plan 来源）：`plugins/compound-engineering/skills/ce-plan/SKILL.md`
+- Learnings（经验沉淀）：`docs/solutions/skill-design/beta-skills-framework.md`, `docs/solutions/skill-design/beta-promotion-orchestration-contract.md`, `docs/solutions/plugin-versioning-requirements.md`

@@ -1,249 +1,249 @@
-# Deepening Workflow
+# Deepening 工作流
 
-This file contains the confidence-check execution path (5.3.3-5.3.7). Load it only when the deepening gate at 5.3.2 determines that deepening is warranted.
+本文件包含 confidence-check execution path（5.3.3-5.3.7）。仅当 5.3.2 的 deepening gate 判定 deepening 有必要时加载。
 
-## 5.3.3 Score Confidence Gaps
+## 5.3.3 为 Confidence Gaps 评分
 
-Use a checklist-first, risk-weighted scoring pass.
+使用 checklist-first、risk-weighted 的 scoring pass。
 
-For each section, compute:
-- **Trigger count** - number of checklist problems that apply
-- **Risk bonus** - add 1 if the topic is high-risk and this section is materially relevant to that risk
-- **Critical-section bonus** - add 1 for `Key Technical Decisions`, `Implementation Units`, `System-Wide Impact`, `Risks & Dependencies`, or `Open Questions` in `Standard` or `Deep` plans
+对每个 section，计算：
+- **Trigger count（触发数量）** - 适用的 checklist problems 数量
+- **Risk bonus（风险加分）** - 如果 topic 是 high-risk，且该 section 与该 risk materially relevant，加 1
+- **Critical-section bonus（关键 section 加分）** - 在 `Standard` 或 `Deep` plans 中，对 `Key Technical Decisions`、`Implementation Units`、`System-Wide Impact`、`Risks & Dependencies` 或 `Open Questions` 加 1
 
-Treat a section as a candidate if:
-- it hits **2+ total points**, or
-- it hits **1+ point** in a high-risk domain and the section is materially important
+若满足以下任一条件，将 section 视为 candidate：
+- 达到 **2+ total points**，或
+- 在 high-risk domain 中达到 **1+ point**，且 section materially important
 
-Choose only the top **2-5** sections by score. If deepening a lightweight plan (high-risk exception), cap at **1-2** sections.
+仅按 score 选择 top **2-5** sections。如果 deepening lightweight plan（high-risk exception），上限为 **1-2** sections。
 
-If the plan already has a `deepened:` date:
-- Prefer sections that have not yet been substantially strengthened, if their scores are comparable
-- Revisit an already-deepened section only when it still scores clearly higher than alternatives
+如果 plan 已有 `deepened:` date：
+- 当 scores 相近时，优先选择尚未 substantively strengthened 的 sections
+- 仅当 already-deepened section 的 score 仍明显高于 alternatives 时，才 revisit 它
 
-**Section Checklists:**
+**Section Checklists（Section 检查清单）：**
 
-**Requirements**
-- Requirements are vague or disconnected from implementation units
-- Success criteria are missing or not reflected downstream
-- Units do not clearly advance the traced requirements
-- Origin requirements are not clearly carried forward
-- Origin A/F/AE IDs (when supplied by the upstream brainstorm) are not preserved where planning decisions touch them, or are referenced inconsistently across Requirements, units, and test scenarios
+**Requirements（需求）**
+- Requirements vague，或与 implementation units disconnected
+- Success criteria 缺失，或未在 downstream 中反映
+- Units 未清晰推进 traced requirements
+- Origin requirements 未清晰 carry forward
+- Origin A/F/AE IDs（当 upstream brainstorm 提供时）在 planning decisions 触及它们的位置未保留，或在 Requirements、units 和 test scenarios 中 referenced inconsistently
 
-**Context & Research / Sources & References**
-- Relevant repo patterns are named but never used in decisions or implementation units
-- Cited learnings or references do not materially shape the plan
-- High-risk work lacks appropriate external or internal grounding
-- Research is generic instead of tied to this repo or this plan
+**Context & Research / Sources & References（上下文、研究、来源与引用）**
+- 相关 repo patterns 被命名，但从未用于 decisions 或 implementation units
+- cited learnings 或 references 没有 materially shape plan
+- High-risk work 缺少适当 external 或 internal grounding
+- Research 是 generic，而不是 tied to this repo or this plan
 
-**Key Technical Decisions**
-- A decision is stated without rationale
-- Rationale does not explain tradeoffs or rejected alternatives
-- The decision does not connect back to scope, requirements, or origin context
-- An obvious design fork exists but the plan never addresses why one path won
+**Key Technical Decisions（关键技术决策）**
+- decision 陈述时没有 rationale
+- rationale 未解释 tradeoffs 或 rejected alternatives
+- decision 未连接回 scope、requirements 或 origin context
+- 存在明显 design fork，但 plan 从未说明为什么一个 path 胜出
 
-**Open Questions**
-- Product blockers are hidden as assumptions
-- Planning-owned questions are incorrectly deferred to implementation
-- Resolved questions have no clear basis in repo context, research, or origin decisions
-- Deferred items are too vague to be useful later
+**Open Questions（开放问题）**
+- Product blockers 被隐藏为 assumptions
+- Planning-owned questions 被错误 deferred to implementation
+- Resolved questions 在 repo context、research 或 origin decisions 中没有清晰 basis
+- Deferred items 过于 vague，日后无用
 
-**High-Level Technical Design (when present)**
-- The sketch uses the wrong medium for the work
-- The sketch contains implementation code rather than pseudo-code
-- The non-prescriptive framing is missing or weak
-- The sketch does not connect to the key technical decisions or implementation units
+**High-Level Technical Design（高层技术设计，存在时）**
+- sketch 对该 work 使用了错误 medium
+- sketch 包含 implementation code，而不是 pseudo-code
+- non-prescriptive framing 缺失或弱
+- sketch 未连接到 key technical decisions 或 implementation units
 
-**High-Level Technical Design (when absent)** *(Standard or Deep plans only)*
-- The work involves DSL design, API surface design, multi-component integration, complex data flow, or state-heavy lifecycle
-- Key technical decisions would be easier to validate with a visual or pseudo-code representation
-- The approach section of implementation units is thin and a higher-level technical design would provide context
+**High-Level Technical Design（高层技术设计，缺失时）** *(仅 Standard 或 Deep plans)*
+- work 涉及 DSL design、API surface design、multi-component integration、complex data flow 或 state-heavy lifecycle
+- Key technical decisions 若有 visual 或 pseudo-code representation 会更易验证
+- implementation units 的 approach section 较薄，而 higher-level technical design 能提供 context
 
-**Implementation Units**
-- Dependency order is unclear or likely wrong
-- File paths or test file paths are missing where they should be explicit
-- Units are too large, too vague, or broken into micro-steps
-- Approach notes are thin or do not name the pattern to follow
-- Test scenarios are vague (don't name inputs and expected outcomes), skip applicable categories (e.g., no error paths for a unit with failure modes, no integration scenarios for a unit crossing layers), or are disproportionate to the unit's complexity
-- Feature-bearing units have blank or missing test scenarios (feature-bearing units require actual test scenarios; the `Test expectation: none` annotation is only valid for non-feature-bearing units)
-- Verification outcomes are vague or not expressed as observable results
-- Existing U-IDs were renumbered after a unit was reordered, split, or deleted (U-IDs are stable: never renumber existing IDs; gaps from deletions are preserved; new units take the next unused number)
-- A unit realizing an origin Key Flow does not cite the F-ID, or a unit enforcing an origin Acceptance Example does not cite the AE-ID, when origin supplies them
+**Implementation Units（实现单元）**
+- Dependency order 不清晰或可能错误
+- 需要 explicit 的 file paths 或 test file paths 缺失
+- Units 过大、过 vague，或被拆成 micro-steps
+- Approach notes 较薄，或未命名要 follow 的 pattern
+- Test scenarios vague（未命名 inputs 和 expected outcomes）、跳过 applicable categories（例如有 failure modes 的 unit 没有 error paths，crossing layers 的 unit 没有 integration scenarios），或与 unit complexity 不成比例
+- Feature-bearing units 有空白或缺失 test scenarios（feature-bearing units 需要实际 test scenarios；`Test expectation: none` annotation 仅对 non-feature-bearing units 有效）
+- Verification outcomes vague，或未表达为 observable results
+- Existing U-IDs 在 unit reorder、split 或 delete 后被 renumbered（U-IDs 是 stable：绝不 renumber existing IDs；删除产生的 gaps 保留；new units 使用下一个 unused number）
+- 当 origin 提供 F-ID/AE-ID 时，实现 origin Key Flow 的 unit 未 cite F-ID，或 enforcing origin Acceptance Example 的 unit 未 cite AE-ID
 
-**System-Wide Impact**
-- Affected interfaces, callbacks, middleware, entry points, or parity surfaces are missing
-- Failure propagation is underexplored
-- State lifecycle, caching, or data integrity risks are absent where relevant
-- Integration coverage is weak for cross-layer work
+**System-Wide Impact（系统级影响）**
+- 受影响的 interfaces、callbacks、middleware、entry points 或 parity surfaces 缺失
+- Failure propagation 探索不足
+- 相关时缺少 state lifecycle、caching 或 data integrity risks
+- cross-layer work 的 integration coverage 较弱
 
-**Risks & Dependencies / Documentation / Operational Notes**
-- Risks are listed without mitigation
-- Rollout, monitoring, migration, or support implications are missing when warranted
-- External dependency assumptions are weak or unstated
-- Security, privacy, performance, or data risks are absent where they obviously apply
+**Risks & Dependencies / Documentation / Operational Notes（风险、依赖、文档与运维说明）**
+- Risks 列出但没有 mitigation
+- 应有 rollout、monitoring、migration 或 support implications 时缺失
+- External dependency assumptions 较弱或未陈述
+- 明显适用时缺少 security、privacy、performance 或 data risks
 
-Use the plan's own `Context & Research` and `Sources & References` as evidence. If those sections cite a pattern, learning, or risk that never affects decisions, implementation units, or verification, treat that as a confidence gap.
+使用 plan 自身的 `Context & Research` 和 `Sources & References` 作为 evidence。如果这些 sections cite 了 pattern、learning 或 risk，但从未影响 decisions、implementation units 或 verification，将其视为 confidence gap。
 
-## 5.3.4 Report and Dispatch Targeted Research
+## 5.3.4 报告并派发 Targeted Research
 
-Before dispatching agents, report what sections are being strengthened and why:
+dispatch agents 前，报告正在 strengthen 哪些 sections 以及原因：
 
 ```text
 Strengthening [section names] — [brief reason for each, e.g., "decision rationale is thin", "cross-boundary effects aren't mapped"]
 ```
 
-For each selected section, choose the smallest useful agent set. Do **not** run every agent. Use at most **1-3 agents per section** and usually no more than **8 agents total**.
+对每个 selected section，选择最小有用 agent set。**不要**运行每个 agent。每个 section 最多使用 **1-3 agents**，通常总共不超过 **8 agents**。
 
-Use fully-qualified agent names inside Task calls.
+在 Task calls 中使用 fully-qualified agent names。
 
-**Deterministic Section-to-Agent Mapping:**
+**Deterministic Section-to-Agent Mapping（确定性 Section 到 Agent 映射）：**
 
-**Requirements / Open Questions classification**
-- `ce-spec-flow-analyzer` for missing user flows, edge cases, and handoff gaps
-- `ce-repo-research-analyst` (Scope: `architecture, patterns`) for repo-grounded patterns, conventions, and implementation reality checks
+**Requirements / Open Questions classification（需求与开放问题分类）**
+- `ce-spec-flow-analyzer` 用于 missing user flows、edge cases 和 handoff gaps
+- `ce-repo-research-analyst`（Scope: `architecture, patterns`）用于 repo-grounded patterns、conventions 和 implementation reality checks
 
-**Context & Research / Sources & References gaps**
-- `ce-learnings-researcher` for institutional knowledge and past solved problems
-- `ce-framework-docs-researcher` for official framework or library behavior
-- `ce-best-practices-researcher` for current external patterns and industry guidance
-- `ce-web-researcher` for landscape/prior-art gaps — competitor patterns, market signals, or an unsettled external option set (which library/provider/approach) that recommendations depend on
-- Add `ce-git-history-analyzer` only when historical rationale or prior art is materially missing
+**Context & Research / Sources & References gaps（上下文、研究、来源与引用缺口）**
+- `ce-learnings-researcher` 用于 institutional knowledge 和 past solved problems
+- `ce-framework-docs-researcher` 用于 official framework 或 library behavior
+- `ce-best-practices-researcher` 用于 current external patterns 和 industry guidance
+- `ce-web-researcher` 用于 landscape/prior-art gaps：competitor patterns、market signals，或 recommendations 依赖的 unsettled external option set（哪个 library/provider/approach）
+- 仅当 historical rationale 或 prior art materially missing 时，添加 `ce-git-history-analyzer`
 
-**Key Technical Decisions**
-- `ce-architecture-strategist` for design integrity, boundaries, and architectural tradeoffs
-- Add `ce-framework-docs-researcher` or `ce-best-practices-researcher` when the decision needs external grounding beyond repo evidence
+**Key Technical Decisions（关键技术决策）**
+- `ce-architecture-strategist` 用于 design integrity、boundaries 和 architectural tradeoffs
+- 当 decision 需要 repo evidence 之外的 external grounding 时，添加 `ce-framework-docs-researcher` 或 `ce-best-practices-researcher`
 
-**High-Level Technical Design**
-- `ce-architecture-strategist` for validating that the technical design accurately represents the intended approach and identifying gaps
-- `ce-repo-research-analyst` (Scope: `architecture, patterns`) for grounding the technical design in existing repo patterns and conventions
-- Add `ce-best-practices-researcher` when the technical design involves a DSL, API surface, or pattern that benefits from external validation
+**High-Level Technical Design（高层技术设计）**
+- `ce-architecture-strategist` 用于验证 technical design 是否准确表示 intended approach，并识别 gaps
+- `ce-repo-research-analyst`（Scope: `architecture, patterns`）用于将 technical design grounded in existing repo patterns and conventions
+- 当 technical design 涉及 DSL、API surface 或受益于 external validation 的 pattern 时，添加 `ce-best-practices-researcher`
 
-**Implementation Units / Verification**
-- `ce-repo-research-analyst` (Scope: `patterns`) for concrete file targets, patterns to follow, and repo-specific sequencing clues
-- `ce-pattern-recognition-specialist` for consistency, duplication risks, and alignment with existing patterns
-- Add `ce-spec-flow-analyzer` when sequencing depends on user flow or handoff completeness
+**Implementation Units / Verification（实现单元与验证）**
+- `ce-repo-research-analyst`（Scope: `patterns`）用于 concrete file targets、patterns to follow 和 repo-specific sequencing clues
+- `ce-pattern-recognition-specialist` 用于 consistency、duplication risks 和 alignment with existing patterns
+- 当 sequencing 依赖 user flow 或 handoff completeness 时，添加 `ce-spec-flow-analyzer`
 
-**System-Wide Impact**
-- `ce-architecture-strategist` for cross-boundary effects, interface surfaces, and architectural knock-on impact
-- Add the specific specialist that matches the risk:
-  - `ce-performance-oracle` for scalability, latency, throughput, and resource-risk analysis
-  - `ce-security-sentinel` for auth, validation, exploit surfaces, and security boundary review
-  - `ce-data-integrity-guardian` for migrations, persistent state safety, consistency, and data lifecycle risks
+**System-Wide Impact（系统级影响）**
+- `ce-architecture-strategist` 用于 cross-boundary effects、interface surfaces 和 architectural knock-on impact
+- 添加匹配实际 risk 的 specific specialist：
+  - `ce-performance-oracle` 用于 scalability、latency、throughput 和 resource-risk analysis
+  - `ce-security-sentinel` 用于 auth、validation、exploit surfaces 和 security boundary review
+  - `ce-data-integrity-guardian` 用于 migrations、persistent state safety、consistency 和 data lifecycle risks
 
-**Risks & Dependencies / Operational Notes**
-- Use the specialist that matches the actual risk:
-  - `ce-security-sentinel` for security, auth, privacy, and exploit risk
-  - `ce-data-integrity-guardian` for migrations, backfills, persistent data safety, constraints, transaction boundaries, and production data transformation risk (plan context — not the PR-review `ce-data-migration-reviewer` persona)
-  - `ce-deployment-verification-agent` for rollout checklists, rollback planning, and launch verification
-  - `ce-performance-oracle` for capacity, latency, and scaling concerns
+**Risks & Dependencies / Operational Notes（风险、依赖与运维说明）**
+- 使用匹配实际 risk 的 specialist：
+  - `ce-security-sentinel` 用于 security、auth、privacy 和 exploit risk
+  - `ce-data-integrity-guardian` 用于 migrations、backfills、persistent data safety、constraints、transaction boundaries 和 production data transformation risk（plan context；不是 PR-review 的 `ce-data-migration-reviewer` persona）
+  - `ce-deployment-verification-agent` 用于 rollout checklists、rollback planning 和 launch verification
+  - `ce-performance-oracle` 用于 capacity、latency 和 scaling concerns
 
-**Agent Prompt Shape:**
+**Agent Prompt Shape（Agent Prompt 形状）：**
 
-For each selected section, pass:
-- The scope prefix from the mapping above when the agent supports scoped invocation
-- A short plan summary
-- The exact section text
-- Why the section was selected, including which checklist triggers fired
-- The plan depth and risk profile
-- A specific question to answer
+对每个 selected section，传入：
+- 当 agent 支持 scoped invocation 时，传入上方 mapping 的 scope prefix
+- 简短 plan summary
+- 精确 section text
+- 为什么选择该 section，包括触发了哪些 checklist triggers
+- plan depth 和 risk profile
+- 要回答的 specific question
 
-Instruct the agent to return:
-- findings that change planning quality
-- stronger rationale, sequencing, verification, risk treatment, or references
-- no implementation code
-- no shell commands
+指示 agent 返回：
+- 能改变 planning quality 的 findings
+- 更强的 rationale、sequencing、verification、risk treatment 或 references
+- 不要 implementation code
+- 不要 shell commands
 
-## 5.3.5 Choose Research Execution Mode
+## 5.3.5 选择 Research Execution Mode
 
-Use the lightest mode that will work:
+使用能工作的最轻量 mode：
 
-- **Direct mode** - Default. Use when the selected section set is small and the parent can safely read the agent outputs inline.
-- **Artifact-backed mode** - Use only when the selected research scope is large enough that inline returns would create unnecessary context pressure.
+- **Direct mode（直接模式）** - 默认。selected section set 较小，且 parent 可以安全 inline 读取 agent outputs 时使用。
+- **Artifact-backed mode（artifact 支撑模式）** - 仅当 selected research scope 足够大，inline returns 会造成不必要 context pressure 时使用。
 
-Signals that justify artifact-backed mode:
-- More than 5 agents are likely to return meaningful findings
-- The selected section excerpts are long enough that repeating them in multiple agent outputs would be wasteful
-- The topic is high-risk and likely to attract bulky source-backed analysis
+证明 artifact-backed mode 合理的 signals：
+- 超过 5 个 agents 可能返回 meaningful findings
+- selected section excerpts 足够长，在多个 agent outputs 中重复会浪费
+- topic high-risk，且可能引来 bulky source-backed analysis
 
-If artifact-backed mode is not clearly warranted, stay in direct mode.
+如果 artifact-backed mode 没有明显必要，留在 direct mode。
 
-Artifact-backed mode uses a per-run OS-temp scratch directory. Create it once before dispatching sub-agents and capture its **absolute path** — pass that absolute path to each sub-agent so they write to it directly. Do not use `.context/`; the artifacts are per-run throwaway that are cleaned up when deepening ends (see 5.3.6b), matching the repo Scratch Space convention for one-shot artifacts. Do not pass unresolved shell-variable strings to sub-agents; they need the resolved absolute path.
+Artifact-backed mode 使用 per-run OS-temp scratch directory。dispatching sub-agents 前创建一次，并捕获其 **absolute path**；将该 absolute path 传给每个 sub-agent，让它们直接写入。不要使用 `.context/`；artifacts 是 per-run throwaway，会在 deepening 结束时清理（见 5.3.6b），符合 repo Scratch Space 对 one-shot artifacts 的约定。不要向 sub-agents 传递未解析的 shell-variable strings；它们需要 resolved absolute path。
 
 ```bash
 SCRATCH_DIR="$(mktemp -d -t ce-plan-deepen-XXXXXX)"
 echo "$SCRATCH_DIR"
 ```
 
-Refer to the echoed absolute path as `<scratch-dir>` throughout the rest of this workflow.
+在本 workflow 剩余部分，将 echoed absolute path 称为 `<scratch-dir>`。
 
-## 5.3.6 Run Targeted Research
+## 5.3.6 运行 Targeted Research
 
-Launch the selected agents in parallel using the execution mode chosen above. If the current platform does not support parallel dispatch, run them sequentially instead. Omit the `mode` parameter when dispatching so the user's configured permission settings apply.
+使用上方选择的 execution mode 并行启动 selected agents。如果当前平台不支持 parallel dispatch，则改为 sequentially 运行。dispatch 时省略 `mode` parameter，让用户配置的 permission settings 生效。
 
-Prefer local repo and institutional evidence first. Use external research only when the gap cannot be closed responsibly from repo context or already-cited sources.
+优先使用 local repo 和 institutional evidence。只有当 gap 无法从 repo context 或 already-cited sources 负责地关闭时，才使用 external research。
 
-If a selected section can be improved by reading the origin document more carefully, do that before dispatching external agents.
+如果某个 selected section 通过更仔细读取 origin document 就能改善，在 dispatching external agents 前先这样做。
 
-**Direct mode:** Have each selected agent return its findings directly to the parent. Keep the return payload focused: strongest findings only, the evidence or sources that matter, the concrete planning improvement implied by the finding.
+**Direct mode（直接模式）：** 让每个 selected agent 直接向 parent 返回 findings。保持 return payload focused：只包含 strongest findings、重要 evidence 或 sources，以及 finding 暗示的 concrete planning improvement。
 
-**Artifact-backed mode:** For each selected agent, pass the absolute `<scratch-dir>` path captured earlier and instruct the agent to write one compact artifact file inside that directory, then return only a short completion summary. Each artifact should contain: target section, why selected, 3-7 findings, source-backed rationale, the specific plan change implied by each finding. No implementation code, no shell commands.
+**Artifact-backed mode（artifact 支撑模式）：** 对每个 selected agent，传入之前捕获的 absolute `<scratch-dir>` path，并指示 agent 在该 directory 中写入一个 compact artifact file，然后只返回 short completion summary。每个 artifact 应包含：target section、why selected、3-7 findings、source-backed rationale、每个 finding 暗示的 specific plan change。不要 implementation code，不要 shell commands。
 
-If an artifact is missing or clearly malformed, re-run that agent or fall back to direct-mode reasoning for that section.
+如果 artifact 缺失或明显 malformed，重新运行该 agent，或对该 section 回退到 direct-mode reasoning。
 
-If agent outputs conflict:
-- Prefer repo-grounded and origin-grounded evidence over generic advice
-- Prefer official framework documentation over secondary best-practice summaries when the conflict is about library behavior
-- If a real tradeoff remains, record it explicitly in the plan
+如果 agent outputs 冲突：
+- 相比 generic advice，优先 repo-grounded 和 origin-grounded evidence
+- 当冲突涉及 library behavior 时，相比 secondary best-practice summaries，优先 official framework documentation
+- 如果仍存在真实 tradeoff，在 plan 中明确记录
 
-## 5.3.6b Interactive Finding Review (Interactive Mode Only)
+## 5.3.6b Interactive Finding Review（仅 Interactive Mode）
 
-Skip this step in auto mode — proceed directly to 5.3.7.
+在 auto mode 中跳过本步骤；直接进入 5.3.7。
 
-In interactive mode, present each agent's findings to the user before integration. For each agent that returned findings:
+在 interactive mode 中，integration 前向用户呈现每个 agent 的 findings。对每个返回 findings 的 agent：
 
-1. **Summarize the agent and its target section** — e.g., "The ce-architecture-strategist reviewed Key Technical Decisions and found:"
-2. **Present the findings concisely** — bullet the key points, not the raw agent output. Include enough context for the user to evaluate: what the agent found, what evidence supports it, and what plan change it implies.
-3. **Ask the user** using the platform's blocking question tool when available (see Interaction Method):
-   - **Accept** — integrate these findings into the plan
-   - **Reject** — discard these findings entirely
-   - **Discuss** — the user wants to talk through the findings before deciding
+1. **Summarize the agent and its target section（总结 agent 及其 target section）** — 例如："The ce-architecture-strategist reviewed Key Technical Decisions and found:"
+2. **Present the findings concisely（简洁呈现 findings）** — 以 bullets 呈现 key points，而不是 raw agent output。包含足够 context 供用户评估：agent 发现了什么、什么 evidence 支持它、它暗示什么 plan change。
+3. **Ask the user**：可用时使用平台 blocking question tool（见 Interaction Method）：
+   - **Accept（接受）** — 将这些 findings integrate into the plan
+   - **Reject（拒绝）** — 完全 discard 这些 findings
+   - **Discuss（讨论）** — 用户想先讨论 findings 再决定
 
-If the user chooses "Discuss", engage in brief dialogue about the findings and then re-ask with only accept/reject (no discuss option on the second ask). The user makes a deliberate choice either way.
+如果用户选择 "Discuss"，围绕 findings 进行简短对话，然后只带 accept/reject 重新询问（第二次询问没有 discuss option）。无论哪种，用户都要做 deliberate choice。
 
-When presenting findings from multiple agents targeting the same section, present them one agent at a time so the user can make independent decisions. Do not merge findings from different agents before showing them.
+当多个 agents 针对同一 section 返回 findings 时，一次呈现一个 agent，让用户能独立决定。展示前不要合并不同 agents 的 findings。
 
-After all agents have been reviewed, carry only the accepted findings forward to 5.3.7.
+所有 agents review 完成后，只将 accepted findings 带入 5.3.7。
 
-If the user accepted no findings, report "No findings accepted — plan unchanged." Then proceed directly to Phase 5.4 (skip document-review and synthesis — the plan was not modified). This interactive-mode-only skip does not apply in auto mode; auto mode always proceeds through 5.3.7 and 5.3.8. No explicit scratch cleanup needed — `$SCRATCH_DIR` is OS temp and will be cleaned up by the OS; leaving it in place preserves the rejected agent artifacts for debugging.
+如果用户没有接受任何 findings，报告 "No findings accepted — plan unchanged." 然后直接进入 Phase 5.4（跳过 document-review 和 synthesis；plan 未修改）。这个 interactive-mode-only skip 不适用于 auto mode；auto mode 总是继续通过 5.3.7 和 5.3.8。无需显式 scratch cleanup；`$SCRATCH_DIR` 是 OS temp，会由 OS 清理；保留它可保存 rejected agent artifacts 以便 debugging。
 
-If findings were accepted and the plan was modified, proceed through 5.3.7 and 5.3.8 as normal — document-review acts as a quality gate on the changes.
+如果有 findings 被接受且 plan 被修改，按正常流程继续 5.3.7 和 5.3.8；document-review 作为 changes 的 quality gate。
 
-## 5.3.7 Synthesize and Update the Plan
+## 5.3.7 综合并更新 Plan
 
-Strengthen only the selected sections. Keep the plan coherent and preserve its overall structure.
+只 strengthen selected sections。保持 plan coherent，并保留整体 structure。
 
-**In interactive mode:** Only integrate findings the user accepted in 5.3.6b. If some findings from different agents touch the same section, reconcile them coherently but do not reintroduce rejected findings.
+**在 interactive mode 中：** 只 integrate 用户在 5.3.6b 接受的 findings。如果不同 agents 的 findings 触及同一 section，coherently reconcile 它们，但不要重新引入 rejected findings。
 
-Allowed changes:
-- Clarify or strengthen decision rationale
-- Tighten requirements trace or origin fidelity
-- Reorder or split implementation units when sequencing is weak — but **never renumber existing U-IDs**. Reordering preserves U-IDs in their new order (e.g., U1, U3, U5 reordered is correct; renumbering to U1, U2, U3 is not). Splitting keeps the original U-ID on the original concept and assigns the next unused number to the new unit. Renumbering breaks ce-work blocker and verification references that were written against the original IDs
-- Add missing pattern references, file/test paths, or verification outcomes
-- Expand system-wide impact, risks, or rollout treatment where justified
-- Reclassify open questions between `Resolved During Planning` and `Deferred to Implementation` when evidence supports the change
-- Strengthen, replace, or add a High-Level Technical Design section when the work warrants it and the current representation is weak
-- Strengthen or add per-unit technical design fields where the unit's approach is non-obvious
-- Add or update `deepened: YYYY-MM-DD` in frontmatter when the plan was substantively improved
+Allowed changes（允许的 changes）：
+- Clarify 或 strengthen decision rationale
+- Tighten requirements trace 或 origin fidelity
+- 当 sequencing 较弱时 reorder 或 split implementation units；但**绝不要 renumber existing U-IDs**。Reordering 会在新顺序中保留 U-IDs（例如 U1、U3、U5 reordered 是正确的；renumbering to U1、U2、U3 不正确）。Splitting 会将 original U-ID 保留给 original concept，并将下一个 unused number 分配给 new unit。Renumbering 会破坏针对 original IDs 写下的 ce-work blocker 和 verification references
+- 添加缺失的 pattern references、file/test paths 或 verification outcomes
+- 在有依据时扩展 system-wide impact、risks 或 rollout treatment
+- 当 evidence 支持 change 时，在 `Resolved During Planning` 与 `Deferred to Implementation` 之间 reclassify open questions
+- 当 work 值得且当前 representation 较弱时，strengthen、replace 或 add High-Level Technical Design section
+- 当 unit 的 approach 不明显时，strengthen 或 add per-unit technical design fields
+- 当 plan 被 substantively improved 时，在 frontmatter 中 add 或 update `deepened: YYYY-MM-DD`
 
-Do **not**:
-- Add implementation code — no imports, exact method signatures, or framework-specific syntax. Pseudo-code sketches and DSL grammars are allowed
-- Add git commands, commit choreography, or exact test command recipes
-- Add generic `Research Insights` subsections everywhere
-- Rewrite the entire plan from scratch
-- Invent new product requirements, scope changes, or success criteria without surfacing them explicitly
-- Renumber existing U-IDs as part of reordering, splitting, deletion, or "tidying" the unit list. Deepening is the most likely accidental-renumber vector — preserve U-IDs even when the new order would look cleaner with sequential numbering
+Do **not（不要）**：
+- 添加 implementation code：不要 imports、exact method signatures 或 framework-specific syntax。允许 pseudo-code sketches 和 DSL grammars
+- 添加 git commands、commit choreography 或 exact test command recipes
+- 到处添加 generic `Research Insights` subsections
+- 从头 rewrite 整个 plan
+- 在未明确 surface 的情况下 invent new product requirements、scope changes 或 success criteria
+- 在 reordering、splitting、deletion 或 "tidying" unit list 时 renumber existing U-IDs。Deepening 是最可能 accidental-renumber 的 vector；即使新顺序用 sequential numbering 看起来更干净，也要保留 U-IDs
 
-If research reveals a product-level ambiguity that should change behavior or scope:
-- Do not silently decide it here
-- Record it under `Open Questions`
-- Recommend `ce-brainstorm` if the gap is truly product-defining
+如果 research 揭示了应改变 behavior 或 scope 的 product-level ambiguity：
+- 不要在这里静默决定
+- 将其记录在 `Open Questions` 下
+- 如果 gap 真正 product-defining，推荐 `ce-brainstorm`
