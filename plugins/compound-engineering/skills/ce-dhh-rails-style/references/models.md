@@ -1,9 +1,9 @@
-# Models - DHH Rails Style
+# Models - DHH Rails Style（Models 模型）
 
 <model_concerns>
-## Concerns for Horizontal Behavior
+## 用 Concerns 承载 Horizontal Behavior
 
-Models heavily use concerns. A typical Card model includes 14+ concerns:
+Models 大量使用 concerns。一个典型 Card model 包含 14+ concerns：
 
 ```ruby
 class Card < ApplicationRecord
@@ -25,15 +25,15 @@ class Card < ApplicationRecord
 end
 ```
 
-Each concern is self-contained with associations, scopes, and methods.
+每个 concern 都 self-contained，包含 associations、scopes 和 methods。
 
-**Naming:** Adjectives describing capability (`Closeable`, `Publishable`, `Watchable`)
+**Naming（命名）：** 使用描述 capability 的 adjectives（`Closeable`、`Publishable`、`Watchable`）
 </model_concerns>
 
 <state_records>
-## State as Records, Not Booleans
+## State as Records, Not Booleans（用 Records 表达 State，而不是 Booleans）
 
-Instead of boolean columns, create separate records:
+不要用 boolean columns，而是创建 separate records：
 
 ```ruby
 # Instead of:
@@ -58,13 +58,13 @@ class Card::NotNow < ApplicationRecord
 end
 ```
 
-**Benefits:**
-- Automatic timestamps (when it happened)
-- Track who made changes
-- Easy filtering via joins and `where.missing`
-- Enables rich UI showing when/who
+**Benefits（收益）：**
+- Automatic timestamps（事情何时发生）
+- Track 谁做了 changes
+- 通过 joins 和 `where.missing` 轻松 filtering
+- 支持展示 when/who 的 rich UI
 
-**In the model:**
+**在 model 中：**
 ```ruby
 module Closeable
   extend ActiveSupport::Concern
@@ -87,7 +87,7 @@ module Closeable
 end
 ```
 
-**Querying:**
+**Querying（查询）：**
 ```ruby
 Card.joins(:closure)         # closed cards
 Card.where.missing(:closure) # open cards
@@ -95,19 +95,19 @@ Card.where.missing(:closure) # open cards
 </state_records>
 
 <callbacks>
-## Callbacks - Used Sparingly
+## Callbacks - Used Sparingly（谨慎使用 Callbacks）
 
-Only 38 callback occurrences across 30 files in Fizzy. Guidelines:
+Fizzy 的 30 个 files 中只有 38 处 callback occurrences。Guidelines：
 
-**Use for:**
-- `after_commit` for async work
-- `before_save` for derived data
-- `after_create_commit` for side effects
+**Use for（适用）：**
+- 用 `after_commit` 处理 async work
+- 用 `before_save` 处理 derived data
+- 用 `after_create_commit` 处理 side effects
 
-**Avoid:**
-- Complex callback chains
-- Business logic in callbacks
-- Synchronous external calls
+**Avoid（避免）：**
+- Complex callback chains（复杂 callback 链）
+- callbacks 中的 business logic
+- Synchronous external calls（同步 external calls）
 
 ```ruby
 class Card < ApplicationRecord
@@ -123,9 +123,9 @@ end
 </callbacks>
 
 <scopes>
-## Scope Naming
+## Scope Naming（Scope 命名）
 
-Standard scope names:
+Standard scope names（标准 scope 名称）：
 
 ```ruby
 class Card < ApplicationRecord
@@ -145,9 +145,9 @@ end
 </scopes>
 
 <poros>
-## Plain Old Ruby Objects
+## Plain Old Ruby Objects（Plain Old Ruby Objects，纯 Ruby 对象）
 
-POROs namespaced under parent models:
+POROs 放在 parent models namespace 下：
 
 ```ruby
 # app/models/event/description.rb
@@ -178,13 +178,13 @@ class User::Filtering
 end
 ```
 
-**NOT used for service objects.** Business logic stays in models.
+**不要用于 service objects。** Business logic 留在 models 中。
 </poros>
 
 <verbs_predicates>
-## Method Naming
+## Method Naming（方法命名）
 
-**Verbs** - Actions that change state:
+**Verbs（动词）** - 改变 state 的 actions：
 ```ruby
 card.close
 card.reopen
@@ -194,14 +194,14 @@ board.publish
 board.archive
 ```
 
-**Predicates** - Queries derived from state:
+**Predicates（谓词）** - 从 state 派生的 queries：
 ```ruby
 card.closed?    # closure.present?
 card.golden?    # goldness.present?
 board.published?
 ```
 
-**Avoid** generic setters:
+**Avoid（避免）** generic setters：
 ```ruby
 # Bad
 card.set_closed(true)
@@ -214,9 +214,9 @@ card.ungild
 </verbs_predicates>
 
 <validation_philosophy>
-## Validation Philosophy
+## Validation Philosophy（Validation 理念）
 
-Minimal validations on models. Use contextual validations on form/operation objects:
+models 上只放 minimal validations。contextual validations 放在 form/operation objects 上：
 
 ```ruby
 # Model - minimal
@@ -240,7 +240,7 @@ class Signup
 end
 ```
 
-**Prefer database constraints** over model validations for data integrity:
+对 data integrity，**prefer database constraints**，而不是 model validations：
 ```ruby
 # migration
 add_index :users, :email, unique: true
@@ -249,9 +249,9 @@ add_foreign_key :cards, :boards
 </validation_philosophy>
 
 <error_handling>
-## Let It Crash Philosophy
+## Let It Crash Philosophy（让错误显式崩溃的哲学）
 
-Use bang methods that raise exceptions on failure:
+使用 failure 时 raise exceptions 的 bang methods：
 
 ```ruby
 # Preferred - raises on failure
@@ -266,13 +266,13 @@ if @card.save
 end
 ```
 
-Let errors propagate naturally. Rails handles ActiveRecord::RecordInvalid with 422 responses.
+让 errors 自然 propagate。Rails 会用 422 responses 处理 ActiveRecord::RecordInvalid。
 </error_handling>
 
 <default_values>
-## Default Values with Lambdas
+## Default Values with Lambdas（使用 Lambdas 设置默认值）
 
-Use lambda defaults for associations with Current:
+对带 Current 的 associations 使用 lambda defaults：
 
 ```ruby
 class Card < ApplicationRecord
@@ -285,13 +285,13 @@ class Comment < ApplicationRecord
 end
 ```
 
-Lambdas ensure dynamic resolution at creation time.
+Lambdas 确保在 creation time 做 dynamic resolution。
 </default_values>
 
 <rails_71_patterns>
-## Rails 7.1+ Model Patterns
+## Rails 7.1+ Model Patterns（Rails 7.1+ Model 模式）
 
-**Normalizes** - clean data before validation:
+**Normalizes** - validation 前清理 data：
 ```ruby
 class User < ApplicationRecord
   normalizes :email, with: ->(email) { email.strip.downcase }
@@ -299,7 +299,7 @@ class User < ApplicationRecord
 end
 ```
 
-**Delegated Types** - replace polymorphic associations:
+**Delegated Types** - 替代 polymorphic associations：
 ```ruby
 class Message < ApplicationRecord
   delegated_type :messageable, types: %w[Comment Reply Announcement]
@@ -311,7 +311,7 @@ message.comment         # returns the Comment
 Message.comments        # scope for Comment messages
 ```
 
-**Store Accessor** - structured JSON storage:
+**Store Accessor（Store 访问器）** - structured JSON storage：
 ```ruby
 class User < ApplicationRecord
   store :settings, accessors: [:theme, :notifications_enabled], coder: JSON
@@ -323,15 +323,15 @@ user.notifications_enabled = true
 </rails_71_patterns>
 
 <concern_guidelines>
-## Concern Guidelines
+## Concern Guidelines（Concern 指南）
 
-- **50-150 lines** per concern (most are ~100)
-- **Cohesive** - related functionality only
-- **Named for capabilities** - `Closeable`, `Watchable`, not `CardHelpers`
-- **Self-contained** - associations, scopes, methods together
-- **Not for mere organization** - create when genuine reuse needed
+- 每个 concern **50-150 lines**（大多约 100）
+- **Cohesive（内聚）** - 只放 related functionality
+- **Named for capabilities（按能力命名）** - `Closeable`、`Watchable`，不是 `CardHelpers`
+- **Self-contained** - associations、scopes、methods 放在一起
+- **Not for mere organization** - 只有需要 genuine reuse 时才创建
 
-**Touch chains** for cache invalidation:
+用于 cache invalidation 的 **Touch chains**：
 ```ruby
 class Comment < ApplicationRecord
   belongs_to :card, touch: true
@@ -342,9 +342,9 @@ class Card < ApplicationRecord
 end
 ```
 
-When comment updates, card's `updated_at` changes, which cascades to board.
+comment updates 时，card 的 `updated_at` 会变化，并 cascade 到 board。
 
-**Transaction wrapping** for related updates:
+用于 related updates 的 **Transaction wrapping**：
 ```ruby
 class Card < ApplicationRecord
   def close(creator: Current.user)

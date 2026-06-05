@@ -1,76 +1,76 @@
-# `ce-report-bug`
+# `ce-report-bug`（报告 bug）
 
-> Report a bug in the compound-engineering plugin — gathers structured information and creates a GitHub issue at `EveryInc/compound-engineering-plugin`.
+> 报告 compound-engineering plugin 中的 bug：收集 structured information，并在 `EveryInc/compound-engineering-plugin` 创建 GitHub issue。
 
-`ce-report-bug` is the **bug-filing** skill. It walks the user through six structured questions (category, component, what happened, expected behavior, repro steps, error messages), automatically gathers environment information (OS, plugin version, agent CLI version), formats a complete bug report, and creates a GitHub issue via `gh`. The skill makes filing a useful bug report fast — the alternative is opening GitHub, finding the right repo, remembering what to include, and typing it from scratch.
+`ce-report-bug` 是 **bug-filing** skill。它引导用户回答六个 structured questions（category、component、what happened、expected behavior、repro steps、error messages），自动收集 environment information（OS、plugin version、agent CLI version），格式化完整 bug report，并通过 `gh` 创建 GitHub issue。此 skill 让提交有用 bug report 变快；否则你需要打开 GitHub、找到正确 repo、记住应包含什么，再从头输入。
 
-Beta-style explicit-invocation only (`disable-model-invocation: true`).
+Beta-style explicit-invocation only（beta 风格，仅显式调用；`disable-model-invocation: true`）。
 
 ---
 
 ## TL;DR
 
-| Question | Answer |
+| 问题 | 答案 |
 |----------|--------|
-| What does it do? | Gathers structured bug info via 6 questions, collects environment data automatically, files a GitHub issue at `EveryInc/compound-engineering-plugin` |
-| When to use it | When something in the compound-engineering plugin doesn't work and you want to report it |
-| What it produces | A GitHub issue URL (or a formatted bug report you can file manually if `gh` isn't available) |
-| Privacy | Doesn't collect personal info, API keys, credentials, or private code |
+| 它做什么？ | 通过 6 个 questions 收集 structured bug info，自动收集 environment data，并在 `EveryInc/compound-engineering-plugin` filing GitHub issue |
+| 何时使用 | Compound-engineering plugin 中某些东西不工作，且你想 report |
+| 产出什么 | GitHub issue URL（或在 `gh` 不可用时生成可手动提交的 formatted bug report） |
+| Privacy | 不收集 personal info、API keys、credentials 或 private code |
 
 ---
 
-## The Problem
+## 问题
 
-Filing a useful bug report has high friction:
+提交有用 bug report 的 friction 很高：
 
-- **Finding the right repo** — which org, which repo, which label?
-- **Remembering what to include** — environment info, repro steps, error messages, expected vs actual behavior — easy to miss something the maintainer needs
-- **Manual environment gathering** — running `uname`, finding plugin version, checking CLI version, formatting it all
-- **No template** — every bug report starts from scratch; some are great, some are "it's broken"
-- **Filing without `gh`** — without the CLI, the user has to copy-paste through the GitHub UI manually
-- **Privacy concerns** — naïve env gathering risks including API keys or paths that reveal too much
+- **Finding the right repo**：哪个 org、哪个 repo、哪个 label？
+- **Remembering what to include**：environment info、repro steps、error messages、expected vs actual behavior；很容易漏掉 maintainer 需要的内容
+- **Manual environment gathering**：运行 `uname`、找 plugin version、检查 CLI version、格式化所有信息
+- **No template**：每个 bug report 从零开始；有些很清楚，有些只是 "it's broken"
+- **Filing without `gh`**：没有 CLI 时，用户必须手动通过 GitHub UI copy-paste
+- **Privacy concerns**：天真的 env gathering 可能包含 API keys 或泄露过多的 paths
 
-## The Solution
+## 方案
 
-`ce-report-bug` runs reporting as a structured intake → format → file flow:
+`ce-report-bug` 按 structured intake -> format -> file flow 运行：
 
-- **6 questions** in a structured order — category, component, actual, expected, repro steps, error messages
-- **Automatic env gathering** — OS via `uname -a`, plugin version via manifest reading, agent CLI version via `--version`
-- **Template-based formatting** — every report has the same shape, so maintainers can scan quickly
-- **`gh issue create`** with the right repo, title prefix, and labels (or fallback without labels)
-- **Manual-fallback** when `gh` is unavailable — formatted report displayed for the user to file by hand
-- **Privacy by design** — only technical info; never personal info, credentials, or code
+- **6 个 questions** 按顺序收集：category、component、actual、expected、repro steps、error messages
+- **Automatic env gathering**：通过 `uname -a` 获取 OS，通过 manifest reading 获取 plugin version，通过 `--version` 获取 agent CLI version
+- **Template-based formatting**：每个 report 形状一致，maintainers 能快速 scan
+- 使用正确 repo、title prefix 和 labels 的 **`gh issue create`**（labels 缺失时 fallback without labels）
+- **Manual-fallback**：`gh` 不可用时展示 formatted report，供用户手动提交
+- **Privacy by design**：只包含 technical info；绝不包含 personal info、credentials 或 code
 
 ---
 
-## What Makes It Novel
+## 独特之处
 
-### 1. Six structured questions in a deliberate order
+### 1. Six structured questions in a deliberate order（按刻意顺序提出 6 个结构化问题）
 
-The skill asks:
+Skill 会询问：
 
-1. **Bug category** (multiple choice) — Agent / Command / Skill / MCP server / Installation / Other
-2. **Specific component** (free text) — name of the agent, command, skill, or MCP server
-3. **What happened (actual behavior)** — clear description of what the user observed
-4. **What should have happened (expected behavior)** — clear description of expected behavior
-5. **Steps to reproduce** — what the user did before the bug occurred
-6. **Error messages** — any error output
+1. **Bug category（bug 类别）**（multiple choice）：Agent / Command / Skill / MCP server / Installation / Other
+2. **Specific component**（free text）：agent、command、skill 或 MCP server 名称
+3. **What happened (actual behavior)**：用户观察到的清晰描述
+4. **What should have happened (expected behavior)**：expected behavior 的清晰描述
+5. **Steps to reproduce**：bug 发生前用户做了什么
+6. **Error messages**：任何 error output
 
-The order matters: category and component first scope the bug; actual vs expected establishes the disconnect; repro steps + errors give the maintainer the diagnostic foothold.
+顺序重要：category 和 component 先界定 bug；actual vs expected 建立 disconnect；repro steps + errors 给 maintainer 诊断抓手。
 
-### 2. Automatic environment gathering
+### 2. Automatic environment gathering（自动收集环境信息）
 
-The skill runs:
+Skill 运行：
 
-- `uname -a` for OS info
-- Reads plugin manifest from platform-specific location (Claude Code: `~/.claude/plugins/installed_plugins.json`; Codex: `.codex/plugins/`; etc.)
-- Runs the platform's CLI version command (`claude --version`, `codex --version`, etc.)
+- `uname -a` 获取 OS info
+- 从 platform-specific location 读取 plugin manifest（Claude Code：`~/.claude/plugins/installed_plugins.json`；Codex：`.codex/plugins/` 等）
+- 运行平台 CLI version command（`claude --version`、`codex --version` 等）
 
-If any of these fail, the skill notes "unknown" and continues — don't block reporting on environment-collection issues.
+如果其中任何一步失败，skill 记录 "unknown" 并继续；不要因为 environment-collection issues 阻塞 reporting。
 
-### 3. Single template, consistent shape
+### 3. Single template, consistent shape（单一模板、一致结构）
 
-Every report uses the same template:
+每个 report 使用相同 template：
 
 ```markdown
 ## Bug Description
@@ -102,11 +102,11 @@ Every report uses the same template:
 *Reported via `/ce-report-bug` skill*
 ```
 
-The footer marks the report as skill-generated so the maintainer knows it followed the canonical template.
+Footer 标记 report 由 skill 生成，让 maintainer 知道它遵循 canonical template。
 
-### 4. `gh issue create` with the right scope
+### 4. `gh issue create` with the right scope（使用正确 scope 创建 issue）
 
-The skill files via:
+Skill 通过以下方式 filing：
 
 ```bash
 gh issue create \
@@ -116,51 +116,52 @@ gh issue create \
   --label "bug,compound-engineering"
 ```
 
-Right repo, right title prefix, right labels. If labels don't exist (some forks/clones may lack them), the skill retries without `--label` rather than failing.
+正确 repo、正确 title prefix、正确 labels。如果 labels 不存在（某些 forks/clones 可能缺少），skill 会不带 `--label` retry，而不是失败。
 
-### 5. Manual fallback when `gh` is unavailable
+### 5. Manual fallback when `gh` is unavailable（`gh` 不可用时手动 fallback）
 
-If `gh` isn't installed or authenticated, the skill displays the fully-formatted report to the user so they can paste it into the GitHub web UI manually. No friction lost — the reporting work is already done.
+如果 `gh` 未安装或未认证，skill 会展示 fully-formatted report，供用户手动粘贴到 GitHub web UI。Reporting work 已经完成，没有信息损失。
 
-### 6. Privacy by design
+### 6. Privacy by design（隐私优先设计）
 
-The skill explicitly does **not** collect:
+Skill 明确 **不** 收集：
 
-- Personal information
-- API keys or credentials
-- Private code from projects
-- File paths beyond basic OS info from `uname`
+- Personal information（个人信息）
+- API keys 或 credentials
+- Projects 中的 private code
+- 除 `uname` 基本 OS info 之外的 file paths
 
-Only technical information about the bug is included. This is documented in the skill so users know what's being shared.
+只包含 bug 的 technical information。Skill 中记录了这一点，让用户知道什么会被 shared。
 
-### 7. Explicit-invocation only
+### 7. Explicit-invocation only（仅显式调用）
 
-`disable-model-invocation: true` prevents the skill from auto-firing on prose mentions of bugs. Bug reporting is a deliberate user choice — invoke `/ce-report-bug` directly.
+`disable-model-invocation: true` 防止 skill 因 prose 中提到 bugs 而 auto-fire。Bug reporting 是 deliberate user choice：直接调用 `/ce-report-bug`。
 
 ---
 
-## Quick Example
+## 快速示例
 
-You hit a bug where `/ce-plan` produces a plan with U-IDs that aren't sequential. You invoke `/ce-report-bug`.
+你遇到 `/ce-plan` 生成 U-IDs 不连续的 bug。调用 `/ce-report-bug`。
 
-The skill walks through 6 questions:
+Skill 走完 6 个 questions：
 
-1. **Category**: Skill not working
-2. **Component**: ce-plan
-3. **What happened**: "Plan was generated with U-IDs U1, U2, U4 — U3 was skipped without explanation."
-4. **Expected**: "U-IDs should be sequential without gaps in initial generation."
-5. **Repro**: "Run `/ce-plan` from a brainstorm doc with 4 implementation units. The third unit gets numbered U4 instead of U3."
-6. **Error messages**: "None visible; just the wrong numbering."
+1. **Category（类别）**：Skill not working
+2. **Component（组件）**：ce-plan
+3. **What happened（实际发生）**："Plan was generated with U-IDs U1, U2, U4 — U3 was skipped without explanation."
+4. **Expected（预期行为）**："U-IDs should be sequential without gaps in initial generation."
+5. **Repro（复现步骤）**："Run `/ce-plan` from a brainstorm doc with 4 implementation units. The third unit gets numbered U4 instead of U3."
+6. **Error messages（错误信息）**："None visible; just the wrong numbering."
 
-Environment gathering runs in the background:
-- `uname -a`: macOS arm64
-- Plugin version: 3.4.1
-- Agent platform: Claude Code
-- Agent version: claude-code 1.2.3
+Environment gathering 在后台运行：
 
-Formatted report goes to `gh issue create --repo EveryInc/compound-engineering-plugin --title "[compound-engineering] Bug: U-ID numbering skips U3 in initial plan generation" --body "..." --label "bug,compound-engineering"`.
+- `uname -a`：macOS arm64
+- Plugin version（plugin 版本）：3.4.1
+- Agent platform（agent 平台）：Claude Code
+- Agent version（agent 版本）：claude-code 1.2.3
 
-Returns:
+Formatted report 被传给 `gh issue create --repo EveryInc/compound-engineering-plugin --title "[compound-engineering] Bug: U-ID numbering skips U3 in initial plan generation" --body "..." --label "bug,compound-engineering"`。
+
+返回：
 
 ```text
 Bug report submitted successfully!
@@ -174,81 +175,81 @@ The maintainer will review your report and respond as soon as possible.
 
 ---
 
-## When to Reach For It
+## 何时使用
 
-Reach for `ce-report-bug` when:
+在以下情况使用 `ce-report-bug`：
 
-- A skill, command, agent, or MCP integration in compound-engineering doesn't work as expected
-- You want to report something the maintainer can action without follow-up questions
-- You're not sure what details to include — the structured questions catch what's needed
+- Compound-engineering 中的 skill、command、agent 或 MCP integration 没按预期工作
+- 想报告 maintainer 可以 action 且无需 follow-up questions 的问题
+- 不确定应包含哪些 details；structured questions 会捕获所需内容
 
-Skip `ce-report-bug` when:
+以下情况跳过 `ce-report-bug`：
 
-- The bug is in a different plugin or tool (this filing target is hardcoded to compound-engineering)
-- It's a feature request, not a bug → file a discussion or feature-request issue manually
-- You're not sure if it's a bug or expected — check `/ce-release-notes` first to see if behavior changed in a recent release
-
----
-
-## Use as Part of the Workflow
-
-`ce-report-bug` is a standalone utility — doesn't sit inside the chain. It's invoked when something goes wrong and the user wants the maintainer to know.
-
-Common companion skills:
-
-- **`/ce-update`** — check version first; you might be reporting a bug that's already fixed in a newer version
-- **`/ce-release-notes`** — check whether the behavior changed recently; might be intended
+- Bug 在不同 plugin 或 tool 中（此 filing target hardcoded 到 compound-engineering）
+- 这是 feature request，不是 bug -> 手动 filing discussion 或 feature-request issue
+- 不确定这是 bug 还是 expected behavior -> 先查 `/ce-release-notes`，看 recent release 是否改变了 behavior
 
 ---
 
-## Use Standalone
+## 作为 Workflow 的一部分使用
 
-Direct invocation:
+`ce-report-bug` 是 standalone utility，不在 chain 内。当出错且用户想让 maintainer 知道时调用。
 
-- `/ce-report-bug` — walks through the 6 questions
-- `/ce-report-bug "brief description"` — uses the description as initial context; still walks through the structured questions for completeness
+常见 companion skills：
 
-The skill drives the intake. There's no skip-questions option — the structured intake is the value; if it's overkill for a one-line report, file via the GitHub UI directly.
+- **`/ce-update`**：先检查 version；你可能正在报告 newer version 已修复的 bug
+- **`/ce-release-notes`**：检查 behavior 最近是否变化；可能是 intended
 
 ---
 
-## Reference
+## 单独使用
 
-| Step | Action |
+直接调用：
+
+- `/ce-report-bug`：走完 6 个 questions
+- `/ce-report-bug "brief description"`：把 description 作为 initial context；仍然走 structured questions，以确保完整
+
+Skill 驱动 intake。没有 skip-questions option：structured intake 就是价值；如果它对 one-line report 显得过重，请直接通过 GitHub UI filing。
+
+---
+
+## 参考
+
+| 步骤 | 操作 |
 |------|--------|
-| 1 | Gather bug info (6 structured questions) |
-| 2 | Collect environment info (OS, plugin version, agent CLI version) |
-| 3 | Format the bug report (consistent template) |
-| 4 | Create GitHub issue via `gh` (with labels; fallback without) |
-| 5 | Confirm submission and display issue URL |
+| 1 | Gather bug info（收集 bug 信息；6 structured questions） |
+| 2 | Collect environment info（收集环境信息；OS、plugin version、agent CLI version） |
+| 3 | Format the bug report（格式化 bug report；consistent template） |
+| 4 | 通过 `gh` 创建 GitHub issue（with labels；fallback without） |
+| 5 | Confirm submission 并 display issue URL（确认提交并显示 issue URL） |
 
-Repo target: `EveryInc/compound-engineering-plugin`. Title prefix: `[compound-engineering]`. Labels: `bug,compound-engineering` (with fallback to no labels if missing).
-
----
-
-## FAQ
-
-**What does the skill collect about my environment?**
-Only technical info: OS string from `uname -a`, plugin version from the manifest, agent platform name, agent CLI version. No personal info, no API keys, no credentials, no private code. The report's `Environment` section shows exactly what's included.
-
-**What if `gh` isn't installed?**
-The skill displays the fully-formatted bug report and asks you to file it manually via the GitHub web UI. No information is lost — the structured intake and formatting still happened.
-
-**Can I report a non-compound-engineering bug?**
-This skill specifically files at `EveryInc/compound-engineering-plugin`. For other plugins or tools, file directly in their respective repos. The structure of this skill is generalizable, but the repo target is hardcoded.
-
-**What if labels don't exist on the repo?**
-The skill retries without `--label`. Some forks or clones may not have the `bug` label set up; the report still files successfully without it.
-
-**Can I edit the report before it gets filed?**
-The skill walks through the questions interactively, so you can refine each answer before moving on. Once the report is formatted, the skill files via `gh` directly. If you want manual review, decline `gh` and file via the web UI yourself with the formatted text.
-
-**Is it OK if I file the same bug twice?**
-The skill doesn't deduplicate — it files what you ask. If you're worried about duplicates, search the issue tracker first. The maintainer can close duplicates as needed.
+Repo target：`EveryInc/compound-engineering-plugin`。Title prefix：`[compound-engineering]`。Labels：`bug,compound-engineering`（missing 时 fallback to no labels）。
 
 ---
 
-## See Also
+## 常见问题
 
-- [`/ce-update`](./ce-update.md) — check plugin version; older versions may have fixed bugs
-- [`/ce-release-notes`](./ce-release-notes.md) — check whether the behavior changed in a recent release; might not be a bug
+**Skill 会收集哪些环境信息？**
+只收集 technical info：来自 `uname -a` 的 OS string、manifest 中的 plugin version、agent platform name、agent CLI version。不收集 personal info、API keys、credentials 或 private code。Report 的 `Environment` section 会明确显示包含内容。
+
+**如果 `gh` 没安装怎么办？**
+Skill 会展示 fully-formatted bug report，并请你通过 GitHub web UI 手动提交。信息不会丢；structured intake 和 formatting 仍已完成。
+
+**可以报告 non-compound-engineering bug 吗？**
+此 skill 专门 filing 到 `EveryInc/compound-engineering-plugin`。其他 plugins 或 tools 请直接到对应 repos filing。此 skill 的结构可泛化，但 repo target 是 hardcoded。
+
+**如果 repo 上 labels 不存在怎么办？**
+Skill 会不带 `--label` retry。某些 forks 或 clones 可能没有设置 `bug` label；report 仍会成功 filing。
+
+**提交前可以编辑 report 吗？**
+Skill 会互动式走完 questions，因此你可以在进入下一步前 refine 每个 answer。Report 格式化后，skill 会直接通过 `gh` filing。如果你想 manual review，请拒绝 `gh`，用 formatted text 自己通过 web UI 提交。
+
+**重复 filing 同一个 bug 可以吗？**
+Skill 不 deduplicate；它会 filing 你要求的内容。如果担心 duplicate，请先搜索 issue tracker。Maintainer 可按需关闭 duplicates。
+
+---
+
+## 另见（See Also）
+
+- [`/ce-update`](./ce-update.md) - 检查 plugin version；older versions 可能已有 fixed bugs
+- [`/ce-release-notes`](./ce-release-notes.md) - 检查 behavior 是否在 recent release 变化；可能不是 bug

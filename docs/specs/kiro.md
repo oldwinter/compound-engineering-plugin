@@ -1,8 +1,8 @@
-# Kiro CLI Spec (Custom Agents, Skills, Steering, MCP, Settings)
+# Kiro CLI Spec（Kiro CLI 规格：Custom Agents、Skills、Steering、MCP、Settings）
 
-Last verified: 2026-02-17
+最后验证：2026-02-17
 
-## Primary sources
+## 主要来源
 
 ```
 https://kiro.dev/docs/cli/
@@ -14,12 +14,12 @@ https://kiro.dev/docs/cli/hooks/
 https://agentskills.io
 ```
 
-## Config locations
+## Config 位置
 
-- Project-level config: `.kiro/` directory at project root.
-- No global/user-level config directory — all config is project-scoped.
+- Project-level config：project root 下的 `.kiro/` directory。
+- 没有 global/user-level config directory——所有 config 都是 project-scoped。
 
-## Directory structure
+## 目录结构
 
 ```
 .kiro/
@@ -36,17 +36,17 @@ https://agentskills.io
     └── mcp.json                 # MCP server configuration
 ```
 
-## Custom agents (JSON config + prompt files)
+## Custom agents（custom agents，JSON config + prompt files，prompt 文件）
 
-- Custom agents are JSON files in `.kiro/agents/`.
-- Each agent has a corresponding prompt `.md` file, referenced via `file://` URI.
-- Agent config has 14 possible fields (see below).
-- Agents are activated by user selection (no auto-activation).
-- The converter outputs a subset of fields relevant to converted plugins.
+- Custom agents 是 `.kiro/agents/` 中的 JSON files。
+- 每个 agent 都有对应 prompt `.md` file，通过 `file://` URI 引用。
+- Agent config 有 14 个 possible fields（见下方）。
+- Agents 由 user selection 激活（没有 auto-activation）。
+- converter 输出与 converted plugins 相关的 fields 子集。
 
-### Agent config fields
+### Agent config fields（agent config 字段）
 
-| Field | Type | Used in conversion | Notes |
+| Field | Type | Used in conversion | Notes（说明） |
 |---|---|---|---|
 | `name` | string | Yes | Agent display name |
 | `description` | string | Yes | Human-readable description |
@@ -63,7 +63,7 @@ https://agentskills.io
 | `model` | string | No | Model selection |
 | `keyboardShortcut` | string | No | Quick-switch shortcut |
 
-### Example agent config
+### Agent config 示例
 
 ```json
 {
@@ -80,27 +80,27 @@ https://agentskills.io
 }
 ```
 
-## Skills (SKILL.md standard)
+## Skills（SKILL.md standard，SKILL.md 标准）
 
-- Skills follow the open [Agent Skills](https://agentskills.io) standard.
-- A skill is a folder containing `SKILL.md` plus optional supporting files.
-- Skills live in `.kiro/skills/`.
-- `SKILL.md` uses YAML frontmatter with `name` and `description` fields.
-- Kiro activates skills on demand based on description matching.
-- The `description` field is critical — Kiro uses it to decide when to activate the skill.
+- Skills 遵循 open [Agent Skills](https://agentskills.io) standard。
+- skill 是包含 `SKILL.md` 以及 optional supporting files 的 folder。
+- Skills 位于 `.kiro/skills/`。
+- `SKILL.md` 使用 YAML frontmatter，包含 `name` 和 `description` fields。
+- Kiro 根据 description matching 按需激活 skills。
+- `description` field 很关键——Kiro 用它决定何时 activate skill。
 
-### Constraints
+### 约束
 
-- Skill name: max 64 characters, pattern `^[a-z][a-z0-9-]*$`, no consecutive hyphens (`--`).
-- Skill description: max 1024 characters.
-- Skill name must match parent directory name.
+- Skill name：最多 64 characters，pattern `^[a-z][a-z0-9-]*$`，不能有 consecutive hyphens（`--`）。
+- Skill description：最多 1024 characters。
+- Skill name 必须匹配 parent directory name。
 
-### Example
+### 示例
 
 ```yaml
 ---
 name: workflows-plan
-description: Plan work by analyzing requirements and creating actionable steps
+description: 通过分析 requirements 并创建 actionable steps 来规划 work
 ---
 
 # Planning Workflow
@@ -108,21 +108,21 @@ description: Plan work by analyzing requirements and creating actionable steps
 Detailed instructions...
 ```
 
-## Steering files
+## Steering files（steering 文件）
 
-- Markdown files in `.kiro/steering/`.
-- Always loaded into every agent session's context.
-- Equivalent to the repo instruction file used by Claude-oriented workflows; in this repo `AGENTS.md` is canonical and `CLAUDE.md` may exist only as a compatibility shim.
-- Used for project-wide instructions, coding standards, and conventions.
+- 位于 `.kiro/steering/` 的 Markdown files。
+- 始终加载进每个 agent session 的 context。
+- 等同于 Claude-oriented workflows 使用的 repo instruction file；在此 repo 中，`AGENTS.md` 是 canonical，`CLAUDE.md` 可能只作为 compatibility shim 存在。
+- 用于 project-wide instructions、coding standards 和 conventions。
 
-## MCP server configuration
+## MCP server configuration（MCP server 配置）
 
-- MCP servers are configured in `.kiro/settings/mcp.json`.
-- **Only stdio transport is supported** — `command` + `args` + `env`.
-- HTTP/SSE transport (`url`, `headers`) is NOT supported by Kiro CLI.
-- The converter skips HTTP-only MCP servers with a warning.
+- MCP servers 配置在 `.kiro/settings/mcp.json`。
+- **只支持 stdio transport**——`command` + `args` + `env`。
+- Kiro CLI 不支持 HTTP/SSE transport（`url`、`headers`）。
+- converter 会跳过 HTTP-only MCP servers，并发出 warning。
 
-### Example
+### 示例
 
 ```json
 {
@@ -139,16 +139,16 @@ Detailed instructions...
 }
 ```
 
-## Hooks
+## Hooks（hooks，钩子）
 
-- Kiro supports 5 hook trigger types: `agentSpawn`, `userPromptSubmit`, `preToolUse`, `postToolUse`, `stop`.
-- Hooks are configured inside agent JSON configs (not separate files).
-- 3 of 5 triggers map to Claude Code hooks (`preToolUse`, `postToolUse`, `stop`).
-- Not converted by the plugin converter for MVP — a warning is emitted.
+- Kiro 支持 5 种 hook trigger types：`agentSpawn`、`userPromptSubmit`、`preToolUse`、`postToolUse`、`stop`。
+- Hooks 配置在 agent JSON configs 内（不是 separate files）。
+- 5 个 triggers 中有 3 个可映射到 Claude Code hooks（`preToolUse`、`postToolUse`、`stop`）。
+- MVP 中 plugin converter 不转换它们——会发出 warning。
 
-## Conversion lossy mappings
+## Conversion lossy mappings（有损转换映射）
 
-| Claude Code Feature | Kiro Status | Notes |
+| Claude Code Feature | Kiro Status | Notes（说明） |
 |---|---|---|
 | `Edit` tool (surgical replacement) | Degraded -> `write` (full-file) | Kiro write overwrites entire files |
 | `context: fork` | Lost | No execution isolation control |
@@ -159,9 +159,9 @@ Detailed instructions...
 | Claude hooks | Skipped | Future follow-up (near-1:1 for 3/5 triggers) |
 | HTTP MCP servers | Skipped | Kiro only supports stdio transport |
 
-## Overwrite behavior during conversion
+## 转换期间的覆盖行为
 
-| Content Type | Strategy | Rationale |
+| Content Type | Strategy | Rationale（理由） |
 |---|---|---|
 | Generated agents (JSON + prompt) | Overwrite | Generated, not user-authored |
 | Generated skills (from commands) | Overwrite | Generated, not user-authored |

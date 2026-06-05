@@ -1,7 +1,7 @@
 {
   "name": "compound-engineering",
   "version": "3.10.0",
-  "description": "AI-powered development tools for code review, research, design, and workflow automation.",
+  "description": "用于 code review、research、design 和 workflow automation 的 AI-powered development tools。",
   "author": {
     "name": "Kieran Klaassen",
     "email": "kieran@every.to",
@@ -25,8 +25,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Compound Engineering",
-    "shortDescription": "AI-powered development tools for code review, research, design, and workflow automation.",
-    "longDescription": "Compound Engineering is a suite of skills and agents that make each unit of engineering work easier than the last. Brainstorm requirements, plan implementations, review code with specialized reviewers, research institutional learnings, and capture solved problems so future work benefits. Skills install natively via Codex; for the full experience with specialized review and research agents, run the companion Bun converter after install (see README).",
+    "shortDescription": "用于 code review、research、design 和 workflow automation 的 AI-powered development tools。",
+    "longDescription": "Compound Engineering 是一套 skills 和 agents，让每个 engineering work unit 都比上一个更容易完成。你可以 brainstorm requirements、plan implementations、用 specialized reviewers 做 code review、research institutional learnings，并 capture solved problems，让 future work 受益。Skills 会通过 Codex native install；如果需要 specialized review 和 research agents 的完整体验，请在安装后运行配套 Bun converter（见 README）。",
     "developerName": "Every",
     "category": "Coding",
     "capabilities": [

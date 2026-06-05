@@ -1,25 +1,25 @@
-# Testing - DHH Rails Style
+# Testing - DHH Rails Style（测试）
 
-## Core Philosophy
+## Core Philosophy（核心理念）
 
-"Minitest with fixtures - simple, fast, deterministic." The approach prioritizes pragmatism over convention.
+"Minitest with fixtures - simple, fast, deterministic." 这个 approach 优先考虑 pragmatism，而不是 convention。
 
-## Why Minitest Over RSpec
+## Why Minitest Over RSpec（为什么用 Minitest 而不是 RSpec）
 
-- **Simpler**: Less DSL magic, plain Ruby assertions
-- **Ships with Rails**: No additional dependencies
-- **Faster boot times**: Less overhead
-- **Plain Ruby**: No specialized syntax to learn
+- **Simpler**：更少 DSL magic，plain Ruby assertions
+- **Ships with Rails**：没有额外 dependencies
+- **Faster boot times**：更少 overhead
+- **Plain Ruby**：没有需要学习的 specialized syntax
 
-## Fixtures as Test Data
+## Fixtures as Test Data（将 Fixtures 作为测试数据）
 
-Rather than factories, fixtures provide preloaded data:
-- Loaded once, reused across tests
-- No runtime object creation overhead
-- Explicit relationship visibility
-- Deterministic IDs for easier debugging
+fixtures 提供 preloaded data，而不是使用 factories：
+- 加载一次，跨 tests 复用
+- 没有 runtime object creation overhead
+- relationship visibility 明确
+- deterministic IDs 让 debugging 更容易
 
-### Fixture Structure
+### Fixture Structure（Fixture 结构）
 ```yaml
 # test/fixtures/users.yml
 david:
@@ -45,7 +45,7 @@ greeting:
   creator: david
 ```
 
-### Using Fixtures in Tests
+### Using Fixtures in Tests（在 Tests 中使用 Fixtures）
 ```ruby
 test "sending a message" do
   user = users(:david)
@@ -55,8 +55,8 @@ test "sending a message" do
 end
 ```
 
-### Dynamic Fixture Values
-ERB enables time-sensitive data:
+### Dynamic Fixture Values（动态 Fixture 值）
+ERB 支持 time-sensitive data：
 ```yaml
 recent_card:
   title: Recent Card
@@ -67,10 +67,10 @@ old_card:
   created_at: <%= 1.month.ago %>
 ```
 
-## Test Organization
+## Test Organization（测试组织）
 
-### Unit Tests
-Verify business logic using setup blocks and standard assertions:
+### Unit Tests（单元测试）
+使用 setup blocks 和 standard assertions 验证 business logic：
 
 ```ruby
 class CardTest < ActiveSupport::TestCase
@@ -100,8 +100,8 @@ class CardTest < ActiveSupport::TestCase
 end
 ```
 
-### Integration Tests
-Test full request/response cycles:
+### Integration Tests（集成测试）
+测试完整 request/response cycles：
 
 ```ruby
 class CardsControllerTest < ActionDispatch::IntegrationTest
@@ -131,8 +131,8 @@ class CardsControllerTest < ActionDispatch::IntegrationTest
 end
 ```
 
-### System Tests
-Browser-based tests using Capybara:
+### System Tests（系统测试）
+使用 Capybara 的 browser-based tests：
 
 ```ruby
 class MessagesTest < ApplicationSystemTestCase
@@ -174,10 +174,10 @@ class MessagesTest < ApplicationSystemTestCase
 end
 ```
 
-## Advanced Patterns
+## Advanced Patterns（高级 Patterns）
 
-### Time Testing
-Use `travel_to` for deterministic time-dependent assertions:
+### Time Testing（时间测试）
+使用 `travel_to` 编写 deterministic time-dependent assertions：
 
 ```ruby
 test "card expires after 30 days" do
@@ -189,8 +189,8 @@ test "card expires after 30 days" do
 end
 ```
 
-### External API Testing with VCR
-Record and replay HTTP interactions:
+### External API Testing with VCR（用 VCR 测试外部 API）
+Record 并 replay HTTP interactions：
 
 ```ruby
 test "fetches user data from API" do
@@ -202,8 +202,8 @@ test "fetches user data from API" do
 end
 ```
 
-### Background Job Testing
-Assert job enqueueing and email delivery:
+### Background Job Testing（后台任务测试）
+Assert job enqueueing 和 email delivery：
 
 ```ruby
 test "closing card enqueues notification job" do
@@ -221,7 +221,7 @@ test "welcome email is sent on signup" do
 end
 ```
 
-### Testing Turbo Streams
+### Testing Turbo Streams（测试 Turbo Streams）
 ```ruby
 test "message creation broadcasts to room" do
   room = rooms(:watercooler)
@@ -232,10 +232,10 @@ test "message creation broadcasts to room" do
 end
 ```
 
-## Testing Principles
+## Testing Principles（测试原则）
 
-### 1. Test Observable Behavior
-Focus on what the code does, not how it does it:
+### 1. Test Observable Behavior（测试可观察行为）
+关注 code 做了什么，而不是它如何做到：
 
 ```ruby
 # ❌ Testing implementation
@@ -252,7 +252,7 @@ test "watchers receive notifications when card closes" do
 end
 ```
 
-### 2. Don't Mock Everything
+### 2. Don't Mock Everything（不要什么都 mock）
 
 ```ruby
 # ❌ Over-mocked test
@@ -278,16 +278,16 @@ test "sending message" do
 end
 ```
 
-### 3. Tests Ship with Features
-Same commit, not TDD-first but together. Neither before (strict TDD) nor after (deferred testing).
+### 3. Tests Ship with Features（测试随功能一起交付）
+同一个 commit，不是 TDD-first，而是 together。既不是提前（strict TDD），也不是事后（deferred testing）。
 
-### 4. Security Fixes Always Include Regression Tests
-Every security fix must include a test that would have caught the vulnerability.
+### 4. Security Fixes Always Include Regression Tests（安全修复始终包含回归测试）
+每个 security fix 都必须包含一个本可捕获该 vulnerability 的 test。
 
-### 5. Integration Tests Validate Complete Workflows
-Don't just test individual pieces - test that they work together.
+### 5. Integration Tests Validate Complete Workflows（集成测试验证完整 workflow）
+不要只测试 individual pieces；要测试它们能一起工作。
 
-## File Organization
+## File Organization（文件组织）
 
 ```
 test/
@@ -302,7 +302,7 @@ test/
 └── test_helper.rb      # Test configuration
 ```
 
-## Test Helper Setup
+## Test Helper Setup（测试 helper 设置）
 
 ```ruby
 # test/test_helper.rb
@@ -325,7 +325,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 end
 ```
 
-## Sign In Helper
+## Sign In Helper（登录 helper）
 
 ```ruby
 # test/support/sign_in_helper.rb

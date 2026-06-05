@@ -1,8 +1,8 @@
-# Minimal first-run template for objective metrics.
-# Start here when "better" is a scalar value from the measurement harness.
+# objective metrics 的 minimal first-run template。
+# 当 "better" 是 measurement harness 中的 scalar value 时，从这里开始。
 
 name: improve-build-latency
-description: Reduce build latency without regressing correctness
+description: 在不让 correctness regression 的前提下降低 build latency
 
 metric:
   primary:
@@ -12,10 +12,10 @@ metric:
   degenerate_gates:
     - name: build_passed
       check: "== 1"
-      description: The build must stay green
+      description: Build 必须保持 green
     - name: test_pass_rate
       check: ">= 1.0"
-      description: Required tests must keep passing
+      description: Required tests 必须持续 passing
   diagnostics:
     - name: artifact_size_mb
     - name: peak_memory_mb
@@ -52,8 +52,8 @@ dependencies:
   approved: []
 
 constraints:
-  - "Keep output artifacts backward compatible"
-  - "Do not skip required validation steps"
+  - "保持 output artifacts backward compatible"
+  - "不要跳过 required validation steps"
 
 stopping:
   max_iterations: 4

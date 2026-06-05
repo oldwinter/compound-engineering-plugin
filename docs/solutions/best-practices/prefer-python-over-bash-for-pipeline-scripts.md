@@ -1,5 +1,5 @@
 ---
-title: "Prefer Python over bash for multi-step pipeline scripts"
+title: "多步骤 pipeline scripts 优先使用 Python 而不是 bash"
 date: 2026-04-09
 category: best-practices
 module: "skill scripting / ce-demo-reel"
@@ -7,11 +7,11 @@ problem_type: tooling_decision
 component: tooling
 severity: medium
 applies_when:
-  - Script orchestrates 2+ external CLI tools (ffmpeg, curl, silicon, vhs)
-  - Script needs retry logic or graceful degradation on tool failure
-  - Script will run on macOS where bash 3.2 is the default
-  - Script needs to be tested from a non-shell test runner (Bun, Jest, pytest)
-  - Script has conditional failure paths where some errors should be caught and others should abort
+  - Script 编排 2+ 个 external CLI tools（ffmpeg、curl、silicon、vhs）
+  - Script 需要 retry logic，或在 tool failure 时 graceful degradation
+  - Script 会运行在默认 bash 3.2 的 macOS 上
+  - Script 需要从 non-shell test runner（Bun、Jest、pytest）测试
+  - Script 有 conditional failure paths，其中一些 errors 应被捕获，而另一些应 abort
 tags:
   - bash-vs-python
   - pipeline-scripts
@@ -21,17 +21,17 @@ tags:
   - ce-demo-reel
 ---
 
-# Prefer Python over bash for multi-step pipeline scripts
+# 多步骤 pipeline scripts 优先使用 Python 而不是 bash
 
-## Context
+## 背景
 
-When building the `ce-demo-reel` skill, the initial implementation used a bash script (`capture-evidence.sh`) to orchestrate ffmpeg stitching, frame normalization, and catbox.moe upload. Over 4 review rounds, the script hit 4 distinct bug classes that are inherent to bash's execution model rather than simple coding mistakes.
+构建 `ce-demo-reel` skill 时，初始 implementation 使用 bash script（`capture-evidence.sh`）编排 ffmpeg stitching、frame normalization 和 catbox.moe upload。在 4 轮 review 中，该脚本遇到了 4 类不同 bugs，它们源自 bash execution model 本身，而不是简单 coding mistakes。
 
-## Guidance
+## 指导
 
-Use Python for agent pipeline scripts that chain multiple CLI tools with error handling. Bash `set -euo pipefail` works for simple sequential scripts but becomes a footgun when you need controlled failure paths.
+对于需要串联多个 CLI tools 并处理 error handling 的 agent pipeline scripts，使用 Python。Bash `set -euo pipefail` 适合简单 sequential scripts，但当你需要 controlled failure paths 时，它会变成 footgun。
 
-**Python subprocess model (explicit error handling):**
+**Python subprocess model（显式 error handling）：**
 ```python
 result = subprocess.run(
     ["curl", "-s", "-F", f"fileToUpload=@{file_path}", url],
@@ -43,7 +43,7 @@ if result.returncode != 0:
     continue
 ```
 
-**Python timeout handling (explicit catch):**
+**Python timeout handling（显式 catch）：**
 ```python
 try:
     result = subprocess.run(cmd, timeout=60)
@@ -52,7 +52,7 @@ except subprocess.TimeoutExpired:
     return subprocess.CompletedProcess(cmd, returncode=1, stdout="", stderr="Timed out")
 ```
 
-**Bash equivalent (the footgun):**
+**Bash equivalent（等价 Bash，footgun）：**
 ```bash
 set -euo pipefail
 
@@ -65,39 +65,39 @@ url=$(curl -s -F "fileToUpload=@${file}" "$endpoint") || true
 # Works but fragile and easy to forget
 ```
 
-## Why This Matters
+## 为什么重要
 
-Agent pipeline scripts run in environments the skill author does not control: different macOS versions (bash 3.2 vs 5.x), CI containers, worktrees. Each bash portability issue requires a non-obvious workaround that reviewers must catch. Python's subprocess model makes error handling explicit and testable rather than implicit and version-dependent.
+Agent pipeline scripts 会运行在 skill author 无法控制的环境中：不同 macOS versions（bash 3.2 vs 5.x）、CI containers、worktrees。每个 bash portability issue 都需要 reviewers 捕获一个非显而易见的 workaround。Python 的 subprocess model 让 error handling 显式且可测试，而不是隐式且依赖版本。
 
-The 4 bugs found were not unusual. They are the predictable consequence of using bash for scripts that exceed its sweet spot.
+发现的 4 个 bugs 并不罕见。它们是用 bash 编写超出其舒适区的 scripts 所产生的可预测后果。
 
-## When to Apply
+## 适用时机
 
-Use Python when:
-- The script orchestrates 2+ external CLI tools
-- The script needs retry logic or graceful degradation on tool failure
-- The script will run on macOS where bash 3.2 is the default
-- The script needs to be tested from a non-shell test runner
-- The script has more than ~3 subcommands
+在以下场景使用 Python：
+- script 编排 2+ 个 external CLI tools
+- script 需要 retry logic 或在 tool failure 时 graceful degradation
+- script 会运行在默认 bash 3.2 的 macOS 上
+- script 需要从 non-shell test runner 测试
+- script 有超过约 3 个 subcommands
 
-Bash is still the right choice when:
-- Simple sequential scripts with no error recovery (set -e is fine)
-- One-liner wrappers around a single tool
-- Scripts using only POSIX features with no array manipulation
-- Git hooks and CI steps where the only failure mode is "abort the pipeline"
+Bash 仍适合以下场景：
+- 没有 error recovery 的简单 sequential scripts（set -e 可以）
+- 围绕单个 tool 的 one-liner wrappers
+- 只使用 POSIX features 且没有 array manipulation 的 scripts
+- 唯一 failure mode 是“abort the pipeline”的 Git hooks 和 CI steps
 
-## Examples
+## 示例
 
-**Before (bash, 4 bugs across 4 review rounds):**
+**Before（bash，4 轮 review 中 4 个 bugs）：**
 
-| Bug | Cause | Workaround needed |
+| Bug | 原因 | 所需 workaround |
 |---|---|---|
 | `url=$(curl ...)` exits on network failure | `set -e` + command substitution | `\|\| true` on every line |
 | `${array[-1]}` fails | Bash 3.2 lacks negative indexing | `${array[${#array[@]}-1]}` |
 | Frame reduction keeps all frames for n=3,4 | Integer math: `step=(n-1)/2` with min 1 | Minimum step of 2 |
 | `command -v ffmpeg` in Bun tests | `command` is a shell builtin, not spawnable | Use `which` instead |
 
-**After (Python, all 4 bug classes eliminated):**
+**After（Python，全部 4 类 bugs 消除）：**
 
 ```python
 # Negative indexing just works
@@ -117,7 +117,7 @@ if not shutil.which("ffmpeg"):
 step = max(2, (len(frames) - 1) // 2)
 ```
 
-## Related
+## 相关
 
-- `docs/solutions/skill-design/script-first-skill-architecture.md`: covers when to use scripts vs agent logic (complementary: that doc answers "should a script do this?", this doc answers "which language?")
-- `docs/solutions/agent-friendly-cli-principles.md`: CLI design from the consumer side (overlaps on exit code and stderr patterns)
+- `docs/solutions/skill-design/script-first-skill-architecture.md`：覆盖何时使用 scripts vs agent logic（互补：该文回答“是否应由 script 做这件事？”，本文回答“用哪种语言？”）
+- `docs/solutions/agent-friendly-cli-principles.md`：从 consumer side 讨论 CLI design（与 exit code 和 stderr patterns 部分重叠）

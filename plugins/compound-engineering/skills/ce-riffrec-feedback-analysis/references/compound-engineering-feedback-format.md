@@ -1,8 +1,8 @@
-# Compound Engineering Feedback Format
+# Compound Engineering Feedback Format（Compound Engineering 反馈格式）
 
-Use this shape when converting Riffrec evidence into a durable brainstorm or planning input.
+将 Riffrec evidence 转换为 durable brainstorm 或 planning input 时，使用此形态。
 
-## Finding
+## Finding（Finding 条目）
 
 ```markdown
 ### F1. <Short problem title>
@@ -15,7 +15,7 @@ Use this shape when converting Riffrec evidence into a durable brainstorm or pla
 - **Requirement candidates:** R1, R2
 ```
 
-## Requirements Kickoff
+## Requirements Kickoff（Requirements 启动材料）
 
 ```markdown
 ---
@@ -108,9 +108,9 @@ topic: <topic>
 -> /ce-brainstorm to confirm, correct, and regroup the captured requirements before any planning.
 ```
 
-## Evidence Rules
+## Evidence Rules（证据规则）
 
-- Prefer moment IDs and screenshot links over prose-only claims.
-- Mark visual interpretation as an inference when the screenshot does not prove intent.
-- Requirements should describe product behavior, not implementation details.
-- Do not include absolute local paths in CE docs; use repo-relative paths when possible.
+- 优先使用 moment IDs 和 screenshot links，而不是 prose-only claims。
+- 当 screenshot 无法证明 intent 时，将 visual interpretation 标记为 inference。
+- Requirements 应描述 product behavior，而不是 implementation details。
+- 不要在 CE docs 中包含 absolute local paths；尽可能使用 repo-relative paths。

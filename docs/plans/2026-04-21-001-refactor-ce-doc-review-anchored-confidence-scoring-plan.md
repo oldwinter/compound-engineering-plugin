@@ -1,363 +1,363 @@
 ---
-title: "Refactor ce-doc-review confidence scoring to anchored rubric"
+title: "将 ce-doc-review confidence scoring 重构为 anchored rubric"
 type: refactor
 status: active
 date: 2026-04-21
 ---
 
-# Refactor ce-doc-review confidence scoring to anchored rubric
+# 将 ce-doc-review confidence scoring 重构为 anchored rubric
 
-## Overview
+## 概览
 
-Replace ce-doc-review's continuous `confidence: 0.0-1.0` field with a 5-anchor rubric (`0 | 25 | 50 | 75 | 100`), each tied to a behavioral definition the persona can honestly self-apply. The change adopts the structural techniques from Anthropic's official code-review plugin (anchored scoring, verbatim rubric in agent prompt, explicit false-positive catalog) while tuning the threshold (`>= 50`) to document-review economics — which have opposite asymmetries from code review (no linter backstop, premise challenges resist verification, surfaced findings are cheap to dismiss via routing menu, missed findings derail downstream implementation).
+将 ce-doc-review 的 continuous `confidence: 0.0-1.0` field 替换为 5-anchor rubric（`0 | 25 | 50 | 75 | 100`），每个 anchor 都绑定到 persona 可以诚实 self-apply 的 behavioral definition。该 change 采用 Anthropic official code-review plugin 中的 structural techniques（anchored scoring、agent prompt 中 verbatim rubric、explicit false-positive catalog），同时将 threshold（`>= 50`）调整为适合 document-review economics：它与 code review 有相反 asymmetries（无 linter backstop、premise challenges 难以 verification、surfaced findings 可通过 routing menu 廉价 dismiss、missed findings 会 derail downstream implementation）。
 
-The goal is to eliminate false-precision gaming (personas anchoring on round numbers like 0.65 / 0.72 / 0.85 and implying differentiation that the model cannot actually produce) and replace it with discrete anchors whose meaning is stable and behaviorally grounded.
+目标是消除 false-precision gaming（personas 锚定 0.65 / 0.72 / 0.85 等 round numbers，并暗示 model 实际无法产生的 differentiation），用含义稳定且 behaviorally grounded 的 discrete anchors 取而代之。
 
-## Problem Frame
+## 问题框架
 
-Current state: `confidence` is a float between 0.0 and 1.0. Synthesis uses per-severity gates (0.50 / 0.60 / 0.65 / 0.75) and a 0.40 FYI floor. LLM-generated confidence at this granularity is not meaningfully calibrated — personas in practice cluster on round numbers (0.60, 0.65, 0.72, 0.80, 0.85), and the gate boundaries create coin-flip bands where trivial score shifts move findings in and out of the actionable tier.
+当前状态：`confidence` 是 0.0 到 1.0 的 float。Synthesis 使用 per-severity gates（0.50 / 0.60 / 0.65 / 0.75）和 0.40 FYI floor。LLM-generated confidence 在这种粒度下并没有 meaningful calibration：personas 实践中聚集在 round numbers（0.60, 0.65, 0.72, 0.80, 0.85），而 gate boundaries 创建了 coin-flip bands，微小分数移动就会让 findings 进出 actionable tier。
 
-Evidence surfaced in a recent review run:
-- One 0.65 adversarial finding sat right at the P2 gate — below-noise admission
-- Multiple product-lens findings in the 0.68-0.72 range all shared the same underlying premise ("motivation weak") — fake precision on top of redundant signal
-- Residual concerns and deferred questions near-duplicated actionable findings, indicating the persona's internal confidence ordering did not distinguish "above-gate finding" from "below-gate concern" coherently
+最近一次 review run 中 surfaced evidence：
+- 一个 0.65 adversarial finding 正好卡在 P2 gate：below-noise admission
+- 多个 0.68-0.72 区间的 product-lens findings 共享同一个 underlying premise（"motivation weak"）：redundant signal 上的 fake precision
+- Residual concerns 和 deferred questions 近似重复 actionable findings，说明 persona 的 internal confidence ordering 不能 coherent 区分 "above-gate finding" 和 "below-gate concern"
 
-Anthropic's official code-review plugin (`anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`) solves this with:
-- 5 anchor points (0/25/50/75/100) each tied to a behavioral criterion ("double-checked and verified", "wasn't able to verify", "evidence directly confirms")
-- A rubric passed verbatim to a separate scoring agent
-- Threshold >= 80 (code-review-specific; doc review uses a different threshold)
-- Explicit false-positive catalog
+Anthropic official code-review plugin（`anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`）用以下方式解决：
+- 5 anchor points（0/25/50/75/100），每个绑定 behavioral criterion（"double-checked and verified", "wasn't able to verify", "evidence directly confirms"）
+- 将 rubric verbatim 传给 separate scoring agent
+- Threshold >= 80（code-review-specific；doc review 使用不同 threshold）
+- Explicit false-positive catalog（明确的 false-positive catalog）
 
-This plan ports the structural techniques and tunes the threshold to document-review economics.
+本 plan port structural techniques，并将 threshold tune 到 document-review economics。
 
-## Requirements Trace
+## 需求追踪
 
-- R1. Replace continuous `confidence` field with 5 discrete anchor points (0, 25, 50, 75, 100) and a behavioral rubric per anchor.
-- R2. Update synthesis pipeline to consume anchor values (gates, tiebreaks, dedup, promotion, cross-persona boost, FYI floor).
-- R3. Update all 7 document-review persona agents' prompts so the rubric is embedded verbatim.
-- R4. Add an explicit false-positive catalog to the subagent template (consolidated from scattered current guidance).
-- R5. Adopt doc-review-appropriate filter threshold: >= 50 across severities (drop only "false positive" and "stylistic-unverified" tiers). Replace graduated per-severity gates.
-- R6. Preserve current tier routing semantics: 50 -> FYI, 75 -> Decision, 100 -> Proposed fix / safe_auto.
-- R7. Update rendering surfaces (template, walkthrough, headless envelope) so anchors display consistently as integer scores, not floats.
-- R8. Update tests and fixtures without regressing coverage.
-- R9. Keep `ce-code-review` unchanged in this PR — it is a separate migration with different economics (see Scope Boundaries).
+- R1. 用 5 个 discrete anchor points（0, 25, 50, 75, 100）和每个 anchor 的 behavioral rubric 替换 continuous `confidence` field。
+- R2. 更新 synthesis pipeline，使其 consume anchor values（gates, tiebreaks, dedup, promotion, cross-persona boost, FYI floor）。
+- R3. 更新全部 7 个 document-review persona agents 的 prompts，使 rubric embedded verbatim。
+- R4. 向 subagent template 添加 explicit false-positive catalog（从 scattered current guidance consolidated）。
+- R5. 采用适合 doc-review 的 filter threshold：all severities `>= 50`（只 drop "false positive" 和 "stylistic-unverified" tiers）。替换 graduated per-severity gates。
+- R6. Preserve current tier routing semantics（保留当前 tier routing 语义）：50 -> FYI，75 -> Decision，100 -> Proposed fix / safe_auto。
+- R7. 更新 rendering surfaces（template, walkthrough, headless envelope），让 anchors consistently display as integer scores，而不是 floats。
+- R8. 更新 tests and fixtures，不 regress coverage。
+- R9. Keep `ce-code-review` unchanged in this PR；它是 separate migration，economics different（see Scope Boundaries）。
 
-## Scope Boundaries
+## 范围边界
 
-- No change to persona-specific domain logic (what each persona looks for). Only the confidence rubric and synthesis consumption change.
-- No change to severity taxonomy (`P0 | P1 | P2 | P3`).
-- No change to `finding_type` or `autofix_class` enums.
-- No change to `residual_risks` / `deferred_questions` schema shape (they remain string arrays).
-- No new schema fields (explicitly rejected `finding_type: grounded | pattern | premise` tag — redundant with persona attribution).
+- 不修改 persona-specific domain logic（每个 persona 查什么）。只修改 confidence rubric 和 synthesis consumption。
+- 不修改 severity taxonomy（`P0 | P1 | P2 | P3`）。
+- 不修改 `finding_type` 或 `autofix_class` enums。
+- 不修改 `residual_risks` / `deferred_questions` schema shape（仍为 string arrays）。
+- 不新增 schema fields（explicitly rejected `finding_type: grounded | pattern | premise` tag；与 persona attribution redundant）。
 
-### Deferred to Separate Tasks
+### 推迟到单独任务
 
-- **ce-code-review scoring migration**: Same pattern, but code-review economics differ (linter backstop, PR-comment cost, ground-truth verifiability). Threshold likely `>= 75` there, matching Anthropic more closely. Separate plan once ce-doc-review migration is proven in practice.
-- **Separate neutral-scorer agent pass**: A second scoring pass where a neutral agent re-scores each finding against the rubric, independent of the producing persona. Structurally valuable (breaks self-serving score inflation) but adds latency and token cost. Evaluate as a follow-up once the anchor rubric is in place and its effect on score inflation can be measured directly.
+- **ce-code-review scoring migration**：同样 pattern，但 code-review economics 不同（linter backstop、PR-comment cost、ground-truth verifiability）。threshold 可能是 `>= 75`，更接近 Anthropic。等 ce-doc-review migration 在实践中 proven 后再单独 plan。
+- **Separate neutral-scorer agent pass**：第二个 scoring pass，由 neutral agent 独立于 producing persona 重新按 rubric score 每个 finding。结构上有价值（打破 self-serving score inflation），但增加 latency 和 token cost。等 anchor rubric 到位且能直接 measure score inflation effect 后，作为 follow-up 评估。
 
-## Context & Research
+## 上下文与调研
 
-### Relevant Code and Patterns
+### 相关代码和模式
 
-- `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json` — confidence field definition (lines 60-65, continuous 0.0-1.0)
-- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md` — schema rule (line 27), advisory band rule (line 116), false-positive list (lines 109-114)
-- `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md` — per-severity gate table (lines 15-25), FYI floor (line 28), cross-persona boost (line 45), promotion patterns (section 3.6), sort (section 3.8)
-- `plugins/compound-engineering/skills/ce-doc-review/references/review-output-template.md` — confidence column rendering (line 67 and section rules)
-- `plugins/compound-engineering/skills/ce-doc-review/references/walkthrough.md` — confidence display in per-finding block
-- `plugins/compound-engineering/agents/document-review/*.md` — 7 persona files. Only `ce-coherence-reviewer.agent.md` currently references a specific confidence floor (`0.85+` for safe_auto patterns, line 26); the others rely on the template
-- `tests/pipeline-review-contract.test.ts`, `tests/review-skill-contract.test.ts`, `tests/fixtures/ce-doc-review/seeded-*.md` — test fixtures with embedded confidence values
+- `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json`：confidence field definition（lines 60-65, continuous 0.0-1.0）
+- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md`：schema rule（line 27）、advisory band rule（line 116）、false-positive list（lines 109-114）
+- `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md`：per-severity gate table（lines 15-25）、FYI floor（line 28）、cross-persona boost（line 45）、promotion patterns（section 3.6）、sort（section 3.8）
+- `plugins/compound-engineering/skills/ce-doc-review/references/review-output-template.md`：confidence column rendering（line 67 and section rules）
+- `plugins/compound-engineering/skills/ce-doc-review/references/walkthrough.md`：per-finding block 中的 confidence display
+- `plugins/compound-engineering/agents/document-review/*.md`：7 persona files。只有 `ce-coherence-reviewer.agent.md` 当前引用 specific confidence floor（`0.85+` for safe_auto patterns, line 26）；其他依赖 template
+- `tests/pipeline-review-contract.test.ts`, `tests/review-skill-contract.test.ts`, `tests/fixtures/ce-doc-review/seeded-*.md`：test fixtures with embedded confidence values
 
-### Institutional Learnings
+### 机构经验
 
-No prior `docs/solutions/` entry on scoring calibration. This plan should produce one on completion (under `docs/solutions/workflow/` or `docs/solutions/skill-design/`) documenting the migration and the reasoning behind the doc-review threshold vs Anthropic's code-review threshold, since the tradeoff is non-obvious and future contributors may question the divergence.
+此前没有关于 scoring calibration 的 `docs/solutions/` entry。本 plan 完成后应产出一篇（under `docs/solutions/workflow/` 或 `docs/solutions/skill-design/`），记录 migration 和 doc-review threshold vs Anthropic code-review threshold 背后的 reasoning，因为 tradeoff 不明显，future contributors 可能会质疑 divergence。
 
-### External References
+### 外部参考
 
-- `anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md` — canonical anchored-rubric pattern. The rubric text and filter approach are the structural model; the threshold is not ported directly (see Key Technical Decisions).
-- Calibration research context: LLM verbal-confidence studies show coarse anchor scales outperform continuous numeric scales because continuous scales invite false precision the model cannot produce. This is why Anthropic chose 5 anchors rather than 0-100 continuous.
+- `anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`：canonical anchored-rubric pattern。rubric text 和 filter approach 是 structural model；threshold 不直接 port（see Key Technical Decisions）。
+- Calibration research context：LLM verbal-confidence studies 显示 coarse anchor scales 优于 continuous numeric scales，因为 continuous scales 会邀请 model 无法产生的 false precision。这也是 Anthropic 选择 5 anchors 而不是 0-100 continuous 的原因。
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **5 anchors, not 3 or 10**: Matches Anthropic's proven format. More resolution than Low/Medium/High, still discrete enough to avoid gaming. The anchor values (0/25/50/75/100) are literal integer scores, preserved as integers in the schema.
-- **Filter threshold `>= 50`, not `>= 80`**: Doc review has opposite economics from code review. The threshold drops only tier 0 ("false positive, pre-existing, or can't survive light scrutiny") and tier 25 ("might be real but couldn't verify; stylistic-not-in-origin"). Tiers 50+ surface with appropriate routing. Rationale documented inline in the rubric so future contributors see why doc review diverges from Anthropic's `>= 80`.
-- **No separate scoring agent (this PR)**: Self-scoring with a rigorous rubric is the first step. Adding a neutral scorer is a follow-up once we can measure whether self-scoring with anchors still inflates scores relative to ground truth.
-- **Anchor-to-tier mapping**: 50 -> FYI subsection, 75 -> Decision / Proposed fix, 100 -> eligible for safe_auto when `autofix_class` also warrants. Tier 25 -> dropped. Tier 0 -> dropped. This replaces both the graduated per-severity gate AND the FYI floor with a single anchor-based routing.
-- **Cross-persona corroboration promotes by one anchor, not `+0.10`**: When 2+ personas raise the same finding, promote one anchor step (50 -> 75, 75 -> 100). Cleaner than the magic `+0.10` and semantically meaningful (independent corroboration genuinely moves a "verified but nitpick" finding to "very likely, will hit in practice").
-- **Tiebreak ordering**: When sorting findings within a severity tier, use anchor descending, then document order (deterministic). Drop the pseudo-precision tiebreak that currently uses float confidence.
-- **Preserve reviewer attribution as the persona-calibration signal**: No `finding_type: grounded | pattern | premise` tag. If a persona's domain caps its natural ceiling at 50-75, the anchors and threshold handle it — findings land in FYI or Decision as appropriate. The reviewer name in the output already tells the user which persona raised it; they can apply their own mental model.
-- **Strawman rule stays; advisory band rule absorbed into the rubric**: The advisory-band guidance currently lives as a "0.40-0.59 LOW" instruction. Under the new rubric, "advisory observations" map cleanly to tier 25 or 50 depending on verifiability. Rewrite the advisory rule to refer to anchors, not a float range.
+- **5 anchors, not 3 or 10**：匹配 Anthropic proven format。比 Low/Medium/High resolution 更高，同时足够 discrete 以 avoid gaming。anchor values（0/25/50/75/100）是 literal integer scores，在 schema 中保留为 integers。
+- **Filter threshold `>= 50`, not `>= 80`**：Doc review 的 economics 与 code review 相反。threshold 只 drop tier 0（"false positive, pre-existing, or can't survive light scrutiny"）和 tier 25（"might be real but couldn't verify; stylistic-not-in-origin"）。Tiers 50+ 会以适当 routing surface。Rationale inline documented in rubric，让 future contributors 明白 doc review 为什么 diverges from Anthropic 的 `>= 80`。
+- **No separate scoring agent（this PR）**：rigorous rubric 下 self-scoring 是第一步。neutral scorer 是 follow-up，等我们能 measure anchors self-scoring 是否仍相对 ground truth inflate。
+- **Anchor-to-tier mapping**：50 -> FYI subsection，75 -> Decision / Proposed fix，100 -> eligible for safe_auto when `autofix_class` also warrants。Tier 25 -> dropped。Tier 0 -> dropped。这同时替换 graduated per-severity gate 和 FYI floor。
+- **Cross-persona corroboration promotes by one anchor, not `+0.10`**：当 2+ personas raise same finding，promote one anchor step（50 -> 75, 75 -> 100）。比 magic `+0.10` 更 clean，且 semantically meaningful（independent corroboration 真正把 "verified but nitpick" finding 推到 "very likely, will hit in practice"）。
+- **Tiebreak ordering**：sorting findings within a severity tier 时，使用 anchor descending，然后 document order（deterministic）。移除当前使用 float confidence 的 pseudo-precision tiebreak。
+- **Preserve reviewer attribution as the persona-calibration signal**：不添加 `finding_type: grounded | pattern | premise` tag。如果 persona 的 domain natural ceiling 是 50-75，anchors and threshold 会处理；findings 进入 FYI 或 Decision。output 中 reviewer name 已告诉用户哪个 persona raised it；用户可应用自己的 mental model。
+- **Strawman rule stays; advisory band rule absorbed into the rubric**：advisory-band guidance 当前作为 "0.40-0.59 LOW" instruction 存在。在新 rubric 下，"advisory observations" 根据 verifiability 清晰 map 到 tier 25 或 50。重写 advisory rule，使其 refer to anchors，而不是 float range。
 
-## Open Questions
+## 开放问题
 
-### Resolved During Planning
+### 规划期间已解决
 
-- **Port ce-code-review in the same PR?** No. Different economics require a different threshold; bundling conflates the migration with the threshold tuning. Do ce-doc-review first, observe, then plan ce-code-review.
-- **Keep numeric anchors or use semantic labels (weak / plausible / verified / certain)?** Keep numeric. Matches Anthropic, preserves ordinality for synthesis comparisons, keeps the rendering compact (`Tier: 75` vs `Tier: verified-strong`).
-- **Add a `finding_type: grounded | pattern | premise` dimension?** No. Redundant with persona attribution and adds decoding overhead without changing what the user does with the finding.
-- **Single threshold or severity-graduated?** Single `>= 50` across severities. Severity already sorts the list; an additional gate gradient adds complexity without differentiating signal.
+- **同一个 PR 中 port ce-code-review？** 否。Different economics require different threshold；bundling 会混淆 migration 与 threshold tuning。先做 ce-doc-review，observe，再 plan ce-code-review。
+- **保留 numeric anchors，还是使用 semantic labels（weak / plausible / verified / certain）？** 保留 numeric。匹配 Anthropic，为 synthesis comparisons 保留 ordinality，并保持 rendering compact（`Tier: 75` vs `Tier: verified-strong`）。
+- **添加 `finding_type: grounded | pattern | premise` dimension？** 否。与 persona attribution redundant，增加 decoding overhead 却不改变 user 如何处理 finding。
+- **single threshold 还是 severity-graduated？** all severities 使用 single `>= 50`。Severity 已经排序 list；额外 gate gradient 增加 complexity，不能区分 signal。
 
-### Deferred to Implementation
+### 推迟到实现阶段
 
-- **Exact rubric wording for each anchor.** The implementation pass writes the final text; this plan captures the behavioral criteria. The wording must be concrete enough that a persona can self-apply it without inventing interpretation — "double-checked against evidence" is concrete; "highly confident" is not.
-- **Whether any persona needs a persona-specific floor override.** Coherence currently cites `0.85+` as its safe_auto threshold. Under the new scale, "safe_auto" maps to anchor 100 (evidence directly confirms) — no separate floor needed. If any other persona has equivalent persona-specific guidance during implementation, decide per-persona whether to preserve or remove.
-- **Fixture value choices.** The seeded plan fixtures carry specific confidence values. Converting `0.85` -> `75` vs `100` is a per-fixture judgment call; the implementer decides based on what the fixture is demonstrating.
+- **每个 anchor 的 exact rubric wording。** implementation pass 写 final text；本 plan 捕捉 behavioral criteria。wording 必须足够 concrete，让 persona 可 self-apply without inventing interpretation；"double-checked against evidence" 是 concrete；"highly confident" 不是。
+- **是否有 persona 需要 persona-specific floor override。** Coherence 当前将 `0.85+` 作为 safe_auto threshold。新 scale 下，"safe_auto" maps to anchor 100（evidence directly confirms）-- 不需要 separate floor。如果 implementation 时发现其他 persona 有等价 guidance，按 persona 决定 preserve or remove。
+- **Fixture value choices。** seeded plan fixtures 带 specific confidence values。将 `0.85` -> `75` 还是 `100` 是 per-fixture judgment call；implementer 根据 fixture demonstrates what 决定。
 
-## Implementation Units
+## 实施单元
 
-- [ ] **Unit 1: Update schema and rubric authority file**
+- [ ] **Unit 1：更新 schema 和 rubric authority file**
 
-**Goal:** Replace the `confidence` field definition with an integer enum and write the canonical behavioral rubric in one place.
+**目标：** 将 `confidence` field definition 替换为 integer enum，并在一个地方写 canonical behavioral rubric。
 
-**Requirements:** R1
+**需求：** R1
 
-**Dependencies:** None (this unit establishes the contract everything else consumes)
+**依赖：** 无（本 unit 建立其他内容消费的 contract）
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json`
-- Test: `tests/frontmatter.test.ts` (schema-shape test if one exists; otherwise covered by contract tests in later units)
+**文件：**
+- 修改： `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json`
+- 测试： `tests/frontmatter.test.ts`（schema-shape test if one exists；otherwise covered by contract tests in later units）
 
-**Approach:**
-- Replace `confidence: { type: "number", minimum: 0.0, maximum: 1.0 }` with `confidence: { type: "integer", enum: [0, 25, 50, 75, 100] }`
-- Embed the rubric in the `description` field as a multi-line string so agents consuming the schema see it inline. Each anchor point gets a behavioral criterion (see "Patterns to follow" below)
-- Keep `"calibrated per persona"` language gone — the rubric is shared, not per-persona
+**方法：**
+- 将 `confidence: { type: "number", minimum: 0.0, maximum: 1.0 }` 替换为 `confidence: { type: "integer", enum: [0, 25, 50, 75, 100] }`
+- 将 rubric embed 到 `description` field 作为 multi-line string，让 consuming schema 的 agents inline see it。每个 anchor point 都有 behavioral criterion（see "Patterns to follow" below）
+- 移除 `"calibrated per persona"` language -- rubric 是 shared，不是 per-persona
 
-**Patterns to follow:**
-- Anthropic's verbatim rubric from `anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md` step 5. Adapt the criteria to document-review context: replace "PR bug" framing with "document issue" framing; replace "directly impacts code functionality" with "directly impacts plan correctness or implementer understanding"; preserve the "double-checked" / "wasn't able to verify" / "evidence directly confirms" behavioral anchors verbatim where they apply
+**遵循的模式：**
+- Anthropic verbatim rubric from `anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md` step 5。将 criteria 适配 document-review context：将 "PR bug" framing 改为 "document issue" framing；将 "directly impacts code functionality" 改为 "directly impacts plan correctness or implementer understanding"；在适用处 preserve "double-checked" / "wasn't able to verify" / "evidence directly confirms" behavioral anchors verbatim
 
-**Test scenarios:**
-- Happy path: A JSON finding with `confidence: 75` validates against the schema
-- Error path: A JSON finding with `confidence: 0.72` fails validation (continuous values rejected)
-- Error path: A JSON finding with `confidence: 10` fails validation (non-anchor integer rejected)
-- Edge case: `confidence: 0` validates (false-positive anchor is a legitimate value, not a validation failure — surface-then-drop happens in synthesis)
+**测试场景：**
+- Happy path：带 `confidence: 75` 的 JSON finding 通过 schema validation
+- Error path：带 `confidence: 0.72` 的 JSON finding validation 失败（continuous values rejected）
+- Error path：带 `confidence: 10` 的 JSON finding validation 失败（non-anchor integer rejected）
+- Edge case：`confidence: 0` validates（false-positive anchor 是 legitimate value，不是 validation failure；surface-then-drop 发生在 synthesis）
 
-**Verification:**
+**验证：**
 - `bun test tests/frontmatter.test.ts` passes
-- Manually running the schema validator against a fixture finding with `confidence: 0.85` produces a clear error message
+- 手动用 schema validator against fixture finding with `confidence: 0.85` 时，produces clear error message
 
-- [ ] **Unit 2: Rewrite rubric guidance in the subagent template**
+- [ ] **Unit 2：重写 subagent template 中的 rubric guidance**
 
-**Goal:** Update the shared template that all 7 personas include, so the rubric, false-positive catalog, and advisory rule all reference the new anchors.
+**目标：** 更新所有 7 个 personas include 的 shared template，使 rubric、false-positive catalog 和 advisory rule 都 reference new anchors。
 
-**Requirements:** R3, R4
+**需求：** R3, R4
 
-**Dependencies:** Unit 1 (schema is the contract this template communicates)
+**依赖：** Unit 1（schema 是该 template communicates 的 contract）
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md`
+**文件：**
+- 修改： `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md`
 
-**Approach:**
-- Replace line 27's `confidence: a number between 0.0 and 1.0 inclusive` with the anchor definition plus the full behavioral rubric (5 bullets, one per anchor). The rubric goes in the template verbatim — this is what every persona sees when the template renders
-- Rewrite the advisory-band rule (line 116) to refer to anchor 25 or anchor 50 instead of "0.40-0.59 LOW band"
-- Consolidate the false-positive catalog (currently lines 109-114, scattered) into a single bulleted list positioned adjacent to the rubric. Add explicit false-positive categories adapted from Anthropic's code-review list: "Issues already resolved elsewhere in the document", "Content inside prior-round Deferred / Open Questions sections", "Stylistic preferences without evidence of impact", "Pre-existing issues the document didn't introduce", "Issues that belong to other personas", "Speculative future-work concerns with no current signal"
-- Update the suppress-below-floor rule (line 53) from "your stated confidence floor" to "anchor tier 50 (the actionable floor) unless your persona sets a stricter floor"
-- Update the example finding (lines 33-48) to use `confidence: 100` instead of `0.92`, with a one-line inline note explaining why ("all three conditions met: double-checked, will hit in practice, evidence directly confirms")
+**方法：**
+- 将 line 27 的 `confidence: a number between 0.0 and 1.0 inclusive` 替换为 anchor definition plus full behavioral rubric（5 bullets, one per anchor）。rubric 放进 template verbatim -- 这是每个 persona render 时看到的内容
+- 重写 advisory-band rule（line 116），用 anchor 25 或 anchor 50 替代 "0.40-0.59 LOW band"
+- 将 false-positive catalog（currently lines 109-114, scattered）consolidate 为一个 bulleted list，放在 rubric adjacent。添加 adapted from Anthropic code-review list 的 explicit false-positive categories："Issues already resolved elsewhere in the document", "Content inside prior-round Deferred / Open Questions sections", "Stylistic preferences without evidence of impact", "Pre-existing issues the document didn't introduce", "Issues that belong to other personas", "Speculative future-work concerns with no current signal"
+- 将 suppress-below-floor rule（line 53）从 "your stated confidence floor" 更新为 "anchor tier 50 (the actionable floor) unless your persona sets a stricter floor"
+- 将 example finding（lines 33-48）改为 `confidence: 100`，而不是 `0.92`，并加 one-line inline note 解释原因（"all three conditions met: double-checked, will hit in practice, evidence directly confirms"）
 
-**Patterns to follow:**
-- Structure of the existing autofix_class section (lines 60-63) — three tiers with a one-sentence behavioral definition each. Mirror this format for the confidence anchors
+**遵循的模式：**
+- Existing autofix_class section structure（lines 60-63）-- three tiers with one-sentence behavioral definition each。对 confidence anchors mirror this format
 
-**Test scenarios:**
-- Test expectation: none — this is a prompt-content file. Behavioral changes are tested via the persona output-shape tests in Unit 6
+**测试场景：**
+- 测试预期：无 -- 这是 prompt-content file。Behavioral changes 通过 Unit 6 的 persona output-shape tests 测试
 
-**Verification:**
-- Rubric text is present verbatim in the template
-- No references to float confidence values (0.0-1.0) remain anywhere in the file
-- False-positive catalog appears as a single consolidated list, not scattered sentences
+**验证：**
+- Rubric text 在 template 中 verbatim present
+- 文件中不再有 float confidence values（0.0-1.0）references
+- False-positive catalog 作为单一 consolidated list 出现，而不是散落的 sentences
 
-- [ ] **Unit 3: Update synthesis pipeline to consume anchor values**
+- [ ] **Unit 3：更新 synthesis pipeline 以消费 anchor values**
 
-**Goal:** Replace every numeric-confidence comparison in the synthesis pipeline with anchor-based logic.
+**目标：** 用 anchor-based logic 替换 synthesis pipeline 中每个 numeric-confidence comparison。
 
-**Requirements:** R2, R5, R6
+**需求：** R2, R5, R6
 
-**Dependencies:** Unit 1
+**依赖：** Unit 1
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md`
+**文件：**
+- 修改： `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md`
 
-**Approach:**
-- **Section 3.2 (Confidence Gate):** Replace the per-severity gate table with a single rule: findings with `confidence: 0` or `confidence: 25` are dropped; findings with `confidence: 50` route to FYI; findings with `confidence: 75` or `100` enter the actionable tier and are classified by autofix_class. Delete the separate "FYI floor at 0.40" concept — it is now the `confidence: 50` anchor
-- **Section 3.3 (Deduplicate):** Replace "keep the highest confidence" tiebreak with "keep the highest anchor; if tied, keep the first by document order"
-- **Section 3.3b (Same-persona redundancy, added in prior session):** Update the kept-finding selection rule to use anchor ordering
-- **Section 3.4 (Cross-persona boost):** Replace `+0.10` boost with "promote by one anchor step (50 -> 75, 75 -> 100). Anchor 100 does not promote further. Record the promotion in the Reviewer column (e.g., `coherence, feasibility (+1 anchor)`)"
-- **Section 3.5b (Tiebreak):** Update the `suggested_fix present` default-to-Apply gate to reference the anchor ordering for tiebreaks
-- **Section 3.6 (Promote):** The "promote manual to safe_auto/gated_auto" logic is orthogonal to confidence and stays as-is; add a note that promotion does not change the confidence anchor (autofix_class and confidence are independent)
-- **Section 3.7 (Route):** Update the routing table: anchor 100 + `safe_auto` -> silent apply; anchor 100 + `gated_auto` -> proposed fix (recommended Apply); anchor 75 -> proposed fix / decision per autofix_class; anchor 50 -> FYI subsection regardless of autofix_class
-- **Section 3.8 (Sort):** Replace "confidence (descending)" with "anchor (descending)" in the sort-key chain
-- **Section 3.9 (Residual/Deferred restatement suppression, added in prior session):** No confidence-dependent logic; no change needed
+**方法：**
+- **Section 3.2 (Confidence Gate):** 用 single rule 替换 per-severity gate table：`confidence: 0` 或 `confidence: 25` 的 findings dropped；`confidence: 50` route to FYI；`confidence: 75` or `100` enters actionable tier，并由 autofix_class classify。删除 separate "FYI floor at 0.40" concept -- 它现在是 `confidence: 50` anchor
+- **Section 3.3 (Deduplicate):** 将 "keep the highest confidence" tiebreak 替换为 "keep the highest anchor; if tied, keep the first by document order"
+- **Section 3.3b (Same-persona redundancy, added in prior session):** 更新 kept-finding selection rule，使用 anchor ordering
+- **Section 3.4 (Cross-persona boost):** 将 `+0.10` boost 替换为 "promote by one anchor step (50 -> 75, 75 -> 100). Anchor 100 does not promote further. Record the promotion in the Reviewer column (e.g., `coherence, feasibility (+1 anchor)`)"
+- **Section 3.5b (Tiebreak):** 更新 `suggested_fix present` default-to-Apply gate，reference anchor ordering for tiebreaks
+- **Section 3.6 (Promote):** "promote manual to safe_auto/gated_auto" logic 与 confidence orthogonal，保持 as-is；添加 note：promotion does not change the confidence anchor（autofix_class and confidence are independent）
+- **Section 3.7 (Route):** 更新 routing table：anchor 100 + `safe_auto` -> silent apply；anchor 100 + `gated_auto` -> proposed fix（recommended Apply）；anchor 75 -> proposed fix / decision per autofix_class；anchor 50 -> FYI subsection regardless of autofix_class
+- **Section 3.8 (Sort):** 将 sort-key chain 中的 "confidence (descending)" 替换为 "anchor (descending)"
+- **Section 3.9（Residual/Deferred restatement suppression，prior session 新增）：** 无 confidence-dependent logic；无需修改
 
-**Patterns to follow:**
-- The existing vocabulary-rule pattern at the Phase 4 preamble — a single strong directive followed by examples. Apply the same style to the anchor-routing rules so they cannot drift
+**遵循的模式：**
+- Existing vocabulary-rule pattern at Phase 4 preamble -- 一个 strong directive followed by examples。对 anchor-routing rules 使用同样 style，避免 drift
 
-**Test scenarios:**
-- Happy path: A finding with `confidence: 75, autofix_class: gated_auto` surfaces in the Proposed Fixes bucket
-- Happy path: A finding with `confidence: 50, autofix_class: manual` surfaces in the FYI subsection
-- Happy path: A finding with `confidence: 100, autofix_class: safe_auto` applies silently
-- Edge case: A finding with `confidence: 25` is dropped entirely (not surfaced in FYI, not surfaced in Residual Concerns)
-- Edge case: Two personas raise the same finding, both at anchor 50; post-boost anchor is 75 and the finding routes as a Decision
-- Edge case: One persona at anchor 100 and one at anchor 50 raise the same finding; merged keeps 100, boost does not apply beyond the cap
+**测试场景：**
+- Happy path：带 `confidence: 75, autofix_class: gated_auto` 的 finding surface 到 Proposed Fixes bucket
+- Happy path：带 `confidence: 50, autofix_class: manual` 的 finding surface 到 FYI subsection
+- Happy path：带 `confidence: 100, autofix_class: safe_auto` 的 finding silently apply
+- Edge case：带 `confidence: 25` 的 finding 被完全 dropped（不 surface 到 FYI，也不 surface 到 Residual Concerns）
+- Edge case：两个 personas raise same finding，且都在 anchor 50；post-boost anchor 为 75，finding routes as Decision
+- Edge case：一个 persona 在 anchor 100、另一个在 anchor 50 raise same finding；merged keeps 100，boost 不超过 cap
 
-**Verification:**
-- No numeric thresholds (0.40, 0.50, 0.60, 0.65, 0.75) remain in the synthesis file
-- The routing table explicitly names each anchor and its destination
-- Cross-persona boost mentions "anchor step" not "+0.10"
+**验证：**
+- synthesis file 中不再有 numeric thresholds（0.40, 0.50, 0.60, 0.65, 0.75）
+- routing table 明确列出每个 anchor 及其 destination
+- Cross-persona boost 使用 "anchor step"，而不是 "+0.10"
 
-- [ ] **Unit 4: Update rendering surfaces**
+- [ ] **Unit 4：更新 rendering surfaces**
 
-**Goal:** Display anchors as integer scores in the user-facing output; remove float-formatting artifacts.
+**目标：** 在 user-facing output 中将 anchors 显示为 integer scores；移除 float-formatting artifacts。
 
-**Requirements:** R7
+**需求：** R7
 
-**Dependencies:** Unit 1, Unit 3
+**依赖：** Unit 1, Unit 3
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-doc-review/references/review-output-template.md`
-- Modify: `plugins/compound-engineering/skills/ce-doc-review/references/walkthrough.md`
-- Modify: `plugins/compound-engineering/skills/ce-doc-review/references/open-questions-defer.md` (if it renders confidence)
-- Modify: `plugins/compound-engineering/skills/ce-doc-review/references/bulk-preview.md` (if it renders confidence)
+**文件：**
+- 修改： `plugins/compound-engineering/skills/ce-doc-review/references/review-output-template.md`
+- 修改： `plugins/compound-engineering/skills/ce-doc-review/references/walkthrough.md`
+- 修改： `plugins/compound-engineering/skills/ce-doc-review/references/open-questions-defer.md`（if it renders confidence）
+- 修改： `plugins/compound-engineering/skills/ce-doc-review/references/bulk-preview.md`（if it renders confidence）
 
-**Approach:**
-- Table `Confidence` columns show the integer score as-is (e.g., `75`), not formatted as a decimal (`0.75`)
-- Walkthrough per-finding block displays `confidence 75` not `confidence 0.75`
-- Headless envelope template in `synthesis-and-presentation.md` Phase 4 shows the integer anchor
-- Add a one-line rubric legend somewhere user-visible so a reader seeing `75` for the first time knows what it means without reading the schema. Candidates: a footer under the Coverage table, or a one-line note at the top of the findings list. Decide during implementation — whichever integrates cleanly with the existing layout
+**方法：**
+- Table `Confidence` columns 按原样显示 integer score（e.g., `75`），不格式化为 decimal（`0.75`）
+- Walkthrough per-finding block 显示 `confidence 75`，而不是 `confidence 0.75`
+- `synthesis-and-presentation.md` Phase 4 中的 Headless envelope template 显示 integer anchor
+- 添加一行 user-visible rubric legend，让首次看到 `75` 的 reader 无需读取 schema 就理解含义。候选：Coverage table 下的 footer，或 findings list 顶部的一行 note。implementation 时决定 -- whichever integrates cleanly with existing layout
 
-**Patterns to follow:**
-- The existing `Tier` column in the output template (which surfaces internal enum values for transparency). Add a `Confidence` or rename `Confidence` to display the anchor integer; keep the `Tier` column separate since anchor and tier are independent
+**遵循的模式：**
+- Existing `Tier` column in output template（透明 surface internal enum values）。添加 `Confidence` 或 rename `Confidence` 以显示 anchor integer；保持 `Tier` column separate，因为 anchor and tier independent
 
-**Test scenarios:**
-- Happy path: A rendered table shows `75` in the Confidence column, not `0.75` or `75%` or `75 (high)`
-- Happy path: Walkthrough per-finding block reads naturally with integer anchor
-- Edge case: When a finding was cross-persona-boosted, the display shows the post-boost anchor value (e.g., 75) and the Reviewer column notes the boost (`coherence, feasibility (+1 anchor)`)
+**测试场景：**
+- Happy path：rendered table 在 Confidence column 中显示 `75`，而不是 `0.75`、`75%` 或 `75 (high)`
+- Happy path：Walkthrough per-finding block 使用 integer anchor 时读起来自然
+- Edge case：当 finding cross-persona-boosted，display shows post-boost anchor value（e.g., 75），Reviewer column notes boost（`coherence, feasibility (+1 anchor)`）
 
-**Verification:**
-- Rendering a fixture finding end-to-end through the synthesis pipeline produces output with integer anchors throughout, no float values
+**验证：**
+- 通过 synthesis pipeline end-to-end render 一个 fixture finding，输出全程使用 integer anchors，无 float values
 
-- [ ] **Unit 5: Update persona files**
+- [ ] **Unit 5：更新 persona files**
 
-**Goal:** Remove per-persona references to specific float confidence values; ensure each persona's domain instructions work with the shared rubric.
+**目标：** 移除 per-persona 对 specific float confidence values 的 references；确保每个 persona 的 domain instructions 与 shared rubric 配合。
 
-**Requirements:** R3
+**需求：** R3
 
-**Dependencies:** Unit 2
+**依赖：** Unit 2
 
-**Files:**
-- Modify: `plugins/compound-engineering/agents/document-review/ce-coherence-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/document-review/ce-adversarial-document-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/document-review/ce-design-lens-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/document-review/ce-feasibility-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/document-review/ce-product-lens-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/document-review/ce-scope-guardian-reviewer.agent.md`
-- Modify: `plugins/compound-engineering/agents/document-review/ce-security-lens-reviewer.agent.md`
+**文件：**
+- 修改： `plugins/compound-engineering/agents/document-review/ce-coherence-reviewer.agent.md`
+- 修改： `plugins/compound-engineering/agents/document-review/ce-adversarial-document-reviewer.agent.md`
+- 修改： `plugins/compound-engineering/agents/document-review/ce-design-lens-reviewer.agent.md`
+- 修改： `plugins/compound-engineering/agents/document-review/ce-feasibility-reviewer.agent.md`
+- 修改： `plugins/compound-engineering/agents/document-review/ce-product-lens-reviewer.agent.md`
+- 修改： `plugins/compound-engineering/agents/document-review/ce-scope-guardian-reviewer.agent.md`
+- 修改： `plugins/compound-engineering/agents/document-review/ce-security-lens-reviewer.agent.md`
 
-**Approach:**
-- Grep each persona file for `confidence` and float values. Replace any specific numeric references (e.g., coherence's `confidence: 0.85+`) with anchor-based equivalents (`anchor 100 when ... ; otherwise anchor 75`)
-- If a persona's domain naturally caps at anchor 75 (e.g., adversarial critiques of premises), add one sentence acknowledging this in the persona's domain rubric so it doesn't over-reach for 100. Do not add a per-persona floor override — the shared >= 50 threshold handles all personas
-- Verify each persona's suppress-conditions section still makes sense under anchor vocabulary; rewrite any float-referencing lines
+**方法：**
+- 对每个 persona file grep `confidence` 和 float values。将 specific numeric references（e.g., coherence's `confidence: 0.85+`）替换为 anchor-based equivalents（`anchor 100 when ... ; otherwise anchor 75`）
+- 如果 persona 的 domain naturally caps at anchor 75（例如 adversarial critiques of premises），在 persona domain rubric 中加一句说明，避免它 over-reach for 100。不要添加 per-persona floor override -- shared >= 50 threshold handles all personas
+- Verify each persona's suppress-conditions section（验证每个 persona 的 suppress-conditions section）在 anchor vocabulary 下仍然合理；rewrite any float-referencing lines
 
-**Patterns to follow:**
-- The shared subagent template's rubric, included by every persona. Any persona-specific guidance should defer to the shared rubric and only add calibration hints specific to that persona's domain
+**遵循的模式：**
+- shared subagent template 的 rubric，每个 persona 都 include。任何 persona-specific guidance 应 defer to shared rubric，仅添加与该 persona domain 相关的 calibration hints
 
-**Test scenarios:**
-- Test expectation: none per-persona — behavior tested via the contract tests in Unit 6
+**测试场景：**
+- Test expectation：per-persona 无单独测试；behavior 通过 Unit 6 的 contract tests 测试
 
-**Verification:**
-- No float confidence values remain in any persona file
-- Each persona's prompt reads coherently with the new rubric
+**验证：**
+- 任何 persona file 中都不再保留 float confidence values
+- 每个 persona 的 prompt 与 new rubric 搭配时读起来 coherent
 
-- [ ] **Unit 6: Update tests and fixtures**
+- [ ] **Unit 6：更新 tests 和 fixtures**
 
-**Goal:** Update all test fixtures and contract assertions to use anchor values; add a migration-correctness test that rejects float confidence.
+**目标：** 更新所有 test fixtures 和 contract assertions 使用 anchor values；添加 migration-correctness test，确保 rejects float confidence。
 
-**Requirements:** R8
+**需求：** R8
 
-**Dependencies:** Unit 1, Unit 3
+**依赖：** Unit 1, Unit 3
 
-**Files:**
-- Modify: `tests/pipeline-review-contract.test.ts`
-- Modify: `tests/review-skill-contract.test.ts`
-- Modify: `tests/fixtures/ce-doc-review/seeded-plan.md`
-- Modify: `tests/fixtures/ce-doc-review/seeded-auth-plan.md`
-- Test: new contract case in `tests/pipeline-review-contract.test.ts` asserting float confidence is rejected
+**文件：**
+- 修改： `tests/pipeline-review-contract.test.ts`
+- 修改： `tests/review-skill-contract.test.ts`
+- 修改： `tests/fixtures/ce-doc-review/seeded-plan.md`
+- 修改： `tests/fixtures/ce-doc-review/seeded-auth-plan.md`
+- 测试： new contract case in `tests/pipeline-review-contract.test.ts` asserting float confidence is rejected
 
-**Approach:**
-- Grep every test and fixture file for `confidence` float values. Convert each per-fixture based on what the fixture is demonstrating:
-  - Fixtures showing strong findings -> `confidence: 100` or `75`
-  - Fixtures showing low-confidence findings -> `confidence: 25` or `50`
-  - Fixtures showing FYI-band findings -> `confidence: 50`
-- Update contract assertions that reference threshold values (0.40, 0.60, 0.65) to anchor equivalents (50, 75, 100)
-- Add a new contract case: construct a finding with `confidence: 0.72` and assert the schema validator rejects it
+**方法：**
+- Grep every test and fixture file for `confidence` float values。根据 fixture 展示的内容逐个 convert：
+- 展示 strong findings 的 fixtures -> `confidence: 100` 或 `75`
+- 展示 low-confidence findings 的 fixtures -> `confidence: 25` 或 `50`
+- 展示 FYI-band findings 的 fixtures -> `confidence: 50`
+- 将 reference threshold values（0.40, 0.60, 0.65）的 contract assertions 更新为 anchor equivalents（50, 75, 100）
+- 添加 new contract case：构造 `confidence: 0.72` 的 finding，assert schema validator rejects it
 
-**Patterns to follow:**
-- Existing test patterns in `tests/pipeline-review-contract.test.ts` for fixture loading and schema validation
+**遵循的模式：**
+- 复用 `tests/pipeline-review-contract.test.ts` 中用于 fixture loading 和 schema validation 的 existing test patterns
 
-**Test scenarios:**
-- Happy path: All existing fixtures validate against the new schema after conversion
-- Error path: A synthesized finding with `confidence: 0.72` fails validation
-- Edge case: A fixture converted from `confidence: 0.65` (previously above-gate for P2) to `confidence: 75` still surfaces in the same tier post-migration (migration does not drop borderline findings)
+**测试场景：**
+- Happy path：所有 existing fixtures 在 conversion 后都通过 new schema validation
+- Error path：带 `confidence: 0.72` 的 synthesized finding validation 失败
+- Edge case：由 `confidence: 0.65`（previously above-gate for P2）converted to `confidence: 75` 的 fixture，在 post-migration 中仍 surface in same tier（migration does not drop borderline findings）
 
-**Verification:**
+**验证：**
 - `bun test` passes with 0 failures
-- Total test count matches or exceeds pre-migration count (new rejection-test added)
+- Total test count（测试总数）匹配或超过 pre-migration count（new rejection-test added）
 
-- [ ] **Unit 7: Document the migration and the threshold divergence**
+- [ ] **Unit 7：记录 migration 和 threshold divergence**
 
-**Goal:** Write a `docs/solutions/` entry so future contributors understand why doc review uses a different threshold from Anthropic's code-review reference.
+**目标：** 写一篇 `docs/solutions/` entry，让 future contributors 理解 doc review 为什么使用不同于 Anthropic code-review reference 的 threshold。
 
-**Requirements:** R1-R9 (documents the whole migration)
+**需求：** R1-R9（documents the whole migration）
 
-**Dependencies:** Units 1-6 complete
+**依赖：** Units 1-6 complete
 
-**Files:**
-- Create: `docs/solutions/skill-design/confidence-anchored-scoring.md`
+**文件：**
+- 新增： `docs/solutions/skill-design/confidence-anchored-scoring.md`
 
-**Approach:**
-- Frontmatter: `module: ce-doc-review`, `problem_type: design_pattern`, `tags: [scoring, calibration, personas]`
-- Body sections:
-  - Problem: continuous confidence invites false precision; LLMs cluster on round numbers
-  - Reference pattern: Anthropic's 5-anchor rubric
-  - Doc-review-specific divergence: threshold >= 50 vs Anthropic's >= 80, with the economics argument (no linter backstop, premise challenges resist verification, routing menu makes dismissal cheap)
-  - When to port this pattern: other persona-based review skills with similar economics
-  - When NOT to port directly: ce-code-review has linter-backstop economics and should tune threshold higher
+**方法：**
+- Frontmatter（frontmatter 字段）：`module: ce-doc-review`, `problem_type: design_pattern`, `tags: [scoring, calibration, personas]`
+- Body sections（正文 sections）：
+  - Problem（问题）：continuous confidence invites false precision；LLMs cluster on round numbers
+  - Reference pattern（参考 pattern）：Anthropic's 5-anchor rubric
+  - Doc-review-specific divergence（doc-review 专属差异）：threshold >= 50 vs Anthropic's >= 80，with economics argument（no linter backstop, premise challenges resist verification, routing menu makes dismissal cheap）
+  - When to port this pattern（何时迁移该 pattern）：other persona-based review skills with similar economics
+  - When NOT to port directly（何时不要直接迁移）：ce-code-review has linter-backstop economics and should tune threshold higher
 
-**Patterns to follow:**
-- Existing entries under `docs/solutions/skill-design/` for frontmatter shape and section structure
+**遵循的模式：**
+- 遵循 `docs/solutions/skill-design/` 下 existing entries 的 frontmatter shape 和 section structure
 
-**Test scenarios:**
-- Test expectation: none — documentation file with no executable behavior
+**测试场景：**
+- 测试预期：无 -- documentation file with no executable behavior
 
-**Verification:**
-- File validates via whatever existing tooling checks `docs/solutions/` frontmatter (if any)
-- A reader unfamiliar with this migration can read the entry and understand both the mechanic and the threshold-tuning rationale
+**验证：**
+- File 可通过现有用于检查 `docs/solutions/` frontmatter 的 tooling（如有）
+- 不熟悉 migration 的 reader 能读懂 mechanic 和 threshold-tuning rationale
 
-## System-Wide Impact
+## 系统级影响
 
-- **Interaction graph:** The `confidence` field is read by every synthesis step (3.2, 3.3, 3.3b, 3.4, 3.5b, 3.6, 3.7, 3.8), every rendering surface (template, walkthrough, open-questions-defer, bulk-preview, headless envelope), and every persona's output contract. A missed update in any of these leaves a format mismatch that will surface as a validation or rendering bug.
-- **Error propagation:** If the schema change lands before the persona prompts update, persona outputs will fail validation and the pipeline will drop all findings. Unit sequencing (Unit 1 before Unit 2 before Unit 5) is load-bearing for this reason.
-- **State lifecycle risks:** The multi-round decision primer (R29 suppression, R30 fix-landed) stores prior-round findings in memory. Prior-round findings serialized with float confidence will not match current-round anchor confidence in fingerprint comparisons. Implementation should check whether the primer carries confidence in its fingerprint — if it does, add a one-time migration or tolerance in the matcher.
-- **API surface parity:** ce-code-review has the same field shape and the same kind of synthesis pipeline. It is intentionally NOT updated in this PR (Scope Boundaries). When ce-code-review's migration eventually runs, it can reuse the rubric structure but will need a higher threshold.
-- **Integration coverage:** End-to-end test invoking the full ce-doc-review flow against a seeded plan is the only way to verify all the surfaces stay in sync. Unit 6's contract tests should include one such end-to-end case.
-- **Unchanged invariants:** Severity taxonomy, finding_type enum, autofix_class enum, rendering structure (sections, coverage table, routing menu), multi-round decision primer shape, chain-linking logic (3.5c), strawman rule. This change is strictly about the confidence dimension; other dimensions remain stable.
+- **Interaction graph:** `confidence` field 被每个 synthesis step（3.2, 3.3, 3.3b, 3.4, 3.5b, 3.6, 3.7, 3.8）、每个 rendering surface（template, walkthrough, open-questions-defer, bulk-preview, headless envelope）以及每个 persona output contract 读取。任何漏改都会留下 format mismatch，并作为 validation or rendering bug surface。
+- **Error propagation:** 如果 schema change 先于 persona prompts update landing，persona outputs 会 validation fail，pipeline 会 drop all findings。因此 Unit sequencing（Unit 1 before Unit 2 before Unit 5）是 load-bearing。
+- **State lifecycle risks:** multi-round decision primer（R29 suppression, R30 fix-landed）将 prior-round findings 存在 memory 中。以 float confidence serialized 的 prior-round findings 不会与 current-round anchor confidence 在 fingerprint comparisons 中 match。Implementation 应检查 primer 是否把 confidence 带入 fingerprint -- 如果是，添加 one-time migration 或 matcher tolerance。
+- **API surface parity:** ce-code-review 有相同 field shape 和类似 synthesis pipeline。本 PR 有意 NOT update 它（Scope Boundaries）。当 ce-code-review migration 运行时，可复用 rubric structure，但需要更高 threshold。
+- **Integration coverage:** against seeded plan 调用 full ce-doc-review flow 的 end-to-end test，是验证所有 surfaces stay in sync 的唯一方式。Unit 6 contract tests 应包含此类 end-to-end case。
+- **Unchanged invariants:** Severity taxonomy、finding_type enum、autofix_class enum、rendering structure（sections, coverage table, routing menu）、multi-round decision primer shape、chain-linking logic（3.5c）、strawman rule。该 change strictly about confidence dimension；其他 dimensions stable。
 
-## Risks & Dependencies
+## 风险与依赖
 
-| Risk | Mitigation |
+| 风险 | 缓解 |
 |------|------------|
-| Personas over-cluster on anchor 75 (new version of gaming) | Rubric criteria for 75 vs 100 must be behaviorally distinct: 75 = "double-checked, will hit in practice"; 100 = "evidence directly confirms, will happen frequently". If clustering still occurs post-migration, consider the neutral-scorer follow-up (deferred scope) |
-| Tests and fixtures update incompletely, leaving hidden float references | Unit 6 includes a grep-all-fixtures audit step; the new rejection test catches any fixture that slips through |
-| Anchor routing rule in synthesis contradicts rendering rule, causing tier/display drift | Unit 3 and Unit 4 share a test case (end-to-end fixture through pipeline) that catches this. Single-source-of-truth routing table in synthesis-and-presentation.md is the canonical reference; rendering reads from it, not reinvents it |
-| `confidence: 0` findings surface in user output by mistake (they should drop silently) | Synthesis 3.2 explicitly drops anchor 0 and anchor 25. Contract test in Unit 6 asserts neither surfaces in any output bucket |
-| Doc review threshold >= 50 proves too permissive in practice (too many noisy findings surface) | The threshold is easy to tune post-migration (change one rule in synthesis 3.2). Documented in the solution entry (Unit 7) so future contributors know where to adjust |
-| Persona prompt changes degrade finding quality | Unit 5 preserves persona-specific domain logic; only confidence-related language changes. Run the reference plan through the migrated flow as a smoke test (Unit 6 end-to-end case) |
+| Personas over-cluster on anchor 75（new version of gaming） | Rubric criteria for 75 vs 100 must be behaviorally distinct：75 = "double-checked, will hit in practice"；100 = "evidence directly confirms, will happen frequently"。如果 post-migration 仍 clustering，consider neutral-scorer follow-up（deferred scope） |
+| Tests and fixtures update incompletely, leaving hidden float references | Unit 6 includes a grep-all-fixtures audit step；new rejection test catches any fixture that slips through |
+| Anchor routing rule in synthesis contradicts rendering rule, causing tier/display drift | Unit 3 and Unit 4 share a test case（end-to-end fixture through pipeline）that catches this。Single-source-of-truth routing table in synthesis-and-presentation.md is canonical；rendering reads from it, not reinvents it |
+| `confidence: 0` findings surface in user output by mistake（they should drop silently） | Synthesis 3.2 explicitly drops anchor 0 and anchor 25。Contract test in Unit 6 asserts neither surfaces in any output bucket |
+| Doc review threshold >= 50 proves too permissive in practice（too many noisy findings surface） | Threshold easy to tune post-migration（change one rule in synthesis 3.2）。Documented in solution entry（Unit 7），future contributors know where to adjust |
+| Persona prompt changes degrade finding quality | Unit 5 preserves persona-specific domain logic；only confidence-related language changes。Run reference plan through migrated flow as smoke test（Unit 6 end-to-end case） |
 
-## Documentation / Operational Notes
+## 文档与运维说明
 
-- This is a breaking change for the ce-doc-review schema. Any external consumer of the findings JSON (there are none currently — the schema is internal) would need to update. No external-consumer impact expected.
-- No rollout flag needed — the migration is atomic across the skill. Before-and-after review of the same document produces comparable output; the anchor scores replace float scores uniformly.
-- The `docs/solutions/skill-design/confidence-anchored-scoring.md` entry (Unit 7) is the canonical explanation for why doc review diverges from Anthropic's code-review threshold. Link to it from the PR description.
+- 这是 ce-doc-review schema 的 breaking change。任何 findings JSON 的 external consumer（当前没有 -- schema 是 internal）都需要 update。No external-consumer impact expected。
+- No rollout flag needed -- migration atomic across skill。对同一 document 的 before-and-after review 产生 comparable output；anchor scores 统一替换 float scores。
+- `docs/solutions/skill-design/confidence-anchored-scoring.md` entry（Unit 7）是解释为什么 doc review diverges from Anthropic code-review threshold 的 canonical explanation。在 PR description 中 link to it。
 
-## Sources & References
+## 来源与参考
 
-- Anthropic reference rubric: `anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`
-- Current schema: `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json`
-- Current synthesis pipeline: `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md`
-- Related prior session work: 2026-04-21 review of a ce-doc-review output that surfaced the fine-grained-score gaming problem, leading to this plan
+- Anthropic reference rubric（Anthropic 参考 rubric）：`anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`
+- Current schema（当前 schema）：`plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json`
+- Current synthesis pipeline（当前 synthesis pipeline）：`plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md`
+- Related prior session work（相关前序 session work）：2026-04-21 review of a ce-doc-review output that surfaced the fine-grained-score gaming problem, leading to this plan

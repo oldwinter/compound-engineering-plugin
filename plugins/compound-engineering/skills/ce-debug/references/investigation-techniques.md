@@ -1,20 +1,20 @@
-# Investigation Techniques
+# Investigation Techniques（调查技巧）
 
-Techniques for deeper investigation when standard code tracing is not enough. Load this when a bug does not reproduce reliably, involves timing or concurrency, or requires framework-specific tracing.
+当 standard code tracing 不够时，用于 deeper investigation 的 techniques。当 bug 不能可靠 reproduce、涉及 timing 或 concurrency、或需要 framework-specific tracing 时加载本文件。
 
 ---
 
-## Root-Cause Tracing
+## Root-Cause Tracing（根因追踪）
 
-When a bug manifests deep in the call stack, the instinct is to fix where the error appears. That treats a symptom. Instead, trace backward through the call chain to find where the bad state originated.
+当 bug 在 call stack 深处显现时，本能反应通常是在 error 出现处修复。这是在治疗 symptom。正确做法是沿 call chain 向后 tracing，找出 bad state 从哪里产生。
 
-**Backward tracing:**
+**Backward tracing（向后追踪）：**
 
-- Start at the error
-- At each level, ask: where did this value come from? Who called this function? What state was passed in?
-- Keep going upstream until finding the point where valid state first became invalid — that is the root cause
+- 从 error 开始
+- 在每一层问：这个 value 从哪里来？谁调用了这个 function？传入了什么 state？
+- 持续 upstream，直到找到 valid state 首次变成 invalid 的点；那就是 root cause
 
-**Worked example:**
+**Worked example（示例）：**
 
 ```
 Symptom: API returns 500 with "Cannot read property 'email' of undefined"
@@ -24,9 +24,9 @@ What was passed? user = await UserRepo.create(params) — but create() returns u
 Original cause: UserRepo.create() silently swallows duplicate key errors and returns undefined instead of throwing
 ```
 
-The fix belongs at the origin (UserRepo.create should throw on duplicate key), not where the error appeared (NotificationService).
+fix 应该落在 origin（UserRepo.create 应在 duplicate key 时 throw），而不是 error 出现处（NotificationService）。
 
-**When manual tracing stalls**, add instrumentation:
+**当 manual tracing 卡住时**，添加 instrumentation：
 
 ```
 // Before the problematic operation
@@ -34,23 +34,23 @@ const stack = new Error().stack;
 console.error('DEBUG [operation]:', { value, cwd: process.cwd(), stack });
 ```
 
-Use `console.error()` in tests — logger output may be suppressed. Log before the dangerous operation, not after it fails.
+在 tests 中使用 `console.error()`；logger output 可能被 suppressed。在 dangerous operation 之前 log，而不是在它失败后。
 
 ---
 
-## Multi-Component Boundary Instrumentation
+## Multi-Component Boundary Instrumentation（多组件边界插桩）
 
-Root-cause tracing walks one call chain. When a bug crosses subsystems — CI → build → signing, API → service → database, frontend → API → background worker — the failure localizes poorly to a single chain. Instead, instrument every component boundary in one run, capture what enters and what exits each, and let the evidence point to the failing layer.
+Root-cause tracing 沿着一条 call chain 走。当 bug 跨越 subsystems（CI → build → signing，API → service → database，frontend → API → background worker）时，failure 很难 localize 到单一 chain。此时应在一次运行中 instrument 每个 component boundary，capture 每一层的进入与退出，让 evidence 指向 failing layer。
 
-**Shape:**
+**Shape（步骤形状）：**
 
-1. List the component boundaries data crosses from trigger to observed symptom.
-2. At each boundary, log what enters and what exits — include the values, relevant environment, and a short tag identifying the boundary.
-3. Run the scenario once.
-4. Read the log linearly, comparing each "exits" value to the next "enters" value.
-5. The boundary where data first stops matching expectation is the failing layer.
+1. 列出 data 从 trigger 到 observed symptom 跨过的 component boundaries。
+2. 在每个 boundary log 进入和退出的内容：包括 values、relevant environment，以及识别 boundary 的 short tag。
+3. 运行 scenario 一次。
+4. 线性阅读 log，将每个 "exits" value 与下一个 "enters" value 对比。
+5. data 首次不再匹配 expectation 的 boundary 就是 failing layer。
 
-**Worked example (app signing on CI):**
+**Worked example（app signing on CI 示例）：**
 
 ```bash
 # Layer 1: workflow env
@@ -70,15 +70,15 @@ security find-identity -v
 codesign --sign "$IDENTITY" --verbose=4 "$APP"
 ```
 
-One run, and the log shows precisely which layer drops the value — secrets → workflow ✓, workflow → build ✗ → focus investigation on the workflow-to-build-script inheritance, not on signing.
+一次运行后，log 会精确显示哪一层丢掉了 value：secrets → workflow ✓，workflow → build ✗。investigation 应聚焦 workflow-to-build-script inheritance，而不是 signing。
 
-**When this beats backward tracing:** When the symptom is far from the trigger (many components apart), when components are owned by different systems (CI vs app code), when the "call stack" is conceptual rather than literal (message bus, HTTP, process boundaries). Backward tracing still applies within each layer once the failing layer is identified.
+**何时优于 backward tracing：** symptom 距 trigger 很远（跨 many components）、components 归属不同 systems（CI vs app code）、"call stack" 是 conceptual 而不是 literal（message bus、HTTP、process boundaries）时。一旦 failing layer 被识别，backward tracing 仍适用于该 layer 内部。
 
 ---
 
-## Git Bisect for Regressions
+## Git Bisect for Regressions（用 Git Bisect 定位回归）
 
-When a bug is a regression ("it worked before"), use binary search to find the breaking commit:
+当 bug 是 regression（"it worked before"）时，用 binary search 找到 breaking commit：
 
 ```bash
 git bisect start
@@ -89,113 +89,113 @@ git bisect good <known-good-ref> # a commit where it worked
 git bisect reset                  # return to original branch when done
 ```
 
-For automated bisection with a test script:
+使用 test script 做 automated bisection：
 
 ```bash
 git bisect start HEAD <known-good-ref>
 git bisect run <test-command>
 ```
 
-The test command should exit 0 for good, non-zero for bad.
+test command 对 good 应 exit 0，对 bad 应 non-zero。
 
 ---
 
-## Intermittent Bug Techniques
+## Intermittent Bug Techniques（间歇性 Bug 技巧）
 
-When a bug does not reproduce reliably after 2-3 attempts:
+当 bug 在 2-3 次尝试后仍无法 reliably reproduce：
 
-**Logging traps.** Add targeted logging at the suspected failure point and run the scenario repeatedly. Capture the state that differs between passing and failing runs.
+**Logging traps（日志陷阱）。** 在 suspected failure point 添加 targeted logging，并反复运行 scenario。capture passing 和 failing runs 之间不同的 state。
 
-**Statistical reproduction.** Run the failing scenario in a loop to establish a reproduction rate:
+**Statistical reproduction（统计复现）。** 在 loop 中运行 failing scenario，建立 reproduction rate：
 
 ```bash
 for i in $(seq 1 20); do echo "Run $i:"; <test-command> && echo "PASS" || echo "FAIL"; done
 ```
 
-A 5% reproduction rate confirms the bug exists but suggests timing or data sensitivity.
+5% reproduction rate 证明 bug 存在，但也暗示 timing 或 data sensitivity。
 
-**Environment isolation.** Systematically eliminate variables:
-- Same test, different machine?
-- Same test, different data seed?
-- Same test, serial vs parallel execution?
-- Same test, with vs without network access?
+**Environment isolation（环境隔离）。** 系统性排除 variables：
+- Same test，不同 machine？
+- Same test，不同 data seed？
+- Same test，serial vs parallel execution（串行 vs 并行执行）？
+- Same test，with vs without network access（有无网络访问）？
 
-**Data-dependent triggers.** If the bug only appears with certain data, identify the trigger condition:
-- What is unique about the failing input?
-- Does the input size, encoding, or edge value matter?
-- Is the data order significant (sorted vs random)?
+**Data-dependent triggers（数据依赖触发）。** 如果 bug 只在 certain data 下出现，识别 trigger condition：
+- failing input 有什么 unique 之处？
+- input size、encoding 或 edge value 是否重要？
+- data order 是否 significant（sorted vs random）？
 
-**Test-order pollution.** If an individual test passes in isolation but fails when the suite runs, tests are leaking state between each other:
+**Test-order pollution（测试顺序污染）。** 如果 individual test 单独运行通过，但 suite 运行时失败，说明 tests 之间在 leaking state：
 
-- Run the failing test alone — if it passes, pollution is confirmed
-- Run the failing test's file alone — narrows pollution to same-file or cross-file
-- Run the suite with randomized test order (most runners support a seed flag) — a different failing-test neighbor each run implies global state mutation
-- Bisect the preceding tests: run the failing test with just the first half of the earlier tests, then the second half, then narrow
+- 单独运行 failing test；如果通过，pollution 已确认
+- 单独运行 failing test 所在文件；将 pollution narrowed 到 same-file 或 cross-file
+- 用 randomized test order 运行 suite（多数 runners 支持 seed flag）；每次 failing-test neighbor 不同，暗示 global state mutation
+- Bisect preceding tests：让 failing test 只与前面 tests 的前半部分一起运行，再与后半部分一起运行，然后继续 narrow
 
-Common culprits once isolated: module-level state, mocks not torn down, temp files not cleaned up, database rows not rolled back, environment variables mutated and not restored.
-
----
-
-## Repro Minimization
-
-Once a bug reproduces reliably, the reproduction is often large — a 500-line integration test, a huge payload, a lengthy form-filling sequence. A smaller reproduction makes every subsequent investigation step faster and localizes the actual trigger.
-
-**Delta debugging (manual):**
-
-1. Cut the reproduction in half.
-2. Does it still fail? If yes, discard the other half; recurse on what remains. If no, the failing behavior depends on something in the half you cut — put it back and cut the other half instead.
-3. Continue until no further reduction is possible without losing the failure.
-
-**For input payloads:**
-
-- Remove fields one at a time (or half at a time) while confirming the bug persists
-- Shrink string values until the minimum length that still triggers the bug
-- Replace complex nested structures with the smallest shape that reproduces
-
-**For test sequences:**
-
-- Remove setup steps that don't appear to affect the failing assertion
-- Inline helpers into the test to see what actually runs
-- Remove other assertions to isolate which one fails and on what state
-
-The minimized repro often reveals the root cause directly — "the bug only triggers when the string contains a tab character" is a much louder signal than "the bug triggers in this 500-line integration test."
+isolated 后常见 culprits：module-level state、mocks 未 torn down、temp files 未 cleaned up、database rows 未 rolled back、environment variables 被 mutated 且未 restored。
 
 ---
 
-## Framework-Specific Debugging
+## Repro Minimization（最小化复现）
 
-### Rails
-- Check callbacks: `before_save`, `after_commit`, `around_action` — these execute implicitly and can alter state
-- Check middleware chain: `rake middleware` lists the full stack
-- Check Active Record query generation: `.to_sql` on any relation
-- Use `Rails.logger.debug` with tagged logging for request tracing
+一旦 bug 能 reliably reproduce，reproduction 往往很大：500-line integration test、huge payload、lengthy form-filling sequence。更小的 reproduction 会让后续每一步 investigation 更快，并 localize actual trigger。
 
-### Node.js
-- Async stack traces: run with `--async-stack-traces` flag for full async call chains
-- Unhandled rejections: check for missing `.catch()` or `await` on promises
-- Event loop delays: `process.hrtime()` before and after suspect operations
-- Memory leaks: `--inspect` flag + Chrome DevTools heap snapshots
+**Delta debugging（manual，手动）：**
 
-### Python
-- Traceback enrichment: `traceback.print_exc()` in except blocks
-- `pdb.set_trace()` or `breakpoint()` for interactive debugging
-- `sys.settrace()` for execution tracing
-- `logging.basicConfig(level=logging.DEBUG)` for verbose output
+1. 将 reproduction cut in half。
+2. 它仍然 fail 吗？如果是，discard 另一半，并对剩余部分 recurse。如果不是，failing behavior 依赖你 cut 掉的那一半；把它放回去，再 cut 另一半。
+3. 持续到无法在保留 failure 的前提下进一步 reduction。
+
+**For input payloads（输入 payload）：**
+
+- 一次 remove 一个 field（或一半），同时确认 bug 仍存在
+- 缩短 string values，直到找到仍 trigger bug 的 minimum length
+- 用能 reproduce 的 smallest shape 替代 complex nested structures
+
+**For test sequences（测试序列）：**
+
+- 移除看起来不影响 failing assertion 的 setup steps
+- 将 helpers inline 到 test 中，查看实际运行了什么
+- 移除其他 assertions，以 isolate 哪个 assertion 在什么 state 上失败
+
+minimized repro 经常直接揭示 root cause："bug only triggers when the string contains a tab character" 比 "bug triggers in this 500-line integration test" 强得多。
 
 ---
 
-## Stepping Debugger vs Instrumentation
+## Framework-Specific Debugging（框架特定 Debugging）
 
-Print-debugging is the default reach — it is fast to add and scales across many cases. But there are cases where an interactive stepping debugger converges to the root cause far faster. The rule of thumb:
+### Rails（Rails）
+- 检查 callbacks：`before_save`、`after_commit`、`around_action`；它们会 implicitly execute 并可能 alter state
+- 检查 middleware chain：`rake middleware` 列出 full stack
+- 检查 Active Record query generation：对任意 relation 使用 `.to_sql`
+- 使用带 tagged logging 的 `Rails.logger.debug` 做 request tracing
 
-- **Reach for a stepping debugger when:** the failing code path is localized (a specific function or tight call chain), the bug is reliably reproducible, and you need precise state at a known point — values of many locals at once, the exact shape of a structure, or the progression of state across a loop. One break, inspect everything.
-- **Reach for instrumentation when:** the bug is intermittent, spans many calls or distributed components, or happens in a context where breaking execution is disruptive (production, concurrent code whose timing matters, long-running processes). Instrumentation captures diffuse behavior across time and environments.
+### Node.js（Node.js）
+- Async stack traces（异步 stack traces）：使用 `--async-stack-traces` flag 运行，获取 full async call chains
+- Unhandled rejections（未处理 rejections）：检查 promises 是否缺少 `.catch()` 或 `await`
+- Event loop delays（event loop 延迟）：在 suspect operations 前后使用 `process.hrtime()`
+- Memory leaks（内存泄漏）：`--inspect` flag + Chrome DevTools heap snapshots
 
-Mixed use is common: instrument first to localize, then attach a debugger at the localized point.
+### Python（Python）
+- Traceback enrichment（traceback 增强）：在 except blocks 中使用 `traceback.print_exc()`
+- 用 `pdb.set_trace()` 或 `breakpoint()` 做 interactive debugging
+- 用 `sys.settrace()` 做 execution tracing
+- 用 `logging.basicConfig(level=logging.DEBUG)` 输出 verbose output
 
-**Entry points by language:**
+---
 
-| Language | Interactive breakpoint | Attach to running process |
+## Stepping Debugger vs Instrumentation（单步调试器 vs 插桩）
+
+Print-debugging 是默认手段：添加快，且适用于许多 cases。但有些情况下，interactive stepping debugger 会更快 converge 到 root cause。经验法则：
+
+- **Reach for a stepping debugger when：** failing code path 已 localized（specific function 或 tight call chain）、bug reliably reproducible，且你需要 known point 的 precise state：一次看许多 locals 的 values、structure 的 exact shape、或 loop 中 state 的 progression。break 一次，inspect everything。
+- **Reach for instrumentation when：** bug 是 intermittent，跨 many calls 或 distributed components，或发生在 breaking execution 会 disruptive 的 context（production、timing-sensitive concurrent code、long-running processes）。Instrumentation 捕获跨 time 和 environments 的 diffuse behavior。
+
+Mixed use 很常见：先 instrument 以 localize，再在 localized point attach debugger。
+
+**Entry points by language（按语言的入口）：**
+
+| Language（语言） | Interactive breakpoint（交互断点） | Attach to running process（附加到运行中进程） |
 |----------|------------------------|---------------------------|
 | Python | `breakpoint()` in code, or `python -m pdb script.py` | `python -m pdb -p <pid>` (Python 3.14+ only); on earlier versions, instrument the target with `rpdb` / `remote-pdb` and connect after it triggers |
 | Node.js | `debugger;` in code + `node --inspect-brk`, then connect via Chrome DevTools or VS Code | `kill -SIGUSR1 <pid>` to enable the inspector on the running process (Linux/macOS), then connect Chrome DevTools or VS Code to the default port 9229 |
@@ -204,32 +204,32 @@ Mixed use is common: instrument first to localize, then attach a debugger at the
 | Rust / C / C++ | `lldb target/debug/binary` or `gdb binary`, then `break`, `run`, `print` | `lldb -p <pid>` / `gdb -p <pid>` |
 | Browser JS | `debugger;` in code, or DevTools Sources → set breakpoint | DevTools attaches to page automatically |
 
-For test runs, most test runners integrate with the above — e.g., `node --inspect-brk $(which jest)`, `pytest --pdb`, `rspec` with `binding.pry`, `dlv test`. Prefer the runner's integration over trying to attach post-hoc.
+对 test runs，多数 test runners 可与上述工具集成，例如 `node --inspect-brk $(which jest)`、`pytest --pdb`、带 `binding.pry` 的 `rspec`、`dlv test`。优先使用 runner integration，而不是事后 attach。
 
 ---
 
-## Race Condition Investigation
+## Race Condition Investigation（Race Condition 调查）
 
-When timing or concurrency is suspected:
+当怀疑 timing 或 concurrency 时：
 
-**Timing isolation.** Add deliberate delays at suspect points to widen the race window and make it reproducible:
+**Timing isolation（时序隔离）。** 在 suspect points 添加 deliberate delays，扩大 race window，使其可 reproduce：
 
 ```
 // Simulate slow operation to expose race
 await new Promise(r => setTimeout(r, 100));
 ```
 
-**Shared mutable state.** Search for variables, caches, or database rows accessed by multiple threads or processes without synchronization. Common patterns:
-- Global or module-level mutable state
-- Cache reads without locks
-- Database rows read then updated without optimistic locking
+**Shared mutable state。** 搜索被多个 threads 或 processes 无 synchronization 访问的 variables、caches 或 database rows。常见 patterns：
+- Global 或 module-level mutable state
+- 无 locks 的 cache reads
+- Database rows 先 read 后 update，且无 optimistic locking
 
-**Async ordering.** Check whether operations assume a specific execution order that is not guaranteed:
-- Promise.all with dependent operations
-- Event handlers that assume emission order
-- Database writes that assume read consistency
+**Async ordering。** 检查 operations 是否假设了不被保证的 specific execution order：
+- 包含 dependent operations 的 Promise.all
+- 假设 emission order 的 event handlers
+- 假设 read consistency 的 database writes
 
-**Condition-based waits instead of arbitrary delays.** Flaky tests are often built on `setTimeout`/`sleep` calls that guess at how long an operation takes. These pass on fast machines and fail under load or in CI. Replace the guess with polling the condition the test actually depends on, bounded by a timeout:
+**Condition-based waits instead of arbitrary delays。** Flaky tests 往往建立在 `setTimeout`/`sleep` calls 上，猜测 operation 需要多久。这些 tests 在 fast machines 上通过，在 load 或 CI 下失败。用 polling test 实际依赖的 condition 替代猜测，并设置 timeout：
 
 ```typescript
 // before: races under load
@@ -241,36 +241,36 @@ await waitFor(() => getResult() !== undefined, 'result available', 5000);
 expect(getResult()).toBeDefined();
 ```
 
-Arbitrary delays remain correct only when testing actual timing behavior (debounce intervals, throttle windows) — in that case, comment why the specific duration is needed.
+只有在测试 actual timing behavior（debounce intervals、throttle windows）时，arbitrary delays 才仍然正确；这种情况下，要 comment 说明为什么需要 specific duration。
 
 ---
 
-## Heisenbugs and the Observer Effect
+## Heisenbugs and the Observer Effect（海森堡 Bug 与观察者效应）
 
-When adding `console.log`, attaching a debugger, or inserting instrumentation causes the bug to disappear, the observation is changing the system's behavior. That is itself diagnostic — do not conclude "fixed." The bug is still present; your instrumentation perturbed it out of sight.
+当添加 `console.log`、attach debugger 或插入 instrumentation 导致 bug 消失时，observation 正在改变 system behavior。这本身就是 diagnostic；不要得出 "fixed" 结论。bug 仍然存在，只是 instrumentation 将它 perturb 到视野之外。
 
-**What the disappearance tells you:**
+**disappearance 告诉你的信息：**
 
-- **Timing-sensitive:** Instrumentation slowed the code enough that a race condition no longer wins. Investigate concurrency, async ordering, and shared mutable state rather than the nominal logic.
-- **Garbage-collection-sensitive:** Logging allocated memory and triggered a GC that hid the symptom. Look at memory pressure, finalizers, object lifecycle.
-- **Optimization-dependent:** Instrumentation prevented a compiler/JIT optimization that was producing wrong results. Rare but real (especially in C/C++/Rust release builds).
-- **Buffering-dependent:** Log flushing changed I/O ordering. Often indicates unflushed writes elsewhere.
-- **Async-ordering-sensitive:** Log I/O introduced a microtask boundary that reorders subsequent operations. Look for code that implicitly depends on synchronous ordering.
+- **Timing-sensitive：** Instrumentation 让 code 变慢，race condition 不再获胜。调查 concurrency、async ordering 和 shared mutable state，而不是 nominal logic。
+- **Garbage-collection-sensitive：** Logging 分配 memory 并 trigger GC，隐藏了 symptom。查看 memory pressure、finalizers、object lifecycle。
+- **Optimization-dependent：** Instrumentation 阻止了产生错误结果的 compiler/JIT optimization。少见但真实存在（尤其是 C/C++/Rust release builds）。
+- **Buffering-dependent：** Log flushing 改变 I/O ordering。通常表明 elsewhere 有 unflushed writes。
+- **Async-ordering-sensitive：** Log I/O 引入 microtask boundary，重排 subsequent operations。寻找 implicitly depends on synchronous ordering 的 code。
 
-**How to investigate without perturbing:**
+**如何在不 perturb 的情况下 investigate：**
 
-- Non-blocking instrumentation: write to a ring buffer in memory, dump it only after failure is observed
-- Sampling profilers instead of tracing: external observation of what's running without injecting code into the path
-- Platform-level instrumentation: `strace`, `dtrace`, eBPF, platform profilers that don't require code changes
-- Post-mortem evidence: core dumps, heap snapshots, captured state from after the failure, without observing during
+- Non-blocking instrumentation（非阻塞插桩）：写入 memory 中的 ring buffer，仅在 observed failure 后 dump
+- Sampling profilers instead of tracing（使用 sampling profiler 替代 tracing）：不向 path 注入 code，从外部观察正在运行什么
+- Platform-level instrumentation（平台级插桩）：`strace`、`dtrace`、eBPF、无需 code changes 的 platform profilers
+- Post-mortem evidence（事后证据）：core dumps、heap snapshots、failure 后 captured state，而不是 during 时观察
 
-The defining rule: if the bug is sensitive to observation, the fix must survive re-introduction of the observation. A fix that only works while instrumentation is present is itself a heisenbug.
+defining rule：如果 bug 对 observation sensitive，fix 必须在 re-introduction of observation 后仍然成立。只有 instrumentation 存在时才有效的 fix，本身就是 heisenbug。
 
 ---
 
-## Browser Debugging
+## Browser Debugging（浏览器 Debugging）
 
-When investigating UI bugs with `agent-browser` or equivalent tools:
+使用 `agent-browser` 或 equivalent tools investigate UI bugs 时：
 
 ```bash
 # Open the affected page
@@ -288,87 +288,87 @@ agent-browser snapshot -i         # capture state after interaction
 agent-browser screenshot bug-evidence.png
 ```
 
-**Port detection:** Check project instruction files (`AGENTS.md`, `CLAUDE.md`) for port references, then `package.json` dev scripts, then `.env` files, falling back to `3000`.
+**Port detection：** 先检查 project instruction files（`AGENTS.md`、`CLAUDE.md`）中的 port references，再看 `package.json` dev scripts，然后 `.env` files，最后 fallback 到 `3000`。
 
-**Console errors:** Check browser console output for JavaScript errors, failed network requests, and CORS issues. These often reveal the root cause of UI bugs before any code tracing is needed.
+**Console errors：** 检查 browser console output 中的 JavaScript errors、failed network requests 和 CORS issues。它们往往在需要 code tracing 前就揭示 UI bugs 的 root cause。
 
-**Network tab:** Check for failed API requests, unexpected response codes, or missing CORS headers. A 422 or 500 response from the backend narrows the investigation immediately.
-
----
-
-## Evidence Harvesting Across Systems
-
-When a bug spans a real environment — production, staging, a multi-service setup — the richest evidence usually already exists in logs, traces, and error-tracker payloads. Use it rather than reproducing from scratch when possible.
-
-**Follow a single request end-to-end.** Pick one concrete failing request (an exact timestamp, user ID, or event ID from an error tracker). Then:
-
-- Search every relevant log source for that identifier — correlation ID, request ID, trace ID, user ID
-- Assemble the timeline in order: edge → API → service → database → downstream calls → response
-- Note where the timeline has gaps (missing logs) or contradictions (timestamps out of order, IDs that don't propagate)
-
-One traced request usually reveals the root cause faster than a dozen attempts to reproduce.
-
-**Correlation IDs.** Most web frameworks either attach a request ID automatically or accept one via header (`X-Request-ID`, `traceparent`). When the project has one, every log line and every downstream call should carry it. If it's missing or not propagated, that is itself a finding — propagation gaps mean the agent cannot assemble the timeline, and neither could the on-call human who investigates the next incident.
-
-**Timestamp triangulation.** When the failing operation has no shared ID, timestamps are the fallback. Constrain every log query to a narrow window around the observed failure, then look for the first anomaly in order. Watch for clock skew between services — a 30-second drift between two hosts reorders evidence and misleads triangulation.
-
-**Error tracker payloads.** Sentry, Bugsnag, Honeybadger, AppSignal and similar tools capture stack traces, breadcrumbs, user context, request state, and release metadata at the moment of failure. Read the full payload before tracing code — it often contains the exact file:line, the variable state, and the breadcrumbs leading to the error. Grouping rules sometimes hide frequency and variant information; expand to see every instance rather than just the representative one.
-
-**APM / distributed traces.** When the project has Datadog APM, Honeycomb, New Relic, or an OpenTelemetry collector, the trace view shows the full call tree across services with timings. Look for: unexpectedly long spans (blocking or slow dependency), failed spans in the middle of the chain, spans that should exist but don't (missing instrumentation also masks bugs).
-
-**Preserve before investigating.** Error trackers and log systems have retention windows. Before starting a long investigation, export or snapshot the key evidence (event ID, trace ID, full stack trace, breadcrumbs) so it doesn't age out mid-session.
+**Network tab：** 检查 failed API requests、unexpected response codes 或 missing CORS headers。backend 返回 422 或 500 会立即 narrow investigation。
 
 ---
 
-## System Boundary Checks
+## Evidence Harvesting Across Systems（跨系统收集证据）
 
-Many bugs live at the boundary between an application and the system it runs on — network, database, filesystem, OS. A fast pass through these boundaries often eliminates whole categories of suspicion before deep code tracing.
+当 bug 跨越 real environment（production、staging、multi-service setup）时，最丰富的 evidence 通常已经存在于 logs、traces 和 error-tracker payloads 中。尽可能使用它，而不是从零 reproduce。
 
-**Network.**
+**Follow a single request end-to-end（端到端跟踪单个 request）。** 选择一个 concrete failing request（exact timestamp、user ID，或 error tracker 中的 event ID）。然后：
 
-- DNS resolution: `dig <host>`, `nslookup <host>`, `host <host>` — does the name resolve to what you expect from this host?
-- Reachability: `curl -v https://host/path` — full headers, redirects, TLS errors
-- Status codes and headers: check response for 4xx/5xx, unexpected redirects, missing CORS headers, content-encoding surprises
-- Connection state: `ss -tan` / `netstat -an` / `lsof -i` — open connections, listening ports, connections in TIME_WAIT or CLOSE_WAIT
-- TLS: `openssl s_client -connect host:443` — certificate chain, expiry, SNI mismatches
+- 在每个 relevant log source 中搜索该 identifier：correlation ID、request ID、trace ID、user ID
+- 按顺序 assemble timeline：edge → API → service → database → downstream calls → response
+- 记录 timeline 哪里有 gaps（missing logs）或 contradictions（timestamps out of order、IDs 未 propagate）
 
-**Database.**
+一个 traced request 通常比十几次 reproduce attempt 更快揭示 root cause。
 
-- Query plan: `EXPLAIN` / `EXPLAIN ANALYZE` on the suspect query — is it using the expected index, or scanning a large table?
-- Slow query log / recent queries: most databases surface the N slowest recent queries — failing queries often show up there
-- Locks and transactions: inspect the lock/transaction tables (`pg_locks`, `information_schema.innodb_trx`, `sys.dm_tran_locks`) — is the operation waiting on a long-held lock?
-- Connection pool: is the app exhausting its pool? Are connections leaking?
-- Replication lag (if read replicas are in the path): a read right after a write may hit a replica that hasn't caught up yet
+**Correlation IDs（关联 ID）。** 多数 web frameworks 会自动 attach request ID，或通过 header（`X-Request-ID`、`traceparent`）接受它。当 project 有 correlation ID 时，每条 log line 和每个 downstream call 都应携带它。如果它缺失或未 propagate，这本身就是 finding；propagation gaps 意味着 agent 无法 assemble timeline，调查下次 incident 的 on-call human 也不行。
 
-**Filesystem.**
+**Timestamp triangulation（时间戳三角定位）。** 当 failing operation 没有 shared ID 时，timestamps 是 fallback。将每个 log query 限制在 observed failure 附近的 narrow window，然后按顺序寻找 first anomaly。注意 services 之间的 clock skew：两个 hosts 间 30 秒 drift 会 reorder evidence 并误导 triangulation。
 
-- Existence and permissions: `ls -la <path>` — does the file exist, is it readable/writable by the running user?
-- Case sensitivity: bugs that only appear on Linux (not macOS) are often case mismatches
-- Open handles: `lsof <path>` or `lsof -p <pid>` — is something still holding the file, preventing write/unlink?
-- Disk space: `df -h` — out-of-space errors sometimes surface as cryptic write failures elsewhere
-- File watching / inotify limits: EMFILE or "too many open files" often means an inotify/FD limit, not a leak in your code
-- Path separators and encoding: Windows-style paths in Unix code, or UTF-8 paths in a non-UTF-8 locale
+**Error tracker payloads（错误追踪 payload）。** Sentry、Bugsnag、Honeybadger、AppSignal 和类似 tools 会在 failure moment capture stack traces、breadcrumbs、user context、request state 和 release metadata。tracing code 前先读 full payload；它常包含 exact file:line、variable state，以及 leading to error 的 breadcrumbs。Grouping rules 有时会隐藏 frequency 和 variant information；expand 查看每个 instance，而不是只看 representative one。
 
-**Processes and signals.** Check whether the process is actually the version you think is running (`ps aux | grep`, cross-reference pid to build time). Zombies, orphaned workers, and crashed-then-restarted-with-old-code processes all masquerade as code bugs.
+**APM / distributed traces（分布式追踪）。** 当 project 有 Datadog APM、Honeycomb、New Relic 或 OpenTelemetry collector 时，trace view 会展示跨 services 的 full call tree 和 timings。查看：unexpectedly long spans（blocking 或 slow dependency）、chain 中间的 failed spans、应该存在却不存在的 spans（missing instrumentation 也会 mask bugs）。
+
+**Preserve before investigating（调查前先保存）。** Error trackers 和 log systems 有 retention windows。开始 long investigation 前，export 或 snapshot key evidence（event ID、trace ID、full stack trace、breadcrumbs），避免它在 session 中途 age out。
 
 ---
 
-## Bug-Class Pattern Checklist
+## System Boundary Checks（系统边界检查）
 
-Before deep tracing, run down this checklist. Many bugs match a recognizable class, and the class implies where to look first. Check whether the observed symptom fits any of these patterns:
+许多 bugs 存在于 application 与其运行 system 的 boundary：network、database、filesystem、OS。快速扫过这些 boundaries，通常能在 deep code tracing 前消除整类 suspect。
 
-- **Time and timezone:** off-by-hours errors near midnight, failures specifically during DST transitions, epoch/milliseconds confusion, naive vs timezone-aware datetimes mixed, UTC-vs-local assumed incorrectly
-- **Encoding and locale:** mojibake in output, byte-vs-character length off-by-one, BOM at the start of a file breaking parsers, non-ASCII characters missing, locale-sensitive comparisons producing inconsistent results
-- **Floating-point precision:** comparisons that "should" be equal but aren't, NaN propagating through a calculation and silently corrupting downstream results, very large or very small numbers losing precision
-- **Integer overflow / underflow:** wraparound on bounded integer types, `int32` overflows in languages without arbitrary-precision integers, negative values where non-negative was assumed
-- **Off-by-one and boundaries:** empty-collection edge case, first or last element missing, inclusive vs exclusive range mismatch, fencepost errors
-- **Cache staleness:** correct behavior immediately after a change, wrong behavior after some time, fixed by restart or cache flush; includes HTTP caches, CDN caches, app-level memoization, browser service workers
-- **Permissions / auth:** works for one user and not another, works in dev without auth layer but fails in prod with it, works with superuser but not with the actual operating identity
-- **Dependency or version drift:** works on one machine but not another, lockfile out of sync with manifest, transitive dependency updated and changed behavior, native module built against a different runtime version
-- **Path / case sensitivity:** works on macOS and fails on Linux (case), works on Linux and fails on Windows (path separators, reserved names like `CON`/`PRN`)
-- **Concurrency / ordering:** works in serial test mode, fails in parallel; works one way and fails another when randomized
-- **Stale build artifacts:** `dist/`, `.next/`, compiled `.pyc`, generated code, Docker image layers — rebuild from clean and see if it reproduces
-- **Observer effect (heisenbug):** bug vanishes when logging, debugger, or profiler is attached — see the Heisenbugs section above
-- **TOCTOU (time-of-check vs time-of-use):** a check passed a moment ago but the underlying state changed before the dependent action ran
+**Network（网络）。**
 
-Pattern-matching here is cheap. Spending 30 seconds checking whether the symptom fits a known class can eliminate hours of speculative tracing.
+- DNS resolution（DNS 解析）：`dig <host>`、`nslookup <host>`、`host <host>` — name 是否从这台 host resolve 成你预期的结果？
+- Reachability（可达性）：`curl -v https://host/path` — full headers、redirects、TLS errors
+- Status codes and headers（状态码与 headers）：检查 response 是否有 4xx/5xx、unexpected redirects、missing CORS headers、content-encoding surprises
+- Connection state（连接状态）：`ss -tan` / `netstat -an` / `lsof -i` — open connections、listening ports、处于 TIME_WAIT 或 CLOSE_WAIT 的 connections
+- TLS：`openssl s_client -connect host:443` — certificate chain（证书链）、expiry（过期时间）、SNI mismatches（SNI 不匹配）
+
+**Database（数据库）。**
+
+- Query plan：对 suspect query 运行 `EXPLAIN` / `EXPLAIN ANALYZE` — 它是否使用 expected index，还是在 scan large table？
+- Slow query log / recent queries：多数 databases 会 surface 最近最慢的 N 条 queries — failing queries 经常出现在这里
+- Locks and transactions：检查 lock/transaction tables（`pg_locks`、`information_schema.innodb_trx`、`sys.dm_tran_locks`）— operation 是否在等待 long-held lock？
+- Connection pool：app 是否耗尽了 pool？connections 是否在 leaking？
+- Replication lag（如果 read replicas 在 path 上）：write 之后立即 read 可能命中尚未 catch up 的 replica
+
+**Filesystem（文件系统）。**
+
+- Existence and permissions：`ls -la <path>` — file 是否存在，running user 是否可读 / 可写？
+- Case sensitivity：只在 Linux（而非 macOS）出现的 bugs，经常是 case mismatches
+- Open handles：`lsof <path>` 或 `lsof -p <pid>` — 是否仍有东西 hold 该 file，阻止 write/unlink？
+- Disk space：`df -h` — out-of-space errors 有时会在其他地方表现成 cryptic write failures
+- File watching / inotify limits：EMFILE 或 "too many open files" 经常意味着 inotify/FD limit，而不是你的 code 有 leak
+- Path separators and encoding：Unix code 中的 Windows-style paths，或 non-UTF-8 locale 中的 UTF-8 paths
+
+**Processes and signals。** 检查 process 是否真的是你以为正在运行的 version（`ps aux | grep`，将 pid 与 build time cross-reference）。Zombies、orphaned workers、crashed-then-restarted-with-old-code processes 都会伪装成 code bugs。
+
+---
+
+## Bug-Class Pattern Checklist（Bug 类型模式检查清单）
+
+在 deep tracing 前，快速过一遍这个 checklist。许多 bugs 匹配 recognizable class，而 class 会暗示应先看哪里。检查 observed symptom 是否符合这些 patterns：
+
+- **Time and timezone（时间与时区）：** 午夜附近的 off-by-hours errors、DST transitions 期间的特定 failures、epoch/milliseconds confusion、naive 与 timezone-aware datetimes 混用、错误假设 UTC-vs-local
+- **Encoding and locale（编码与 locale）：** output 中出现 mojibake、byte-vs-character length off-by-one、file 开头 BOM 破坏 parsers、non-ASCII characters missing、locale-sensitive comparisons 产生 inconsistent results
+- **Floating-point precision（浮点精度）：** "should" be equal 的 comparisons 实际不相等、NaN 在 calculation 中传播并静默污染 downstream results、极大或极小数字丢失 precision
+- **Integer overflow / underflow（整数溢出 / 下溢）：** bounded integer types 上 wraparound、没有 arbitrary-precision integers 的语言中 `int32` overflows、假设 non-negative 的地方出现 negative values
+- **Off-by-one and boundaries（边界与差一错误）：** empty-collection edge case、first 或 last element missing、inclusive vs exclusive range mismatch、fencepost errors
+- **Cache staleness（缓存陈旧）：** change 后立刻正确，一段时间后错误，restart 或 cache flush 后恢复；包括 HTTP caches、CDN caches、app-level memoization、browser service workers
+- **Permissions / auth（权限 / 认证）：** 一个 user 可用另一个不可用，dev 无 auth layer 时可用但 prod 有 auth layer 时失败，superuser 可用但 actual operating identity 不可用
+- **Dependency or version drift（依赖或版本漂移）：** 一台 machine 可用另一台不可用，lockfile 与 manifest 不一致，transitive dependency 更新并改变 behavior，native module 针对不同 runtime version 构建
+- **Path / case sensitivity（路径 / 大小写敏感）：** macOS 可用但 Linux 失败（case），Linux 可用但 Windows 失败（path separators、`CON`/`PRN` 等 reserved names）
+- **Concurrency / ordering（并发 / 顺序）：** serial test mode 可用，parallel 失败；randomized 后某种方式可用另一种失败
+- **Stale build artifacts（陈旧构建产物）：** `dist/`、`.next/`、compiled `.pyc`、generated code、Docker image layers — 从 clean rebuild 看是否 reproduce
+- **Observer effect (heisenbug)（观察者效应）：** logging、debugger 或 profiler attached 时 bug 消失 — 见上方 Heisenbugs section
+- **TOCTOU (time-of-check vs time-of-use)：** 刚才 check 通过，但 dependent action 运行前底层 state 已变化
+
+这里的 pattern-matching 成本很低。花 30 秒检查 symptom 是否符合 known class，可能省掉数小时 speculative tracing。

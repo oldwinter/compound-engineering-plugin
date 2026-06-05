@@ -1,17 +1,17 @@
-# Documentation schema for learnings written by ce-compound
-# Treat this as the canonical frontmatter contract for docs/solutions/.
+# ce-compound 写入 learnings 使用的 documentation schema
+# 将它视为 docs/solutions/ 的 canonical frontmatter contract。
 #
-# The schema has two tracks based on problem_type:
-#   Bug track  — problem_type is a defect or failure (build_error, test_failure, etc.)
-#   Knowledge track — problem_type is guidance or practice (best_practice, workflow_issue, etc.)
+# schema 基于 problem_type 分成两条 tracks：
+#   Bug track — problem_type 是 defect 或 failure（build_error、test_failure 等）
+#   Knowledge track — problem_type 是 guidance 或 practice（best_practice、workflow_issue 等）
 #
-# Both tracks share the same required core fields. The tracks differ in which
-# additional fields are required vs optional (see track_rules below).
+# 两条 tracks 共享相同 required core fields。它们的差异在于哪些
+# additional fields 是 required 还是 optional（见下方 track_rules）。
 
 # --- Track classification ---------------------------------------------------
 tracks:
   bug:
-    description: "Defects, failures, and errors that were diagnosed and fixed"
+    description: "已诊断并修复的 defects、failures 和 errors"
     problem_types:
       - build_error
       - test_failure
@@ -23,7 +23,7 @@ tracks:
       - integration_issue
       - logic_error
   knowledge:
-    description: "Practices, patterns, conventions, decisions, workflow improvements, and documentation"
+    description: "Practices、patterns、conventions、decisions、workflow improvements 和 documentation"
     problem_types:
       - best_practice
       - documentation_gap
@@ -38,12 +38,12 @@ tracks:
 required_fields:
   module:
     type: string
-    description: "Module or area affected"
+    description: "受影响的 module 或 area"
 
   date:
     type: string
     pattern: '^\d{4}-\d{2}-\d{2}$'
-    description: "Date documented (YYYY-MM-DD)"
+    description: "记录日期（YYYY-MM-DD）"
 
   problem_type:
     type: enum
@@ -65,7 +65,7 @@ required_fields:
       - design_pattern
       - tooling_decision
       - convention
-    description: "Primary category — determines track (bug vs knowledge). Prefer the narrowest applicable value; best_practice is the fallback when no narrower knowledge-track value fits."
+    description: "主要 category，用于决定 track（bug vs knowledge）。优先选择最窄的适用值；当没有更窄的 knowledge-track value 适配时，best_practice 是 fallback。"
 
   component:
     type: enum
@@ -87,7 +87,7 @@ required_fields:
       - testing_framework
       - documentation
       - tooling
-    description: "Component involved"
+    description: "涉及的 component"
 
   severity:
     type: enum
@@ -96,7 +96,7 @@ required_fields:
       - high
       - medium
       - low
-    description: "Impact severity"
+    description: "影响 severity"
 
 # --- Track-specific rules ----------------------------------------------------
 track_rules:
@@ -106,7 +106,7 @@ track_rules:
         type: array[string]
         min_items: 1
         max_items: 5
-        description: "Observable symptoms such as errors or broken behavior"
+        description: "可观察 symptoms，例如 errors 或 broken behavior"
       root_cause:
         type: enum
         values:
@@ -127,7 +127,7 @@ track_rules:
           - inadequate_documentation
           - missing_tooling
           - incomplete_setup
-        description: "Fundamental technical cause of the problem"
+        description: "问题的 fundamental technical cause"
       resolution_type:
         type: enum
         values:
@@ -141,18 +141,18 @@ track_rules:
           - documentation_update
           - tooling_addition
           - seed_data_update
-        description: "Type of fix applied"
+        description: "已应用 fix 的 type"
 
   knowledge:
     optional:
       applies_when:
         type: array[string]
         max_items: 5
-        description: "Conditions or situations where this guidance applies"
+        description: "此 guidance 适用的 conditions 或 situations"
       symptoms:
         type: array[string]
         max_items: 5
-        description: "Observable gaps or friction that prompted this guidance (optional for knowledge track)"
+        description: "促成此 guidance 的可观察 gaps 或 friction（knowledge track 可选）"
       root_cause:
         type: enum
         values:
@@ -173,7 +173,7 @@ track_rules:
           - inadequate_documentation
           - missing_tooling
           - incomplete_setup
-        description: "Underlying cause, if there is a specific one (optional for knowledge track)"
+        description: "Underlying cause；如果存在具体原因则填写（knowledge track 可选）"
       resolution_type:
         type: enum
         values:
@@ -187,45 +187,45 @@ track_rules:
           - documentation_update
           - tooling_addition
           - seed_data_update
-        description: "Type of change, if applicable (optional for knowledge track)"
+        description: "Change type；适用时填写（knowledge track 可选）"
 
 # --- Fields optional for BOTH tracks ----------------------------------------
 optional_fields:
   related_components:
     type: array[string]
-    description: "Other components involved"
+    description: "涉及的其他 components"
 
   tags:
     type: array[string]
     max_items: 8
-    description: "Search keywords, lowercase and hyphen-separated"
+    description: "Search keywords，使用 lowercase 且 hyphen-separated"
 
 # --- Fields optional for bug track only -------------------------------------
 bug_optional_fields:
   rails_version:
     type: string
     pattern: '^\d+\.\d+\.\d+$'
-    description: "Rails version in X.Y.Z format. Only relevant for bug-track docs."
+    description: "X.Y.Z format 的 Rails version。仅与 bug-track docs 相关。"
 
 # --- Backward compatibility --------------------------------------------------
-# Docs created before the track system was introduced may have bug-track
-# fields (symptoms, root_cause, resolution_type) on knowledge-type
-# problem_types. These are valid legacy docs:
-#   - Bug-track fields present on a knowledge-track doc are harmless. Do not
-#     strip them during refresh unless the doc is being rewritten for other reasons.
-#   - When creating NEW docs, follow the track rules above.
+# track system 引入之前创建的 docs，可能会在 knowledge-type
+# problem_types 上带有 bug-track fields（symptoms、root_cause、resolution_type）。
+# 这些是 valid legacy docs：
+#   - knowledge-track doc 上存在 bug-track fields 是 harmless 的。不要
+#     在 refresh 时移除它们，除非该 doc 因其他原因正在被 rewrite。
+#   - 创建 NEW docs 时，遵循上方 track rules。
 
 # --- Validation rules --------------------------------------------------------
 validation_rules:
-  - "Determine track from problem_type using the tracks section above"
-  - "All shared required_fields must be present"
-  - "Bug-track required fields (symptoms, root_cause, resolution_type) must be present on bug-track docs"
-  - "Knowledge-track docs have no additional required fields beyond the shared ones"
-  - "Bug-track fields on existing knowledge-track docs are harmless (see backward compatibility note)"
-  - "Track-specific optional fields may be included but are not required"
-  - "Enum fields must match allowed values exactly"
-  - "Array fields must respect min_items/max_items when specified"
-  - "date must match YYYY-MM-DD format"
-  - "rails_version, if provided, must match X.Y.Z format and only applies to bug-track docs"
-  - "tags should be lowercase and hyphen-separated"
-  - "Array-of-strings frontmatter items (symptoms, applies_when, tags, related_components, or any future array field) must be wrapped in double quotes when the value starts with a YAML reserved indicator (`, [, *, &, !, |, >, %, @, ?) or contains the substring `: ` — otherwise strict YAML parsers reject the file"
+  - "使用上方 tracks section 从 problem_type 判断 track"
+  - "所有 shared required_fields 都必须存在"
+  - "bug-track docs 必须包含 bug-track required fields（symptoms、root_cause、resolution_type）"
+  - "knowledge-track docs 除 shared fields 外没有额外 required fields"
+  - "existing knowledge-track docs 上的 bug-track fields 是 harmless 的（见 backward compatibility note）"
+  - "可以包含 track-specific optional fields，但不是 required"
+  - "Enum fields 必须精确匹配 allowed values"
+  - "指定 min_items/max_items 时，array fields 必须遵守它们"
+  - "date 必须匹配 YYYY-MM-DD format"
+  - "如果提供 rails_version，必须匹配 X.Y.Z format，且仅适用于 bug-track docs"
+  - "tags 应为 lowercase 且 hyphen-separated"
+  - "Array-of-strings frontmatter items（symptoms、applies_when、tags、related_components 或未来任何 array field）当 value 以 YAML reserved indicator（`, [, *, &, !, |, >, %, @, ?）开头，或包含 substring `: ` 时，必须包在 double quotes 中；否则 strict YAML parsers 会 reject 该文件"

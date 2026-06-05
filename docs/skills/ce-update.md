@@ -1,96 +1,96 @@
 # `ce-update`
 
-> Check whether the installed compound-engineering plugin is up to date and recommend the update command if not. Claude Code only.
+> 检查已安装的 compound-engineering plugin 是否最新；如果不是，推荐 update command。仅 Claude Code。
 
-`ce-update` is the **plugin version check** skill. It compares the version your Claude Code session has loaded against `plugin.json` on `main` (where the marketplace installs from) and tells you whether you're up to date — and if not, gives you the exact `claude plugin update` command to run.
+`ce-update` 是 **plugin version check** skill。它会比较 Claude Code session 已加载的 version 和 `main` 上的 `plugin.json`（marketplace 从那里安装），告诉你是否 up to date；如果不是，给出要运行的精确 `claude plugin update` command。
 
-It's Claude Code only because it relies on the plugin harness cache layout (`~/.claude/plugins/cache/<marketplace>/compound-engineering/<version>/...`) for version detection. On other platforms or under `claude --plugin-dir` local development, the skill recognizes the case and tells you no action is needed.
+它仅适用于 Claude Code，因为 version detection 依赖 plugin harness cache layout（`~/.claude/plugins/cache/<marketplace>/compound-engineering/<version>/...`）。在其他 platforms 或 `claude --plugin-dir` local development 下，skill 会识别该情况并告诉你不需要 action。
 
 ---
 
 ## TL;DR
 
-| Question | Answer |
+| Question（问题） | Answer（答案） |
 |----------|--------|
-| What does it do? | Compares loaded plugin version against `plugin.json` on `main`; recommends the update command if out of date |
-| When to use it | "Update compound engineering", "is ce up to date", or when bug behavior suggests a stale plugin |
-| What it produces | "Up to date" or an `out of date` message with the exact `claude plugin update` command |
-| Status | Claude Code only (`disable-model-invocation: true`) |
+| 它做什么？ | 比较 loaded plugin version 和 `main` 上的 `plugin.json`；如果 out of date，推荐 update command |
+| 何时使用 | "Update compound engineering"、"is ce up to date"，或 bug behavior 暗示 stale plugin 时 |
+| 产出什么 | "Up to date" 或带精确 `claude plugin update` command 的 `out of date` message |
+| Status（状态） | Claude Code only（`disable-model-invocation: true`） |
 
 ---
 
-## The Problem
+## 问题
 
-Plugin version drift causes confusing failure modes:
+Plugin version drift 会导致 confusing failure modes：
 
-- **Bug reports against fixed bugs** — the user reports an issue that was fixed two versions ago, but their plugin is stale
-- **Skills behaving like an old version** — the user runs a skill and gets behavior that doesn't match the current docs
-- **No obvious way to check** — "what version am I on" isn't surfaced anywhere obvious in Claude Code
-- **Wrong update command suggestion** — manual cache-sweep / marketplace-refresh advice from before `claude plugin update` shipped
-- **Marketplace name confusion** — the plugin distributes under multiple marketplace names (public vs internal/team installs); a hardcoded name in the update command would be wrong for half the audience
+- **Bug reports against fixed bugs**：用户报告两版前已修的 issue，但他们的 plugin stale
+- **Skills 表现像旧版本**：用户运行 skill，得到与当前 docs 不一致的 behavior
+- **No obvious way to check**："what version am I on" 在 Claude Code 里没有明显入口
+- **Wrong update command suggestion**：在 `claude plugin update` 发布前的 manual cache-sweep / marketplace-refresh advice 已过时
+- **Marketplace name confusion**：plugin 通过多个 marketplace names 分发（public vs internal/team installs）；update command 中 hardcoded name 会对一半用户错误
 
-## The Solution
+## 方案
 
-`ce-update` runs a focused version probe:
+`ce-update` 运行 focused version probe：
 
-- **Three parallel scripts** probe upstream version (from `main` HEAD via `gh api`), currently-loaded version (from the plugin cache path), and marketplace name (also from the cache path)
-- **Compare against `main` HEAD `plugin.json`**, not the latest GitHub release tag — the marketplace installs from `main`, so release tags false-positive whenever `main` is ahead
-- **Sentinel-driven failure handling** — `__CE_UPDATE_VERSION_FAILED__` (gh unavailable / rate-limited) and `__CE_UPDATE_NOT_MARKETPLACE__` (loaded outside the standard cache, e.g., `claude --plugin-dir` local dev) are explicit cases the skill recognizes
-- **Recommended update command uses the detected marketplace name**, not a hardcoded one — works for public, internal, and team marketplaces
-- **Beta-style explicit-invocation only** — won't auto-fire from prose mentions of "update"
-
----
-
-## What Makes It Novel
-
-### 1. Compares against `main` HEAD, not release tags
-
-The marketplace installs plugin contents from `main` HEAD, not from the latest release tag. Comparing against tags would false-positive whenever `main` is ahead of the last tag — which is the normal state between releases. The skill reads `plugins/compound-engineering/.claude-plugin/plugin.json` on `main` directly via `gh api`.
-
-### 2. Marketplace name detected from skill path, not hardcoded
-
-The plugin distributes under multiple marketplace names — `compound-engineering-plugin` for public installs (per the README), and other names for internal or team marketplaces. Hardcoding a name into the update command would be wrong for half the audience. Instead, the skill parses `${CLAUDE_SKILL_DIR}` against the marketplace-cache layout (`~/.claude/plugins/cache/<marketplace>/compound-engineering/<version>/skills/ce-update`) and extracts the marketplace name from the path. The recommended `claude plugin update compound-engineering@<marketplace>` command uses the detected name.
-
-### 3. Three parallel probes with explicit sentinels
-
-Three scripts run in parallel via the Bash tool:
-
-- `scripts/upstream-version.sh` — reads `plugin.json` on `main` via `gh api`; prints version or `__CE_UPDATE_VERSION_FAILED__`
-- `scripts/currently-loaded-version.sh` — parses `${CLAUDE_SKILL_DIR}` for the version segment; prints version or `__CE_UPDATE_NOT_MARKETPLACE__`
-- `scripts/marketplace-name.sh` — parses `${CLAUDE_SKILL_DIR}` for the marketplace segment; prints name or `__CE_UPDATE_NOT_MARKETPLACE__`
-
-Sentinels make failure modes structural — the skill knows whether the upstream fetch failed (different recovery) vs whether the skill is loaded outside the standard cache (different message).
-
-### 4. `--plugin-dir` local-dev mode recognized
-
-When `scripts/currently-loaded-version.sh` returns `__CE_UPDATE_NOT_MARKETPLACE__`, two cases collapse to the same handling:
-
-- A `claude --plugin-dir` local-development session (skill loaded from the local checkout, not the marketplace cache)
-- A non-Claude-Code platform (this skill is Claude Code-only)
-
-The skill tells the user: "Loaded from outside the marketplace cache. Normal when using `claude --plugin-dir` for local development. No action for this session. Your marketplace install (if any) is unaffected — run `/ce-update` in a regular Claude Code session (no `--plugin-dir`) to check that cache."
-
-### 5. Pinned narrow `allowed-tools`
-
-The skill declares the three specific scripts in `allowed-tools` — `Bash(bash *upstream-version.sh)`, `Bash(bash *currently-loaded-version.sh)`, `Bash(bash *marketplace-name.sh)` — so users without `bypassPermissions` skip the approval prompts when the skill runs them. Pinned per filename rather than broad `Bash(bash *)`.
-
-### 6. Beta-style explicit-invocation only
-
-`disable-model-invocation: true` prevents the skill from auto-firing on prose mentions of "update" or version-related discussion. Plugin updates are a deliberate user choice — invoke `/ce-update` directly.
+- **Three parallel scripts** probe upstream version（通过 `gh api` 从 `main` HEAD 读取）、currently-loaded version（从 plugin cache path）、marketplace name（也从 cache path）
+- **Compare against `main` HEAD `plugin.json`**，不是 latest GitHub release tag；marketplace 从 `main` 安装，因此当 `main` ahead 时，release tags 会 false-positive
+- **Sentinel-driven failure handling**：`__CE_UPDATE_VERSION_FAILED__`（gh unavailable / rate-limited）和 `__CE_UPDATE_NOT_MARKETPLACE__`（loaded outside standard cache，例如 `claude --plugin-dir` local dev）是 skill 识别的 explicit cases
+- **Recommended update command 使用检测到的 marketplace name**，而不是 hardcoded one；适用于 public、internal 和 team marketplaces
+- **Beta-style explicit-invocation only**：不会因为 prose mentions of "update" 自动触发
 
 ---
 
-## Quick Example
+## 它的新意
 
-You suspect a skill behavior doesn't match what the docs say. You wonder if your plugin is stale. You invoke `/ce-update`.
+### 1. 比较 `main` HEAD，而不是 release tags
 
-The skill runs three scripts in parallel:
+Marketplace 从 `main` HEAD 安装 plugin contents，不是 latest release tag。与 tags 比较会在 `main` ahead of last tag 时 false-positive，而这正是 releases 之间的正常状态。Skill 通过 `gh api` 直接读取 `main` 上的 `plugins/compound-engineering/.claude-plugin/plugin.json`。
 
-- `upstream-version.sh` returns `2.42.0` (current `plugin.json` on `main`)
-- `currently-loaded-version.sh` returns `2.40.0` (parsed from your loaded skill path)
-- `marketplace-name.sh` returns `compound-engineering-plugin` (parsed from the same path)
+### 2. Marketplace name 从 skill path 检测，而不是 hardcoded
 
-Currently-loaded ≠ upstream → out of date. The skill responds:
+Plugin 通过多个 marketplace names 分发：public installs 使用 `compound-engineering-plugin`（按 README），internal 或 team marketplaces 使用其他名字。把 name hardcode 进 update command 会让一半 audience 错误。Skill 会根据 `${CLAUDE_SKILL_DIR}` 按 marketplace-cache layout（`~/.claude/plugins/cache/<marketplace>/compound-engineering/<version>/skills/ce-update`）parse，并从 path 中提取 marketplace name。推荐的 `claude plugin update compound-engineering@<marketplace>` command 使用检测到的 name。
+
+### 3. 带 explicit sentinels 的 three parallel probes
+
+三个 scripts 通过 Bash tool 并行运行：
+
+- `scripts/upstream-version.sh`：通过 `gh api` 读取 `main` 上的 `plugin.json`；打印 version 或 `__CE_UPDATE_VERSION_FAILED__`
+- `scripts/currently-loaded-version.sh`：parse `${CLAUDE_SKILL_DIR}` 中的 version segment；打印 version 或 `__CE_UPDATE_NOT_MARKETPLACE__`
+- `scripts/marketplace-name.sh`：parse `${CLAUDE_SKILL_DIR}` 中的 marketplace segment；打印 name 或 `__CE_UPDATE_NOT_MARKETPLACE__`
+
+Sentinels 让 failure modes 结构化：skill 知道是 upstream fetch failed（不同 recovery），还是 skill loaded outside standard cache（不同 message）。
+
+### 4. 识别 `--plugin-dir` local-dev mode
+
+当 `scripts/currently-loaded-version.sh` 返回 `__CE_UPDATE_NOT_MARKETPLACE__`，两类情况用同一处理：
+
+- `claude --plugin-dir` local-development session（skill 从 local checkout 加载，而不是 marketplace cache）
+- Non-Claude-Code platform（此 skill 是 Claude Code-only）
+
+Skill 告诉用户："Loaded from outside the marketplace cache. Normal when using `claude --plugin-dir` for local development. No action for this session. Your marketplace install (if any) is unaffected — run `/ce-update` in a regular Claude Code session (no `--plugin-dir`) to check that cache."
+
+### 5. Pinned narrow `allowed-tools`（固定且收窄的 `allowed-tools`）
+
+Skill 在 `allowed-tools` 中声明三个 specific scripts：`Bash(bash *upstream-version.sh)`、`Bash(bash *currently-loaded-version.sh)`、`Bash(bash *marketplace-name.sh)`；没有 `bypassPermissions` 的用户运行它们时可跳过 approval prompts。按 filename pin，而不是宽泛 `Bash(bash *)`。
+
+### 6. Beta-style explicit-invocation only（beta 风格的显式调用限定）
+
+`disable-model-invocation: true` 防止 skill 因 "update" 或 version-related discussion 的 prose mentions 自动触发。Plugin updates 是 deliberate user choice；请直接调用 `/ce-update`。
+
+---
+
+## 快速示例
+
+你怀疑某个 skill behavior 与 docs 不一致，想知道 plugin 是否 stale。调用 `/ce-update`。
+
+Skill 并行运行三个 scripts：
+
+- `upstream-version.sh` 返回 `2.42.0`（`main` 上当前 `plugin.json`）
+- `currently-loaded-version.sh` 返回 `2.40.0`（从 loaded skill path parse）
+- `marketplace-name.sh` 返回 `compound-engineering-plugin`（从同一路径 parse）
+
+Currently-loaded != upstream -> out of date。Skill 回复：
 
 ```text
 compound-engineering is on v2.40.0 but v2.42.0 is available.
@@ -101,89 +101,89 @@ Update with:
 Then restart Claude Code to apply.
 ```
 
-You run the command, restart, and the next session has the new version.
+你运行 command，重启，下一个 session 就有新 version。
 
 ---
 
-## When to Reach For It
+## 何时使用
 
-Reach for `ce-update` when:
+在以下情况使用 `ce-update`：
 
-- You said "update compound engineering", "ce update", "is ce up to date"
-- A skill is behaving differently than the docs describe
-- You're filing a bug and want to confirm you're on a current version first
-- You're about to use a feature that was added recently and want to verify it's available
+- 你说了 "update compound engineering"、"ce update"、"is ce up to date"
+- Skill behavior 与 docs 描述不同
+- Filing bug 前想确认自己在 current version
+- 即将使用最近添加的 feature，想确认它可用
 
-Skip `ce-update` when:
+以下情况跳过 `ce-update`：
 
-- You're on a non-Claude-Code platform — the skill stops with a "no action" message; updating happens through that platform's mechanism
-- You're in a `claude --plugin-dir` local-dev session — the skill recognizes the case and stops
-- You want to check a specific component version, not the whole plugin → read `plugin.json` directly
-
----
-
-## Use as Part of the Workflow
-
-`ce-update` is a standalone utility — it doesn't sit inside the chain. It's invoked when version drift is suspected:
-
-- **From `/ce-report-bug`** — checking version is the first thing a bug report should establish
-- **From the user directly** when the agent's behavior smells stale
-
-The output is read directly by the user — no downstream skill consumes it.
+- 你在 non-Claude-Code platform：skill 会以 "no action" message 停止；update 通过该 platform 的机制进行
+- 你在 `claude --plugin-dir` local-dev session：skill 会识别并停止
+- 你想检查 specific component version，而不是 whole plugin：直接读取 `plugin.json`
 
 ---
 
-## Use Standalone
+## 作为 Workflow 的一部分使用
 
-Direct invocation:
+`ce-update` 是 standalone utility，不位于 chain 内。它在怀疑 version drift 时调用：
 
-- `/ce-update` — runs the version check
+- **From `/ce-report-bug`**：version check 应是 bug report 首要确认事项
+- **From the user directly**：当 agent behavior 闻起来 stale
 
-There are no arguments. The skill probes, compares, and reports. If the upstream fetch fails (gh unavailable or rate-limited), it says so and stops without recommending a partial answer.
+Output 直接给用户阅读；没有 downstream skill 消费它。
 
 ---
 
-## Reference
+## 单独使用
 
-| Sentinel | Meaning |
+直接调用：
+
+- `/ce-update`：运行 version check
+
+没有 arguments。Skill probe、compare 并 report。如果 upstream fetch fails（gh unavailable 或 rate-limited），它会说明并停止，不推荐 partial answer。
+
+---
+
+## 参考
+
+| Sentinel | Meaning（含义） |
 |----------|---------|
-| `__CE_UPDATE_VERSION_FAILED__` | `gh api` couldn't fetch upstream `plugin.json` (gh unavailable, rate-limited) — skill stops with that message |
-| `__CE_UPDATE_NOT_MARKETPLACE__` | Skill is loaded outside `~/.claude/plugins/cache/` — usually `claude --plugin-dir` local dev. Skill stops with "no action" message |
+| `__CE_UPDATE_VERSION_FAILED__` | `gh api` 无法 fetch upstream `plugin.json`（gh unavailable、rate-limited）；skill 带 message 停止 |
+| `__CE_UPDATE_NOT_MARKETPLACE__` | Skill loaded outside `~/.claude/plugins/cache/`；通常是 `claude --plugin-dir` local dev。Skill 以 "no action" message 停止 |
 
-Scripts (in `scripts/`):
+Scripts（位于 `scripts/`）：
 
-- `upstream-version.sh` — `gh api` against `plugins/compound-engineering/.claude-plugin/plugin.json` on `main`
-- `currently-loaded-version.sh` — parses `${CLAUDE_SKILL_DIR}` for version segment
-- `marketplace-name.sh` — parses `${CLAUDE_SKILL_DIR}` for marketplace segment
+- `upstream-version.sh`：对 `main` 上的 `plugins/compound-engineering/.claude-plugin/plugin.json` 运行 `gh api`
+- `currently-loaded-version.sh`：parse `${CLAUDE_SKILL_DIR}` 中的 version segment
+- `marketplace-name.sh`：parse `${CLAUDE_SKILL_DIR}` 中的 marketplace segment
 
-All three use Python 3 stdlib and `gh` only — no PyYAML or other deps.
-
----
-
-## FAQ
-
-**Why compare against `main` HEAD instead of the latest release tag?**
-Because the marketplace installs plugin contents from `main` HEAD, not from release tags. Comparing against tags would false-positive whenever `main` is ahead of the last tag — which is the normal state between releases.
-
-**Why does the marketplace name get detected from the path?**
-Because the plugin distributes under multiple marketplace names — public installs use `compound-engineering-plugin`, internal/team marketplaces use other names. Hardcoding the name into the update command would be wrong for half the audience. Detecting it from the cache path keeps the recommendation correct for whichever marketplace you're on.
-
-**Why is it Claude Code only?**
-Because version detection relies on the Claude Code plugin harness cache layout (`~/.claude/plugins/cache/<marketplace>/compound-engineering/<version>/...`). Other platforms have their own update mechanisms; this skill defers to those. When the skill detects it's not in the standard cache, it says so cleanly and stops.
-
-**What if `gh api` is rate-limited?**
-The skill tells you the upstream version couldn't be fetched and stops. It doesn't guess or recommend a partial answer. Wait for the rate limit, or check the version manually via the GitHub UI.
-
-**What about `--plugin-dir` local development?**
-The skill recognizes the case (`__CE_UPDATE_NOT_MARKETPLACE__` from the path-parsing scripts) and tells you: this is normal when using `--plugin-dir`, no action for this session, your marketplace install (if any) is unaffected.
-
-**Why no auto-invocation?**
-`disable-model-invocation: true` prevents the skill from firing on prose like "update the plan" or "is this up to date" that has nothing to do with plugin versions. Update is a deliberate user choice.
+三者都只使用 Python 3 stdlib 和 `gh`，不依赖 PyYAML 或其他 deps。
 
 ---
 
-## See Also
+## 常见问题
 
-- [`ce-setup`](./ce-setup.md) — installs missing dependencies; complementary to version checks
-- [`ce-report-bug`](./ce-report-bug.md) — reporting a bug; should establish version first
-- [`ce-release-notes`](./ce-release-notes.md) — summarize recent compound-engineering plugin releases
+**为什么比较 `main` HEAD，而不是 latest release tag？**
+因为 marketplace 从 `main` HEAD 安装 plugin contents，而不是 release tags。与 tags 比较会在 `main` ahead of last tag 时 false-positive，这是 releases 之间的正常状态。
+
+**为什么 marketplace name 从 path 检测？**
+因为 plugin 通过多个 marketplace names 分发：public installs 使用 `compound-engineering-plugin`，internal/team marketplaces 使用其他 names。把 name hardcode 到 update command 会对一半 audience 错误。从 cache path 检测可让 recommendation 对当前 marketplace 保持正确。
+
+**为什么仅 Claude Code？**
+因为 version detection 依赖 Claude Code plugin harness cache layout（`~/.claude/plugins/cache/<marketplace>/compound-engineering/<version>/...`）。其他 platforms 有自己的 update mechanisms；此 skill defer 给它们。当 skill 检测到不在 standard cache 中，会 cleanly 说明并停止。
+
+**如果 `gh api` rate-limited 怎么办？**
+Skill 会告诉你 upstream version 无法 fetch 并停止。它不会 guess 或推荐 partial answer。等待 rate limit，或通过 GitHub UI 手动检查 version。
+
+**`--plugin-dir` local development 怎么办？**
+Skill 会识别该情况（path-parsing scripts 返回 `__CE_UPDATE_NOT_MARKETPLACE__`）并告诉你：使用 `--plugin-dir` 时这是正常的；此 session 不需要 action；你的 marketplace install（如果有）不受影响。
+
+**为什么不 auto-invocation？**
+`disable-model-invocation: true` 防止 skill 因 "update the plan" 或 "is this up to date" 这类与 plugin versions 无关的 prose 自动触发。Update 是 deliberate user choice。
+
+---
+
+## 另见
+
+- [`ce-setup`](./ce-setup.md) - 安装缺失 dependencies；与 version checks 互补
+- [`ce-report-bug`](./ce-report-bug.md) - 报告 bug；应先确认 version
+- [`ce-release-notes`](./ce-release-notes.md) - 总结最近 compound-engineering plugin releases

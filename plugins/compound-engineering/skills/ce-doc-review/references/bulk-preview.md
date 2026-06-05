@@ -1,26 +1,26 @@
-# Bulk Action Preview
+# Bulk Action Preview（批量 Action 预览）
 
-This reference defines the compact plan preview that Interactive mode shows before every bulk action — best-judgment (routing option B), Append-to-Open-Questions (routing option C), and the walk-through's `Auto-resolve with best judgment on the rest` (option D of the per-finding question). The preview gives the user a single-screen view of what the agent is about to do, with exactly two options to Proceed or Cancel.
+本 reference 定义 Interactive mode 在每次 bulk action 前展示的 compact plan preview：best-judgment（routing option B）、Append-to-Open-Questions（routing option C），以及 walk-through 的 `Auto-resolve with best judgment on the rest`（per-finding question 的 option D）。Preview 给用户一个 single-screen view，展示 agent 即将做什么，并且只提供 Proceed 或 Cancel 两个 options。
 
-Interactive mode only.
-
----
-
-## When the preview fires
-
-Three call sites:
-
-1. **Routing option B (top-level best-judgment)** — after the user picks `Auto-resolve with best judgment — apply per-finding edits the agent can defend, surface the rest` from the routing question, but before any action executes. Scope: every pending `gated_auto` or `manual` finding at confidence anchor `75` or `100`.
-2. **Routing option C (top-level Append-to-Open-Questions)** — after the user picks `Append findings to the doc's Open Questions section and proceed` but before any append runs. Scope: every pending `gated_auto` or `manual` finding at confidence anchor `75` or `100`. Every finding appears under `Appending to Open Questions (N):` regardless of the agent's natural recommendation, because option C is batch-defer.
-3. **Walk-through `Auto-resolve with best judgment on the rest`** — after the user picks `Auto-resolve with best judgment on the rest` from a per-finding question, but before the remaining findings are resolved. Scope: the current finding and everything not yet decided. Already-decided findings from the walk-through are not included in the preview.
-
-In all three cases the user confirms with `Proceed` or backs out with `Cancel`. No per-item decisions inside the preview — per-item decisioning is the walk-through's role.
+仅 Interactive mode。
 
 ---
 
-## Preview structure
+## Preview 何时触发
 
-The preview is grouped by the action the agent intends to take. Bucket headers appear only when their bucket is non-empty.
+三个 call sites：
+
+1. **Routing option B（top-level best-judgment）**：用户在 routing question 中选择 `Auto-resolve with best judgment — apply per-finding edits the agent can defend, surface the rest` 之后、任何 action 执行之前。Scope：所有 pending、confidence anchor 为 `75` 或 `100` 的 `gated_auto` 或 `manual` finding。
+2. **Routing option C（top-level Append-to-Open-Questions）**：用户选择 `Append findings to the doc's Open Questions section and proceed` 后、任何 append 运行前。Scope：所有 pending、confidence anchor 为 `75` 或 `100` 的 `gated_auto` 或 `manual` finding。由于 option C 是 batch-defer，每个 finding 都出现在 `Appending to Open Questions (N):` 下，无论 agent 的 natural recommendation 如何。
+3. **Walk-through `Auto-resolve with best judgment on the rest`**：用户在 per-finding question 中选择 `Auto-resolve with best judgment on the rest` 后、remaining findings 被 resolved 前。Scope：current finding 和所有尚未 decided 的内容。Walk-through 中 already-decided findings 不包含在 preview 中。
+
+三种情况中，用户都用 `Proceed` 确认，或用 `Cancel` 退出。Preview 内没有 per-item decisions；per-item decisioning 是 walk-through 的职责。
+
+---
+
+## Preview structure（预览结构）
+
+Preview 按 agent 打算执行的 action 分组。Bucket headers 只在对应 bucket 非空时出现。
 
 ```
 <Path label> — <scope summary>:
@@ -36,7 +36,7 @@ Skipping (N):
   [P2] <section> — <one-line plain-English summary>
 ```
 
-Worked example for routing option B (top-level best-judgment):
+Routing option B（top-level best-judgment）的 worked example：
 
 ```
 Auto-resolve plan — 8 findings:
@@ -58,71 +58,71 @@ Skipping (2):
 
 ---
 
-## Scope summary wording by path
+## 各 path 的 scope summary wording
 
-- **Routing option B (top-level best-judgment):** header reads `Auto-resolve plan — N findings:`.
-- **Routing option C (top-level Append-to-Open-Questions):** header reads `Append plan — N findings as Open Questions entries:`. Every finding lands in the `Appending to Open Questions (N):` bucket.
-- **Walk-through `Auto-resolve with best judgment on the rest`:** header reads `Auto-resolve plan — N remaining findings (K already decided):`. Already-decided findings from the walk-through are not included in the preview or in the bucket counts. The `K already decided` counter communicates that the walk-through was partially completed.
-
----
-
-## Per-finding line format
-
-Each line uses the compressed form of the framing-quality guidance from the subagent template (observable-consequence-first, no internal section numbering unless needed to locate). The one-line summary is drawn from the persona-produced `why_it_matters` by taking the first sentence (and, when the first sentence is too long for the preview width, paraphrasing it tightly to fit).
-
-- **Shape:** `[<severity>] <section> — <one-line summary>`
-- **Width target:** keep lines near 80 columns so the preview renders cleanly in narrow terminals. Truncate with ellipsis when necessary.
-- **No section numbering** unless the reader needs it to locate the issue (when multiple findings hit the same named section).
-
-When no `why_it_matters` is available for a finding (rare — only if persona output was malformed), fall back to the finding's title directly. Note the gap in the completion report's Coverage section if it affects more than a few findings in the same run.
+- **Routing option B（top-level best-judgment）：** header 为 `Auto-resolve plan — N findings:`。
+- **Routing option C（top-level Append-to-Open-Questions）：** header 为 `Append plan — N findings as Open Questions entries:`。每个 finding 都落在 `Appending to Open Questions (N):` bucket。
+- **Walk-through `Auto-resolve with best judgment on the rest`：** header 为 `Auto-resolve plan — N remaining findings (K already decided):`。Walk-through 中 already-decided findings 不包含在 preview 或 bucket counts 中。`K already decided` counter 表明 walk-through 已部分完成。
 
 ---
 
-## Question and options
+## Per-finding line format（逐条 finding 行格式）
 
-After the preview body is rendered, ask the user using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension)). In Claude Code, the tool should already be loaded from the Interactive-mode pre-load step — if it isn't, call `ToolSearch` with query `select:AskUserQuestion` now. The text fallback below applies only when the harness genuinely lacks a blocking tool — `ToolSearch` returns no match, the tool call explicitly fails, or the runtime mode does not expose it (e.g., Codex edit modes without `request_user_input`). A pending schema load is not a fallback trigger. Never silently skip the question.
+每行使用 subagent template 中 framing-quality guidance 的 compressed form（observable-consequence-first，除非定位需要，否则不使用 internal section numbering）。One-line summary 从 persona 产出的 `why_it_matters` 中取第一句；当第一句对 preview width 来说太长时，紧凑 paraphrase 以适配。
 
-Stem (adapted to the path):
+- **Shape（形状）:** `[<severity>] <section> — <one-line summary>`
+- **Width target（宽度目标）:** 将 lines 保持在约 80 columns，让 preview 在 narrow terminals 中 clean render。必要时用 ellipsis truncate。
+- **No section numbering**，除非 reader 需要它定位 issue（多个 findings 命中同名 section 时）。
 
-- For routing B: `The agent is about to apply the plan above. Proceed?`
-- For routing C: `The agent is about to append the findings above to the doc's Open Questions section. Proceed?`
-- For walk-through `Auto-resolve with best judgment on the rest`: `The agent is about to resolve the remaining findings above. Proceed?`
-
-Options (exactly two, in all three cases):
-
-- `Proceed` — execute the plan as shown
-- `Cancel` — do nothing, return to the originating question
-
-Only when `ToolSearch` explicitly returns no match or the tool call errors — or on a platform with no blocking question tool — fall back to presenting numbered options and waiting for the user's next reply.
+当某个 finding 没有可用的 `why_it_matters`（罕见，只在 persona output malformed 时），直接 fallback 到 finding title。如果这影响同一 run 中不止少数 findings，在 completion report 的 Coverage section 中注明 gap。
 
 ---
 
-## Cancel semantics
+## Question and options（问题与选项）
 
-- **From routing option B Cancel:** return the user to the routing question (the four-option menu). Do not edit the document, do not append any Open Questions entries, do not record any state.
-- **From routing option C Cancel:** same — return to the routing question, no side effects.
-- **From walk-through `Auto-resolve with best judgment on the rest` Cancel:** return the user to the current finding's per-finding question (not to the routing question). The walk-through continues from where it was, with prior decisions intact.
+Preview body render 后，使用 platform 的 blocking question tool 询问用户（Claude Code 中 `AskUserQuestion`，Codex 中 `request_user_input`，Gemini 中 `ask_user`，Pi 中 `ask_user`（需要 `pi-ask-user` extension））。在 Claude Code 中，该 tool 应已由 Interactive-mode pre-load step 加载；如果没有，现在用 query `select:AskUserQuestion` 调用 `ToolSearch`。下方 text fallback 仅在 harness 真正缺少 blocking tool 时适用：`ToolSearch` 没有 match、tool call 明确失败，或 runtime mode 不暴露它（例如没有 `request_user_input` 的 Codex edit modes）。Pending schema load 不是 fallback trigger。永远不要 silently skip question。
 
-In every case, `Cancel` changes no on-disk or in-memory state.
+Stem（按 path 调整）：
 
----
+- For routing B（routing B，固定文案）：`The agent is about to apply the plan above. Proceed?`
+- For routing C（routing C，固定文案）：`The agent is about to append the findings above to the doc's Open Questions section. Proceed?`
+- For walk-through（walk-through，固定文案）`Auto-resolve with best judgment on the rest`: `The agent is about to resolve the remaining findings above. Proceed?`
 
-## Proceed semantics
+Options（三种情况都精确为两个）：
 
-When the user picks `Proceed`:
+- `Proceed` — 按展示执行 plan
+- `Cancel` — 不做任何事，返回 originating question
 
-- **Routing option B (top-level best-judgment):** for each finding in the plan, execute the recommended action. Apply findings go into the Apply set for a single end-of-batch document-edit pass (see `walkthrough.md` for the Apply batching rules). Defer findings route through `references/open-questions-defer.md`. Skip findings are recorded as no-action. After all actions complete, emit the unified completion report (see `walkthrough.md`).
-- **Routing option C (top-level Append-to-Open-Questions):** every finding routes through `references/open-questions-defer.md` for Open Questions append. No document edits apply (beyond the Open Questions section additions themselves). After all appends complete (or fail), emit the unified completion report.
-- **Walk-through `Auto-resolve with best judgment on the rest`:** same as routing option B, but scoped to the findings the user hadn't decided on. Apply findings join the in-memory Apply set with the ones the user already picked during the walk-through; all dispatch together in the single end-of-walk-through Apply pass.
-
-Failure during `Proceed` (e.g., an Open Questions append fails for one finding during a batch Defer) follows the failure path defined in `references/open-questions-defer.md` — surface the failure inline with Retry / Fall back / Convert to Skip, continue with the rest of the plan, and capture the failure in the completion report's failure section.
+只有当 `ToolSearch` 明确返回 no match、tool call error，或 platform 没有 blocking question tool 时，才 fallback 到展示 numbered options 并等待用户下一次回复。
 
 ---
 
-## Edge cases
+## Cancel semantics（Cancel 语义）
 
-- **Zero findings in a bucket:** omit the bucket header. A preview with only Apply and Skip does not show an empty `Appending to Open Questions (0):` line.
-- **All findings in one bucket:** preview still shows the bucket header; Proceed / Cancel still offered. This is the common case for routing option C (every finding under `Appending to Open Questions`).
-- **N=1 preview (only one finding in scope):** the preview still uses the grouped format, just with a single-line bucket. `Proceed` / `Cancel` still apply.
-- **Open Questions append unavailable** (document is read-only, append flow reports no-go): routing option C is not offered upstream (see `references/open-questions-defer.md` unavailability handling). Best-judgment (option B) and walk-through `Auto-resolve with best judgment on the rest` can still run — they may contain per-finding Defer recommendations from synthesis. Before rendering any best-judgment-shaped preview, downgrade every Defer recommendation to Skip when the session's cached append-availability is false, and surface the downgrade on the preview itself (e.g., a `Skipping — append unavailable (N):` bucket, or a note in the header: `N Defer recommendations downgraded to Skip — document is read-only.`).
-- **Walk-through `Auto-resolve with best judgment on the rest` with zero remaining findings:** the walk-through's own logic suppresses `Auto-resolve with best judgment on the rest` as an option when N=1 and otherwise, so the preview should never be invoked with zero remaining findings. If it is, render `Auto-resolve plan — 0 remaining findings` and fall through to Proceed with no-op.
+- **From routing option B Cancel:** 将用户返回 routing question（four-option menu）。不要编辑 document，不要 append 任何 Open Questions entries，不要记录任何 state。
+- **From routing option C Cancel:** 相同：返回 routing question，无 side effects。
+- **From walk-through `Auto-resolve with best judgment on the rest` Cancel:** 将用户返回 current finding 的 per-finding question（不是 routing question）。Walk-through 从原处继续，prior decisions 保持 intact。
+
+任何情况下，`Cancel` 都不改变 on-disk 或 in-memory state。
+
+---
+
+## Proceed semantics（Proceed 语义）
+
+当用户选择 `Proceed`：
+
+- **Routing option B（top-level best-judgment）：** 对 plan 中每个 finding 执行 recommended action。Apply findings 进入 Apply set，供单次 end-of-batch document-edit pass 使用（Apply batching rules 见 `walkthrough.md`）。Defer findings 通过 `references/open-questions-defer.md` 路由。Skip findings 记录为 no-action。所有 actions 完成后，emit unified completion report（见 `walkthrough.md`）。
+- **Routing option C（top-level Append-to-Open-Questions）：** 每个 finding 都通过 `references/open-questions-defer.md` 路由，做 Open Questions append。不应用 document edits（除了 Open Questions section additions 本身）。所有 appends 完成（或失败）后，emit unified completion report。
+- **Walk-through `Auto-resolve with best judgment on the rest`：** 与 routing option B 相同，但 scope 限于用户尚未 decide 的 findings。Apply findings 与用户在 walk-through 中已选择的 findings 一起加入 in-memory Apply set；全部在单次 end-of-walk-through Apply pass 中一起 dispatch。
+
+`Proceed` 期间的 failure（例如 batch Defer 中某个 finding 的 Open Questions append 失败）遵循 `references/open-questions-defer.md` 定义的 failure path：inline 展示 failure，并提供 Retry / Fall back / Convert to Skip；继续处理 plan 剩余部分，并在 completion report 的 failure section 中捕获该 failure。
+
+---
+
+## Edge cases（边缘情况）
+
+- **Bucket 中 zero findings:** 省略 bucket header。只有 Apply 和 Skip 的 preview 不显示空的 `Appending to Open Questions (0):` line。
+- **所有 findings 在同一 bucket:** Preview 仍显示 bucket header；仍提供 Proceed / Cancel。这是 routing option C 的常见情况（每个 finding 都在 `Appending to Open Questions` 下）。
+- **N=1 preview（scope 中只有一个 finding）：** Preview 仍使用 grouped format，只是 bucket 只有一行。`Proceed` / `Cancel` 仍适用。
+- **Open Questions append unavailable**（document read-only，append flow reports no-go）：upstream 不提供 routing option C（见 `references/open-questions-defer.md` unavailability handling）。Best-judgment（option B）和 walk-through `Auto-resolve with best judgment on the rest` 仍可运行；它们可能包含 synthesis 给出的 per-finding Defer recommendations。在 render 任何 best-judgment-shaped preview 前，如果 session cached append-availability 为 false，将每个 Defer recommendation downgrade 为 Skip，并在 preview 本身 surface downgrade（例如 `Skipping — append unavailable (N):` bucket，或 header note：`N Defer recommendations downgraded to Skip — document is read-only.`）。
+- **Walk-through `Auto-resolve with best judgment on the rest` with zero remaining findings:** Walk-through 自身逻辑会在 N=1 和其他情况下 suppress `Auto-resolve with best judgment on the rest` option，因此 preview 不应以 zero remaining findings 被调用。如果发生，render `Auto-resolve plan — 0 remaining findings`，并 fall through 到 no-op 的 Proceed。

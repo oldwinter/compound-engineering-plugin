@@ -1,190 +1,190 @@
 ---
-title: "feat: Rewrite frontend-design skill with layered architecture and visual verification"
+title: "feat: 用 layered architecture 和 visual verification 重写 frontend-design skill"
 type: feat
 status: completed
 date: 2026-03-22
 origin: docs/brainstorms/2026-03-22-frontend-design-skill-improvement.md
 ---
 
-# feat: Rewrite frontend-design skill with layered architecture and visual verification
+# feat: 用 layered architecture 与 visual verification 重写 frontend-design skill
 
-## Overview
+## 概览
 
-Rewrite the `frontend-design` skill from a 43-line aesthetic manifesto into a structured, layered skill that detects existing design systems, provides context-specific guidance, and verifies its own output via browser screenshots. Add a surgical trigger in `ce-work-beta` to load the skill for UI tasks without Figma designs.
+将 `frontend-design` skill 从 43 行 aesthetic manifesto 重写为结构化、分层的 skill：它能检测 existing design systems，提供 context-specific guidance，并通过 browser screenshots 验证自身输出。在 `ce-work-beta` 中添加一个 surgical trigger，使其在没有 Figma designs 的 UI tasks 上加载该 skill。
 
-## Problem Frame
+## 问题框架
 
-The current skill provides vague creative encouragement ("be bold", "choose a BOLD aesthetic direction") but lacks practical structure. It has no mechanism to detect existing design systems, no context-specific guidance (landing pages vs dashboards vs components in existing apps), no concrete constraints, no accessibility guidance, and no verification step. The beta workflow (`ce:plan-beta` -> `deepen-plan-beta` -> `ce:work-beta`) has no way to invoke it -- the skill is effectively orphaned.
+当前 skill 提供含糊的 creative encouragement（"be bold"、"choose a BOLD aesthetic direction"），但缺乏实用结构。它无法检测 existing design systems，没有 context-specific guidance（landing pages vs dashboards vs existing apps 中的 components）、没有 concrete constraints、没有 accessibility guidance，也没有 verification step。beta workflow（`ce:plan-beta` -> `deepen-plan-beta` -> `ce:work-beta`）没有调用它的方式 -- 该 skill 实际上已被孤立。
 
-Two external sources informed the redesign: Anthropic's official frontend-design skill (nearly identical to ours, same gaps) and OpenAI's comprehensive frontend skill from March 2026 (see origin: `docs/brainstorms/2026-03-22-frontend-design-skill-improvement.md`).
+两个外部来源影响了这次 redesign：Anthropic's official frontend-design skill（与我们的几乎一致，存在相同 gaps）以及 OpenAI 于 March 2026 发布的综合 frontend skill（see origin: `docs/brainstorms/2026-03-22-frontend-design-skill-improvement.md`）。
 
-## Requirements Trace
+## 需求追踪
 
-- R1. Detect existing design systems before applying opinionated guidance (Layer 0)
-- R2. Enforce authority hierarchy: existing design system > user instructions > skill defaults
-- R3. Provide pre-build planning step (visual thesis, content plan, interaction plan)
-- R4. Cover typography, color, composition, motion, accessibility, and imagery with concrete constraints
-- R5. Provide context-specific modules: landing pages, apps/dashboards, components/features
-- R6. Module C (components/features) is the default when working in an existing app
-- R7. Two-tier anti-pattern system: overridable defaults vs quality floor
-- R8. Visual self-verification via browser screenshot with tool cascade
-- R9. Cross-agent compatibility (Claude Code, Codex, Gemini CLI)
-- R10. ce-work-beta loads the skill for UI tasks without Figma designs
-- R11. Verification screenshot reuse -- skill's screenshot satisfies ce-work-beta Phase 4's requirement
+- R1. 在应用 opinionated guidance 前检测 existing design systems（Layer 0）
+- R2. 强制 authority hierarchy：existing design system > user instructions > skill defaults
+- R3. 提供 pre-build planning step（visual thesis、content plan、interaction plan）
+- R4. 用 concrete constraints 覆盖 typography、color、composition、motion、accessibility 和 imagery
+- R5. 提供 context-specific modules：landing pages、apps/dashboards、components/features
+- R6. 在 existing app 中工作时，Module C（components/features）是默认值
+- R7. 两层 anti-pattern system：overridable defaults vs quality floor
+- R8. 通过 browser screenshot 进行 visual self-verification，并使用 tool cascade
+- R9. Cross-agent compatibility（Claude Code、Codex、Gemini CLI）
+- R10. ce-work-beta 为没有 Figma designs 的 UI tasks 加载该 skill
+- R11. Verification screenshot reuse -- skill 的 screenshot 满足 ce-work-beta Phase 4 的 requirement
 
-## Scope Boundaries
+## 范围边界
 
-- The `frontend-design` skill itself handles all design guidance and verification. ce-work-beta gets only a trigger.
-- ce-work (non-beta) is not modified.
-- The design-iterator agent is not modified. The skill does not invoke it.
-- The agent-browser skill is upstream-vendored and not modified.
-- The design-iterator's `<frontend_aesthetics>` block (which duplicates current skill content) is not cleaned up in this plan -- that is a separate follow-up.
+- `frontend-design` skill 本身处理所有 design guidance 和 verification。ce-work-beta 只获得一个 trigger。
+- ce-work（non-beta）不修改。
+- design-iterator agent 不修改。skill 不调用它。
+- agent-browser skill 是 upstream-vendored，不修改。
+- design-iterator 的 `<frontend_aesthetics>` block（重复 current skill content）不在本 plan 中 cleanup -- 那是独立 follow-up。
 
-## Context & Research
+## 上下文与研究
 
-### Relevant Code and Patterns
+### 相关代码与模式
 
-- `plugins/compound-engineering/skills/frontend-design/SKILL.md` -- target for full rewrite (43 lines currently)
-- `plugins/compound-engineering/skills/ce-work-beta/SKILL.md` -- target for surgical Phase 2 addition (lines 210-219, between Figma Design Sync and Track Progress)
-- `plugins/compound-engineering/skills/ce-plan-beta/SKILL.md` -- reference for cross-agent interaction patterns (Pattern A: platform's blocking question tool with named equivalents)
-- `plugins/compound-engineering/skills/reproduce-bug/SKILL.md` -- reference for cross-agent patterns
-- `plugins/compound-engineering/skills/agent-browser/SKILL.md` -- upstream-vendored, reference for browser automation CLI
-- `plugins/compound-engineering/agents/design/ce-design-iterator.agent.md` -- contains `<frontend_aesthetics>` block that overlaps with current skill; new skill will supersede this when both are loaded
-- `plugins/compound-engineering/AGENTS.md` -- skill compliance checklist (cross-platform interaction, tool selection, reference rules)
+- `plugins/compound-engineering/skills/frontend-design/SKILL.md` -- full rewrite target（当前 43 行）
+- `plugins/compound-engineering/skills/ce-work-beta/SKILL.md` -- surgical Phase 2 addition target（lines 210-219，在 Figma Design Sync 与 Track Progress 之间）
+- `plugins/compound-engineering/skills/ce-plan-beta/SKILL.md` -- cross-agent interaction patterns 参考（Pattern A：platform's blocking question tool with named equivalents）
+- `plugins/compound-engineering/skills/reproduce-bug/SKILL.md` -- cross-agent patterns 参考
+- `plugins/compound-engineering/skills/agent-browser/SKILL.md` -- upstream-vendored，browser automation CLI 参考
+- `plugins/compound-engineering/agents/design/ce-design-iterator.agent.md` -- 包含与 current skill 重叠的 `<frontend_aesthetics>` block；新 skill 会在两者同时加载时 supersede 它
+- `plugins/compound-engineering/AGENTS.md` -- skill compliance checklist（cross-platform interaction、tool selection、reference rules）
 
-### Institutional Learnings
+### 组织内经验
 
-- **Cross-platform tool references** (`docs/solutions/skill-design/compound-refresh-skill-improvements.md`): Never hardcode a single tool name with an escape hatch. Use capability-first language with platform examples and plain-text fallback. Anti-pattern table directly applicable.
-- **Beta skills framework** (`docs/solutions/skill-design/beta-skills-framework.md`): frontend-design is NOT a beta skill -- it is a stable skill being improved. ce-work-beta should reference it by its stable name.
-- **Codex skill conversion** (`docs/solutions/codex-skill-prompt-entrypoints.md`): Skills are copied as-is to Codex. Slash references inside SKILL.md are NOT rewritten. Use semantic wording ("load the `agent-browser` skill") rather than slash syntax.
-- **Context token budget** (`docs/plans/2026-02-08-refactor-reduce-plugin-context-token-usage-plan.md`): Description field's only job is discovery. The proposed 6-line description is well-sized for the budget.
-- **Script-first architecture** (`docs/solutions/skill-design/script-first-skill-architecture.md`): When a skill's core value IS the model's judgment, script-first does not apply. Frontend-design is judgment-based. Detection checklist should be inline, not in reference files.
+- **Cross-platform tool references**（`docs/solutions/skill-design/compound-refresh-skill-improvements.md`）：绝不要硬编码单一 tool name 再附 escape hatch。使用 capability-first language，提供 platform examples 和 plain-text fallback。Anti-pattern table 可直接应用。
+- **Beta skills framework**（`docs/solutions/skill-design/beta-skills-framework.md`）：frontend-design 不是 beta skill -- 它是正在改进的 stable skill。ce-work-beta 应通过 stable name 引用它。
+- **Codex skill conversion**（`docs/solutions/codex-skill-prompt-entrypoints.md`）：Skills 会按原样复制到 Codex。SKILL.md 内的 slash references 不会改写。使用 semantic wording（"load the `agent-browser` skill"），而不是 slash syntax。
+- **Context token budget**（`docs/plans/2026-02-08-refactor-reduce-plugin-context-token-usage-plan.md`）：Description field 的唯一作用是 discovery。提议的 6 行 description 对 budget 来说合适。
+- **Script-first architecture**（`docs/solutions/skill-design/script-first-skill-architecture.md`）：当 skill 的核心价值是 model judgment 时，script-first 不适用。Frontend-design 是 judgment-based。Detection checklist 应 inline，而不是放 reference files。
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **No `disable-model-invocation`**: The skill should auto-invoke when the model detects frontend work. Current skill does not have it; the rewrite preserves this.
-- **Drop `license` frontmatter field**: Only the current frontend-design skill has this field. No other skill uses it. Drop it for consistency.
-- **Inline everything in SKILL.md**: No reference files or scripts directory. The skill is pure guidance (~300-400 lines of markdown). The detection checklist, context modules, anti-patterns, litmus checks, and verification cascade all live in one file.
-- **Fix ce-work-beta duplicate numbering**: The current Phase 2 has two items numbered "6." (Figma Design Sync and Track Progress). Fix this while inserting the new section.
-- **Framework-conditional animation defaults**: CSS animations as universal baseline. Framer Motion for React, Vue Transition / Motion One for Vue, Svelte transitions for Svelte. Only when no existing animation library is detected.
-- **Semantic skill references only**: Reference agent-browser as "load the `agent-browser` skill" not `/agent-browser`. Per AGENTS.md and Codex conversion learnings.
+- **不加 `disable-model-invocation`**：该 skill 应在 model 检测到 frontend work 时 auto-invoke。当前 skill 没有该字段；rewrite 保持这一点。
+- **删除 `license` frontmatter field**：只有当前 frontend-design skill 有这个字段。其他 skill 都不用。为一致性删除。
+- **全部 inline 在 SKILL.md 中**：不建 reference files 或 scripts directory。该 skill 是纯 guidance（约 300-400 行 markdown）。Detection checklist、context modules、anti-patterns、litmus checks 和 verification cascade 都放在一个文件内。
+- **修复 ce-work-beta duplicate numbering**：当前 Phase 2 有两个编号 "6."（Figma Design Sync 和 Track Progress）。插入新 section 时一起修复。
+- **Framework-conditional animation defaults**：CSS animations 作为 universal baseline。React 用 Framer Motion，Vue 用 Vue Transition / Motion One，Svelte 用 Svelte transitions。仅在未检测到 existing animation library 时使用。
+- **Semantic skill references only**：将 agent-browser 引用为 "load the `agent-browser` skill"，不是 `/agent-browser`。遵循 AGENTS.md 与 Codex conversion learnings。
 
-## Open Questions
+## 开放问题
 
-### Resolved During Planning
+### 规划期间已解决
 
-- **Should the skill have `disable-model-invocation: true`?** No. It should auto-invoke for frontend work. The current skill does not have it.
-- **Should Module A/B ever apply in an existing app?** No. When working inside an existing app, always default to Module C regardless of what's being built. Modules A and B are for greenfield work.
-- **Should the `license` field be kept?** No. It is unique to this skill and inconsistent with all other skills.
+- **skill 是否应有 `disable-model-invocation: true`？** 不。它应为 frontend work auto-invoke。当前 skill 也没有。
+- **Module A/B 是否可用于 existing app？** 不。在 existing app 内工作时，无论构建什么，都默认使用 Module C。Modules A 和 B 用于 greenfield work。
+- **是否保留 `license` field？** 不。它是该 skill 独有字段，与其他所有 skills 不一致。
 
-### Deferred to Implementation
+### 延后到实现阶段
 
-- **Exact line count of the rewritten skill**: Estimated 300-400 lines. The implementer should prioritize clarity over brevity but avoid bloat.
-- **Whether the design-iterator's `<frontend_aesthetics>` block needs updating**: Out of scope. The new skill supersedes it when loaded. Cleanup is a separate follow-up.
+- **重写后 skill 的精确 line count**：估计 300-400 行。implementer 应优先 clarity，同时避免 bloat。
+- **design-iterator 的 `<frontend_aesthetics>` block 是否需要更新**：out of scope。新 skill 在加载时 supersedes 它。cleanup 是独立 follow-up。
 
-## Implementation Units
+## 实现单元
 
-- [x] **Unit 1: Rewrite frontend-design SKILL.md**
+- [x] **Unit 1：重写 frontend-design SKILL.md**
 
-  **Goal:** Replace the 43-line aesthetic manifesto with the full layered skill covering detection, planning, guidance, context modules, anti-patterns, litmus checks, and visual verification.
+  **目标：** 用完整 layered skill 替换 43 行 aesthetic manifesto，覆盖 detection、planning、guidance、context modules、anti-patterns、litmus checks 和 visual verification。
 
-  **Requirements:** R1, R2, R3, R4, R5, R6, R7, R8, R9
+  **需求：** R1, R2, R3, R4, R5, R6, R7, R8, R9
 
-  **Dependencies:** None
+  **依赖：** None
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/skills/frontend-design/SKILL.md`
+  **文件：**
+- Modify（修改）: `plugins/compound-engineering/skills/frontend-design/SKILL.md`
 
-  **Approach:**
-  - Full rewrite preserving only the `name` field from current frontmatter
-  - Use the optimized description from the brainstorm doc (see origin: Section "Skill Description (Optimized)")
-  - Structure as: Frontmatter -> Preamble (authority hierarchy, workflow preview) -> Layer 0 (context detection with concrete checklist, mode classification, cross-platform question pattern) -> Layer 1 (pre-build planning) -> Layer 2 (design guidance core with subsections for typography, color, composition, motion, accessibility, imagery) -> Context Modules (A/B/C) -> Hard Rules & Anti-Patterns (two tiers) -> Litmus Checks -> Visual Verification (tool cascade with scope control)
-  - Carry forward from current skill: anti-AI-slop identity, creative energy for greenfield, tone-picking exercise, differentiation prompt
-  - Apply AGENTS.md skill compliance checklist: imperative voice, capability-first tool references with platform examples, semantic skill references, no shell recipes for exploration, cross-platform question patterns with fallback
-  - All rules framed as defaults that yield to existing design systems and user instructions
-  - Copy guidance uses "Every sentence should earn its place. Default to less copy, not more." (not arbitrary percentage thresholds)
-  - Animation defaults are framework-conditional: CSS baseline, then Framer Motion (React), Vue Transition/Motion One (Vue), Svelte transitions (Svelte)
-  - Visual verification cascade: existing project tooling -> browser MCP tools -> agent-browser CLI (load the `agent-browser` skill for setup) -> mental review as last resort
-  - One verification pass with scope control ("sanity check, not pixel-perfect review")
-  - Note relationship to design-iterator: "For iterative refinement beyond a single pass, see the `design-iterator` agent"
+  **做法：**
+  - Full rewrite，仅保留当前 frontmatter 的 `name` field
+  - 使用 brainstorm doc 中优化过的 description（see origin: Section "Skill Description (Optimized)"）
+  - 结构：Frontmatter -> Preamble（authority hierarchy、workflow preview）-> Layer 0（context detection with concrete checklist、mode classification、cross-platform question pattern）-> Layer 1（pre-build planning）-> Layer 2（design guidance core，subsections 覆盖 typography、color、composition、motion、accessibility、imagery）-> Context Modules（A/B/C）-> Hard Rules & Anti-Patterns（two tiers）-> Litmus Checks -> Visual Verification（tool cascade with scope control）
+  - 从 current skill 保留：anti-AI-slop identity、greenfield 的 creative energy、tone-picking exercise、differentiation prompt
+  - 应用 AGENTS.md skill compliance checklist：imperative voice、capability-first tool references with platform examples、semantic skill references、no shell recipes for exploration、cross-platform question patterns with fallback
+  - 所有 rules 都 framed as defaults，向 existing design systems 和 user instructions 让位
+  - Copy guidance 使用 "Every sentence should earn its place. Default to less copy, not more."（不用 arbitrary percentage thresholds）
+  - Animation defaults 是 framework-conditional：CSS baseline，然后 Framer Motion（React）、Vue Transition/Motion One（Vue）、Svelte transitions（Svelte）
+  - Visual verification cascade：existing project tooling -> browser MCP tools -> agent-browser CLI（加载 `agent-browser` skill 进行 setup）-> mental review as last resort
+  - 一轮 verification，并控制 scope（"sanity check, not pixel-perfect review"）
+  - 说明与 design-iterator 的关系："For iterative refinement beyond a single pass, see the `design-iterator` agent"
 
-  **Patterns to follow:**
-  - `plugins/compound-engineering/skills/ce-plan-beta/SKILL.md` -- cross-agent interaction pattern (Pattern A)
+  **遵循的模式：**
+  - `plugins/compound-engineering/skills/ce-plan-beta/SKILL.md` -- cross-agent interaction pattern（Pattern A）
   - `plugins/compound-engineering/skills/reproduce-bug/SKILL.md` -- cross-agent tool reference pattern
   - `plugins/compound-engineering/AGENTS.md` -- skill compliance checklist
-  - `docs/solutions/skill-design/compound-refresh-skill-improvements.md` -- anti-pattern table for tool references
+  - `docs/solutions/skill-design/compound-refresh-skill-improvements.md` -- tool references 的 anti-pattern table
 
-  **Test scenarios:**
-  - Skill passes all items in the AGENTS.md skill compliance checklist
-  - Description field is present and follows "what + when" format
-  - No hardcoded Claude-specific tool names without platform equivalents
-  - No slash references to other skills (uses semantic wording)
-  - No `TodoWrite`/`TodoRead` references
-  - No shell commands for routine file exploration
-  - Cross-platform question pattern includes AskUserQuestion, request_user_input, ask_user, and a fallback
-  - All design rules explicitly framed as defaults (not absolutes)
-  - Layer 0 detection checklist is concrete (specific file patterns and config names)
-  - Mode classification has clear thresholds (4+ signals = existing, 1-3 = partial, 0 = greenfield)
-  - Visual verification section references agent-browser semantically ("load the `agent-browser` skill")
+  **测试场景：**
+  - Skill 通过 AGENTS.md skill compliance checklist 的全部 items
+  - Description field 存在，并遵循 "what + when" format
+  - 没有 hardcoded Claude-specific tool names，除非同时给出 platform equivalents
+  - 没有对其他 skills 的 slash references（使用 semantic wording）
+  - 没有 `TodoWrite`/`TodoRead` references
+  - 没有用于 routine file exploration 的 shell commands
+  - Cross-platform question pattern 包含 AskUserQuestion、request_user_input、ask_user 和 fallback
+  - 所有 design rules 都明确 framed as defaults（非 absolutes）
+  - Layer 0 detection checklist 具体（specific file patterns 和 config names）
+  - Mode classification 有清晰 thresholds（4+ signals = existing，1-3 = partial，0 = greenfield）
+  - Visual verification section 以 semantic 方式引用 agent-browser（"load the `agent-browser` skill"）
 
-  **Verification:**
-  - `grep -E 'description:' plugins/compound-engineering/skills/frontend-design/SKILL.md` returns the optimized description
-  - `grep -E '^\`(references|assets|scripts)/[^\`]+\`' plugins/compound-engineering/skills/frontend-design/SKILL.md` returns nothing (no unlinked references)
-  - Manual review confirms the layered structure matches the brainstorm doc's "Skill Structure" outline
+  **验证：**
+  - `grep -E 'description:' plugins/compound-engineering/skills/frontend-design/SKILL.md` 返回 optimized description
+  - `grep -E '^\`(references|assets|scripts)/[^\`]+\`' plugins/compound-engineering/skills/frontend-design/SKILL.md` 无结果（没有 unlinked references）
+  - Manual review 确认 layered structure 匹配 brainstorm doc 的 "Skill Structure" outline
   - `bun run release:validate` passes
 
-- [x] **Unit 2: Add frontend-design trigger to ce-work-beta Phase 2**
+- [x] **Unit 2：在 ce-work-beta Phase 2 中添加 frontend-design trigger**
 
-  **Goal:** Insert a conditional section in ce-work-beta Phase 2 that loads the `frontend-design` skill for UI tasks without Figma designs, and fix the duplicate item numbering.
+  **目标：** 在 ce-work-beta Phase 2 中插入 conditional section，对没有 Figma designs 的 UI tasks 加载 `frontend-design` skill，并修复 duplicate item numbering。
 
-  **Requirements:** R10, R11
+  **需求：** R10, R11
 
-  **Dependencies:** Unit 1 (the skill must exist in its new form for the reference to be meaningful)
+  **依赖：** Unit 1（skill 必须以新形式存在，引用才有意义）
 
-  **Files:**
-  - Modify: `plugins/compound-engineering/skills/ce-work-beta/SKILL.md`
+  **文件：**
+- Modify（修改）: `plugins/compound-engineering/skills/ce-work-beta/SKILL.md`
 
-  **Approach:**
-  - Insert new section after Figma Design Sync (line 217) and before Track Progress (line 219)
-  - New section titled "Frontend Design Guidance" (if applicable), following the same conditional pattern as Figma Design Sync
-  - Content: UI task detection heuristic (implementation files include views/templates/components/layouts/pages, creates user-visible routes, plan text contains UI/frontend/design language, or task builds something user-visible in browser) + instruction to load the `frontend-design` skill + note that the skill's verification screenshot satisfies Phase 4's screenshot requirement
-  - Fix duplicate "6." numbering: Figma Design Sync = 6, Frontend Design Guidance = 7, Track Progress = 8
-  - Keep the addition to ~10 lines including the heuristic and the verification-reuse note
-  - Use semantic skill reference: "load the `frontend-design` skill" (not slash syntax)
+  **做法：**
+  - 在 Figma Design Sync（line 217）后、Track Progress（line 219）前插入 new section
+  - New section 标题为 "Frontend Design Guidance"（if applicable），遵循与 Figma Design Sync 相同的 conditional "(if applicable)" pattern
+  - 内容：UI task detection heuristic（implementation files 包含 views/templates/components/layouts/pages、创建 user-visible routes、plan text 含 UI/frontend/design language，或 task 构建 browser 中 user-visible 的东西）+ 加载 `frontend-design` skill 的 instruction + skill 的 verification screenshot 满足 Phase 4 screenshot requirement 的说明
+  - 修复 duplicate "6." numbering：Figma Design Sync = 6，Frontend Design Guidance = 7，Track Progress = 8
+  - 加法保持在约 10 行，包括 heuristic 和 verification-reuse note
+  - 使用 semantic skill reference："load the `frontend-design` skill"（不是 slash syntax）
 
-  **Patterns to follow:**
-  - The existing Figma Design Sync section (lines 210-217) -- same conditional "(if applicable)" pattern, same level of brevity
+  **遵循的模式：**
+  - 现有 Figma Design Sync section（lines 210-217）-- 同样的 conditional "(if applicable)" pattern，同样简洁
 
-  **Test scenarios:**
-  - New section follows same formatting as Figma Design Sync section
-  - No duplicate item numbers in Phase 2
-  - Semantic skill reference used (no slash syntax for frontend-design)
-  - Verification screenshot reuse is explicit
+  **测试场景：**
+  - New section 遵循与 Figma Design Sync 相同的 formatting
+  - Phase 2 中无 duplicate item numbers
+  - 使用 semantic skill reference（无 frontend-design slash syntax）
+  - 明确说明 verification screenshot reuse
   - `bun run release:validate` passes
 
-  **Verification:**
-  - Phase 2 items are numbered sequentially without duplicates
-  - The new section references `frontend-design` skill semantically
-  - The verification-reuse note is present
+  **验证：**
+  - Phase 2 items 按顺序编号，无 duplicates
+  - New section 以 semantic 方式引用 `frontend-design` skill
+  - verification-reuse note 存在
   - `bun run release:validate` passes
 
-## System-Wide Impact
+## 系统级影响
 
-- **Interaction graph:** The frontend-design skill is auto-invocable (no `disable-model-invocation`). When loaded, it may interact with: agent-browser CLI (for verification screenshots), browser MCP tools, or existing project browser tooling. ce-work-beta Phase 2 will conditionally trigger the skill load. The design-iterator agent's `<frontend_aesthetics>` block will be superseded when both the skill and agent are active in the same context.
-- **Error propagation:** If browser tooling is unavailable for verification, the skill falls back to mental review. No hard failure path.
-- **State lifecycle risks:** None. This is markdown document work -- no runtime state, no data, no migrations.
-- **API surface parity:** The skill description change affects how Claude discovers and triggers the skill. The new description is broader (covers existing app modifications) which may increase trigger rate.
-- **Integration coverage:** The primary integration is ce-work-beta -> frontend-design skill -> agent-browser. This flow should be manually tested end-to-end with a UI task in the beta workflow.
+- **Interaction graph:** frontend-design skill 可 auto-invocable（没有 `disable-model-invocation`）。加载后可能与 agent-browser CLI（用于 verification screenshots）、browser MCP tools 或 existing project browser tooling 交互。ce-work-beta Phase 2 会 conditional trigger skill load。design-iterator agent 的 `<frontend_aesthetics>` block 会在 skill 与 agent 同时 active 时被 supersede。
+- **Error propagation:** 如果 browser tooling 不可用于 verification，skill 会 fallback 到 mental review。没有 hard failure path。
+- **State lifecycle risks:** 无。这是 markdown document work -- 无 runtime state、无 data、无 migrations。
+- **API surface parity:** skill description change 会影响 Claude 发现和触发该 skill 的方式。新 description 更宽（覆盖 existing app modifications），可能提升 trigger rate。
+- **Integration coverage:** 主要 integration 是 ce-work-beta -> frontend-design skill -> agent-browser。该 flow 应通过 beta workflow 中的 UI task 进行一次 end-to-end manual test。
 
-## Risks & Dependencies
+## 风险与依赖
 
-- **Trigger rate change:** The broader description may cause the skill to trigger for borderline cases (e.g., a task that touches one CSS class). Mitigated by the Layer 0 detection step which will quickly identify "existing system" mode and short-circuit most opinionated guidance.
-- **Skill length:** Estimated 300-400 lines is substantial for a skill body. Mitigated by the layered architecture -- an agent in "existing system" mode can skip Layer 2's opinionated sections entirely.
-- **design-iterator overlap:** The design-iterator's `<frontend_aesthetics>` block now partially duplicates the skill's Layer 2 content. Not a functional problem (the skill supersedes when loaded) but creates maintenance overhead. Flagged for follow-up cleanup.
+- **Trigger rate change:** 更宽的 description 可能让 skill 对边缘情况触发（例如只碰一个 CSS class 的 task）。Layer 0 detection step 可缓解：它会快速识别 "existing system" mode 并短路大多数 opinionated guidance。
+- **Skill length:** 估计 300-400 行，对 skill body 来说较长。Layered architecture 可缓解 -- "existing system" mode 中的 agent 可完全跳过 Layer 2 opinionated sections。
+- **design-iterator overlap:** design-iterator 的 `<frontend_aesthetics>` block 现在部分重复 skill 的 Layer 2 content。功能上不是问题（skill 加载时 supersedes 它），但带来 maintenance overhead。标记为 follow-up cleanup。
 
-## Sources & References
+## 来源与参考
 
-- **Origin document:** [docs/brainstorms/2026-03-22-frontend-design-skill-improvement.md](docs/brainstorms/2026-03-22-frontend-design-skill-improvement.md)
-- Related code: `plugins/compound-engineering/skills/frontend-design/SKILL.md`, `plugins/compound-engineering/skills/ce-work-beta/SKILL.md`
-- External inspiration: Anthropic official frontend-design skill, OpenAI "Designing Delightful Frontends with GPT-5.4" skill (March 2026)
-- Institutional learnings: `docs/solutions/skill-design/compound-refresh-skill-improvements.md`, `docs/solutions/skill-design/beta-skills-framework.md`, `docs/solutions/codex-skill-prompt-entrypoints.md`
+- **Origin document（来源文档）:** [docs/brainstorms/2026-03-22-frontend-design-skill-improvement.md](docs/brainstorms/2026-03-22-frontend-design-skill-improvement.md)
+- Related code（相关代码）: `plugins/compound-engineering/skills/frontend-design/SKILL.md`, `plugins/compound-engineering/skills/ce-work-beta/SKILL.md`
+- External inspiration（外部灵感）: Anthropic official frontend-design skill, OpenAI "Designing Delightful Frontends with GPT-5.4" skill（March 2026）
+- Institutional learnings（机构经验）: `docs/solutions/skill-design/compound-refresh-skill-improvements.md`, `docs/solutions/skill-design/beta-skills-framework.md`, `docs/solutions/codex-skill-prompt-entrypoints.md`

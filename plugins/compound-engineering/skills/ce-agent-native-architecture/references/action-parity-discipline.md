@@ -1,33 +1,33 @@
 <overview>
-A structured discipline for ensuring agents can do everything users can do. Every UI action should have an equivalent agent tool. This isn't a one-time check—it's an ongoing practice integrated into your development workflow.
+一种 structured discipline，用来确保 agents 能做 users 能做的一切。每个 UI action 都应该有一个 equivalent agent tool。这不是一次性检查，而是集成到 development workflow 中的 ongoing practice。
 
-**Core principle:** When adding a UI feature, add the corresponding tool in the same PR.
+**Core principle：** 添加 UI feature 时，在同一个 PR 中添加 corresponding tool。
 </overview>
 
 <why_parity>
-## Why Action Parity Matters
+## Why Action Parity Matters（为什么 Action Parity 重要）
 
-**The failure case:**
+**Failure case（失败案例）：**
 ```
 User: "Write something about Catherine the Great in my reading feed"
 Agent: "What system are you referring to? I'm not sure what reading feed means."
 ```
 
-The user could publish to their feed through the UI. But the agent had no `publish_to_feed` tool. The fix was simple—add the tool. But the insight is profound:
+用户可以通过 UI publish 到自己的 feed。但 agent 没有 `publish_to_feed` tool。fix 很简单：添加 tool。但这个 insight 很深：
 
-**Every action a user can take through the UI must have an equivalent tool the agent can call.**
+**用户能通过 UI 执行的每个 action，都必须有 agent 可调用的 equivalent tool。**
 
-Without this parity:
-- Users ask agents to do things they can't do
-- Agents ask clarifying questions about features they should understand
-- The agent feels limited compared to direct app usage
-- Users lose trust in the agent's capabilities
+缺少这种 parity 时：
+- Users 会要求 agents 做它们做不到的事
+- Agents 会对本该理解的 features 提澄清问题
+- agent 相比 direct app usage 显得受限
+- Users 会失去对 agent capabilities 的信任
 </why_parity>
 
 <capability_mapping>
-## The Capability Map
+## The Capability Map（能力地图）
 
-Maintain a structured map of UI actions to agent tools:
+维护一张从 UI actions 到 agent tools 的 structured map：
 
 | UI Action | UI Location | Agent Tool | System Prompt Reference |
 |-----------|-------------|------------|-------------------------|
@@ -39,9 +39,9 @@ Maintain a structured map of UI actions to agent tools:
 | Take screenshot | Camera | N/A (user action) | — |
 | Search web | Chat | `web_search` | "Search the internet" |
 
-**Update this table whenever adding features.**
+**每次添加 features 时都更新这张表。**
 
-### Template for Your App
+### Template for Your App（你的 App 模板）
 
 ```markdown
 # Capability Map - [Your App Name]
@@ -53,18 +53,18 @@ Maintain a structured map of UI actions to agent tools:
 | | | | | 🚫 N/A |
 ```
 
-Status meanings:
-- ✅ Done: Tool exists and is documented in system prompt
-- ⚠️ Missing: UI action exists but no agent equivalent
-- 🚫 N/A: User-only action (e.g., biometric auth, camera capture)
+Status meanings（状态含义）：
+- ✅ Done：Tool 已存在，且已在 system prompt 中 documented
+- ⚠️ Missing：UI action 存在，但没有 agent equivalent
+- 🚫 N/A：User-only action（例如 biometric auth、camera capture）
 </capability_mapping>
 
 <parity_workflow>
-## The Action Parity Workflow
+## The Action Parity Workflow（Action Parity 工作流）
 
-### When Adding a New Feature
+### When Adding a New Feature（添加新 Feature 时）
 
-Before merging any PR that adds UI functionality:
+merge 任何添加 UI functionality 的 PR 前：
 
 ```
 1. What action is this?
@@ -87,12 +87,12 @@ Before merging any PR that adds UI functionality:
    → Add row to tracking document
 ```
 
-### PR Checklist
+### PR Checklist（PR 检查清单）
 
-Add to your PR template:
+添加到你的 PR template：
 
 ```markdown
-## Agent-Native Checklist
+## Agent-Native Checklist（Agent-Native 检查清单）
 
 - [ ] Every new UI action has a corresponding agent tool
 - [ ] System prompt updated to mention new capability
@@ -103,13 +103,13 @@ Add to your PR template:
 </parity_workflow>
 
 <parity_audit>
-## The Parity Audit
+## The Parity Audit（Parity 审计）
 
-Periodically audit your app for action parity gaps:
+定期 audit app 中的 action parity gaps：
 
-### Step 1: List All UI Actions
+### Step 1: List All UI Actions（列出所有 UI Actions）
 
-Walk through every screen and list what users can do:
+遍历每个 screen，列出 users 可以做什么：
 
 ```
 Library Screen:
@@ -142,9 +142,9 @@ Settings:
 - Delete account
 ```
 
-### Step 2: Check Tool Coverage
+### Step 2: Check Tool Coverage（检查 Tool 覆盖）
 
-For each action, verify:
+对每个 action，verify：
 
 ```
 ✅ View list of books      → read_library
@@ -165,32 +165,32 @@ For each action, verify:
 ⚠️ Delete insight         → MISSING (need delete_feed_item tool)
 ```
 
-### Step 3: Prioritize Gaps
+### Step 3: Prioritize Gaps（确定 Gaps 优先级）
 
-Not all gaps are equal:
+不是所有 gaps 都一样：
 
-**High priority (users will ask for this):**
-- Add new book
-- Create/edit/delete content
-- Core workflow actions
+**High priority（users 会要求这个）：**
+- Add new book（添加新书）
+- Create/edit/delete content（创建、编辑、删除内容）
+- Core workflow actions（核心 workflow actions）
 
-**Medium priority (occasional requests):**
-- Filter/search variations
-- Export functionality
-- Sharing features
+**Medium priority（中优先级，occasional requests）：**
+- Filter/search variations（过滤/搜索变体）
+- Export functionality（导出功能）
+- Sharing features（分享功能）
 
-**Low priority (rarely requested via agent):**
-- Theme changes
-- Account deletion
-- Settings that are UI-preference
+**Low priority（很少通过 agent 请求）：**
+- Theme changes（主题变更）
+- Account deletion（账户删除）
+- 属于 UI-preference 的 settings
 </parity_audit>
 
 <tool_design_for_parity>
-## Designing Tools for Parity
+## Designing Tools for Parity（为 Parity 设计 Tools）
 
-### Match Tool Granularity to UI Granularity
+### Match Tool Granularity to UI Granularity（让 Tool 粒度匹配 UI 粒度）
 
-If the UI has separate buttons for "Edit" and "Delete", consider separate tools:
+如果 UI 对 "Edit" 和 "Delete" 有 separate buttons，考虑 separate tools：
 
 ```typescript
 // Matches UI granularity
@@ -201,7 +201,7 @@ tool("delete_feed_item", { id }, ...);
 tool("modify_feed_item", { id, action: "update" | "delete", ... }, ...);
 ```
 
-### Use User Vocabulary in Tool Names
+### Use User Vocabulary in Tool Names（在 Tool 名中使用用户词汇）
 
 ```typescript
 // Good: Matches what users say
@@ -215,9 +215,9 @@ tool("insert_library_item", ...);
 tool("initiate_web_scrape_workflow", ...);
 ```
 
-### Return What the UI Shows
+### Return What the UI Shows（返回 UI 展示的内容）
 
-If the UI shows a confirmation with details, the tool should too:
+如果 UI 显示带 details 的 confirmation，tool 也应该如此：
 
 ```typescript
 // UI shows: "Added 'Moby Dick' to your library"
@@ -232,11 +232,11 @@ tool("add_book", async ({ title, author }) => {
 </tool_design_for_parity>
 
 <context_parity>
-## Context Parity
+## Context Parity（上下文对等）
 
-Whatever the user sees, the agent should be able to access.
+无论用户看到什么，agent 都应该能够 access。
 
-### The Problem
+### The Problem（问题）
 
 ```swift
 // UI shows recent analyses in a list
@@ -252,9 +252,9 @@ let systemPrompt = """
 """
 ```
 
-The user sees their reading journal. The agent doesn't. This creates a disconnect.
+用户能看到自己的 reading journal。agent 看不到。这会造成 disconnect。
 
-### The Fix
+### The Fix（修复）
 
 ```swift
 // System prompt includes what UI shows
@@ -267,18 +267,18 @@ let systemPrompt = """
 """
 ```
 
-### Context Parity Checklist
+### Context Parity Checklist（Context Parity 检查清单）
 
-For each screen in your app:
-- [ ] What data does this screen display?
-- [ ] Is that data available to the agent?
-- [ ] Can the agent access the same level of detail?
+对 app 中每个 screen：
+- [ ] 这个 screen 显示什么 data？
+- [ ] 这些 data 是否对 agent available？
+- [ ] agent 是否能 access 相同 detail level？
 </context_parity>
 
 <continuous_parity>
-## Maintaining Parity Over Time
+## Maintaining Parity Over Time（持续维护 Parity）
 
-### Git Hooks / CI Checks
+### Git Hooks / CI Checks（Git Hooks / CI 检查）
 
 ```bash
 #!/bin/bash
@@ -298,7 +298,7 @@ if [ -n "$NEW_ACTIONS" ]; then
 fi
 ```
 
-### Automated Parity Testing
+### Automated Parity Testing（自动化 Parity 测试）
 
 ```typescript
 // parity.test.ts
@@ -319,38 +319,38 @@ describe('Action Parity', () => {
 });
 ```
 
-### Regular Audits
+### Regular Audits（定期审计）
 
-Schedule periodic reviews:
+安排 periodic reviews：
 
 ```markdown
 ## Monthly Parity Audit
 
-1. Review all PRs merged this month
-2. Check each for new UI actions
+1. Review 本月 merged 的所有 PRs
+2. 检查每个 PR 是否新增 UI actions
 3. Verify tool coverage
-4. Update capability map
-5. Test with natural language requests
+4. 更新 capability map
+5. 用 natural language requests 测试
 ```
 </continuous_parity>
 
 <examples>
-## Real Example: The Feed Gap
+## Real Example：The Feed Gap（真实案例：Feed 缺口）
 
-**Before:** Every Reader had a feed where insights appeared, but no agent tool to publish there.
+**Before：** Every Reader 有一个 feed 用来显示 insights，但没有 agent tool 可以 publish 到那里。
 
 ```
 User: "Write something about Catherine the Great in my reading feed"
 Agent: "I'm not sure what system you're referring to. Could you clarify?"
 ```
 
-**Diagnosis:**
-- ✅ UI action: User can publish insights from the analysis view
-- ❌ Agent tool: No `publish_to_feed` tool
-- ❌ System prompt: No mention of "feed" or how to publish
-- ❌ Context: Agent didn't know what "feed" meant
+**Diagnosis（诊断）：**
+- ✅ UI action：User can publish insights from the analysis view（User 可以从 analysis view 发布 insights）
+- ❌ Agent tool：No `publish_to_feed` tool（没有 `publish_to_feed` tool）
+- ❌ System prompt：No mention of "feed" or how to publish（没有提到 "feed" 或如何发布）
+- ❌ Context：Agent didn't know what "feed" meant（Agent 不知道 "feed" 是什么）
 
-**Fix:**
+**Fix：**
 
 ```swift
 // 1. Add the tool
@@ -382,7 +382,7 @@ where insights appear. Use `publish_to_feed` to create content there.
 """
 ```
 
-**After:**
+**After（之后）：**
 ```
 User: "Write something about Catherine the Great in my reading feed"
 Agent: [Uses publish_to_feed to create insight]
@@ -391,19 +391,19 @@ Agent: [Uses publish_to_feed to create insight]
 </examples>
 
 <checklist>
-## Action Parity Checklist
+## Action Parity Checklist（Action Parity 检查清单）
 
-For every PR with UI changes:
-- [ ] Listed all new UI actions
-- [ ] Verified agent tool exists for each action
-- [ ] Updated system prompt with new capabilities
-- [ ] Added to capability map
-- [ ] Tested with natural language request
+对每个带 UI changes 的 PR：
+- [ ] Listed all new UI actions（列出所有新的 UI actions）
+- [ ] Verified agent tool exists for each action（确认每个 action 都有 agent tool）
+- [ ] Updated system prompt with new capabilities（用新 capabilities 更新 system prompt）
+- [ ] Added to capability map（添加到 capability map）
+- [ ] Tested with natural language request（用 natural language request 测试）
 
-For periodic audits:
-- [ ] Walked through every screen
-- [ ] Listed all possible user actions
-- [ ] Checked tool coverage for each
-- [ ] Prioritized gaps by likelihood of user request
-- [ ] Created issues for high-priority gaps
+对 periodic audits：
+- [ ] Walked through every screen（走查每个 screen）
+- [ ] Listed all possible user actions（列出所有可能的 user actions）
+- [ ] Checked tool coverage for each（检查每个 action 的 tool coverage）
+- [ ] Prioritized gaps by likelihood of user request（按用户请求可能性为 gaps 排序）
+- [ ] Created issues for high-priority gaps（为 high-priority gaps 创建 issues）
 </checklist>

@@ -1,43 +1,43 @@
 ---
-title: Add Cursor CLI as a Target Provider
+title: 将 Cursor CLI 添加为 Target Provider
 type: feat
 date: 2026-02-12
 ---
 
-# Add Cursor CLI as a Target Provider
+# 将 Cursor CLI 添加为 Target Provider
 
-## Overview
+## 概览
 
-Add `cursor` as a fourth target provider in the converter CLI, alongside `opencode`, `codex`, and `droid`. This enables `--to cursor` for both `convert` and `install` commands, converting Claude Code plugins into Cursor-compatible format.
+在 converter CLI 中添加 `cursor` 作为第四个 target provider，与 `opencode`、`codex` 和 `droid` 并列。这样 `convert` 和 `install` 命令都可以使用 `--to cursor`，把 Claude Code plugins 转换为 Cursor-compatible format。
 
-Cursor CLI (`cursor-agent`) launched in August 2025 and supports rules (`.mdc`), commands (`.md`), skills (`SKILL.md` standard), and MCP servers (`.cursor/mcp.json`). The mapping from Claude Code is straightforward because Cursor adopted the open SKILL.md standard and has a similar command format.
+Cursor CLI（`cursor-agent`）于 2025 年 8 月发布，支持 rules（`.mdc`）、commands（`.md`）、skills（`SKILL.md` standard）和 MCP servers（`.cursor/mcp.json`）。由于 Cursor 采用了开放的 SKILL.md standard，并且 command format 类似，从 Claude Code 到 Cursor 的映射相对直接。
 
-## Component Mapping
+## 组件映射
 
-| Claude Code | Cursor Equivalent | Notes |
+| Claude Code | Cursor 等价物 | 说明 |
 |---|---|---|
-| `agents/*.md` | `.cursor/rules/*.mdc` | Agents become "Agent Requested" rules (`alwaysApply: false`, `description` set) so the AI activates them on demand rather than flooding context |
-| `commands/*.md` | `.cursor/commands/*.md` | Plain markdown files; Cursor commands have no frontmatter support -- description becomes a markdown heading |
-| `skills/*/SKILL.md` | `.cursor/skills/*/SKILL.md` | **Identical standard** -- copy directly |
-| MCP servers | `.cursor/mcp.json` | Same JSON structure (`mcpServers` key), compatible format |
-| `hooks/` | No equivalent | Cursor has no hook system; emit `console.warn` and skip |
-| `.claude/` paths | `.cursor/` paths | Content rewriting needed |
+| `agents/*.md` | `.cursor/rules/*.mdc` | Agents 转为 "Agent Requested" rules（`alwaysApply: false`，设置 `description`），让 AI 按需激活，而不是塞满 context |
+| `commands/*.md` | `.cursor/commands/*.md` | 普通 markdown 文件；Cursor commands 不支持 frontmatter -- description 转为 markdown heading |
+| `skills/*/SKILL.md` | `.cursor/skills/*/SKILL.md` | **标准完全相同** -- 直接 copy |
+| MCP servers | `.cursor/mcp.json` | 相同 JSON structure（`mcpServers` key），format compatible |
+| `hooks/` | No equivalent | Cursor 没有 hook system；emit `console.warn` 并 skip |
+| `.claude/` paths | `.cursor/` paths | 需要 content rewriting |
 
-### Key Design Decisions
+### 关键设计决策
 
-**1. Agents use `alwaysApply: false` (Agent Requested mode)**
+**1. Agents 使用 `alwaysApply: false`（Agent Requested mode）**
 
-With 29 agents, setting `alwaysApply: true` would flood every Cursor session's context. Instead, agents become "Agent Requested" rules: `alwaysApply: false` with a populated `description` field. Cursor's AI reads the description and activates the rule only when relevant -- matching how Claude Code agents are invoked on demand.
+如果 29 个 agents 都设置 `alwaysApply: true`，每个 Cursor session 的 context 都会被淹没。因此 agents 会变成 "Agent Requested" rules：`alwaysApply: false`，并填充 `description` field。Cursor 的 AI 会读取 description，只在相关时激活 rule -- 这与 Claude Code agents 的按需调用方式匹配。
 
-**2. Commands are plain markdown (no frontmatter)**
+**2. Commands 是 plain markdown（无 frontmatter）**
 
-Cursor commands (`.cursor/commands/*.md`) are simple markdown files where the filename becomes the command name. Unlike Claude Code commands, they do not support YAML frontmatter. The converter emits the description as a leading markdown comment, then the command body.
+Cursor commands（`.cursor/commands/*.md`）是简单 markdown 文件，filename 会成为 command name。与 Claude Code commands 不同，它们不支持 YAML frontmatter。converter 会把 description 作为前置 markdown comment 输出，然后输出 command body。
 
-**3. Flattened command names with deduplication**
+**3. Flattened command names 并进行 deduplication**
 
-Cursor uses flat command names (no namespaces). `workflows:plan` becomes `plan`. If two commands flatten to the same name, the `uniqueName()` pattern from the codex converter appends `-2`, `-3`, etc.
+Cursor 使用 flat command names（无 namespaces）。`workflows:plan` 会变成 `plan`。如果两个 commands flatten 后同名，则复用 codex converter 的 `uniqueName()` pattern，追加 `-2`、`-3` 等后缀。
 
-### Rules (`.mdc`) Frontmatter Format
+### Rules (`.mdc`) Frontmatter Format（frontmatter 格式）
 
 ```yaml
 ---
@@ -47,11 +47,11 @@ alwaysApply: false
 ---
 ```
 
-- `description` (string): Used by the AI to decide relevance -- maps from agent `description`
-- `globs` (string): Comma-separated file patterns for auto-attachment -- leave empty for converted agents
-- `alwaysApply` (boolean): Set `false` for Agent Requested mode
+- `description`（string）：AI 用它判断相关性 -- 从 agent `description` 映射
+- `globs`（string）：逗号分隔的 file patterns，用于 auto-attachment -- converted agents 留空
+- `alwaysApply`（boolean）：Agent Requested mode 下设置为 `false`
 
-### MCP Servers (`.cursor/mcp.json`)
+### MCP Servers (`.cursor/mcp.json`)（MCP servers 配置）
 
 ```json
 {
@@ -65,30 +65,30 @@ alwaysApply: false
 }
 ```
 
-Supports both local (command-based) and remote (url-based) servers. Pass through `headers` for remote servers.
+支持 local（command-based）和 remote（url-based）servers。remote servers 的 `headers` pass through。
 
-## Acceptance Criteria
+## 验收标准
 
-- [x] `bun run src/index.ts convert --to cursor ./plugins/compound-engineering` produces valid Cursor config
-- [x] Agents convert to `.cursor/rules/*.mdc` with `alwaysApply: false` and populated `description`
-- [x] Commands convert to `.cursor/commands/*.md` as plain markdown (no frontmatter)
-- [x] Flattened command names that collide are deduplicated (`plan`, `plan-2`, etc.)
-- [x] Skills copied to `.cursor/skills/` (identical format)
-- [x] MCP servers written to `.cursor/mcp.json` with backup of existing file
-- [x] Content transformation rewrites `.claude/` and `~/.claude/` paths to `.cursor/` and `~/.cursor/`
-- [x] `/workflows:plan` transformed to `/plan` (flat command names)
-- [x] `Task agent-name(args)` transformed to natural-language skill reference
-- [x] Plugins with hooks emit `console.warn` about unsupported hooks
-- [x] Writer does not double-nest `.cursor/.cursor/` (follows droid writer pattern)
-- [x] `model` and `allowedTools` fields silently dropped (no Cursor equivalent)
-- [x] Converter and writer tests pass
-- [x] Existing tests still pass (`bun test`)
+- [x] `bun run src/index.ts convert --to cursor ./plugins/compound-engineering` 生成 valid Cursor config
+- [x] Agents 转为 `.cursor/rules/*.mdc`，包含 `alwaysApply: false` 和 populated `description`
+- [x] Commands 转为 `.cursor/commands/*.md` plain markdown（无 frontmatter）
+- [x] Flattened command names 发生冲突时会 deduplicate（`plan`、`plan-2` 等）
+- [x] Skills copied to `.cursor/skills/`（format identical，格式相同）
+- [x] MCP servers 写入 `.cursor/mcp.json`，并 backup existing file
+- [x] Content transformation 将 `.claude/` 和 `~/.claude/` paths rewrite 为 `.cursor/` 和 `~/.cursor/`
+- [x] `/workflows:plan` 转换为 `/plan`（flat command names）
+- [x] `Task agent-name(args)` 转换为 natural-language skill reference
+- [x] 带 hooks 的 plugins 会 emit `console.warn` 提示 unsupported hooks
+- [x] Writer 不会 double-nest `.cursor/.cursor/`（遵循 droid writer pattern）
+- [x] `model` 和 `allowedTools` fields silently dropped（无 Cursor equivalent）
+- [x] Converter and writer tests pass（converter 和 writer tests 通过）
+- [x] Existing tests still pass（existing tests 仍通过，`bun test`）
 
-## Implementation
+## 实现
 
-### Phase 1: Types
+### 阶段 1：Types
 
-**Create `src/types/cursor.ts`**
+**创建 `src/types/cursor.ts`**
 
 ```typescript
 export type CursorRule = {
@@ -120,51 +120,51 @@ export type CursorBundle = {
 }
 ```
 
-### Phase 2: Converter
+### 阶段 2：Converter
 
-**Create `src/converters/claude-to-cursor.ts`**
+**创建 `src/converters/claude-to-cursor.ts`**
 
-Core functions:
+核心函数：
 
-1. **`convertClaudeToCursor(plugin, options)`** -- main entry point
-   - Convert each agent to a `.mdc` rule via `convertAgentToRule()`
-   - Convert each command (including `disable-model-invocation` ones) via `convertCommand()`
-   - Pass skills through as directory references
-   - Convert MCP servers to JSON-compatible object
-   - Emit `console.warn` if `plugin.hooks` has entries
+1. **`convertClaudeToCursor(plugin, options)`** -- main entry point（主入口）
+   - 通过 `convertAgentToRule()` 将每个 agent 转换为 `.mdc` rule
+   - 通过 `convertCommand()` 转换每个 command（包括 `disable-model-invocation` commands）
+   - 将 skills 作为 directory references pass through
+   - 将 MCP servers 转换为 JSON-compatible object
+   - 如果 `plugin.hooks` 有 entries，则 emit `console.warn`
 
-2. **`convertAgentToRule(agent, usedNames)`** -- agent -> `.mdc` rule
-   - Frontmatter fields: `description` (from agent description), `globs: ""`, `alwaysApply: false`
-   - Body: agent body with content transformations applied
-   - Prepend capabilities section if present
-   - Deduplicate names via `uniqueName()`
-   - Silently drop `model` field (no Cursor equivalent)
+2. **`convertAgentToRule(agent, usedNames)`** -- agent -> `.mdc` rule（agent 转 rule）
+   - Frontmatter fields（frontmatter 字段）: `description`（from agent description）、`globs: ""`、`alwaysApply: false`
+   - Body：应用 content transformations 后的 agent body
+   - 如存在 capabilities section，则 prepend
+   - 通过 `uniqueName()` deduplicate names
+   - Silently drop `model` field（无 Cursor equivalent）
 
-3. **`convertCommand(command, usedNames)`** -- command -> plain `.md`
-   - Flatten namespace: `workflows:plan` -> `plan`
-   - Deduplicate flattened names via `uniqueName()`
-   - Emit as plain markdown: description as `<!-- description -->` comment, then body
-   - Include `argument-hint` as a `## Arguments` section if present
-   - Body: apply `transformContentForCursor()` transformations
-   - Silently drop `allowedTools` (no Cursor equivalent)
+3. **`convertCommand(command, usedNames)`** -- command -> plain `.md`（command 转纯 `.md`）
+   - Flatten namespace（扁平化 namespace）：`workflows:plan` -> `plan`
+   - 通过 `uniqueName()` deduplicate flattened names
+   - 以 plain markdown 输出：description 作为 `<!-- description -->` comment，然后是 body
+   - 如果存在 `argument-hint`，加入 `## Arguments` section
+   - Body：应用 `transformContentForCursor()` transformations
+   - Silently drop `allowedTools`（无 Cursor equivalent）
 
-4. **`transformContentForCursor(body)`** -- content rewriting
+4. **`transformContentForCursor(body)`** -- content rewriting（内容重写）
    - `.claude/` -> `.cursor/` and `~/.claude/` -> `~/.cursor/`
-   - `Task agent-name(args)` -> `Use the agent-name skill to: args` (same as codex)
-   - `/workflows:command` -> `/command` (flatten slash commands)
-   - `@agent-name` references -> `the agent-name rule` (use codex's suffix-matching pattern)
-   - Skip file paths (containing `/`) and common non-command patterns
+   - `Task agent-name(args)` -> `Use the agent-name skill to: args`（same as codex）
+   - `/workflows:command` -> `/command`（flatten slash commands）
+   - `@agent-name` references -> `the agent-name rule`（use codex's suffix-matching pattern）
+   - Skip file paths（包含 `/`）和常见 non-command patterns
 
-5. **`convertMcpServers(servers)`** -- MCP config
-   - Map each `ClaudeMcpServer` entry to Cursor-compatible JSON
-   - Pass through: `command`, `args`, `env`, `url`, `headers`
-   - Drop `type` field (Cursor infers transport from `command` vs `url`)
+5. **`convertMcpServers(servers)`** -- MCP config（MCP 配置）
+   - 将每个 `ClaudeMcpServer` entry 映射为 Cursor-compatible JSON
+   - Pass through（透传）: `command`、`args`、`env`、`url`、`headers`
+   - Drop `type` field（丢弃 `type` field；Cursor infers transport from `command` vs `url`）
 
-### Phase 3: Writer
+### 阶段 3：Writer
 
-**Create `src/targets/cursor.ts`**
+**创建 `src/targets/cursor.ts`**
 
-Output structure:
+Output structure（输出结构）:
 
 ```
 .cursor/
@@ -180,17 +180,17 @@ Output structure:
 └── mcp.json
 ```
 
-Core function: `writeCursorBundle(outputRoot, bundle)`
+核心函数：`writeCursorBundle(outputRoot, bundle)`
 
-- `resolveCursorPaths(outputRoot)` -- detect if path already ends in `.cursor` to avoid double-nesting (follow droid writer pattern at `src/targets/droid.ts:31-50`)
-- Write rules to `rules/` as `.mdc` files
-- Write commands to `commands/` as `.md` files
-- Copy skill directories to `skills/` via `copyDir()`
-- Write `mcp.json` via `writeJson()` with `backupFile()` for existing files
+- `resolveCursorPaths(outputRoot)` -- 检测 path 是否已经以 `.cursor` 结尾，避免 double-nesting（遵循 `src/targets/droid.ts:31-50` 的 droid writer pattern）
+- 将 rules 作为 `.mdc` files 写入 `rules/`
+- 将 commands 作为 `.md` files 写入 `commands/`
+- 通过 `copyDir()` 将 skill directories 复制到 `skills/`
+- 通过 `writeJson()` 写入 `mcp.json`，并用 `backupFile()` 备份 existing files
 
-### Phase 4: Wire into CLI
+### 阶段 4：接入 CLI
 
-**Modify `src/targets/index.ts`**
+**修改 `src/targets/index.ts`**
 
 ```typescript
 import { convertClaudeToCursor } from "../converters/claude-to-cursor"
@@ -206,101 +206,101 @@ cursor: {
 },
 ```
 
-**Modify `src/commands/convert.ts`**
+**修改 `src/commands/convert.ts`**
 
-- Update `--to` description: `"Target format (opencode | codex | droid | cursor)"`
-- Add to `resolveTargetOutputRoot`: `if (targetName === "cursor") return path.join(outputRoot, ".cursor")`
+- 更新 `--to` description: `"Target format (opencode | codex | droid | cursor)"`
+- 添加到 `resolveTargetOutputRoot`: `if (targetName === "cursor") return path.join(outputRoot, ".cursor")`
 
-**Modify `src/commands/install.ts`**
+**修改 `src/commands/install.ts`**
 
-- Same two changes as convert.ts
+- 与 convert.ts 相同的两处修改
 
-### Phase 5: Tests
+### 阶段 5：Tests
 
-**Create `tests/cursor-converter.test.ts`**
+**创建 `tests/cursor-converter.test.ts`**
 
-Test cases (use inline `ClaudePlugin` fixtures, following codex converter test pattern):
+测试用例（使用 inline `ClaudePlugin` fixtures，并遵循 codex converter test pattern）：
 
-- Agent converts to rule with `.mdc` frontmatter (`alwaysApply: false`, `description` populated)
-- Agent with empty description gets default description text
-- Agent with capabilities prepended to body
-- Agent `model` field silently dropped
-- Agent with empty body gets default body text
-- Command converts with flattened name (`workflows:plan` -> `plan`)
-- Command name collision after flattening is deduplicated (`plan`, `plan-2`)
-- Command with `disable-model-invocation` is still included
-- Command `allowedTools` silently dropped
-- Command with `argument-hint` gets Arguments section
-- Skills pass through as directory references
-- MCP servers convert to JSON config (local and remote)
-- MCP `headers` pass through for remote servers
-- Content transformation: `.claude/` paths -> `.cursor/`
-- Content transformation: `~/.claude/` paths -> `~/.cursor/`
-- Content transformation: `Task agent(args)` -> natural language
-- Content transformation: slash commands flattened
-- Hooks present -> `console.warn` emitted
-- Plugin with zero agents produces empty rules array
-- Plugin with only skills works correctly
+- Agent 转换为带 `.mdc` frontmatter 的 rule（`alwaysApply: false`，`description` populated）
+- 空 description 的 agent 获得 default description text
+- 带 capabilities 的 agent 会把 capabilities prepend 到 body
+- Agent `model` field 被静默丢弃
+- 空 body 的 agent 获得 default body text
+- Command 转换时使用 flattened name（`workflows:plan` -> `plan`）
+- Flattening 后的 command name collision 会被 deduplicate（`plan`、`plan-2`）
+- 带 `disable-model-invocation` 的 command 仍会 included
+- Command `allowedTools` 被静默丢弃
+- 带 `argument-hint` 的 command 获得 Arguments section
+- Skills 作为 directory references 透传
+- MCP servers 转换为 JSON config（local and remote）
+- remote servers 的 MCP `headers` pass through
+- Content transformation（内容转换）：`.claude/` paths -> `.cursor/`
+- Content transformation（内容转换）：`~/.claude/` paths -> `~/.cursor/`
+- Content transformation（内容转换）：`Task agent(args)` -> natural language
+- Content transformation（内容转换）：slash commands flattened
+- 存在 hooks -> emit `console.warn`
+- 零 agents 的 plugin 产生 empty rules array
+- 只有 skills 的 plugin 能正确工作
 
-**Create `tests/cursor-writer.test.ts`**
+**创建 `tests/cursor-writer.test.ts`**
 
-Test cases (use temp directories, following droid writer test pattern):
+测试用例（使用 temp directories，并遵循 droid writer test pattern）：
 
-- Full bundle writes rules, commands, skills, mcp.json
-- Rules written as `.mdc` files in `rules/` directory
-- Commands written as `.md` files in `commands/` directory
-- Skills copied to `skills/` directory
-- MCP config written as valid JSON `mcp.json`
-- Existing `mcp.json` is backed up before overwrite
-- Output root already ending in `.cursor` does NOT double-nest
-- Empty bundle (no rules, commands, skills, or MCP) produces no output
+- Full bundle 写入 rules、commands、skills、mcp.json
+- Rules 作为 `.mdc` files 写入 `rules/` directory
+- Commands 作为 `.md` files 写入 `commands/` directory
+- Skills 被复制到 `skills/` directory
+- MCP config 写成 valid JSON `mcp.json`
+- Existing `mcp.json` overwrite 前会备份
+- 已经以 `.cursor` 结尾的 output root 不会 double-nest
+- Empty bundle（no rules, commands, skills, or MCP）不产生 output
 
-### Phase 6: Documentation
+### 阶段 6：Documentation
 
-**Create `docs/specs/cursor.md`**
+**创建 `docs/specs/cursor.md`**
 
-Document the Cursor CLI spec as a reference, following `docs/specs/codex.md` pattern:
+按照 `docs/specs/codex.md` pattern，记录 Cursor CLI spec 作为 reference：
 
-- Rules format (`.mdc` with `description`, `globs`, `alwaysApply` frontmatter)
-- Commands format (plain markdown, no frontmatter)
-- Skills format (identical SKILL.md standard)
-- MCP server configuration (`.cursor/mcp.json`)
-- CLI permissions (`.cursor/cli.json` -- for reference, not converted)
-- Config file locations (project-level vs global)
+- Rules format（带 `description`, `globs`, `alwaysApply` frontmatter 的 `.mdc`）
+- Commands format（plain markdown, no frontmatter；纯 markdown，无 frontmatter）
+- Skills format（identical SKILL.md standard；相同 SKILL.md standard）
+- MCP server configuration（MCP server 配置：`.cursor/mcp.json`）
+- CLI permissions（`.cursor/cli.json` -- for reference, not converted；仅供参考，不转换）
+- Config file locations（project-level vs global；project-level 与 global）
 
-**Update `README.md`**
+**更新 `README.md`**
 
-Add `cursor` to the supported targets in the CLI usage section.
+在 CLI usage section 中把 `cursor` 加入 supported targets。
 
-## What We're NOT Doing
+## 不做什么
 
-- Not converting hooks (Cursor has no hook system -- warn and skip)
-- Not generating `.cursor/cli.json` permissions (user-specific, not plugin-scoped)
-- Not creating `AGENTS.md` (Cursor reads it natively, but not part of plugin conversion)
-- Not using `globs` field intelligently (would require analyzing agent content to guess file patterns)
-- Not adding sync support (follow-up task)
-- Not transforming content inside copied SKILL.md files (known limitation -- skills may reference `.claude/` paths internally)
-- Not clearing old output before writing (matches existing target behavior -- re-runs accumulate)
+- 不转换 hooks（Cursor 没有 hook system -- warn and skip）
+- 不生成 `.cursor/cli.json` permissions（user-specific, not plugin-scoped）
+- 不创建 `AGENTS.md`（Cursor 会 natively read it，但它不属于 plugin conversion）
+- 不智能使用 `globs` field（需要分析 agent content 来猜 file patterns）
+- 不添加 sync support（follow-up task）
+- 不转换 copied SKILL.md files 内部的内容（known limitation -- skills 可能在内部引用 `.claude/` paths）
+- 不在写入前清理 old output（matches existing target behavior -- re-runs accumulate）
 
-## Complexity Assessment
+## 复杂度评估
 
-This is a **medium change**. The converter architecture is well-established with three existing targets, so this is mostly pattern-following. The key novelties are:
+这是一个 **medium change**。converter architecture 已经有三个现有 targets，因此主要是 follow pattern。关键新点是：
 
-1. The `.mdc` frontmatter format (different from all other targets)
-2. Agents map to "rules" rather than a direct equivalent
-3. Commands are plain markdown (no frontmatter) unlike other targets
-4. Name deduplication needed for flattened command namespaces
+1. `.mdc` frontmatter format（不同于其他 targets）
+2. Agents 映射为 "rules"，而不是 direct equivalent
+3. Commands 是 plain markdown（no frontmatter），不同于其他 targets
+4. flattened command namespaces 需要 name deduplication
 
-Skills being identical across platforms simplifies things significantly. MCP config is nearly 1:1.
+Skills 在各平台格式相同，显著简化工作。MCP config 基本是 1:1。
 
-## References
+## 参考资料
 
-- Cursor Rules: `.cursor/rules/*.mdc` with `description`, `globs`, `alwaysApply` frontmatter
-- Cursor Commands: `.cursor/commands/*.md` (plain markdown, no frontmatter)
-- Cursor Skills: `.cursor/skills/*/SKILL.md` (open standard, identical to Claude Code)
-- Cursor MCP: `.cursor/mcp.json` with `mcpServers` key
-- Cursor CLI: `cursor-agent` command (launched August 2025)
-- Existing codex converter: `src/converters/claude-to-codex.ts` (has `uniqueName()` deduplication pattern)
-- Existing droid writer: `src/targets/droid.ts` (has double-nesting guard pattern)
-- Existing codex plan: `docs/plans/2026-02-08-feat-convert-local-md-settings-for-opencode-codex-plan.md`
-- Target provider checklist: `AGENTS.md` section "Adding a New Target Provider"
+- Cursor Rules：带 `description`, `globs`, `alwaysApply` frontmatter 的 `.cursor/rules/*.mdc`
+- Cursor Commands：`.cursor/commands/*.md`（plain markdown, no frontmatter；纯 markdown，无 frontmatter）
+- Cursor Skills：`.cursor/skills/*/SKILL.md`（open standard, identical to Claude Code；开放标准，与 Claude Code 相同）
+- Cursor MCP：带 `mcpServers` key 的 `.cursor/mcp.json`
+- Cursor CLI：`cursor-agent` command（launched August 2025；2025 年 8 月发布）
+- 现有 codex converter：`src/converters/claude-to-codex.ts`（包含 `uniqueName()` deduplication pattern）
+- 现有 droid writer：`src/targets/droid.ts`（包含 double-nesting guard pattern）
+- 现有 codex plan：`docs/plans/2026-02-08-feat-convert-local-md-settings-for-opencode-codex-plan.md`
+- Target provider checklist：`AGENTS.md` section "Adding a New Target Provider"（新增 Target Provider 的 checklist）

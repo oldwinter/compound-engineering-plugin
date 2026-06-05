@@ -1,66 +1,66 @@
 ---
 name: ce-report-bug
-description: Report a bug in the compound-engineering plugin
-argument-hint: "[optional: brief description of the bug]"
+description: 报告 compound-engineering plugin 中的 bug
+argument-hint: "[可选：bug 的简短描述]"
 disable-model-invocation: true
 ---
 
-# Report a Compound Engineering Plugin Bug
+# 报告 Compound Engineering Plugin Bug
 
-Report bugs encountered while using the compound-engineering plugin. This skill gathers structured information and creates a GitHub issue for the maintainer.
+报告使用 compound-engineering plugin 时遇到的 bugs。此 skill 收集 structured information，并为 maintainer 创建 GitHub issue。
 
-## Step 1: Gather Bug Information
+## Step 1：收集 Bug Information
 
-Ask the user the following questions using the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question:
+使用平台 blocking question tool 向用户询问以下问题：Claude Code 中用 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 搭配 `select:AskUserQuestion`）、Codex 中用 `request_user_input`、Gemini 中用 `ask_user`、Pi 中用 `ask_user`（需要 `pi-ask-user` extension）。只有 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中的 numbered options；不要因为需要 schema load 就 fallback。绝不要 silently skip 该问题：
 
-**Question 1: Bug Category**
-- What type of issue are you experiencing?
-- Options: Agent not working, Command not working, Skill not working, MCP server issue, Installation problem, Other
+**Question 1：Bug Category（bug 类别）**
+- 你遇到的是什么类型 issue？
+- Options（选项）：Agent not working（Agent 不工作）、Command not working（Command 不工作）、Skill not working（Skill 不工作）、MCP server issue（MCP server 问题）、Installation problem（安装问题）、Other（其他）
 
-**Question 2: Specific Component**
-- Which specific component is affected?
-- Ask for the name of the agent, command, skill, or MCP server
+**Question 2：Specific Component（具体组件）**
+- 哪个 specific component 受到影响？
+- 询问 agent、command、skill 或 MCP server 的名称
 
-**Question 3: What Happened (Actual Behavior)**
-- Ask: "What happened when you used this component?"
-- Get a clear description of the actual behavior
+**Question 3：What Happened（实际行为）**
+- Ask（询问）: "What happened when you used this component?"
+- 获取 actual behavior 的清晰描述
 
-**Question 4: What Should Have Happened (Expected Behavior)**
-- Ask: "What did you expect to happen instead?"
-- Get a clear description of expected behavior
+**Question 4：What Should Have Happened（预期行为）**
+- Ask（询问）: "What did you expect to happen instead?"
+- 获取 expected behavior 的清晰描述
 
-**Question 5: Steps to Reproduce**
-- Ask: "What steps did you take before the bug occurred?"
-- Get reproduction steps
+**Question 5：Steps to Reproduce（复现步骤）**
+- Ask（询问）: "What steps did you take before the bug occurred?"
+- 获取 reproduction steps
 
-**Question 6: Error Messages**
-- Ask: "Did you see any error messages? If so, please share them."
-- Capture any error output
+**Question 6：Error Messages（错误信息）**
+- Ask（询问）: "Did you see any error messages? If so, please share them."
+- Capture 任何 error output
 
-## Step 2: Collect Environment Information
+## Step 2: 收集 Environment Information（环境信息）
 
-Automatically gather environment details. Detect the coding agent platform and collect what is available:
+自动收集 environment details。检测 coding agent platform，并收集可用信息：
 
-**OS info (all platforms):**
+**OS info（OS 信息，all platforms）：**
 ```bash
 uname -a
 ```
 
-**Plugin version:** Read the plugin manifest or installed plugin metadata. Common locations:
-- Claude Code: `~/.claude/plugins/installed_plugins.json`
-- Codex: `.codex/plugins/` or project config
-- Other platforms: check the platform's plugin registry
+**Plugin version（Plugin 版本）:** 读取 plugin manifest 或 installed plugin metadata。常见位置：
+- Claude Code：`~/.claude/plugins/installed_plugins.json`
+- Codex：`.codex/plugins/` 或 project config
+- Other platforms（其他平台）：检查该平台的 plugin registry
 
-**Agent CLI version:** Run the platform's version command:
-- Claude Code: `claude --version`
-- Codex: `codex --version`
-- Other platforms: use the appropriate CLI version flag
+**Agent CLI version（Agent CLI 版本）:** 运行平台 version command：
+- Claude Code：`claude --version`
+- Codex：`codex --version`
+- Other platforms（其他平台）：使用合适的 CLI version flag
 
-If any of these fail, note "unknown" and continue — do not block the report.
+如果其中任何一步失败，记录 "unknown" 并继续；不要 block report。
 
-## Step 3: Format the Bug Report
+## Step 3: 格式化 Bug Report（bug 报告）
 
-Create a well-structured bug report with:
+创建结构清晰的 bug report：
 
 ```markdown
 ## Bug Description
@@ -101,9 +101,9 @@ Create a well-structured bug report with:
 *Reported via `/ce-report-bug` skill*
 ```
 
-## Step 4: Create GitHub Issue
+## Step 4: 创建 GitHub Issue（GitHub issue）
 
-Use the GitHub CLI to create the issue:
+使用 GitHub CLI 创建 issue：
 
 ```bash
 gh issue create \
@@ -113,7 +113,7 @@ gh issue create \
   --label "bug,compound-engineering"
 ```
 
-**Note:** If labels don't exist, create without labels:
+**Note（注意）:** 如果 labels 不存在，不带 labels 创建：
 ```bash
 gh issue create \
   --repo EveryInc/compound-engineering-plugin \
@@ -121,14 +121,14 @@ gh issue create \
   --body "[Formatted bug report]"
 ```
 
-## Step 5: Confirm Submission
+## Step 5: 确认提交
 
-After the issue is created:
-1. Display the issue URL to the user
-2. Thank them for reporting the bug
-3. Let them know the maintainer (Kieran Klaassen) will be notified
+Issue 创建后：
+1. 向用户展示 issue URL
+2. 感谢他们 reporting bug（报告 bug）
+3. 告诉他们 maintainer（Kieran Klaassen）会收到通知
 
-## Output Format
+## Output Format（输出格式）
 
 ```
 Bug report submitted successfully!
@@ -140,18 +140,18 @@ Thank you for helping improve the compound-engineering plugin!
 The maintainer will review your report and respond as soon as possible.
 ```
 
-## Error Handling
+## Error Handling（错误处理）
 
-- If `gh` CLI is not installed or not authenticated: prompt the user to install/authenticate first
-- If issue creation fails: display the formatted report so the user can manually create the issue
-- If required information is missing: re-prompt for that specific field
+- 如果 `gh` CLI 未安装或未认证：提示用户先 install/authenticate（安装或认证）
+- 如果 issue creation 失败：展示 formatted report，让用户可以手动创建 issue
+- 如果 required information 缺失：针对该 specific field 重新 prompt
 
-## Privacy Notice
+## Privacy Notice（隐私说明）
 
-This skill does NOT collect:
-- Personal information
-- API keys or credentials
-- Private code from projects
-- File paths beyond basic OS info
+此 skill **不** 收集：
+- Personal information（个人信息）
+- API keys 或 credentials
+- Projects 中的 private code
+- 除 basic OS info 外的 file paths
 
-Only technical information about the bug is included in the report.
+Report 中只包含关于 bug 的 technical information（技术信息）。

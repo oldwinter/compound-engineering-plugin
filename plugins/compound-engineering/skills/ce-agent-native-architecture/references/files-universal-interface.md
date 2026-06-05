@@ -1,43 +1,43 @@
 <overview>
-Files are the universal interface for agent-native applications. Agents are naturally fluent with file operations—they already know how to read, write, and organize files. This document covers why files work so well, how to organize them, and the context.md pattern for accumulated knowledge.
+Files 是 agent-native applications 的 universal interface。Agents 天然熟悉 file operations：它们已经知道如何 read、write 和 organize files。本文说明 files 为什么如此有效、如何组织它们，以及用于 accumulated knowledge 的 context.md pattern。
 </overview>
 
 <why_files>
-## Why Files
+## 为什么是 Files
 
-Agents are naturally good at files. Claude Code works because bash + filesystem is the most battle-tested agent interface. When building agent-native apps, lean into this.
+Agents 天然擅长处理 files。Claude Code 能工作，是因为 bash + filesystem 是最 battle-tested 的 agent interface。构建 agent-native apps 时，要顺势利用这一点。
 
-### Agents Already Know How
+### Agents Already Know How（Agents 已经知道怎么做）
 
-You don't need to teach the agent your API—it already knows `cat`, `grep`, `mv`, `mkdir`. File operations are the primitives it's most fluent with.
+你不需要教 agent 你的 API；它已经知道 `cat`、`grep`、`mv`、`mkdir`。File operations 是它最熟悉的 primitives。
 
-### Files Are Inspectable
+### Files Are Inspectable（Files 可检查）
 
-Users can see what the agent created, edit it, move it, delete it. No black box. Complete transparency into agent behavior.
+Users 可以看到 agent 创建了什么、编辑它、移动它、删除它。没有 black box。agent behavior 完全透明。
 
-### Files Are Portable
+### Files Are Portable（Files 可携带）
 
-Export is trivial. Backup is trivial. Users own their data. No vendor lock-in, no complex migration paths.
+Export 很简单。Backup 很简单。Users 拥有自己的 data。没有 vendor lock-in，没有复杂 migration paths。
 
-### App State Stays in Sync
+### App State Stays in Sync（App State 保持同步）
 
-On mobile, if you use the file system with iCloud, all devices share the same file system. The agent's work on one device appears on all devices—without you having to build a server.
+在 mobile 上，如果你结合 iCloud 使用 file system，所有 devices 共享同一个 file system。agent 在一台 device 上做的 work 会出现在所有 devices 上；你不必构建 server。
 
-### Directory Structure Is Information Architecture
+### Directory Structure Is Information Architecture（目录结构就是信息架构）
 
-The filesystem gives you hierarchy for free. `/projects/acme/notes/` is self-documenting in a way that `SELECT * FROM notes WHERE project_id = 123` isn't.
+filesystem 免费提供 hierarchy。`/projects/acme/notes/` 有一种 `SELECT * FROM notes WHERE project_id = 123` 没有的 self-documenting 特性。
 </why_files>
 
 <file_organization>
-## File Organization Patterns
+## File Organization Patterns（文件组织 Patterns）
 
-> **Needs validation:** These conventions are one approach that's worked so far, not a prescription. Better solutions should be considered.
+> **Needs validation：** 这些 conventions 是目前有效的一种 approach，不是 prescription。应继续考虑更好的 solutions。
 
-A general principle of agent-native design: **Design for what agents can reason about.** The best proxy for that is what would make sense to a human. If a human can look at your file structure and understand what's going on, an agent probably can too.
+agent-native design 的一个通用原则：**Design for what agents can reason about.** 最好的 proxy 是它对人类是否也说得通。如果 human 看你的 file structure 就能理解发生了什么，agent 大概率也能。
 
-### Entity-Scoped Directories
+### Entity-Scoped Directories（按 Entity 定范围的目录）
 
-Organize files around entities, not actors or file types:
+围绕 entities 组织 files，而不是围绕 actors 或 file types：
 
 ```
 {entity_type}/{entity_id}/
@@ -46,11 +46,11 @@ Organize files around entities, not actors or file types:
 └── related materials
 ```
 
-**Example:** `Research/books/{bookId}/` contains everything about one book—full text, notes, sources, agent logs.
+**Example：** `Research/books/{bookId}/` 包含一本 book 的所有内容：full text、notes、sources、agent logs。
 
-### Naming Conventions
+### Naming Conventions（命名约定）
 
-| File Type | Naming Pattern | Example |
+| File Type（文件类型） | Naming Pattern（命名模式） | Example（示例） |
 |-----------|---------------|---------|
 | Entity data | `{entity}.json` | `library.json`, `status.json` |
 | Human-readable content | `{content_type}.md` | `introduction.md`, `profile.md` |
@@ -61,15 +61,15 @@ Organize files around entities, not actors or file types:
 | Checkpoints | `{sessionId}.checkpoint` | UUID-based |
 | Configuration | `config.json` | Feature settings |
 
-### Directory Naming
+### Directory Naming（目录命名）
 
-- **Entity-scoped:** `{entityType}/{entityId}/` (e.g., `Research/books/{bookId}/`)
-- **Type-scoped:** `{type}/` (e.g., `AgentCheckpoints/`, `AgentLogs/`)
-- **Convention:** Lowercase with underscores, not camelCase
+- **Entity-scoped：** `{entityType}/{entityId}/`（例如 `Research/books/{bookId}/`）
+- **Type-scoped：** `{type}/`（例如 `AgentCheckpoints/`、`AgentLogs/`）
+- **Convention：** lowercase with underscores，不用 camelCase
 
-### Ephemeral vs. Durable Separation
+### Ephemeral vs. Durable Separation（临时与持久分离）
 
-Separate agent working files from user's permanent data:
+将 agent working files 与用户 permanent data 分开：
 
 ```
 Documents/
@@ -81,16 +81,16 @@ Documents/
     └── books/{bookId}/
 ```
 
-### The Split: Markdown vs JSON
+### The Split: Markdown vs JSON（Markdown 与 JSON 的分工）
 
-- **Markdown:** For content users might read or edit
-- **JSON:** For structured data the app queries
+- **Markdown：** 用于 users 可能 read 或 edit 的 content
+- **JSON：** 用于 app queries 的 structured data
 </file_organization>
 
 <context_md_pattern>
-## The context.md Pattern
+## The context.md Pattern（context.md 模式）
 
-A file the agent reads at the start of each session and updates as it learns:
+agent 在每个 session 开始时读取、并随着学习持续更新的文件：
 
 ```markdown
 # Context
@@ -121,56 +121,56 @@ Reading assistant for the Every app.
 - Last sync: 10 minutes ago
 ```
 
-### Benefits
+### Benefits（收益）
 
-- **Agent behavior evolves without code changes** - Update the context, behavior changes
-- **Users can inspect and modify** - Complete transparency
-- **Natural place for accumulated context** - Learnings persist across sessions
-- **Portable across sessions** - Restart agent, knowledge preserved
+- **Agent behavior evolves without code changes** - 更新 context，behavior 就会改变
+- **Users can inspect and modify** - 完全透明
+- **Natural place for accumulated context** - Learnings 跨 sessions 持久化
+- **Portable across sessions** - restart agent 后，knowledge 仍保留
 
-### How It Works
+### How It Works（工作方式）
 
-1. Agent reads `context.md` at session start
-2. Agent updates it when learning something important
-3. System can also update it (recent activity, new resources)
-4. Context persists across sessions
+1. Agent 在 session start 读取 `context.md`
+2. Agent 学到重要内容时更新它
+3. System 也可以更新它（recent activity、new resources）
+4. Context 跨 sessions 持久化
 
-### What to Include
+### What to Include（包含什么）
 
-| Section | Purpose |
+| Section（Section） | Purpose（用途） |
 |---------|---------|
-| Who I Am | Agent identity and role |
-| What I Know About This User | Learned preferences, interests |
-| What Exists | Available resources, data |
-| Recent Activity | Context for continuity |
-| My Guidelines | Learned rules and constraints |
-| Current State | Session status, pending items |
+| Who I Am | Agent identity and role（Agent 身份与角色） |
+| What I Know About This User | Learned preferences, interests（已学习到的偏好与兴趣） |
+| What Exists | Available resources, data（可用资源与 data） |
+| Recent Activity | continuity 所需 context |
+| My Guidelines | Learned rules and constraints（已学习到的规则与 constraints） |
+| Current State | Session status, pending items（Session 状态与 pending items） |
 </context_md_pattern>
 
 <files_vs_database>
-## Files vs. Database
+## Files vs. Database（Files 与 Database）
 
-> **Needs validation:** This framing is informed by mobile development. For web apps, the tradeoffs are different.
+> **Needs validation：** 这个 framing 受 mobile development 启发。对 web apps 来说，tradeoffs 不同。
 
-| Use files for... | Use database for... |
+| Use files for...（适合用 files） | Use database for...（适合用 database） |
 |------------------|---------------------|
-| Content users should read/edit | High-volume structured data |
-| Configuration that benefits from version control | Data that needs complex queries |
-| Agent-generated content | Ephemeral state (sessions, caches) |
-| Anything that benefits from transparency | Data with relationships |
-| Large text content | Data that needs indexing |
+| users 应 read/edit 的 content | High-volume structured data |
+| 受益于 version control 的 configuration | 需要 complex queries 的 data |
+| Agent-generated content | Ephemeral state（sessions、caches） |
+| 任何受益于 transparency 的内容 | 有 relationships 的 data |
+| Large text content | 需要 indexing 的 data |
 
-**The principle:** Files for legibility, databases for structure. When in doubt, files—they're more transparent and users can always inspect them.
+**The principle：** Files 用于 legibility，databases 用于 structure。拿不准时选 files；它们更透明，users 总能 inspect。
 
-### When Files Work Best
+### When Files Work Best（Files 最适合的情况）
 
-- Scale is small (one user's library, not millions of records)
-- Transparency is valued over query speed
-- Cloud sync (iCloud, Dropbox) works well with files
+- Scale 较小（一个 user's library，而不是数百万 records）
+- Transparency 比 query speed 更重要
+- Cloud sync（iCloud、Dropbox）能很好处理 files
 
-### Hybrid Approach
+### Hybrid Approach（混合方案）
 
-Even if you need a database for performance, consider maintaining a file-based "source of truth" that the agent works with, synced to the database for the UI:
+即使你因 performance 需要 database，也可以考虑维护一个 agent 使用的 file-based "source of truth"，并将其 sync 到 database 供 UI 查询：
 
 ```
 Files (agent workspace):
@@ -182,42 +182,42 @@ Database (UI queries):
 </files_vs_database>
 
 <conflict_model>
-## Conflict Model
+## Conflict Model（冲突模型）
 
-If agents and users write to the same files, you need a conflict model.
+如果 agents 和 users 写同一批 files，你需要 conflict model。
 
-### Current Reality
+### Current Reality（当前现实）
 
-Most implementations use **last-write-wins** via atomic writes:
+大多数 implementations 通过 atomic writes 使用 **last-write-wins**：
 
 ```swift
 try data.write(to: url, options: [.atomic])
 ```
 
-This is simple but can lose changes.
+这很简单，但可能丢失 changes。
 
-### Options
+### Options（选项）
 
-| Strategy | Pros | Cons |
+| Strategy（策略） | Pros（优点） | Cons（缺点） |
 |----------|------|------|
 | **Last write wins** | Simple | Changes can be lost |
-| **Agent checks before writing** | Preserves user edits | More complexity |
+| **Agent checks before writing** | 保留 user edits | More complexity |
 | **Separate spaces** | No conflicts | Less collaboration |
 | **Append-only logs** | Never overwrites | Files grow forever |
 | **File locking** | Safe concurrent access | Complexity, can block |
 
-### Recommended Approaches
+### Recommended Approaches（推荐做法）
 
-**For files agents write frequently (logs, status):** Last-write-wins is fine. Conflicts are rare.
+**对 agents 频繁写入的 files（logs、status）：** Last-write-wins 可以接受。Conflicts 很少。
 
-**For files users edit (profiles, notes):** Consider explicit handling:
-- Agent checks modification time before overwriting
-- Or keep agent output separate from user-editable content
-- Or use append-only pattern
+**对 users 会 edit 的 files（profiles、notes）：** 考虑 explicit handling：
+- Agent overwriting 前检查 modification time
+- 或将 agent output 与 user-editable content 分开
+- 或使用 append-only pattern
 
-### iCloud Considerations
+### iCloud Considerations（iCloud 注意事项）
 
-iCloud sync adds complexity. It creates `{filename} (conflict).md` files when sync conflicts occur. Monitor for these:
+iCloud sync 会增加 complexity。发生 sync conflicts 时，它会创建 `{filename} (conflict).md` files。需要 monitor 这些文件：
 
 ```swift
 NotificationCenter.default.addObserver(
@@ -226,9 +226,9 @@ NotificationCenter.default.addObserver(
 )
 ```
 
-### System Prompt Guidance
+### System Prompt Guidance（System Prompt 指导）
 
-Tell the agent about the conflict model:
+在 system prompt 中告诉 agent conflict model：
 
 ```markdown
 ## Working with User Content
@@ -242,7 +242,7 @@ If a file has been modified since you last wrote it, ask before overwriting.
 </conflict_model>
 
 <examples>
-## Example: Reading App File Structure
+## Example：Reading App File Structure（阅读 App 文件结构示例）
 
 ```
 Documents/
@@ -264,38 +264,38 @@ Documents/
 └── context.md                    # Agent's accumulated knowledge
 ```
 
-**How it works:**
+**工作方式：**
 
-1. User adds book → creates entry in `library.json`
-2. Agent downloads text → saves to `Research/books/{id}/full_text.txt`
-3. Agent researches → saves to `sources/`
-4. Agent generates intro → saves to `introduction.md`
-5. User edits intro → agent sees changes on next read
-6. Agent updates `context.md` with learnings
+1. User adds book → 在 `library.json` 创建 entry
+2. Agent downloads text → 保存到 `Research/books/{id}/full_text.txt`
+3. Agent researches → 保存到 `sources/`
+4. Agent generates intro → 保存到 `introduction.md`
+5. User edits intro → agent 下次 read 时看到 changes
+6. Agent 用 learnings 更新 `context.md`
 </examples>
 
 <checklist>
-## Files as Universal Interface Checklist
+## Files as Universal Interface Checklist（Files as Universal Interface 检查清单）
 
-### Organization
-- [ ] Entity-scoped directories (`{type}/{id}/`)
-- [ ] Consistent naming conventions
-- [ ] Ephemeral vs durable separation
-- [ ] Markdown for human content, JSON for structured data
+### Organization（组织方式）
+- [ ] Entity-scoped directories（entity 作用域目录，`{type}/{id}/`）
+- [ ] Consistent naming conventions（一致的命名约定）
+- [ ] Ephemeral vs durable separation（临时内容与持久内容分离）
+- [ ] Markdown 用于 human content，JSON 用于 structured data
 
 ### context.md
-- [ ] Agent reads context at session start
-- [ ] Agent updates context when learning
-- [ ] Includes: identity, user knowledge, what exists, guidelines
-- [ ] Persists across sessions
+- [ ] Agent 在 session start 读取 context
+- [ ] Agent 学习时更新 context
+- [ ] 包含：identity、user knowledge、what exists、guidelines
+- [ ] 跨 sessions 持久化
 
-### Conflict Handling
-- [ ] Conflict model defined (last-write-wins, check-before-write, etc.)
-- [ ] Agent guidance in system prompt
-- [ ] iCloud conflict monitoring (if applicable)
+### Conflict Handling（冲突处理）
+- [ ] 已定义 conflict model（last-write-wins、check-before-write 等）
+- [ ] system prompt 中有 agent guidance
+- [ ] iCloud conflict monitoring（如适用）
 
-### Integration
-- [ ] UI observes file changes (or shared service)
-- [ ] Agent can read user edits
-- [ ] User can inspect agent output
+### Integration（集成）
+- [ ] UI observes file changes（或 shared service）
+- [ ] Agent 可以 read user edits
+- [ ] User 可以 inspect agent output
 </checklist>

@@ -1,5 +1,5 @@
 ---
-title: Windsurf Global Scope Support
+title: Windsurf Global Scope Support（全局 scope 支持）
 type: feat
 status: completed
 date: 2026-02-25
@@ -7,19 +7,19 @@ deepened: 2026-02-25
 prior: docs/plans/2026-02-23-feat-add-windsurf-target-provider-plan.md (removed — superseded)
 ---
 
-# Windsurf Global Scope Support
+# Windsurf Global Scope Support（Windsurf global scope 支持）
 
-## Post-Implementation Revisions (2026-02-26)
+## 实现后修订（2026-02-26）
 
-After auditing the implementation against `docs/specs/windsurf.md`, two significant changes were made:
+根据 `docs/specs/windsurf.md` audit implementation 后，做了两个重要变更：
 
-1. **Agents → Skills (not Workflows)**: Claude agents map to Windsurf Skills (`skills/{name}/SKILL.md`), not Workflows. Skills are "complex multi-step tasks with supporting resources" — a better conceptual match for specialized expertise/personas. Workflows are "reusable step-by-step procedures" — a better match for Claude Commands (slash commands).
+1. **Agents → Skills（not Workflows）**：Claude agents 映射到 Windsurf Skills（`skills/{name}/SKILL.md`），不是 Workflows。Skills 是 "complex multi-step tasks with supporting resources"，更适合作为 specialized expertise/personas 的概念映射。Workflows 是 "reusable step-by-step procedures"，更适合 Claude Commands（slash commands）。
 
-2. **Workflows are flat files**: Command workflows are written to `global_workflows/{name}.md` (global scope) or `workflows/{name}.md` (workspace scope). No subdirectories — the spec requires flat files.
+2. **Workflows are flat files**：Command workflows 写入 `global_workflows/{name}.md`（global scope）或 `workflows/{name}.md`（workspace scope）。不使用 subdirectories；spec 要求 flat files。
 
-3. **Content transforms updated**: `@agent-name` references are kept as-is (Windsurf skill invocation syntax). `/command` references produce `/{name}` (not `/commands/{name}`). `Task agent(args)` produces `Use the @agent-name skill: args`.
+3. **Content transforms updated**：`@agent-name` references 保持原样（Windsurf skill invocation syntax）。`/command` references 产出 `/{name}`（不是 `/commands/{name}`）。`Task agent(args)` 产出 `Use the @agent-name skill: args`。
 
-### Final Component Mapping (per spec)
+### 最终组件映射（per spec）
 
 | Claude Code | Windsurf | Output Path | Invocation |
 |---|---|---|---|
@@ -30,69 +30,69 @@ After auditing the implementation against `docs/specs/windsurf.md`, two signific
 | Hooks | Skipped with warning | N/A | N/A |
 | CLAUDE.md | Skipped | N/A | N/A |
 
-### Files Changed in Revision
+### 修订中变更的文件
 
-- `src/types/windsurf.ts` — `agentWorkflows` → `agentSkills: WindsurfGeneratedSkill[]`
-- `src/converters/claude-to-windsurf.ts` — `convertAgentToSkill()`, updated content transforms
-- `src/targets/windsurf.ts` — Skills written as `skills/{name}/SKILL.md`, flat workflows
-- Tests updated to match
-
----
-
-## Enhancement Summary
-
-**Deepened on:** 2026-02-25
-**Research agents used:** architecture-strategist, kieran-typescript-reviewer, security-sentinel, code-simplicity-reviewer, pattern-recognition-specialist
-**External research:** Windsurf MCP docs, Windsurf tutorial docs
-
-### Key Improvements from Deepening
-1. **HTTP/SSE servers should be INCLUDED** — Windsurf supports all 3 transport types (stdio, Streamable HTTP, SSE). Original plan incorrectly skipped them.
-2. **File permissions: use `0o600`** — `mcp_config.json` contains secrets and must not be world-readable. Add secure write support.
-3. **Extract `resolveTargetOutputRoot` to shared utility** — both commands duplicate this; adding scope makes it worse. Extract first.
-4. **Bug fix: missing `result[name] = entry`** — all 5 review agents caught a copy-paste bug in the `buildMcpConfig` sample code.
-5. **`hasPotentialSecrets` to shared utility** — currently in sync.ts, would be duplicated. Extract to `src/utils/secrets.ts`.
-6. **Windsurf `mcp_config.json` is global-only** — per Windsurf docs, no per-project MCP config support. Workspace scope writes it for forward-compatibility but emit a warning.
-7. **Windsurf supports `${env:VAR}` interpolation** — consider writing env var references instead of literal values for secrets.
-
-### New Considerations Discovered
-- Backup files accumulate with secrets and are never cleaned up — cap at 3 backups
-- Workspace `mcp_config.json` could be committed to git — warn about `.gitignore`
-- `WindsurfMcpServerEntry` type needs `serverUrl` field for HTTP/SSE servers
-- Simplicity reviewer recommends handling scope as windsurf-specific in CLI rather than generic `TargetHandler` fields — but brainstorm explicitly chose "generic with windsurf as first adopter". **Decision: keep generic approach** per user's brainstorm decision, with JSDoc documenting the relationship between `defaultScope` and `supportedScopes`.
+- `src/types/windsurf.ts`：`agentWorkflows` → `agentSkills: WindsurfGeneratedSkill[]`
+- `src/converters/claude-to-windsurf.ts`：`convertAgentToSkill()`、updated content transforms
+- `src/targets/windsurf.ts`：Skills 写为 `skills/{name}/SKILL.md`，workflows 为 flat
+- Tests 已更新以匹配
 
 ---
 
-## Overview
+## 增强摘要
 
-Add a generic `--scope global|workspace` flag to the converter CLI with Windsurf as the first adopter. Global scope writes to `~/.codeium/windsurf/`, making workflows, skills, and MCP servers available across all projects. This also upgrades MCP handling from a human-readable setup doc (`mcp-setup.md`) to a proper machine-readable config (`mcp_config.json`), and removes AGENTS.md generation (the plugin's CLAUDE.md contains development-internal instructions, not user-facing content).
+**Deepened on（深化日期）：** 2026-02-25
+**Research agents used（使用的 research agents）：** architecture-strategist、kieran-typescript-reviewer、security-sentinel、code-simplicity-reviewer、pattern-recognition-specialist
+**External research（外部调研）：** Windsurf MCP docs、Windsurf tutorial docs
 
-## Problem Statement / Motivation
+### Deepening 带来的关键改进
+1. **HTTP/SSE servers should be INCLUDED**：Windsurf 支持全部 3 种 transport types（stdio、Streamable HTTP、SSE）。原 plan 错误地跳过它们。
+2. **File permissions: use `0o600`**：`mcp_config.json` 包含 secrets，不能 world-readable。增加 secure write support。
+3. **Extract `resolveTargetOutputRoot` to shared utility**：两个 commands 都重复这段逻辑；新增 scope 会让重复更糟。先抽取。
+4. **Bug fix: missing `result[name] = entry`**：全部 5 个 review agents 都发现了 `buildMcpConfig` sample code 中的 copy-paste bug。
+5. **`hasPotentialSecrets` to shared utility**：当前在 sync.ts 中，会被重复。抽取到 `src/utils/secrets.ts`。
+6. **Windsurf `mcp_config.json` is global-only**：按 Windsurf docs，没有 per-project MCP config support。Workspace scope 为 forward-compatibility 写入它，但 emit warning。
+7. **Windsurf supports `${env:VAR}` interpolation**：可考虑为 secrets 写入 env var references，而不是 literal values。
 
-The current Windsurf converter (v0.10.0) writes everything to project-level `.windsurf/`, requiring re-installation per project. Windsurf supports global paths for skills (`~/.codeium/windsurf/skills/`) and MCP config (`~/.codeium/windsurf/mcp_config.json`). Users should install once and get capabilities everywhere.
+### 新发现的考虑事项
+- Backup files 会带着 secrets 累积且永不 cleanup：cap at 3 backups
+- Workspace `mcp_config.json` 可能被 commit 到 git：提示 `.gitignore`
+- `WindsurfMcpServerEntry` type 需要 `serverUrl` field 以支持 HTTP/SSE servers
+- Simplicity reviewer 建议将 scope 作为 windsurf-specific CLI 处理，而不是 generic `TargetHandler` fields；但 brainstorm 明确选择 "generic with windsurf as first adopter"。**Decision: keep generic approach**，并用 JSDoc 记录 `defaultScope` 与 `supportedScopes` 的关系。
 
-Additionally, the v0.10.0 MCP output was a markdown setup guide — not an actual integration. Windsurf reads `mcp_config.json` directly, so we should write to that file.
+---
 
-## Breaking Changes from v0.10.0
+## 概览
 
-This is a **minor version bump** (v0.11.0) with intentional breaking changes to the experimental Windsurf target:
+向 converter CLI 添加 generic `--scope global|workspace` flag，并以 Windsurf 作为第一个 adopter。Global scope 写入 `~/.codeium/windsurf/`，让 workflows、skills 和 MCP servers 在所有 projects 中可用。同时，将 MCP handling 从 human-readable setup doc（`mcp-setup.md`）升级为 proper machine-readable config（`mcp_config.json`），并移除 AGENTS.md generation（plugin 的 CLAUDE.md 包含 development-internal instructions，不是 user-facing content）。
 
-1. **Default output location changed** — `--to windsurf` now defaults to global scope (`~/.codeium/windsurf/`). Use `--scope workspace` for the old behavior.
-2. **AGENTS.md no longer generated** — old files are left in place (not deleted).
-3. **`mcp-setup.md` replaced by `mcp_config.json`** — proper machine-readable integration. Old files left in place.
-4. **Env var secrets included with warning** — previously redacted, now included (required for the config file to work).
-5. **`--output` semantics changed** — `--output` now specifies the direct target directory (not a parent where `.windsurf/` is created).
+## 问题陈述 / 动机
 
-## Proposed Solution
+当前 Windsurf converter（v0.10.0）将所有内容写到 project-level `.windsurf/`，要求每个 project 重新 install。Windsurf 支持 skills（`~/.codeium/windsurf/skills/`）和 MCP config（`~/.codeium/windsurf/mcp_config.json`）的 global paths。Users 应该 install 一次，就在所有地方获得 capabilities。
 
-### Phase 0: Extract Shared Utilities (prerequisite)
+此外，v0.10.0 MCP output 是 markdown setup guide，不是真正 integration。Windsurf 直接读取 `mcp_config.json`，因此我们应写入该 file。
 
-**Files:** `src/utils/resolve-output.ts` (new), `src/utils/secrets.ts` (new)
+## 相对 v0.10.0 的 Breaking Changes
 
-#### 0a. Extract `resolveTargetOutputRoot` to shared utility
+这是一次 **minor version bump**（v0.11.0），包含对 experimental Windsurf target 的 intentional breaking changes：
 
-Both `install.ts` and `convert.ts` have near-identical `resolveTargetOutputRoot` functions that are already diverging (`hasExplicitOutput` exists in install.ts but not convert.ts). Adding scope would make the duplication worse.
+1. **Default output location changed**：`--to windsurf` 现在默认 global scope（`~/.codeium/windsurf/`）。旧行为使用 `--scope workspace`。
+2. **AGENTS.md no longer generated**：old files 保留原地（不删除）。
+3. **`mcp-setup.md` replaced by `mcp_config.json`**：proper machine-readable integration。Old files 保留原地。
+4. **Env var secrets included with warning**：之前 redacted，现在 included（config file 要工作必须这样）。
+5. **`--output` semantics changed**：`--output` 现在指定 direct target directory（不是创建 `.windsurf/` 的 parent）。
 
-- [x] Create `src/utils/resolve-output.ts` with a unified function:
+## 方案提议
+
+### 阶段 0：抽取 Shared Utilities（前置）
+
+**文件：** `src/utils/resolve-output.ts`（new）, `src/utils/secrets.ts`（new）
+
+#### 0a. 将 `resolveTargetOutputRoot` 抽取为 shared utility
+
+`install.ts` 和 `convert.ts` 都有几乎相同的 `resolveTargetOutputRoot` functions，且已经开始 divergence（`hasExplicitOutput` 存在于 install.ts，但 convert.ts 中没有）。新增 scope 会让重复更糟。
+
+- [x] 创建 `src/utils/resolve-output.ts`，包含 unified function：
 
 ```typescript
 import os from "os"
@@ -136,21 +136,21 @@ export function resolveTargetOutputRoot(options: {
 }
 ```
 
-- [x] Update `install.ts` to import and call `resolveTargetOutputRoot` from shared utility
-- [x] Update `convert.ts` to import and call `resolveTargetOutputRoot` from shared utility
-- [x] Add `hasExplicitOutput` tracking to `convert.ts` (currently missing)
+- [x] 更新 `install.ts`，import 并调用 shared utility 中的 `resolveTargetOutputRoot`
+- [x] 更新 `convert.ts`，import 并调用 shared utility 中的 `resolveTargetOutputRoot`
+- [x] 向 `convert.ts` 添加 `hasExplicitOutput` tracking（当前缺失）
 
-### Research Insights (Phase 0)
+### Research Insights（阶段 0）
 
-**Architecture review:** Both commands will call the same function with the same signature. This eliminates the divergence and ensures scope resolution has a single source of truth. The `--also` loop in both commands also uses this function with `handler.defaultScope`.
+**Architecture review：** 两个 commands 将以同一 signature 调用同一 function。这消除 divergence，并确保 scope resolution 拥有 single source of truth。两个 commands 中的 `--also` loop 也会使用这个 function，并传入 `handler.defaultScope`。
 
-**Pattern review:** This follows the same extraction pattern as `resolveTargetHome` in `src/utils/resolve-home.ts`.
+**Pattern review：** 这遵循与 `src/utils/resolve-home.ts` 中 `resolveTargetHome` 相同的 extraction pattern。
 
-#### 0b. Extract `hasPotentialSecrets` to shared utility
+#### 0b. 将 `hasPotentialSecrets` 抽取为 shared utility
 
-Currently in `sync.ts:20-31`. The same regex pattern also appears in `claude-to-windsurf.ts:223` as `redactEnvValue`. Extract to avoid a third copy.
+当前位于 `sync.ts:20-31`。相同 regex pattern 也以 `redactEnvValue` 形式出现在 `claude-to-windsurf.ts:223`。抽取以避免第三份 copy。
 
-- [x] Create `src/utils/secrets.ts`:
+- [x] 创建 `src/utils/secrets.ts`：
 
 ```typescript
 const SENSITIVE_PATTERN = /key|token|secret|password|credential|api_key/i
@@ -169,14 +169,14 @@ export function hasPotentialSecrets(
 }
 ```
 
-- [x] Update `sync.ts` to import from shared utility
-- [x] Use in new windsurf converter
+- [x] 更新 `sync.ts`，从 shared utility import
+- [x] 在新的 windsurf converter 中使用
 
-### Phase 1: Types and TargetHandler
+### 阶段 1：Types and TargetHandler
 
-**Files:** `src/types/windsurf.ts`, `src/targets/index.ts`
+**文件：** `src/types/windsurf.ts`, `src/targets/index.ts`
 
-#### 1a. Update WindsurfBundle type
+#### 1a. 更新 WindsurfBundle type
 
 ```typescript
 // src/types/windsurf.ts
@@ -200,17 +200,17 @@ export type WindsurfBundle = {
 }
 ```
 
-- [x] Remove `agentsMd: string | null`
-- [x] Replace `mcpSetupDoc: string | null` with `mcpConfig: WindsurfMcpConfig | null`
-- [x] Add `WindsurfMcpServerEntry` (supports both stdio and HTTP/SSE) and `WindsurfMcpConfig` types
+- [x] 移除 `agentsMd: string | null`
+- [x] 用 `mcpConfig: WindsurfMcpConfig | null` 替换 `mcpSetupDoc: string | null`
+- [x] 添加 `WindsurfMcpServerEntry`（同时支持 stdio 和 HTTP/SSE）以及 `WindsurfMcpConfig` types
 
-### Research Insights (Phase 1a)
+### Research Insights（阶段 1a）
 
-**Windsurf docs confirm** three transport types: stdio (`command` + `args`), Streamable HTTP (`serverUrl`), and SSE (`serverUrl` or `url`). The `WindsurfMcpServerEntry` type must support all three — making `command` optional and adding `serverUrl` and `headers` fields.
+**Windsurf docs confirm：** 三种 transport types：stdio（`command` + `args`）、Streamable HTTP（`serverUrl`）和 SSE（`serverUrl` 或 `url`）。`WindsurfMcpServerEntry` type 必须支持全部三种，因此 `command` optional，并增加 `serverUrl` 和 `headers` fields。
 
-**TypeScript reviewer:** Consider making `WindsurfMcpServerEntry` a discriminated union if strict typing is desired. However, since this mirrors JSON config structure, a flat type with optional fields is pragmatically simpler.
+**TypeScript reviewer：** 如果想要 strict typing，可考虑将 `WindsurfMcpServerEntry` 做成 discriminated union。但由于它镜像 JSON config structure，带 optional fields 的 flat type 更 pragmatically simpler。
 
-#### 1b. Add TargetScope to TargetHandler
+#### 1b. 向 TargetHandler 添加 TargetScope
 
 ```typescript
 // src/targets/index.ts
@@ -232,36 +232,36 @@ export type TargetHandler<TBundle = unknown> = {
 }
 ```
 
-- [x] Add `TargetScope` type export
-- [x] Add `defaultScope?` and `supportedScopes?` to `TargetHandler` with JSDoc
-- [x] Set windsurf target: `defaultScope: "global"`, `supportedScopes: ["global", "workspace"]`
-- [x] No changes to other targets (they have no scope fields, flag is ignored)
+- [x] 添加 `TargetScope` type export
+- [x] 向 `TargetHandler` 添加带 JSDoc 的 `defaultScope?` 和 `supportedScopes?`
+- [x] 设置 windsurf target：`defaultScope: "global"`、`supportedScopes: ["global", "workspace"]`
+- [x] 其他 targets 不改（它们没有 scope fields，flag ignored）
 
-### Research Insights (Phase 1b)
+### Research Insights（阶段 1b）
 
-**Simplicity review:** Argued this is premature generalization (only 1 of 8 targets uses scopes). Recommended handling scope as windsurf-specific with `if (targetName !== "windsurf")` guard instead. **Decision: keep generic approach** per brainstorm decision "Generic with windsurf as first adopter", but add JSDoc documenting the invariant.
+**Simplicity review：** 认为这是 premature generalization（8 个 targets 中只有 1 个使用 scopes）。建议以 windsurf-specific 方式处理 scope，并用 `if (targetName !== "windsurf")` guard。**Decision: keep generic approach**，遵循 brainstorm decision "Generic with windsurf as first adopter"，但用 JSDoc 记录 invariant。
 
-**TypeScript review:** Suggested a `ScopeConfig` grouped object to prevent `defaultScope` without `supportedScopes`. The JSDoc approach is simpler and sufficient for now.
+**TypeScript review：** 建议用 grouped object `ScopeConfig` 防止出现 `defaultScope` without `supportedScopes`。JSDoc approach 更简单，目前足够。
 
-**Architecture review:** Adding optional fields to `TargetHandler` follows Open/Closed Principle — existing targets are unaffected. Clean extension.
+**Architecture review：** 向 `TargetHandler` 添加 optional fields 遵循 Open/Closed Principle：existing targets 不受影响。Clean extension。
 
-### Phase 2: Converter Changes
+### 阶段 2：Converter Changes
 
-**Files:** `src/converters/claude-to-windsurf.ts`
+**文件：** `src/converters/claude-to-windsurf.ts`
 
-#### 2a. Remove AGENTS.md generation
+#### 2a. 移除 AGENTS.md generation
 
-- [x] Remove `buildAgentsMd()` function
-- [x] Remove `agentsMd` from return value
+- [x] 移除 `buildAgentsMd()` function
+- [x] 从 return value 移除 `agentsMd`
 
-#### 2b. Replace MCP setup doc with MCP config
+#### 2b. 用 MCP config 替换 MCP setup doc
 
-- [x] Remove `buildMcpSetupDoc()` function
-- [x] Remove `redactEnvValue()` helper
-- [x] Add `buildMcpConfig()` that returns `WindsurfMcpConfig | null`
-- [x] Include **all** env vars (including secrets) — no redaction
-- [x] Use shared `hasPotentialSecrets()` from `src/utils/secrets.ts`
-- [x] Include **both** stdio and HTTP/SSE servers (Windsurf supports all transport types)
+- [x] 移除 `buildMcpSetupDoc()` function
+- [x] 移除 `redactEnvValue()` helper
+- [x] 添加 `buildMcpConfig()`，返回 `WindsurfMcpConfig | null`
+- [x] 包含 **all** env vars（包括 secrets）：不 redact
+- [x] 使用 `src/utils/secrets.ts` 中 shared `hasPotentialSecrets()`
+- [x] 包含 **both** stdio 和 HTTP/SSE servers（Windsurf 支持全部 transport types）
 
 ```typescript
 function buildMcpConfig(
@@ -303,13 +303,13 @@ function buildMcpConfig(
 }
 ```
 
-### Research Insights (Phase 2)
+### Research Insights（阶段 2）
 
-**Windsurf docs (critical correction):** Windsurf supports **stdio, Streamable HTTP, and SSE** transports in `mcp_config.json`. HTTP/SSE servers use `serverUrl` (not `url`). The original plan incorrectly planned to skip HTTP/SSE servers. This is now corrected — all transport types are included.
+**Windsurf docs（critical correction）：** Windsurf 在 `mcp_config.json` 中支持 **stdio、Streamable HTTP 和 SSE** transports。HTTP/SSE servers 使用 `serverUrl`（不是 `url`）。原 plan 错误地计划跳过 HTTP/SSE servers。现在已修正：包含所有 transport types。
 
-**All 5 review agents flagged:** The original code sample was missing `result[name] = entry` — the entry was built but never stored. Fixed above.
+**All 5 review agents flagged：** 原始 code sample 缺少 `result[name] = entry`：entry 被 build 但从未存入。上方已修复。
 
-**Security review:** The warning message should enumerate which specific env var names triggered detection. Enhanced version:
+**Security review：** Warning message 应列出触发检测的具体 env var names。增强版：
 
 ```typescript
 if (hasPotentialSecrets(result)) {
@@ -323,37 +323,37 @@ if (hasPotentialSecrets(result)) {
 }
 ```
 
-**Windsurf env var interpolation:** Windsurf supports `${env:VARIABLE_NAME}` syntax in `mcp_config.json`. Future enhancement: write env var references instead of literal values for secrets. Out of scope for v0.11.0 (requires more research on which fields support interpolation).
+**Windsurf env var interpolation：** Windsurf 支持 `mcp_config.json` 中的 `${env:VARIABLE_NAME}` syntax。Future enhancement：为 secrets 写入 env var references，而不是 literal values。v0.11.0 out of scope（需要进一步研究哪些 fields 支持 interpolation）。
 
-### Phase 3: Writer Changes
+### 阶段 3：Writer Changes
 
-**Files:** `src/targets/windsurf.ts`, `src/utils/files.ts`
+**文件：** `src/targets/windsurf.ts`, `src/utils/files.ts`
 
-#### 3a. Simplify writer — remove AGENTS.md and double-nesting guard
+#### 3a. 简化 writer — 移除 AGENTS.md 和 double-nesting guard
 
-The writer always writes directly into `outputRoot`. The CLI resolves the correct output root based on scope.
+Writer 始终直接写入 `outputRoot`。CLI 根据 scope resolve 正确 output root。
 
-- [x] Remove AGENTS.md writing block (lines 10-17)
-- [x] Remove `resolveWindsurfPaths()` — no longer needed
-- [x] Write workflows, skills, and MCP config directly into `outputRoot`
+- [x] 移除 AGENTS.md writing block（lines 10-17）
+- [x] 移除 `resolveWindsurfPaths()`：不再需要
+- [x] 将 workflows、skills 和 MCP config 直接写入 `outputRoot`
 
-### Research Insights (Phase 3a)
+### Research Insights（阶段 3a）
 
-**Pattern review (dissent):** Every other writer (kiro, copilot, gemini, droid) has a `resolve*Paths()` function with a double-nesting guard. Removing it makes Windsurf the only target where the CLI fully owns nesting. This creates an inconsistency in the `write()` contract.
+**Pattern review（dissent）：** 其他每个 writer（kiro、copilot、gemini、droid）都有 `resolve*Paths()` function 和 double-nesting guard。移除它会让 Windsurf 成为唯一由 CLI 完全拥有 nesting 的 target。这造成 `write()` contract 不一致。
 
-**Resolution:** Accept the divergence — Windsurf has genuinely different semantics (global vs workspace). Add a JSDoc comment on `TargetHandler.write()` documenting that some writers may apply additional nesting while the Windsurf writer expects the final resolved path. Long-term, other targets could migrate to this pattern in a separate refactor.
+**Resolution：** 接受 divergence：Windsurf 语义确实不同（global vs workspace）。在 `TargetHandler.write()` 上添加 JSDoc comment，记录某些 writers 可能 apply additional nesting，而 Windsurf writer 期望 final resolved path。长期来看，其他 targets 可在 separate refactor 中迁移到该 pattern。
 
-#### 3b. Replace MCP setup doc with JSON config merge
+#### 3b. 用 JSON config merge 替换 MCP setup doc
 
-Follow Kiro pattern (`src/targets/kiro.ts:68-92`) with security hardening:
+遵循 Kiro pattern（`src/targets/kiro.ts:68-92`），并添加 security hardening：
 
-- [x] Read existing `mcp_config.json` if present
-- [x] Backup before overwrite (`backupFile()`)
-- [x] Parse existing JSON (warn and replace if corrupted; add `!Array.isArray()` guard)
-- [x] Merge at `mcpServers` key: plugin entries overwrite same-name entries, user entries preserved
-- [x] Preserve all other top-level keys in existing file
-- [x] Write merged result with **restrictive permissions** (`0o600`)
-- [x] Emit warning when writing to workspace scope (Windsurf `mcp_config.json` is global-only per docs)
+- [x] 如存在，读取 existing `mcp_config.json`
+- [x] overwrite 前 backup（`backupFile()`）
+- [x] Parse existing JSON（corrupted 时 warn and replace；添加 `!Array.isArray()` guard）
+- [x] 在 `mcpServers` key 下 merge：plugin entries overwrite same-name entries，user entries preserved
+- [x] Preserve existing file 中所有 other top-level keys
+- [x] 用 **restrictive permissions**（`0o600`）写入 merged result
+- [x] 写入 workspace scope 时 emit warning（Windsurf `mcp_config.json` 按 docs 是 global-only）
 
 ```typescript
 // MCP config merge with security hardening
@@ -387,11 +387,11 @@ if (bundle.mcpConfig) {
 }
 ```
 
-### Research Insights (Phase 3b)
+### Research Insights（阶段 3b）
 
-**Security review (HIGH):** The current `writeJson()` in `src/utils/files.ts` uses default umask (`0o644`) — world-readable. The sync targets all use `{ mode: 0o600 }` for secret-containing files. The Windsurf writer (and Kiro writer) must do the same.
+**Security review（HIGH）:** 当前 `src/utils/files.ts` 中的 `writeJson()` 使用 default umask（`0o644`），world-readable。sync targets 都对 secret-containing files 使用 `{ mode: 0o600 }`。Windsurf writer（以及 Kiro writer）也必须如此。
 
-**Implementation:** Add a `writeJsonSecure()` helper or add a `mode` parameter to `writeJson()`:
+**Implementation:** 添加 `writeJsonSecure()` helper，或向 `writeJson()` 添加 `mode` parameter：
 
 ```typescript
 // src/utils/files.ts
@@ -402,21 +402,21 @@ export async function writeJsonSecure(filePath: string, data: unknown): Promise<
 }
 ```
 
-**Security review (MEDIUM):** Backup files inherit default permissions. Ensure `backupFile()` also sets `0o600` on the backup copy when the source may contain secrets.
+**Security review（MEDIUM）:** Backup files 继承 default permissions。确保 source 可能包含 secrets 时，`backupFile()` 也为 backup copy 设置 `0o600`。
 
-**Security review (MEDIUM):** Workspace `mcp_config.json` could be committed to git. After writing to workspace scope, emit a warning:
+**Security review（MEDIUM）:** Workspace `mcp_config.json` 可能被 commit 到 git。写入 workspace scope 后 emit warning：
 
 ```
 Warning: .windsurf/mcp_config.json may contain secrets. Ensure it is in .gitignore.
 ```
 
-**TypeScript review:** The `readJson<Record<string, unknown>>` assertion is unsafe — a valid JSON array or string passes parsing but fails the type. Added `!Array.isArray()` guard.
+**TypeScript review:** `readJson<Record<string, unknown>>` assertion 不安全：valid JSON array 或 string 能 parse 但不符合 type。已添加 `!Array.isArray()` guard。
 
-**TypeScript review:** The `bundle.mcpConfig` null check is sufficient — when non-null, `mcpServers` is guaranteed to have entries (the converter returns null for empty servers). Simplified from `bundle.mcpConfig && Object.keys(...)`.
+**TypeScript review:** `bundle.mcpConfig` null check 足够；non-null 时 `mcpServers` 保证有 entries（converter 对 empty servers 返回 null）。从 `bundle.mcpConfig && Object.keys(...)` 简化。
 
-**Windsurf docs (important):** `mcp_config.json` is a **global configuration only** — Windsurf has no per-project MCP config support. Writing it to `.windsurf/` in workspace scope may not be discovered by Windsurf. Emit a warning for workspace scope but still write the file for forward-compatibility.
+**Windsurf docs（important）:** `mcp_config.json` 是 **global configuration only**：Windsurf 没有 per-project MCP config support。将它写入 `.windsurf/` workspace scope 可能不会被 Windsurf discover。Workspace scope emit warning 但仍写入 file 以便 forward-compatibility。
 
-#### 3c. Updated writer structure
+#### 3c. 更新后的 writer structure
 
 ```typescript
 export async function writeWindsurfBundle(outputRoot: string, bundle: WindsurfBundle): Promise<void> {
@@ -467,11 +467,11 @@ export async function writeWindsurfBundle(outputRoot: string, bundle: WindsurfBu
 }
 ```
 
-### Phase 4: CLI Wiring
+### 阶段 4：CLI Wiring
 
-**Files:** `src/commands/install.ts`, `src/commands/convert.ts`
+**文件：** `src/commands/install.ts`, `src/commands/convert.ts`
 
-#### 4a. Add `--scope` flag to both commands
+#### 4a. 向两个 commands 添加 `--scope` flag
 
 ```typescript
 scope: {
@@ -480,12 +480,12 @@ scope: {
 },
 ```
 
-- [x] Add `scope` arg to `install.ts`
-- [x] Add `scope` arg to `convert.ts`
+- [x] 向 `install.ts` 添加 `scope` arg
+- [x] 向 `convert.ts` 添加 `scope` arg
 
-#### 4b. Validate scope with type guard
+#### 4b. 使用 type guard 验证 scope
 
-Use a proper type guard instead of unsafe `as TargetScope` cast:
+使用 proper type guard，而不是 unsafe `as TargetScope` cast：
 
 ```typescript
 function isTargetScope(value: string): value is TargetScope {
@@ -504,124 +504,124 @@ if (scopeValue !== undefined) {
 const resolvedScope = scopeValue ?? target.defaultScope ?? "workspace"
 ```
 
-- [x] Add `isTargetScope` type guard
-- [x] Add scope validation in both commands (single block, not two separate checks)
+- [x] 添加 `isTargetScope` type guard
+- [x] 在两个 commands 中添加 scope validation（single block，不做两份 separate checks）
 
-### Research Insights (Phase 4b)
+### Research Insights（阶段 4b）
 
-**TypeScript review:** The original plan cast `scopeValue as TargetScope` before validation — a type lie. Use a proper type guard function to keep the type system honest.
+**TypeScript review：** 原 plan 在 validation 前使用 `scopeValue as TargetScope` cast，这是 type lie。使用 proper type guard function 保持 type system honest。
 
-**Simplicity review:** The two-step validation (check supported, then check exists) can be a single block with the type guard approach above.
+**Simplicity review：** 两步 validation（先 check supported，再 check exists）可以通过上面的 type guard approach 合成 single block。
 
-#### 4c. Update output root resolution
+#### 4c. 更新 output root resolution
 
-Both commands now use the shared `resolveTargetOutputRoot` from Phase 0a.
+两个 commands 现在都使用 Phase 0a 的 shared `resolveTargetOutputRoot`。
 
-- [x] Call shared function with `scope: resolvedScope` for primary target
-- [x] Default scope: `target.defaultScope ?? "workspace"` (only used when target supports scopes)
+- [x] 对 primary target 调用 shared function，并传 `scope: resolvedScope`
+- [x] Default scope：`target.defaultScope ?? "workspace"`（仅当 target supports scopes 时使用）
 
-#### 4d. Handle `--also` targets
+#### 4d. 处理 `--also` targets
 
-`--scope` applies only to the primary `--to` target. Extra `--also` targets use their own `defaultScope`.
+`--scope` 只作用于 primary `--to` target。Extra `--also` targets 使用各自的 `defaultScope`。
 
-- [x] Pass `handler.defaultScope` for `--also` targets (each uses its own default)
-- [x] Update the `--also` loop in both commands to use target-specific scope resolution
+- [x] 为 `--also` targets 传入 `handler.defaultScope`（每个使用自己的 default）
+- [x] 更新两个 commands 中的 `--also` loop，使其使用 target-specific scope resolution
 
-### Research Insights (Phase 4d)
+### Research Insights（阶段 4d）
 
-**Architecture review:** There is no way for users to specify scope for an `--also` target (e.g., `--also windsurf:workspace`). Accept as a known v0.11.0 limitation. If users need workspace scope for windsurf, they can run two separate commands. Add a code comment indicating where per-target scope overrides would be added in the future.
+**Architecture review：** 目前 users 无法为 `--also` target 指定 scope（例如 `--also windsurf:workspace`）。作为 v0.11.0 known limitation 接受。如果 users 需要 windsurf workspace scope，可以运行两条 separate commands。添加 code comment，说明未来 per-target scope overrides 会添加在哪里。
 
-### Phase 5: Tests
+### 阶段 5：Tests
 
-**Files:** `tests/windsurf-converter.test.ts`, `tests/windsurf-writer.test.ts`
+**文件：** `tests/windsurf-converter.test.ts`, `tests/windsurf-writer.test.ts`
 
-#### 5a. Update converter tests
+#### 5a. 更新 converter tests
 
-- [x] Remove all AGENTS.md tests (lines 275-303: empty plugin, CLAUDE.md missing)
-- [x] Remove all `mcpSetupDoc` tests (lines 305-366: stdio, HTTP/SSE, redaction, null)
-- [x] Update `fixturePlugin` default — remove `agentsMd` and `mcpSetupDoc` references
-- [x] Add `mcpConfig` tests:
-  - stdio server produces correct JSON structure with `command`, `args`, `env`
-  - HTTP/SSE server produces correct JSON structure with `serverUrl`, `headers`
-  - mixed servers (stdio + HTTP) both included
-  - env vars included (not redacted) — verify actual values present
-  - `hasPotentialSecrets()` emits console.warn for sensitive keys
-  - `hasPotentialSecrets()` does NOT warn when no sensitive keys
-  - no servers produces null mcpConfig
-  - empty bundle has null mcpConfig
-  - server with no command and no URL is skipped with warning
+- [x] 移除所有 AGENTS.md tests（lines 275-303：empty plugin、CLAUDE.md missing）
+- [x] 移除所有 `mcpSetupDoc` tests（lines 305-366：stdio、HTTP/SSE、redaction、null）
+- [x] 更新 `fixturePlugin` default：移除 `agentsMd` 和 `mcpSetupDoc` references
+- [x] 添加 `mcpConfig` tests：
+  - stdio server 产生带 `command`, `args`, `env` 的 correct JSON structure
+  - HTTP/SSE server 产生带 `serverUrl`, `headers` 的 correct JSON structure
+  - mixed servers（stdio + HTTP）both included（两类 servers 都 included）
+  - env vars included（not redacted）：verify actual values present（确认实际 values 存在）
+  - `hasPotentialSecrets()` 对 sensitive keys emits console.warn
+  - 没有 sensitive keys 时，`hasPotentialSecrets()` does NOT warn
+  - no servers produces null mcpConfig（无 servers 时产生 null mcpConfig）
+  - empty bundle has null mcpConfig（empty bundle 有 null mcpConfig）
+  - 没有 command 和 URL 的 server is skipped with warning
 
-#### 5b. Update writer tests
+#### 5b. 更新 writer tests
 
-- [x] Remove AGENTS.md tests (backup test, creation test, double-nesting AGENTS.md parent test)
-- [x] Remove double-nesting guard test (guard removed)
-- [x] Remove `mcp-setup.md` write test
-- [x] Update `emptyBundle` fixture — remove `agentsMd`, `mcpSetupDoc`, add `mcpConfig: null`
-- [x] Add `mcp_config.json` tests:
-  - writes mcp_config.json to outputRoot
-  - merges with existing mcp_config.json (preserves user servers)
-  - backs up existing mcp_config.json before overwrite
-  - handles corrupted existing mcp_config.json (warn and replace)
-  - handles existing mcp_config.json with array (not object) at root
-  - handles existing mcp_config.json with `mcpServers: null`
-  - preserves non-mcpServers keys in existing file
-  - server name collision: plugin entry wins
-  - file permissions are 0o600 (not world-readable)
-- [x] Update full bundle test — writer writes directly into outputRoot (no `.windsurf/` nesting)
+- [x] 移除 AGENTS.md tests（backup test、creation test、double-nesting AGENTS.md parent test）
+- [x] 移除 double-nesting guard test（guard removed）
+- [x] 移除 `mcp-setup.md` write test
+- [x] 更新 `emptyBundle` fixture：移除 `agentsMd`、`mcpSetupDoc`，添加 `mcpConfig: null`
+- [x] 添加 `mcp_config.json` tests：
+  - writes mcp_config.json to outputRoot（写入到 outputRoot）
+  - merges with existing mcp_config.json（合并 existing mcp_config.json，并 preserves user servers）
+  - overwrite 前 backs up existing mcp_config.json
+  - handles corrupted existing mcp_config.json（warn and replace；警告并替换）
+  - handles existing mcp_config.json with array（not object）at root（处理 root 为 array 的情况）
+  - handles existing mcp_config.json with `mcpServers: null`（处理 `mcpServers: null`）
+  - preserves non-mcpServers keys in existing file（保留 existing file 中的 non-mcpServers keys）
+  - server name collision：plugin entry wins（server name 冲突时 plugin entry 优先）
+  - file permissions are 0o600（not world-readable；不是 world-readable）
+- [x] 更新 full bundle test：writer 直接写入 outputRoot（无 `.windsurf/` nesting）
 
-#### 5c. Add scope resolution tests
+#### 5c. 添加 scope resolution tests
 
-Test the shared `resolveTargetOutputRoot` function:
+测试 shared `resolveTargetOutputRoot` function：
 
-- [x] Default scope for windsurf is "global" → resolves to `~/.codeium/windsurf/`
-- [x] Explicit `--scope workspace` → resolves to `cwd/.windsurf/`
-- [x] `--output` overrides scope resolution (both global and workspace)
-- [x] Invalid scope value for windsurf → error
-- [x] `--scope` on non-scope target (e.g., opencode) → error
-- [x] `--also windsurf` uses windsurf's default scope ("global")
-- [x] `isTargetScope` type guard correctly identifies valid/invalid values
+- [x] windsurf default scope 是 "global" → resolves to `~/.codeium/windsurf/`
+- [x] Explicit `--scope workspace` → resolves to `cwd/.windsurf/`（显式 `--scope workspace` 解析到 `cwd/.windsurf/`）
+- [x] `--output` overrides scope resolution（global 和 workspace 都是）
+- [x] windsurf 的 invalid scope value → error
+- [x] non-scope target（例如 opencode）上使用 `--scope` → error
+- [x] `--also windsurf` 使用 windsurf default scope（"global"）
+- [x] `isTargetScope` type guard 正确识别 valid/invalid values
 
-### Phase 6: Documentation
+### 阶段 6：Documentation
 
-**Files:** `README.md`, `CHANGELOG.md`
+**文件：** `README.md`, `CHANGELOG.md`
 
-- [x] Update README.md Windsurf section to mention `--scope` flag and global default
-- [x] Add CHANGELOG entry for v0.11.0 with breaking changes documented
-- [x] Document migration path: `--scope workspace` for old behavior
-- [x] Note that Windsurf `mcp_config.json` is global-only (workspace MCP config may not be discovered)
+- [x] 更新 README.md Windsurf section，提到 `--scope` flag 和 global default
+- [x] 添加 v0.11.0 CHANGELOG entry，并记录 breaking changes
+- [x] 记录 migration path：旧行为用 `--scope workspace`
+- [x] 注明 Windsurf `mcp_config.json` 是 global-only（workspace MCP config 可能不会被 discover）
 
-## Acceptance Criteria
+## 验收标准
 
-- [x] `install compound-engineering --to windsurf` writes to `~/.codeium/windsurf/` by default
-- [x] `install compound-engineering --to windsurf --scope workspace` writes to `cwd/.windsurf/`
-- [x] `--output /custom/path` overrides scope for both commands
-- [x] `--scope` on non-supporting target produces clear error
-- [x] `mcp_config.json` merges with existing file (backup created, user entries preserved)
-- [x] `mcp_config.json` written with `0o600` permissions (not world-readable)
-- [x] No AGENTS.md generated for either scope
-- [x] Env var secrets included in `mcp_config.json` with `console.warn` listing affected servers
-- [x] Both stdio and HTTP/SSE MCP servers included in `mcp_config.json`
-- [x] All existing tests updated, all new tests pass
-- [x] No regressions in other targets
-- [x] `resolveTargetOutputRoot` extracted to shared utility (no duplication)
+- [x] `install compound-engineering --to windsurf` 默认写入 `~/.codeium/windsurf/`
+- [x] `install compound-engineering --to windsurf --scope workspace` 写入 `cwd/.windsurf/`
+- [x] `--output /custom/path` 对两个 commands 都 overrides scope
+- [x] non-supporting target 上使用 `--scope` produces clear error
+- [x] `mcp_config.json` 与 existing file merge（创建 backup，preserve user entries）
+- [x] `mcp_config.json` 以 `0o600` permissions 写入（not world-readable）
+- [x] 两种 scope 都不生成 AGENTS.md
+- [x] Env var secrets included in `mcp_config.json`，并用 `console.warn` 列出 affected servers
+- [x] stdio 和 HTTP/SSE MCP servers 都 included in `mcp_config.json`
+- [x] 所有 existing tests 已更新，所有 new tests pass
+- [x] 其他 targets 无 regressions
+- [x] `resolveTargetOutputRoot` 已抽取为 shared utility（无 duplication）
 
-## Dependencies & Risks
+## 依赖与风险
 
-**Risk: Global workflow path is undocumented.** Windsurf may not discover workflows from `~/.codeium/windsurf/workflows/`. Mitigation: documented as a known assumption in the brainstorm. Users can `--scope workspace` if global workflows aren't discovered.
+**Risk: Global workflow path is undocumented.** Windsurf 可能不会从 `~/.codeium/windsurf/workflows/` discover workflows。Mitigation：在 brainstorm 中记录为 known assumption。如果 global workflows 没有被 discover，users 可以用 `--scope workspace`。
 
-**Risk: Breaking changes for existing v0.10.0 users.** Mitigation: document migration path clearly. `--scope workspace` restores previous behavior. Target is experimental with a small user base.
+**Risk: Breaking changes for existing v0.10.0 users.** Mitigation：清晰记录 migration path。`--scope workspace` 恢复 previous behavior。Target 是 experimental，user base 小。
 
-**Risk: Workspace `mcp_config.json` not read by Windsurf.** Per Windsurf docs, `mcp_config.json` is global-only configuration. Workspace scope writes the file for forward-compatibility but emits a warning. The primary use case is global scope anyway.
+**Risk: Workspace `mcp_config.json` not read by Windsurf.** 按 Windsurf docs，`mcp_config.json` 是 global-only configuration。Workspace scope 写入该 file 只是 forward-compatibility，并 emit warning。Primary use case 是 global scope。
 
-**Risk: Secrets in `mcp_config.json` committed to git.** Mitigation: `0o600` file permissions, console.warn about sensitive env vars, warning about `.gitignore` for workspace scope.
+**Risk: Secrets in `mcp_config.json` committed to git.** Mitigation：`0o600` file permissions、关于 sensitive env vars 的 console.warn、workspace scope 下关于 `.gitignore` 的 warning。
 
-## References & Research
+## 参考与调研
 
-- Spec: `docs/specs/windsurf.md` (authoritative reference for component mapping)
-- Kiro MCP merge pattern: [src/targets/kiro.ts:68-92](../../src/targets/kiro.ts)
-- Sync secrets warning: [src/commands/sync.ts:20-28](../../src/commands/sync.ts)
-- Windsurf MCP docs: https://docs.windsurf.com/windsurf/cascade/mcp
-- Windsurf Skills global path: https://docs.windsurf.com/windsurf/cascade/skills
-- Windsurf MCP tutorial: https://windsurf.com/university/tutorials/configuring-first-mcp-server
-- Adding converter targets (learning): [docs/solutions/adding-converter-target-providers.md](../solutions/adding-converter-target-providers.md)
-- Plugin versioning (learning): [docs/solutions/plugin-versioning-requirements.md](../solutions/plugin-versioning-requirements.md)
+- Spec（规格）：`docs/specs/windsurf.md`（authoritative reference for component mapping）
+- Kiro MCP merge pattern（Kiro MCP merge 模式）：[src/targets/kiro.ts:68-92](../../src/targets/kiro.ts)
+- Sync secrets warning（sync secrets 警告）：[src/commands/sync.ts:20-28](../../src/commands/sync.ts)
+- Windsurf MCP docs（Windsurf MCP 文档）：https://docs.windsurf.com/windsurf/cascade/mcp
+- Windsurf Skills global path（Windsurf Skills 全局路径）：https://docs.windsurf.com/windsurf/cascade/skills
+- Windsurf MCP tutorial（Windsurf MCP 教程）：https://windsurf.com/university/tutorials/configuring-first-mcp-server
+- Adding converter targets（learning，经验）：[docs/solutions/adding-converter-target-providers.md](../solutions/adding-converter-target-providers.md)
+- Plugin versioning（learning，经验）：[docs/solutions/plugin-versioning-requirements.md](../solutions/plugin-versioning-requirements.md)

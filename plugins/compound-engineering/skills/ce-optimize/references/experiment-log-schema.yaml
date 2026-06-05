@@ -1,25 +1,25 @@
-# Experiment Log Schema
-# This is the canonical schema for the experiment log file that accumulates
-# across an optimization run.
+# Experiment Log Schema（实验日志 schema）
+# 这是 experiment log file 的 canonical schema，该文件会在
+# optimization run 过程中持续累积。
 #
 # Location: .context/compound-engineering/ce-optimize/<spec-name>/experiment-log.yaml
 #
-# PERSISTENCE MODEL:
-# The experiment log on disk is the SINGLE SOURCE OF TRUTH. The agent's
-# in-memory context is expendable and will be compacted during long runs.
+# PERSISTENCE MODEL（持久化模型）：
+# 磁盘上的 experiment log 是 SINGLE SOURCE OF TRUTH。agent 的
+# in-memory context 是 expendable 的，并会在 long runs 中被 compact。
 #
-# Write discipline:
-# - Each experiment entry is APPENDED immediately after its measurement
-#   completes (SKILL.md step 3.3), before batch evaluation
-# - Outcome fields may be updated in-place after batch evaluation (step 3.5)
-# - The `best` section is updated after each batch if a new best is found
-# - The `hypothesis_backlog` is updated after each batch
-# - The agent re-reads this file from disk at every phase boundary
+# Write discipline（写入纪律）：
+# - 每个 experiment entry 会在其 measurement
+#   完成后立即 APPEND（SKILL.md step 3.3），早于 batch evaluation
+# - Outcome fields 可在 batch evaluation 后 in-place 更新（step 3.5）
+# - 如果发现 new best，`best` section 会在每个 batch 后更新
+# - `hypothesis_backlog` 会在每个 batch 后更新
+# - agent 会在每个 phase boundary 从磁盘重新读取此文件
 #
-# The orchestrator does NOT read the full log each iteration -- it uses a
-# rolling window (last 10 experiments) + a strategy digest file for
-# hypothesis generation. But the full log exists on disk for resume,
-# crash recovery, and post-run analysis.
+# orchestrator 不会在每次 iteration 读取完整 log；它使用
+# rolling window（最近 10 个 experiments）+ strategy digest file 来做
+# hypothesis generation。但完整 log 保留在磁盘上，用于 resume、
+# crash recovery 和 post-run analysis。
 
 # ============================================================================
 # TOP-LEVEL STRUCTURE
@@ -30,12 +30,12 @@ structure:
   spec:
     type: string
     required: true
-    description: "Name of the optimization spec this log belongs to"
+    description: "此 log 所属 optimization spec 的 name"
 
   run_id:
     type: string
     required: true
-    description: "Unique identifier for this optimization run (timestamp-based). Distinguishes resumed runs from fresh starts."
+    description: "此 optimization run 的 unique identifier（timestamp-based）。用于区分 resumed runs 和 fresh starts。"
 
   started_at:
     type: string
@@ -45,23 +45,23 @@ structure:
   baseline:
     type: object
     required: true
-    description: "Metrics measured on the original code before any optimization"
+    description: "任何 optimization 前在 original code 上测得的 metrics"
     children:
       timestamp:
         type: string
         format: "ISO 8601 timestamp"
       gates:
         type: object
-        description: "Key-value pairs of gate metric names to their baseline values"
+        description: "gate metric names 到 baseline values 的 key-value pairs"
       diagnostics:
         type: object
-        description: "Key-value pairs of diagnostic metric names to their baseline values"
+        description: "diagnostic metric names 到 baseline values 的 key-value pairs"
       judge:
         type: object
-        description: "Judge scores on the baseline (only when primary type is 'judge')"
+        description: "baseline 上的 judge scores（仅当 primary type 为 'judge'）"
         children:
-          # All fields from the scoring config appear here
-          # Plus:
+          # scoring config 中的所有 fields 都出现在这里
+          # 另外还有：
           sample_seed:
             type: integer
           judge_cost_usd:
@@ -70,32 +70,32 @@ structure:
   experiments:
     type: array
     required: true
-    description: "Ordered list of all experiments, including kept, reverted, errored, and deferred"
+    description: "所有 experiments 的 ordered list，包括 kept、reverted、errored 和 deferred"
     items:
       type: object
-      # See EXPERIMENT ENTRY below
+      # 见下方 EXPERIMENT ENTRY
 
   best:
     type: object
     required: true
-    description: "Summary of the current best result"
+    description: "current best result 的 summary"
     children:
       iteration:
         type: integer
-        description: "Iteration number of the best experiment (use 0 for the baseline snapshot before any experiment is kept)"
+        description: "best experiment 的 iteration number（在任何 experiment 被 kept 前，baseline snapshot 使用 0）"
       metrics:
         type: object
-        description: "All metric values from the current best state (seed with baseline metrics during CP-1)"
+        description: "current best state 中的所有 metric values（CP-1 期间以 baseline metrics seed）"
       judge:
         type: object
-        description: "Judge scores from the best experiment (only when primary type is 'judge')"
+        description: "best experiment 的 judge scores（仅当 primary type 为 'judge'）"
       total_judge_cost_usd:
         type: number
-        description: "Running total of all judge costs across all experiments"
+        description: "所有 experiments 的 judge costs running total"
 
   hypothesis_backlog:
     type: array
-    description: "Remaining hypotheses not yet tested"
+    description: "尚未 tested 的 remaining hypotheses"
     items:
       type: object
       children:
@@ -123,45 +123,45 @@ experiment_entry:
 
     iteration:
       type: integer
-      description: "Sequential experiment number (1-indexed, monotonically increasing)"
+      description: "Sequential experiment number（1-indexed，单调递增）"
 
     batch:
       type: integer
-      description: "Batch number this experiment was part of. Multiple experiments in the same batch ran in parallel."
+      description: "此 experiment 所属 batch number。同一 batch 中的多个 experiments 并行运行。"
 
     hypothesis:
       type: string
-      description: "Human-readable description of what this experiment tried"
+      description: "此 experiment 尝试内容的 human-readable description"
 
     category:
       type: string
-      description: "Category for grouping and diversity selection (e.g., signal-extraction, graph-signals, embedding, algorithm, preprocessing)"
+      description: "用于 grouping 和 diversity selection 的 category（例如 signal-extraction、graph-signals、embedding、algorithm、preprocessing）"
 
     outcome:
       type: enum
       values:
-        - measured                # measurement finished and metrics were persisted, awaiting batch evaluation
-        - kept                    # primary metric improved, gates passed -> merged to optimization branch
-        - reverted                # primary metric did not improve or was worse -> changes discarded
-        - degenerate              # degenerate gate failed -> immediately reverted, no judge evaluation
-        - error                   # measurement command crashed, timed out, or produced malformed output
-        - deferred_needs_approval # experiment needs an unapproved dependency -> set aside for batch approval
-        - timeout                 # measurement command exceeded timeout_seconds
-        - runner_up_kept          # file-disjoint runner-up that was cherry-picked and re-measured successfully
-        - runner_up_reverted      # file-disjoint runner-up that was cherry-picked but combined measurement was not better
+        - measured                # measurement 已完成且 metrics 已 persisted，等待 batch evaluation
+        - kept                    # primary metric improved，gates passed -> merge 到 optimization branch
+        - reverted                # primary metric 未 improve 或更差 -> changes discarded
+        - degenerate              # degenerate gate failed -> 立即 reverted，无 judge evaluation
+        - error                   # measurement command crashed、timed out 或 produced malformed output
+        - deferred_needs_approval # experiment 需要 unapproved dependency -> 暂存以进行 batch approval
+        - timeout                 # measurement command 超过 timeout_seconds
+        - runner_up_kept          # file-disjoint runner-up，已 cherry-picked 且 re-measured successfully
+        - runner_up_reverted      # file-disjoint runner-up，已 cherry-picked 但 combined measurement not better
       description: >
-        Load-bearing state: the loop branches on this value.
-        'measured' is the only non-terminal state and exists so CP-3 can persist
-        raw metrics before batch-level comparison decides the final outcome.
-        'kept' and 'runner_up_kept' advance the optimization branch.
-        'deferred_needs_approval' items are re-presented at wrap-up.
-        All other states are terminal for that experiment.
+        Load-bearing state：loop 会根据此 value branch。
+        'measured' 是唯一 non-terminal state，存在目的是让 CP-3 能 persist
+        raw metrics，然后由 batch-level comparison 决定最终 outcome。
+        'kept' 和 'runner_up_kept' 会 advance optimization branch。
+        'deferred_needs_approval' items 会在 wrap-up 时重新呈现。
+        所有其他 states 对该 experiment 都是 terminal。
 
   optional_children:
 
     changes:
       type: array
-      description: "Files modified by this experiment"
+      description: "此 experiment 修改的 files"
       items:
         type: object
         children:
@@ -172,49 +172,49 @@ experiment_entry:
 
     gates:
       type: object
-      description: "Gate metric values from the measurement command"
+      description: "来自 measurement command 的 gate metric values"
 
     gates_passed:
       type: boolean
-      description: "Whether all degenerate gates passed"
+      description: "所有 degenerate gates 是否 passed"
 
     diagnostics:
       type: object
-      description: "Diagnostic metric values from the measurement command"
+      description: "来自 measurement command 的 diagnostic metric values"
 
     judge:
       type: object
-      description: "Judge evaluation scores (only when primary type is 'judge' and gates passed)"
+      description: "Judge evaluation scores（仅当 primary type 为 'judge' 且 gates passed）"
       children:
-        # All fields from scoring.primary and scoring.secondary appear here
-        # Plus:
+        # scoring.primary 和 scoring.secondary 中的所有 fields 都出现在这里
+        # 另外还有：
         judge_cost_usd:
           type: number
-          description: "Cost of judge calls for this experiment"
+          description: "此 experiment 的 judge calls cost"
 
     primary_delta:
       type: string
-      description: "Change in primary metric from current best (e.g., '+0.7', '-0.3')"
+      description: "相对 current best 的 primary metric change（例如 '+0.7'、'-0.3'）"
 
     learnings:
       type: string
-      description: "What was learned from this experiment. The agent reads these to avoid re-trying similar approaches and to inform new hypothesis generation."
+      description: "从此 experiment 中学到了什么。agent 会读取这些内容，避免重试 similar approaches，并为 new hypothesis generation 提供信息。"
 
     commit:
       type: string
-      description: "Git commit SHA on the optimization branch (only for 'kept' and 'runner_up_kept' outcomes)"
+      description: "optimization branch 上的 Git commit SHA（仅用于 'kept' 和 'runner_up_kept' outcomes）"
 
     deferred_reason:
       type: string
-      description: "Why this experiment was deferred (only for 'deferred_needs_approval' outcome)"
+      description: "此 experiment 被 deferred 的原因（仅用于 'deferred_needs_approval' outcome）"
 
     error_message:
       type: string
-      description: "Error details (only for 'error' and 'timeout' outcomes)"
+      description: "Error details（仅用于 'error' 和 'timeout' outcomes）"
 
     merged_with:
       type: integer
-      description: "Iteration number of the experiment this was merged with (only for 'runner_up_kept' and 'runner_up_reverted')"
+      description: "此 experiment merge with 的 experiment iteration number（仅用于 'runner_up_kept' 和 'runner_up_reverted'）"
 
 # ============================================================================
 # OUTCOME STATE TRANSITIONS
@@ -230,28 +230,31 @@ experiment_entry:
 #         -> gates passed
 #           -> persist raw metrics   -> outcome: measured
 #           -> judge evaluated (if type: judge)
-#             -> best in batch, improved  -> outcome: kept
+#             -> batch 中最佳且 improved -> outcome: kept
 #             -> runner-up, file-disjoint -> cherry-pick + re-measure
 #               -> combined better        -> outcome: runner_up_kept
+#                  （组合后更好）
 #               -> combined not better    -> outcome: runner_up_reverted
+#                  （组合后没有更好）
 #             -> not improved             -> outcome: reverted
 #       -> needs unapproved dep    -> outcome: deferred_needs_approval
+#          （需要未批准 dependency）
 #
-# Only 'kept' and 'runner_up_kept' produce a commit on the optimization branch.
-# Only 'deferred_needs_approval' items are re-presented at wrap-up for approval.
+# 只有 'kept' 和 'runner_up_kept' 会在 optimization branch 上产生 commit。
+# 只有 'deferred_needs_approval' items 会在 wrap-up 时重新呈现以供 approval。
 
 # ============================================================================
-# STRATEGY DIGEST (separate file)
+# STRATEGY DIGEST（单独文件）
 # ============================================================================
 #
-# Written after each batch to:
+# 每个 batch 后写入：
 #   .context/compound-engineering/ce-optimize/<spec-name>/strategy-digest.md
 #
-# Contains a compressed summary of:
-# - What hypothesis categories have been tried
-# - Which approaches succeeded (kept) and which failed (reverted)
-# - The exploration frontier: what hasn't been tried yet
-# - Key learnings that should inform next hypotheses
+# 包含以下内容的 compressed summary：
+# - 已尝试过哪些 hypothesis categories
+# - 哪些 approaches succeeded（kept），哪些 failed（reverted）
+# - exploration frontier：还有什么尚未尝试
+# - 应为 next hypotheses 提供信息的 key learnings
 #
-# The orchestrator reads the strategy digest (not the full experiment log)
-# when generating new hypotheses between batches.
+# orchestrator 在 batches 之间生成 new hypotheses 时，读取 strategy digest
+# （而不是完整 experiment log）。

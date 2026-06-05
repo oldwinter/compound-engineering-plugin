@@ -1,354 +1,354 @@
 ---
-title: "refactor: Recenter installs on native packages and shared skill cleanup"
+title: "refactor: 将 installs 重新聚焦到 native packages 和 shared skill cleanup"
 type: refactor
 status: active
 date: 2026-04-18
 ---
 
-# Recenter Installs on Native Packages and Shared Skill Cleanup
+# 将 installs 重新聚焦到 native packages 和 shared skill cleanup
 
-## Overview
+## 概览
 
-Rework the install strategy around current agent-harness behavior:
+围绕当前 agent-harness behavior 重做 install strategy：
 
-- Use native package/plugin installers where they can install the full Compound Engineering payload.
-- Avoid `~/.agents` for CE-owned installs because shared skills there can shadow native plugin installs such as Copilot.
-- Keep agents target-native unless the harness's package format explicitly supports bundled agents.
-- Add a first-class cleanup path for old CE-owned flat installs, renamed skills, removed skills, converted-agent skills, prompts, commands, and target-specific artifacts.
+- 在可以安装完整 Compound Engineering payload 的地方使用 native package/plugin installers。
+- 避免把 CE-owned installs 写入 `~/.agents`，因为其中的 shared skills 可能 shadow native plugin installs，例如 Copilot。
+- 除非 harness package format 明确支持 bundled agents，否则 agents 保持 target-native。
+- 为 old CE-owned flat installs、renamed skills、removed skills、converted-agent skills、prompts、commands 和 target-specific artifacts 添加 first-class cleanup path。
 
-This plan supersedes the Copilot-only native plugin plan because the same decision now affects Codex, Gemini, Pi, OpenCode, and every retained custom converter target.
+本 plan supersedes Copilot-only native plugin plan，因为同一决策现在影响 Codex、Gemini、Pi、OpenCode 和所有 retained custom converter targets。
 
-## Problem Frame
+## 问题框架
 
-The current CLI grew when most targets did not have native package/plugin support. That is no longer uniformly true:
+当前 CLI 诞生时，多数 targets 都没有 native package/plugin support。现在情况不再统一：
 
-- Claude Code has native plugin marketplaces.
-- Copilot CLI has plugin marketplaces and can install repo-hosted plugins.
-- Gemini CLI has native extensions and shared `~/.agents/skills` skill discovery.
-- Pi has native packages via `pi install` and also reads `~/.agents/skills`.
-- Codex has native plugins, but current public docs still make non-official distribution depend on local/repo/personal marketplace files.
-- OpenCode also reads `~/.agents/skills`, but CE should avoid that root by default because it can shadow Copilot plugin skills.
-- Windsurf no longer needs active support and should be deprecated from user-facing conversion/install flows while preserving cleanup for old CE artifacts.
+- Claude Code 有 native plugin marketplaces。
+- Copilot CLI 有 plugin marketplaces，并能 install repo-hosted plugins。
+- Gemini CLI 有 native extensions 和 shared `~/.agents/skills` skill discovery。
+- Pi 有通过 `pi install` 的 native packages，也读取 `~/.agents/skills`。
+- Codex 有 native plugins，但当前 public docs 仍让 non-official distribution 依赖 local/repo/personal marketplace files。
+- OpenCode 也读取 `~/.agents/skills`，但 CE 默认应避免该 root，因为它会 shadow Copilot plugin skills。
+- Windsurf 不再需要 active support，应从 user-facing conversion/install flows 中 deprecate，同时为旧 CE artifacts 保留 cleanup。
 
-At the same time, our legacy installs leave stale flat artifacts behind. Examples include removed skills such as `reproduce-bug`, renamed workflows such as `workflows:*` -> `ce:*`, old prompt files, and agents that older converters flattened into skills. We cannot delete all of `~/.agents/skills` or `~/.codex/skills` because users may have non-CE skills there.
+同时，legacy installs 会留下 stale flat artifacts。例子包括 removed skills（如 `reproduce-bug`）、renamed workflows（`workflows:*` -> `ce:*`）、旧 prompt files，以及旧 converters flatten 成 skills 的 agents。不能删除整个 `~/.agents/skills` 或 `~/.codex/skills`，因为 users 可能在其中有 non-CE skills。
 
-## Requirements Trace
+## 需求追踪
 
-- R1. Prefer native installers when they install the full useful payload with a reasonable user flow.
-- R2. Do not write CE-owned installs to `~/.agents`; treat it as a legacy cleanup surface only.
-- R3. Preserve target-specific agent behavior where the harness supports agents.
-- R4. Continue converting agents to skills only for targets that lack compatible agent packaging or invocation.
-- R5. Track all CE legacy skills, agents, commands, prompts, and generated aliases so cleanup can remove stale CE-owned artifacts without touching user-owned items.
-- R6. Any remaining custom install path must run legacy cleanup on every install.
-- R7. Native-install targets must have a documented one-time cleanup command users can run before switching from old Bun installs.
-- R8. Forward installs must write a manifest so removed or renamed artifacts can be cleaned without expanding the hand-maintained legacy list forever.
-- R9. The README and target specs must clearly distinguish native installer paths from legacy/custom converter paths.
-- R10. Deprecate Windsurf support and preserve cleanup for old CE Windsurf installs.
+- R1. 当 native installers 能用 reasonable user flow 安装完整 useful payload 时，prefer native installers
+- R2. 不把 CE-owned installs 写入 `~/.agents`；将它视为 legacy cleanup surface only
+- R3. 在 harness supports agents 时，preserve target-specific agent behavior
+- R4. 只有 targets 缺少 compatible agent packaging or invocation 时，才继续 convert agents to skills
+- R5. Track all CE legacy skills、agents、commands、prompts 和 generated aliases，让 cleanup 可以移除 stale CE-owned artifacts 而不碰 user-owned items
+- R6. 任何 remaining custom install path 都必须在每次 install 时运行 legacy cleanup
+- R7. Native-install targets 必须有 documented one-time cleanup command，用户在从 old Bun installs 切换前可以运行
+- R8. Forward installs 必须写 manifest，使 removed or renamed artifacts 可清理，而不需要永远扩展 hand-maintained legacy list
+- R9. README 和 target specs 必须清晰区分 native installer paths 与 legacy/custom converter paths
+- R10. Deprecate Windsurf support，并为旧 CE Windsurf installs 保留 cleanup
 
-## External Research Summary
+## 外部调研摘要
 
-| Harness | Shared `~/.agents/skills` | Native package/plugin install | Agent support path | Planning conclusion |
+| Harness | Shared `~/.agents/skills` | Native package/plugin install | Agent support path | Planning conclusion（planning 结论） |
 | --- | --- | --- | --- | --- |
-| Claude Code | Not the primary install path for this repo | Yes, `/plugin marketplace add` + `/plugin install` | Plugin `agents/` | Keep Claude native plugin as canonical. No Bun install needed for Claude. |
-| Codex | Yes, but CE should avoid it to prevent Copilot plugin shadowing. Codex also discovers `~/.codex/skills` in current local behavior. | Yes, but current docs describe official plugin directory plus local repo/personal marketplace files. | Custom agents are TOML under `~/.codex/agents` or `.codex/agents`, not `~/.agents/agents`. | Keep custom Codex install. Write CE skills under `~/.codex/skills/compound-engineering` and convert Claude agents to flat Codex TOML custom agents under `~/.codex/agents`. |
-| Copilot CLI | Yes. Docs list project `.agents/skills` and personal `~/.agents/skills`. | Yes. `copilot plugin marketplace add OWNER/REPO`, then `copilot plugin install NAME@MARKETPLACE`. Copilot can read existing `.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json`. | Personal `~/.copilot/agents`, project `.github/agents`, Claude-compatible `~/.claude/agents` / `.claude/agents`, and plugin `agents/`. No documented `~/.agents/agents`. | Move Copilot to native plugin distribution using the existing Claude plugin metadata. Remove user-facing Bun install. |
-| Gemini CLI | Yes, but CE should avoid it to prevent Copilot plugin shadowing. | Yes. `gemini extensions install <github-url-or-local-path>`, but monorepo subdirectory install is not documented. | Project `.gemini/agents`, user `~/.gemini/agents`, and extension `agents/`. The verified `.agents/*` alias is for skills, not subagents. | Keep custom Bun install to `~/.gemini/{skills,agents,commands}` for now; revisit native extension distribution later. |
-| Pi | Yes. Docs list `~/.agents/skills` and `.agents/skills`. | Yes. `pi install npm:...`, `pi install git:...`, URL, or local path. | Core Pi has no built-in subagents; subagents are extension/package-provided. Packages can bundle extensions, skills, prompts, themes. | Prefer a Pi package if we can package the existing compat extension, prompts, and skills cleanly. Until then, keep custom writer and cleanup. |
-| OpenCode | Yes, but CE should avoid it to prevent Copilot plugin shadowing. | Partial. OpenCode has plugins/config, but no equivalent repo marketplace install for our full payload in current target design. | Agents are OpenCode markdown/config under `~/.config/opencode/agents` or `.opencode/agents`. | Keep custom writer for agents/config; do not share pass-through skills via `~/.agents/skills` by default. |
-| Factory Droid | No confirmed `~/.agents/skills`; docs mention `.factory/skills`, `~/.factory/skills`, and project `.agent/skills` compatibility. | Yes. `droid plugin marketplace add <repo>`, then `droid plugin install NAME@MARKETPLACE`. Droid can install Claude Code-compatible plugins directly. | Plugin agents load through the native plugin translation path. | Move Droid to native plugin distribution and remove user-facing Bun install. |
-| Kiro | No confirmed `~/.agents/skills` in current docs. | Has import flows, but not a CE-wide plugin install path in current target. | Agents are `.kiro/agents` JSON + prompt files. | Keep custom writer. |
-| Windsurf | No longer relevant for CE support. | N/A | Current converter maps agents to skills. | Deprecate/remove user-facing support; keep legacy cleanup for old CE Windsurf installs. |
-| Qwen Code | No shared `~/.agents` conclusion needed. | Extension-oriented target already has per-plugin root. | Qwen supports target-native agents. | Keep custom writer/package output. |
+| Claude Code | 不是此 repo 的 primary install path | Yes，`/plugin marketplace add` + `/plugin install` | Plugin `agents/` | 将 Claude native plugin 保持为 canonical。Claude 不需要 Bun install。 |
+| Codex | Yes，但 CE 应避免使用，以防 Copilot plugin shadowing。Codex 在当前本地行为中也会 discover `~/.codex/skills`。 | Yes，但当前 docs 描述的是 official plugin directory 加 local repo/personal marketplace files。 | Custom agents 是 `~/.codex/agents` 或 `.codex/agents` 下的 TOML，不是 `~/.agents/agents`。 | 保留 custom Codex install。将 CE skills 写到 `~/.codex/skills/compound-engineering`，并将 Claude agents 转成 `~/.codex/agents` 下的 flat Codex TOML custom agents。 |
+| Copilot CLI | Yes。Docs 列出 project `.agents/skills` 和 personal `~/.agents/skills`。 | Yes。`copilot plugin marketplace add OWNER/REPO`，然后 `copilot plugin install NAME@MARKETPLACE`。Copilot 可读取现有 `.claude-plugin/marketplace.json` 和 `.claude-plugin/plugin.json`。 | Personal `~/.copilot/agents`、project `.github/agents`、Claude-compatible `~/.claude/agents` / `.claude/agents`，以及 plugin `agents/`。没有 documented `~/.agents/agents`。 | 使用现有 Claude plugin metadata，将 Copilot 迁移到 native plugin distribution。移除 user-facing Bun install。 |
+| Gemini CLI | Yes，但 CE 应避免使用，以防 Copilot plugin shadowing。 | Yes。`gemini extensions install <github-url-or-local-path>`，但 monorepo subdirectory install 未 documented。 | Project `.gemini/agents`、user `~/.gemini/agents` 和 extension `agents/`。已验证的 `.agents/*` alias 适用于 skills，不适用于 subagents。 | 目前保留 custom Bun install 到 `~/.gemini/{skills,agents,commands}`；稍后再重新评估 native extension distribution。 |
+| Pi | Yes。Docs 列出 `~/.agents/skills` 和 `.agents/skills`。 | Yes。`pi install npm:...`、`pi install git:...`、URL 或 local path。 | Core Pi 没有内建 subagents；subagents 由 extension/package 提供。Packages 可以 bundle extensions、skills、prompts、themes。 | 如果能干净打包现有 compat extension、prompts 和 skills，则优先使用 Pi package。在此之前，保留 custom writer 和 cleanup。 |
+| OpenCode | Yes，但 CE 应避免使用，以防 Copilot plugin shadowing。 | Partial。OpenCode 有 plugins/config，但当前 target design 中没有等价的 repo marketplace install 来承载完整 payload。 | Agents 是 `~/.config/opencode/agents` 或 `.opencode/agents` 下的 OpenCode markdown/config。 | 保留 agents/config 的 custom writer；默认不要通过 `~/.agents/skills` 共享 pass-through skills。 |
+| Factory Droid | 当前未确认 `~/.agents/skills`；docs 提到 `.factory/skills`、`~/.factory/skills` 和 project `.agent/skills` compatibility。 | Yes。`droid plugin marketplace add <repo>`，然后 `droid plugin install NAME@MARKETPLACE`。Droid 可直接安装 Claude Code-compatible plugins。 | Plugin agents 通过 native plugin translation path 加载。 | 将 Droid 移到 native plugin distribution，并移除 user-facing Bun install。 |
+| Kiro | 当前 docs 中未确认 `~/.agents/skills`。 | 有 import flows，但当前 target 中没有 CE-wide plugin install path。 | Agents 是 `.kiro/agents` JSON + prompt files。 | 保留 custom writer。 |
+| Windsurf | 不再与 CE support 相关。 | N/A | 当前 converter 将 agents 映射为 skills。 | Deprecate/remove user-facing support；为旧 CE Windsurf installs 保留 legacy cleanup。 |
+| Qwen Code | 不需要 shared `~/.agents` conclusion。 | Extension-oriented target 已有 per-plugin root。 | Qwen 支持 target-native agents。 | 保留 custom writer/package output。 |
 
-Sources checked:
+已检查来源：
 
-- Codex skills: `https://developers.openai.com/codex/skills`
-- Codex plugins: `https://developers.openai.com/codex/plugins` and `https://developers.openai.com/codex/plugins/build`
-- Codex subagents: `https://developers.openai.com/codex/subagents`
-- Copilot agents/skills/plugins: `https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/create-custom-agents-for-cli`, `https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills`, `https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference`
-- Gemini skills/subagents/extensions: `https://geminicli.com/docs/cli/skills/`, `https://geminicli.com/docs/core/subagents/`, `https://geminicli.com/docs/extensions/reference/`, `https://developers.googleblog.com/subagents-have-arrived-in-gemini-cli/`
-- Pi skills/packages: `https://buildwithpi.ai/README.md`, `https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/skills.md`, `https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md`
-- OpenCode skills/agents: `https://opencode.ai/docs/skills`, `https://opencode.ai/docs/agents/`
-- Factory Droid skills: `https://docs.factory.ai/cli/configuration/skills`
-- Kiro skills/agents: `https://kiro.dev/docs/skills/`, `https://kiro.dev/docs/cli/custom-agents/configuration-reference/`
+- Codex skills：`https://developers.openai.com/codex/skills`
+- Codex plugins：`https://developers.openai.com/codex/plugins` 和 `https://developers.openai.com/codex/plugins/build`
+- Codex subagents：`https://developers.openai.com/codex/subagents`
+- Copilot agents/skills/plugins：`https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/create-custom-agents-for-cli`, `https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills`, `https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference`
+- Gemini skills/subagents/extensions：`https://geminicli.com/docs/cli/skills/`, `https://geminicli.com/docs/core/subagents/`, `https://geminicli.com/docs/extensions/reference/`, `https://developers.googleblog.com/subagents-have-arrived-in-gemini-cli/`
+- Pi skills/packages：`https://buildwithpi.ai/README.md`, `https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/skills.md`, `https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md`
+- OpenCode skills/agents：`https://opencode.ai/docs/skills`, `https://opencode.ai/docs/agents/`
+- Factory Droid skills：`https://docs.factory.ai/cli/configuration/skills`
+- Kiro skills/agents：`https://kiro.dev/docs/skills/`, `https://kiro.dev/docs/cli/custom-agents/configuration-reference/`
 
-## Key Decisions
+## 关键决策
 
-### 1. Do not make `~/.agents` a CE-managed install root
+### 1. 不要让 `~/.agents` 成为 CE-managed install root
 
-`~/.agents/plugins/marketplace.json` is documented by Codex as a personal marketplace file, not as a cross-harness plugin installation convention. Copilot installs plugins under `~/.copilot/installed-plugins`, Gemini installs extensions under `~/.gemini/extensions`, and Pi packages install through Pi settings plus npm/git/local package storage.
+Codex 将 `~/.agents/plugins/marketplace.json` document 为 personal marketplace file，而不是 cross-harness plugin installation convention。Copilot 将 plugins 安装到 `~/.copilot/installed-plugins`，Gemini 将 extensions 安装到 `~/.gemini/extensions`，Pi packages 通过 Pi settings 加 npm/git/local package storage 安装。
 
-`~/.agents/skills` is also unsafe as a CE-managed install root. Copilot loads personal/project skills before plugin skills and deduplicates by `SKILL.md` `name`. A CE skill installed into `~/.agents/skills` for another target can silently shadow the same skill from Copilot's native plugin.
+`~/.agents/skills` 作为 CE-managed install root 也不安全。Copilot 会优先加载 personal/project skills，再加载 plugin skills，并按 `SKILL.md` 的 `name` deduplicate。为另一个 target 安装到 `~/.agents/skills` 的 CE skill 可能 silently shadow Copilot native plugin 中的 same skill。
 
-Treat `~/.agents` as a legacy cleanup surface, not a forward install surface.
+将 `~/.agents` 视为 legacy cleanup surface，而不是 forward install surface。
 
-### 2. Use native package distribution by target, not one universal folder
+### 2. 按 target 使用 native package distribution，而不是一个 universal folder
 
-Native targets should have target-native packaging:
+Native targets 应使用 target-native packaging：
 
-- Claude: existing `.claude-plugin` marketplace/plugin.
-- Copilot: reuse existing `.claude-plugin` marketplace/plugin metadata. Do not add a parallel `.github/plugin` surface unless a future Copilot-only manifest field becomes necessary.
-- Gemini: custom Bun install to `~/.gemini/{skills,agents,commands}` for now; future `gemini-extension.json` distribution remains possible.
-- Pi: npm/git/local package with `package.json` `pi` manifest.
-- Codex: `~/.codex/skills/compound-engineering`, `~/.codex/agents`, and optional future `.codex-plugin/plugin.json`, but do not retire custom install until remote install UX is verified.
+- Claude：复用 existing `.claude-plugin` marketplace/plugin。
+- Copilot: 复用 existing `.claude-plugin` marketplace/plugin metadata. 不添加 parallel `.github/plugin` surface，除非未来出现必要 Copilot-only manifest field。
+- Gemini: 暂时使用 custom Bun install to `~/.gemini/{skills,agents,commands}`；未来仍可能做 `gemini-extension.json` distribution。
+- Pi：带 `package.json` `pi` manifest 的 npm/git/local package。
+- Codex: `~/.codex/skills/compound-engineering`、`~/.codex/agents`，以及 optional future `.codex-plugin/plugin.json`；但在 remote install UX verified 前，不 retire custom install。
 
-### 3. Agents are not portable via `~/.agents`
+### 3. Agents 不能通过 `~/.agents` portable
 
-`~/.agents/skills` is increasingly common. `~/.agents/agents` is not documented by the primary sources checked for Codex, Copilot, or Gemini. Agent support must remain per target:
+`~/.agents/skills` 越来越常见。primary sources checked for Codex、Copilot 或 Gemini 中没有 document `~/.agents/agents`。Agent support 必须保持 per target：
 
-- Copilot agents: markdown agent files under `~/.copilot/agents`, `.github/agents`, Claude-compatible `.claude/agents` / `~/.claude/agents`, or plugin `agents`.
-- Gemini sub-agents: markdown files under `.gemini/agents`, `~/.gemini/agents`, or extension `agents/`.
-- Codex custom agents: TOML files under `.codex/agents` / `~/.codex/agents`. CE should generate these from Claude Markdown agents instead of degrading them into skills.
-- OpenCode agents: markdown/config under `.opencode/agents` / `~/.config/opencode/agents`.
-- Kiro agents: JSON configs and prompt files under `.kiro/agents`.
-- Pi: no built-in subagents; package an extension if CE needs subagent behavior.
+- Copilot agents：位于 `~/.copilot/agents`、`.github/agents`、Claude-compatible `.claude/agents` / `~/.claude/agents` 或 plugin `agents` 下的 markdown agent files。
+- Gemini sub-agents：位于 `.gemini/agents`、`~/.gemini/agents` 或 extension `agents/` 下的 markdown files。
+- Codex custom agents: TOML files under `.codex/agents` / `~/.codex/agents`. CE 应从 Claude Markdown agents 生成这些，而不是把它们 degrade into skills。
+- OpenCode agents：位于 `.opencode/agents` / `~/.config/opencode/agents` 下的 markdown/config。
+- Kiro agents：位于 `.kiro/agents` 下的 JSON configs 和 prompt files。
+- Pi: no built-in subagents；如果 CE 需要 subagent behavior，则 package an extension。
 
-This means the previous "convert agents to skills" behavior remains legitimate for targets without compatible agent packaging, but it should not be applied to Copilot and Gemini unless intentionally degraded. Gemini's April 2026 subagent support makes this more important: Gemini output should package CE agents as subagents under Gemini-owned roots, while `~/.agents` remains cleanup-only.
+这意味着 previous "convert agents to skills" behavior 对缺少 compatible agent packaging 的 targets 仍是 legitimate，但不应应用到 Copilot 和 Gemini，除非有意 degrade。Gemini 的 2026 年 4 月 subagent support 让这一点更重要：Gemini output 应把 CE agents 作为 subagents packaged under Gemini-owned roots，而 `~/.agents` 保持 cleanup-only。
 
-### 4. Cleanup must be a product feature, not incidental writer behavior
+### 4. Cleanup 必须是 product feature，而不是 incidental writer behavior
 
-Current cleanup work in `src/data/plugin-legacy-artifacts.ts` is the right direction, but it is too writer-bound. We need a standalone cleanup command that can run before switching users from old Bun installs to native harness installers.
+当前 `src/data/plugin-legacy-artifacts.ts` 中的 cleanup work 方向正确，但过于 writer-bound。需要 standalone cleanup command，让 users 在从 old Bun installs 切换到 native harness installers 前运行。
 
-Custom writers should still invoke cleanup automatically. Native installers cannot clean old CE artifacts in unrelated roots, so users need an explicit CE cleanup command.
+Custom writers 仍应自动 invoke cleanup。Native installers 无法清理 unrelated roots 中的 old CE artifacts，因此 users 需要 explicit CE cleanup command。
 
-### 5. Legacy inventory should be generated and validated against git history
+### 5. Legacy inventory 应从 git history 生成并验证
 
-The hand-maintained legacy list should be backed by a script that scans historical plugin inventories from git history:
+hand-maintained legacy list 应由 script 支撑，该 script 扫描 git history 中的 historical plugin inventories：
 
 - `plugins/compound-engineering/skills/*`
 - `plugins/compound-engineering/agents/*`
 - `plugins/compound-engineering/commands/*`
-- historical `prompts/*` or converted command outputs
-- renamed colon/underscore/hyphen variants per target
+- historical `prompts/*` 或 converted command outputs
+- 每个 target 的 renamed colon/underscore/hyphen variants
 
-The result should be committed as data, and tests should fail when the current or historical source inventory includes an untracked CE artifact.
+结果应作为 data commit，tests 应在 current or historical source inventory 包含 untracked CE artifact 时失败。
 
-## Implementation Units
+## 实施单元
 
-- [ ] **Unit 1: Add a platform install strategy spec**
+- [ ] **Unit 1：添加 platform install strategy spec**
 
-**Goal:** Replace ad hoc target assumptions with one repo-owned matrix for native vs custom install, shared-skill support, and agent support.
+**目标：** 用一个 repo-owned matrix 替换 ad hoc target assumptions，用于 native vs custom install、shared-skill support 和 agent support。
 
-**Requirements:** R1, R2, R3, R4, R9
+**需求：** R1, R2, R3, R4, R9
 
-**Files:**
-- Create: `docs/solutions/integrations/native-plugin-install-strategy.md`
-- Modify: `README.md`
-- Modify as needed: `docs/specs/codex.md`, `docs/specs/copilot.md`, `docs/specs/gemini.md`, `docs/specs/opencode.md`
+**文件：**
+- 新增：`docs/solutions/integrations/native-plugin-install-strategy.md`
+- 修改：`README.md`
+- 按需修改：`docs/specs/codex.md`, `docs/specs/copilot.md`, `docs/specs/gemini.md`, `docs/specs/opencode.md`
 
-**Approach:**
-- Document why CE avoids `~/.agents/skills` despite broad discovery support.
-- Document target-native package locations and install commands.
-- Mark each current target as `native-primary`, `custom-primary`, or `hybrid`.
-- Explicitly list whether source Claude agents become target agents or generated skills.
+**方法：**
+- 记录为什么 CE 尽管有 broad discovery support，仍避免使用 `~/.agents/skills`。
+- 记录 target-native package locations 和 install commands。
+- 将每个 current target 标记为 `native-primary`、`custom-primary` 或 `hybrid`。
+- 显式列出 source Claude agents 会变成 target agents 还是 generated skills。
 
-**Test scenarios:**
-- README no longer implies all targets require the same Bun install path.
-- Target specs agree on whether a target uses native install or custom writer.
-
----
-
-- [ ] **Unit 2: Build a standalone CE cleanup command**
-
-**Goal:** Give users one command to remove stale CE-owned artifacts from old installs before or during migration to native installers.
-
-**Requirements:** R5, R6, R7, R8
-
-**Files:**
-- Create: `src/commands/cleanup.ts`
-- Create or Modify: `src/cleanup/*`
-- Modify: `src/index.ts`
-- Modify: `src/targets/*` custom writers to call shared cleanup helpers
-- Modify: `tests/cli.test.ts`
-- Add targeted cleanup tests under `tests/`
-
-**Approach:**
-- Add a command such as `compound cleanup compound-engineering --targets codex,copilot,gemini,pi,opencode,droid --apply`.
-- Default to dry-run unless the existing CLI convention strongly favors direct action.
-- Move matched legacy artifacts to a timestamped backup rather than hard-deleting.
-- Only touch known CE-owned artifacts, existing install-manifest entries, and symlinks whose targets are CE-managed.
-- Cover `~/.agents/skills`, `~/.codex/skills`, `~/.codex/prompts`, `~/.copilot/skills`, `~/.copilot/agents`, `~/.gemini/skills`, `~/.gemini/agents`, `~/.gemini/commands`, `~/.pi/agent/{skills,prompts,extensions}`, `~/.config/opencode/{skills,agents,commands,plugins}`, `~/.factory/{skills,commands,droids}`, deprecated `~/.codeium/windsurf/{skills,workflows,mcp_config.json}`, and other current writer roots.
-
-**Test scenarios:**
-- Dry run reports stale `reproduce-bug` without moving it.
-- Apply moves stale CE artifacts to backup.
-- Non-CE skill with the same parent directory root is preserved.
-- A CE-managed symlink in `~/.agents/skills` is removed or moved safely.
-- A real user-owned directory at a CE-looking path is skipped unless manifest/history proves CE ownership.
+**测试场景：**
+- README 不再暗示所有 targets 都需要相同 Bun install path。
+- Target specs 对某个 target 使用 native install 还是 custom writer 保持一致。
 
 ---
 
-- [ ] **Unit 3: Generate and validate the historical CE artifact manifest**
+- [ ] **Unit 2：构建 standalone CE cleanup command**
 
-**Goal:** Prevent future cleanup gaps when skills or agents are removed, renamed, or converted.
+**目标：** 给 users 一条 command，用于在 migrating to native installers 前或过程中，移除 old installs 留下的 stale CE-owned artifacts。
 
-**Requirements:** R5, R8
+**需求：** R5, R6, R7, R8
 
-**Files:**
-- Modify: `src/data/plugin-legacy-artifacts.ts`
-- Create: `scripts/generate-legacy-artifacts.ts` or similar
-- Create: `tests/plugin-legacy-artifacts-history.test.ts`
-- Modify: existing `tests/plugin-legacy-artifacts.test.ts`
+**文件：**
+- 新增：`src/commands/cleanup.ts`
+- 新增或修改：`src/cleanup/*`
+- 修改：`src/index.ts`
+- 修改：`src/targets/*` custom writers，让它们调用 shared cleanup helpers
+- 修改：`tests/cli.test.ts`
+- 在 `tests/` 下添加 targeted cleanup tests
 
-**Approach:**
-- Scan git history for CE plugin directories and normalize names per target.
-- Preserve hand-added aliases only for cases not recoverable from source directory history.
-- Commit generated data in a stable sorted form.
-- Test that current source artifacts and known removed artifacts are included.
+**方法：**
+- 添加 command，例如 `compound cleanup compound-engineering --targets codex,copilot,gemini,pi,opencode,droid --apply`。
+- 默认 dry-run，除非 existing CLI convention strongly favors direct action。
+- 将 matched legacy artifacts 移到 timestamped backup，而不是 hard-delete。
+- 只触碰 known CE-owned artifacts、existing install-manifest entries，以及 targets are CE-managed 的 symlinks。
+- 覆盖 `~/.agents/skills`, `~/.codex/skills`, `~/.codex/prompts`, `~/.copilot/skills`, `~/.copilot/agents`, `~/.gemini/skills`, `~/.gemini/agents`, `~/.gemini/commands`, `~/.pi/agent/{skills,prompts,extensions}`, `~/.config/opencode/{skills,agents,commands,plugins}`, `~/.factory/{skills,commands,droids}`, deprecated `~/.codeium/windsurf/{skills,workflows,mcp_config.json}` 和其他 current writer roots。
 
-**Test scenarios:**
-- Removed `reproduce-bug` remains in cleanup data.
-- If `document-review` is renamed to `ce-doc-review`, both old and new cleanup-relevant names are tracked.
-- Historical `prompts` outputs remain cleanup candidates.
-- Colon, underscore, and hyphen variants normalize correctly for Codex, Gemini, Pi, and OpenCode.
+**测试场景：**
+- Dry run 报告 stale `reproduce-bug`，但不移动它。
+- Apply 将 stale CE artifacts 移到 backup。
+- 同一 parent directory root 下的 Non-CE skill 被 preserved。
+- `~/.agents/skills` 中的 CE-managed symlink 被安全移除或移动。
+- CE-looking path 中的 real user-owned directory 会被跳过，除非 manifest/history 证明 CE ownership。
 
 ---
 
-- [ ] **Unit 4: Move Copilot to native plugin distribution through existing Claude metadata**
+- [ ] **Unit 3：生成并验证 historical CE artifact manifest**
 
-**Goal:** Replace user-facing `bunx ... --to copilot` with Copilot marketplace/plugin install.
+**目标：** 当 skills or agents 被 removed、renamed 或 converted 时，防止 future cleanup gaps。
 
-**Requirements:** R1, R3, R4, R7, R9
+**需求：** R5, R8
 
-**Files:**
-- Modify: `README.md`
-- Modify: `docs/specs/copilot.md`
-- Modify: CLI target registration/tests if direct install is deprecated
-- Reassess/remove: `src/converters/claude-to-copilot.ts`, `src/targets/copilot.ts`, `src/types/copilot.ts`, and Copilot writer/converter tests if they no longer serve release validation
+**文件：**
+- 修改：`src/data/plugin-legacy-artifacts.ts`
+- 新增：`scripts/generate-legacy-artifacts.ts` 或类似脚本
+- 新增：`tests/plugin-legacy-artifacts-history.test.ts`
+- 修改：existing `tests/plugin-legacy-artifacts.test.ts`
 
-**Approach:**
-- Use the existing root `.claude-plugin/marketplace.json`; Copilot CLI explicitly looks there for marketplace metadata.
-- Use the existing plugin-local `.claude-plugin/plugin.json`; Copilot CLI can discover plugin manifests from `.claude-plugin/plugin.json`.
-- Document Copilot native install instructions:
+**方法：**
+- 扫描 git history 中的 CE plugin directories，并按 target normalize names。
+- 仅为无法从 source directory history 恢复的 cases 保留 hand-added aliases。
+- 以 stable sorted form commit generated data。
+- 测试 current source artifacts 和 known removed artifacts 均被包含。
+
+**测试场景：**
+- Removed `reproduce-bug` 仍保留在 cleanup data 中。
+- 如果 `document-review` rename 为 `ce-doc-review`，old 和 new cleanup-relevant names 都被 tracked。
+- Historical `prompts` outputs 仍是 cleanup candidates。
+- Colon、underscore 和 hyphen variants 对 Codex、Gemini、Pi 和 OpenCode 正确 normalize。
+
+---
+
+- [ ] **Unit 4：通过 existing Claude metadata 将 Copilot 迁移到 native plugin distribution**
+
+**目标：** 用 Copilot marketplace/plugin install 替换 user-facing `bunx ... --to copilot`。
+
+**需求：** R1, R3, R4, R7, R9
+
+**文件：**
+- 修改：`README.md`
+- 修改：`docs/specs/copilot.md`
+- 如果 direct install deprecated，则修改 CLI target registration/tests
+- 重新评估/移除：`src/converters/claude-to-copilot.ts`, `src/targets/copilot.ts`, `src/types/copilot.ts`，以及不再服务 release validation 的 Copilot writer/converter tests
+
+**方法：**
+- 使用 existing root `.claude-plugin/marketplace.json`；Copilot CLI 会明确读取该 marketplace metadata。
+- 使用 existing plugin-local `.claude-plugin/plugin.json`；Copilot CLI 可从 `.claude-plugin/plugin.json` discover plugin manifests。
+- 记录 Copilot native install instructions：
   - `copilot plugin marketplace add EveryInc/compound-engineering-plugin`
   - `copilot plugin install compound-engineering@compound-engineering-plugin`
-- Keep plugin agents as agents, not generated skills.
-- Do not create parallel `.github/plugin` metadata or `agents-copilot/` output unless a real compatibility failure is proven.
-- Run or recommend `compound cleanup compound-engineering --targets copilot,codex --apply` before switching old installs.
-- Treat stale Copilot skills as a shadowing risk, not only a duplicate-display risk. Copilot deduplicates skills by `SKILL.md` `name` with first-found-wins precedence, and personal/project skill roots such as `~/.agents/skills` load before plugin skills.
+- 保持 plugin agents 为 agents，而不是 generated skills。
+- 不创建 parallel `.github/plugin` metadata 或 `agents-copilot/` output，除非证明存在 real compatibility failure。
+- 切换 old installs 前，运行或推荐 `compound cleanup compound-engineering --targets copilot,codex --apply`。
+- 将 stale Copilot skills 视为 shadowing risk，而不只是 duplicate-display risk。Copilot 按 `SKILL.md` `name` deduplicates skills，采用 first-found-wins precedence，且 personal/project skill roots（如 `~/.agents/skills`）先于 plugin skills 加载。
 
-**Test scenarios:**
-- Existing `.claude-plugin/marketplace.json` parses and has a `compound-engineering` entry whose `source` points at `plugins/compound-engineering`.
-- Existing `plugins/compound-engineering/.claude-plugin/plugin.json` parses and is valid enough for both Claude and Copilot.
-- Copilot docs/spec record the native install commands and the `.claude-plugin` compatibility.
-- README does not advertise old direct Copilot Bun install as the primary path.
-- If possible, a local-path Copilot plugin install in a temporary config directory succeeds without modifying the user's real Copilot home.
-- A seeded stale `~/.agents/skills/ce-plan/SKILL.md` shadows a plugin-provided `ce-plan` in docs/tests or manual verification, proving cleanup is required even when Copilot does not show duplicate skills.
-
----
-
-- [ ] **Unit 5: Update Gemini custom install and defer extension packaging**
-
-**Goal:** Keep Gemini on the custom Bun installer for now, but make it write Gemini-native skills and subagents under `~/.gemini` without using `~/.agents`.
-
-**Requirements:** R1, R3, R4, R7, R9
-
-**Files:**
-- Create or Generate: Gemini skill/agent/command payloads as needed
-- Modify: `docs/specs/gemini.md`
-- Modify: `README.md`
-- Reassess: `src/converters/claude-to-gemini.ts`, `src/targets/gemini.ts`
-
-**Approach:**
-- Write pass-through skills to `~/.gemini/skills`.
-- Write normalized flat Gemini subagents to `~/.gemini/agents`.
-- Write command TOML files to `~/.gemini/commands` if CE ships commands again.
-- Write a managed manifest to `~/.gemini/compound-engineering/install-manifest.json`.
-- Do not write CE-owned Gemini artifacts to `~/.agents/skills`.
-- Do not assume `gemini extensions install` supports `--path` for a monorepo subdirectory. Current docs and local help list GitHub repository URL or local path sources, while `--path` is documented for `gemini skills install`.
-- Defer native extension distribution until we choose a shape where the installed source root contains `gemini-extension.json`: dedicated Gemini extension repo, generated distribution branch/package, or release asset.
-- Preserve agent prompt bodies where possible; the necessary work is flattening agent files into direct `agents/*.md` entries and stripping/translating Claude-specific frontmatter such as `color` and string-form `tools`.
-
-**Test scenarios:**
-- Bun install writes to Gemini-owned roots and does not write to `~/.agents/skills`.
-- Gemini-specific agents are packaged as extension sub-agents, not flattened into skills unless deliberately configured.
-- Generated Gemini agents are flat direct files under `~/.gemini/agents`, contain strict Gemini-compatible frontmatter, and load without validation errors.
-- Legacy `.gemini` direct install cleanup still runs from the cleanup command.
+**测试场景：**
+- Existing `.claude-plugin/marketplace.json` parses，并有一个 `compound-engineering` entry whose `source` points at `plugins/compound-engineering`。
+- Existing `plugins/compound-engineering/.claude-plugin/plugin.json` parses，且对 Claude 和 Copilot 都足够 valid。
+- Copilot docs/spec 记录 native install commands 和 `.claude-plugin` compatibility。
+- README 不再将 old direct Copilot Bun install 宣传为 primary path。
+- 如果可能，在 temporary config directory 中 local-path Copilot plugin install 成功，且不修改用户真实 Copilot home。
+- seeded stale `~/.agents/skills/ce-plan/SKILL.md` 在 docs/tests 或 manual verification 中 shadow plugin-provided `ce-plan`，证明即使 Copilot 不显示 duplicate skills，cleanup 也仍必需。
 
 ---
 
-- [ ] **Unit 6: Add or defer Pi package distribution**
+- [ ] **Unit 5：更新 Gemini custom install，并 defer extension packaging**
 
-**Goal:** Decide whether CE can be installed with `pi install` and, if yes, package the existing Pi output as a real Pi package.
+**目标：** 暂时让 Gemini 继续使用 custom Bun installer，但使其写入 Gemini-native skills and subagents under `~/.gemini`，不使用 `~/.agents`。
 
-**Requirements:** R1, R4, R6, R7, R9
+**需求：** R1, R3, R4, R7, R9
 
-**Files:**
-- Create or Modify: package metadata for Pi package distribution
-- Modify: `docs/specs/pi.md` if created, otherwise add one
-- Modify: `README.md`
-- Reassess: `src/converters/claude-to-pi.ts`, `src/targets/pi.ts`
+**文件：**
+- 按需新增或生成：Gemini skill/agent/command payloads
+- 修改：`docs/specs/gemini.md`
+- 修改：`README.md`
+- 重新评估：`src/converters/claude-to-gemini.ts`, `src/targets/gemini.ts`
 
-**Approach:**
-- Prefer npm package distribution if we want to avoid asking users to manually clone a repository.
-- Package Pi resources with `package.json` `pi` manifest: `skills`, `prompts`, and `extensions`.
-- Resolve the existing compat-extension conflict risk before promoting Pi native package as primary.
-- Until packaged and tested, keep the custom Pi writer and have it call shared cleanup every install.
+**方法：**
+- 将 pass-through skills 写入 `~/.gemini/skills`。
+- 将 normalized flat Gemini subagents 写入 `~/.gemini/agents`。
+- 如果 CE 再次 ship commands，将 command TOML files 写入 `~/.gemini/commands`。
+- 将 managed manifest 写入 `~/.gemini/compound-engineering/install-manifest.json`。
+- 不要将 CE-owned Gemini artifacts 写入 `~/.agents/skills`。
+- 不要假设 `gemini extensions install` 支持 monorepo subdirectory 的 `--path`。Current docs 和 local help list GitHub repository URL or local path sources，而 `--path` 是为 `gemini skills install` documented。
+- Defer native extension distribution，直到选择一种 installed source root 包含 `gemini-extension.json` 的形状：dedicated Gemini extension repo、generated distribution branch/package 或 release asset。
+- 尽可能 preserve agent prompt bodies；必要工作是将 agent files flatten 成 direct `agents/*.md` entries，并 strip/translate Claude-specific frontmatter，例如 `color` 和 string-form `tools`。
 
-**Test scenarios:**
-- Pi package manifest includes skills/prompts/extensions.
-- Existing `compound-engineering-compat.ts` does not conflict with popular subagent packages or is made conditional.
-- Cleanup removes old direct writer artifacts under `~/.pi/agent`.
+**测试场景：**
+- Bun install 写入 Gemini-owned roots，且不写入 `~/.agents/skills`。
+- Gemini-specific agents 被 package 为 extension sub-agents，除非 deliberate configured，否则不 flatten into skills。
+- Generated Gemini agents 是 `~/.gemini/agents` 下的 flat direct files，包含 strict Gemini-compatible frontmatter，并能无 validation errors 加载。
+- Legacy `.gemini` direct install cleanup 仍从 cleanup command 运行。
 
 ---
 
-- [x] **Unit 7: Rationalize remaining custom targets and deprecate Windsurf**
+- [ ] **Unit 6：添加或 defer Pi package distribution**
 
-**Goal:** Make explicit which targets still need the Bun converter/install path, remove Windsurf from active support, and ensure each retained or deprecated target has cleanup coverage.
+**目标：** 决定 CE 是否可通过 `pi install` 安装；如果可以，将 existing Pi output package 成 real Pi package。
 
-**Requirements:** R4, R6, R8, R9, R10
+**需求：** R1, R4, R6, R7, R9
 
-**Files:**
-- Modify: `src/targets/index.ts`
-- Modify: `src/targets/{codex,opencode,kiro,qwen}.ts`
-- Delete: custom plugin install writers for native-marketplace targets such as Droid and Copilot
-- Delete: `src/converters/claude-to-windsurf.ts`, `src/types/windsurf.ts`, `src/targets/windsurf.ts`, `src/sync/windsurf.ts`, `tests/windsurf-*.test.ts`
-- Modify: README target table
-- Modify: target writer tests
+**文件：**
+- 新增或修改：Pi package distribution 的 package metadata
+- 修改：`docs/specs/pi.md`（如果已创建），否则新增
+- 修改：`README.md`
+- 重新评估：`src/converters/claude-to-pi.ts`, `src/targets/pi.ts`
 
-**Approach:**
-- Keep custom targets where native install does not cover the full payload or is not documented enough.
-- Run shared cleanup for each custom install.
-- Deprecate Windsurf from user-facing `convert`, `install`, `sync`, README, and target lists.
-- Preserve Windsurf cleanup support so old CE artifacts can be removed from `~/.codeium/windsurf/` even after active support is gone.
-- For Codex, keep current custom install as primary until native plugin distribution from a GitHub repo is as simple as Copilot/Gemini/Pi or until official directory publishing is available.
-- For Codex skills, write to `~/.codex/skills/compound-engineering/<skill>` with a manifest under `~/.codex/compound-engineering/`; do not write to `~/.agents/skills`.
-- For Codex agents, convert Claude Markdown agents to flat TOML custom agents under `~/.codex/agents` using CE-prefixed names such as `ce-review-correctness-reviewer`, and update converted skill content so `Task`/agent references explicitly ask Codex to spawn the named custom agent.
-- The Codex skill-plus-agent split was smoke-tested on 2026-04-18: a skill in `~/.agents/skills/ce-codex-agent-smoke` successfully spawned a TOML custom agent from `~/.codex/agents/ce-codex-agent-smoke.toml` and returned `CODEX_TOML_AGENT_SMOKE_OK`.
-- Codex duplicate discovery was also smoke-tested on 2026-04-18: the same skill name installed under both `~/.agents/skills` and legacy `~/.codex/skills` appeared twice in the skill picker. Codex cleanup must remove old CE-owned skills from both roots before writing the namespaced `~/.codex/skills/compound-engineering` install.
-- Shared skill nesting was smoke-tested on 2026-04-18: Codex discovered flat, nested, and Superpowers-style symlink-pack skills under `~/.agents/skills`, but Copilot and Gemini only discovered the flat direct `~/.agents/skills/<skill>/SKILL.md` shape. CE should avoid this root anyway because of Copilot shadowing.
-- For OpenCode, do not share pass-through skills via `~/.agents/skills` unless the user explicitly opts into cross-harness shared skills and understands Copilot shadowing.
+**方法：**
+- 如果不想要求 users 手动 clone repository，prefer npm package distribution。
+- 使用 `package.json` `pi` manifest package Pi resources：`skills`、`prompts` 和 `extensions`。
+- 在 promote Pi native package 为 primary 前，解决 existing compat-extension conflict risk。
+- 在 packaged and tested 前，保留 custom Pi writer，并让它每次 install 调用 shared cleanup。
 
-**Test scenarios:**
-- Each custom writer calls cleanup with the correct target roots.
-- Target writer manifests remove artifacts that disappear between installs.
-- Windsurf is no longer advertised or selectable as an active install target.
-- Cleanup can still identify and back up old CE Windsurf artifacts.
-- README table matches registered target behavior.
+**测试场景：**
+- Pi package manifest 包含 skills/prompts/extensions。
+- Existing `compound-engineering-compat.ts` 不与 popular subagent packages 冲突，或变为 conditional。
+- Cleanup 移除 `~/.pi/agent` 下的 old direct writer artifacts。
 
-## Sequencing
+---
 
-1. Land the strategy spec and cleanup command first. This reduces migration risk no matter which native packaging target lands next.
-2. Promote Copilot native install next because its plugin marketplace flow is documented and closest to Claude's model.
-3. Add Gemini extension packaging after Copilot because Gemini can bundle skills, commands, and preview sub-agents through extensions.
-4. Decide Pi packaging after resolving the extension conflict and npm-package shape.
-5. Revisit Codex native plugins last; the platform supports plugins, but the public distribution UX still appears less direct than Copilot/Gemini/Pi for a GitHub-hosted third-party plugin.
-6. Deprecate Windsurf and keep the remaining custom targets, with cleanup mandatory and manifest-backed.
+- [x] **Unit 7：理顺 remaining custom targets 并 deprecate Windsurf**
 
-## Open Questions
+**目标：** 明确哪些 targets 仍需要 Bun converter/install path，从 active support 中移除 Windsurf，并确保每个 retained or deprecated target 都有 cleanup coverage。
 
-- Should the cleanup command default to dry-run or apply? Recommendation: dry-run for standalone use, apply automatically inside custom install writers.
-- Should native package payloads be checked in or generated during release validation? Recommendation: generated but checked for determinism in CI if the target package must be present in the repo.
-- Should the existing `@every-env/compound-plugin` npm package also become the Pi package, or should Pi get a smaller dedicated npm package? Recommendation: investigate package contents first; avoid bloating Pi installs with converter-only code if avoidable.
-- Should Codex native plugin support be documented as experimental alongside custom install? Recommendation: yes, but do not retire custom install until remote marketplace install is verified end to end.
+**需求：** R4, R6, R8, R9, R10
 
-## Verification
+**文件：**
+- 修改：`src/targets/index.ts`
+- 修改：`src/targets/{codex,opencode,kiro,qwen}.ts`
+- 删除：native-marketplace targets（如 Droid 和 Copilot）的 custom plugin install writers
+- 删除：`src/converters/claude-to-windsurf.ts`, `src/types/windsurf.ts`, `src/targets/windsurf.ts`, `src/sync/windsurf.ts`, `tests/windsurf-*.test.ts`
+- 修改：README target table
+- 修改：target writer tests
 
-- `bun test` after implementation units touching CLI, writers, or conversion.
-- `bun run release:validate` after native package manifests or plugin inventory changes.
-- Manual smoke tests for native installers:
+**方法：**
+- 保留 native install 不覆盖 full payload 或缺少足够 docs 的 custom targets。
+- 每个 custom install 都运行 shared cleanup。
+- 从 user-facing `convert`、`install`、`sync`、README 和 target lists 中 deprecate Windsurf。
+- 保留 Windsurf cleanup support，使 old CE artifacts 即使 active support 移除后仍可从 `~/.codeium/windsurf/` 移除。
+- 对 Codex，保留 current custom install as primary，直到 native plugin distribution from a GitHub repo 与 Copilot/Gemini/Pi 一样简单，或 official directory publishing 可用。
+- 对 Codex skills，写入 `~/.codex/skills/compound-engineering/<skill>`，manifest under `~/.codex/compound-engineering/`；不要写入 `~/.agents/skills`。
+- 对 Codex agents，将 Claude Markdown agents 转为 flat TOML custom agents under `~/.codex/agents`，使用 CE-prefixed names 如 `ce-review-correctness-reviewer`，并更新 converted skill content，使 `Task`/agent references 明确要求 Codex spawn named custom agent。
+- Codex skill-plus-agent split was smoke-tested on 2026-04-18：`~/.agents/skills/ce-codex-agent-smoke` 中的 skill 成功 spawn `~/.codex/agents/ce-codex-agent-smoke.toml` 中的 TOML custom agent，并返回 `CODEX_TOML_AGENT_SMOKE_OK`。
+- Codex duplicate discovery was also smoke-tested on 2026-04-18：相同 skill name 安装在 `~/.agents/skills` 和 legacy `~/.codex/skills` 下时，会在 skill picker 中出现两次。Codex cleanup 必须在写入 namespaced `~/.codex/skills/compound-engineering` install 前，从两个 roots 移除 old CE-owned skills。
+- Shared skill nesting was smoke-tested on 2026-04-18：Codex 能发现 `~/.agents/skills` 下的 flat、nested 和 Superpowers-style symlink-pack skills，但 Copilot 和 Gemini 只发现 flat direct `~/.agents/skills/<skill>/SKILL.md` shape。CE 无论如何都应避免这个 root，因为 Copilot shadowing。
+- 对 OpenCode，除非 user explicitly opts into cross-harness shared skills 并理解 Copilot shadowing，否则不要通过 `~/.agents/skills` share pass-through skills。
+
+**测试场景：**
+- 每个 custom writer 都用正确 target roots 调用 cleanup。
+- Target writer manifests 会移除 installs 之间消失的 artifacts。
+- Windsurf 不再作为 active install target 被宣传或可选择。
+- Cleanup 仍可识别并 back up old CE Windsurf artifacts。
+- README table 与 registered target behavior 匹配。
+
+## 顺序安排
+
+1. 先 land strategy spec 和 cleanup command。无论下一个 native packaging target 是谁，这都会降低 migration risk。
+2. 接着 promote Copilot native install，因为其 plugin marketplace flow 已 documented，且最接近 Claude model。
+3. 在 Copilot 后添加 Gemini extension packaging，因为 Gemini 可通过 extensions bundle skills、commands 和 preview sub-agents。
+4. 解决 extension conflict 和 npm-package shape 后再决定 Pi packaging。
+5. 最后 revisit Codex native plugins；platform 支持 plugins，但 public distribution UX 对 GitHub-hosted third-party plugin 来说仍不如 Copilot/Gemini/Pi 直接。
+6. Deprecate Windsurf，并保留 remaining custom targets，cleanup mandatory and manifest-backed。
+
+## 开放问题
+
+- cleanup command 应 default to dry-run 还是 apply？Recommendation：standalone use 默认 dry-run；custom install writers 内自动 apply。
+- native package payloads 应 check in，还是 release validation 期间生成？Recommendation：如果 target package 必须存在于 repo，生成后在 CI 中 check determinism。
+- existing `@every-env/compound-plugin` npm package 是否也应成为 Pi package，还是 Pi 应有更小的 dedicated npm package？Recommendation：先调查 package contents；避免让 Pi installs 背负 converter-only code。
+- Codex native plugin support 是否应作为 experimental 与 custom install 一起 document？Recommendation：yes，但在 remote marketplace install end to end verified 前，不 retire custom install。
+
+## 验证
+
+- touching CLI、writers 或 conversion 的 implementation units 后运行 `bun test`。
+- native package manifests 或 plugin inventory changes 后运行 `bun run release:validate`。
+- native installers 的 manual smoke tests：
   - Claude: `/plugin install compound-engineering`
-  - Copilot: `copilot plugin marketplace add EveryInc/compound-engineering-plugin` then install
+  - Copilot: `copilot plugin marketplace add EveryInc/compound-engineering-plugin` then install（然后安装）
   - Gemini: `gemini extensions install <repo-url-or-local-path>`
-  - Pi: `pi install npm:<package>` or local package path
-- Cleanup smoke test with seeded temp homes for `~/.agents`, `~/.codex`, `~/.copilot`, `~/.gemini`, `~/.pi`, `~/.config/opencode`, and `~/.factory`.
+  - Pi: `pi install npm:<package>` or local package path（或 local package path）
+- 使用 seeded temp homes 对 `~/.agents`, `~/.codex`, `~/.copilot`, `~/.gemini`, `~/.pi`, `~/.config/opencode` 和 `~/.factory` 做 cleanup smoke test。

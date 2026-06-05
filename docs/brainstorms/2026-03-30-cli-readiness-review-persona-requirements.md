@@ -3,63 +3,63 @@ date: 2026-03-30
 topic: cli-readiness-review-persona
 ---
 
-# CLI Agent-Readiness Review Persona in ce:review
+# ce:review 中的 CLI Agent-Readiness Review Persona
 
-## Problem Frame
+## 问题框架
 
-The `cli-agent-readiness-reviewer` agent exists as a standalone deep-audit tool, but developers only benefit from it if they know it exists and invoke it explicitly. Most CLI code gets reviewed through `ce:review`, which has no CLI-specific lens. Agent-readiness issues (prose-only output, missing `--json`, interactive prompts without bypass, unbounded list output) ship undetected because no review persona covers them.
+`cli-agent-readiness-reviewer` agent 作为 standalone deep-audit tool 存在，但只有 developers 知道它存在并显式调用时才受益。多数 CLI code 通过 `ce:review` review，而它没有 CLI-specific lens。Agent-readiness issues（prose-only output、missing `--json`、interactive prompts without bypass、unbounded list output）会在没有任何 review persona 覆盖的情况下 ship。
 
-Adding CLI readiness as a conditional persona in ce:review makes this expertise automatic -- the developer runs their normal review and gets CLI agent-readiness findings alongside security, performance, and other concerns.
+把 CLI readiness 作为 ce:review 中的 conditional persona，可以让这类 expertise 自动发生——developer 运行正常 review，即可和 security、performance 及其他 concerns 一起获得 CLI agent-readiness findings。
 
-## Requirements
+## 需求
 
-**Persona Selection**
+**Persona Selection（persona 选择）**
 
-- R1. ce:review's orchestrator selects the CLI readiness persona based on diff analysis (same pattern as security-reviewer, performance-reviewer, etc.) -- not always-on
-- R2. Activation signals: diff touches CLI command definitions, argument parsing, CLI framework usage, or command handler implementations. The orchestrator uses judgment (not keyword matching), consistent with how all other conditional personas are activated
-- R3. Non-overlapping scope with agent-native-reviewer: CLI readiness evaluates CLI command structure and agent-friendliness; agent-native evaluates UI/agent tool parity. Both may activate on the same diff if it touches both CLI and UI code -- their findings address different concerns. Overlap is possible and handled during synthesis rather than prevented mechanically
+- R1. ce:review 的 orchestrator 基于 diff analysis 选择 CLI readiness persona（与 security-reviewer、performance-reviewer 等相同 pattern）——不是 always-on
+- R2. Activation signals：diff 触及 CLI command definitions、argument parsing、CLI framework usage 或 command handler implementations。orchestrator 使用 judgment（不是 keyword matching），与其他 conditional personas 的激活方式一致
+- R3. 与 agent-native-reviewer scope 不重叠：CLI readiness 评估 CLI command structure 和 agent-friendliness；agent-native 评估 UI/agent tool parity。如果同一个 diff 同时触及 CLI 和 UI code，两者都可能激活——它们的 findings 处理不同 concerns。Overlap 可能存在，并在 synthesis 中处理，而不是机械阻止
 
-**Persona Behavior**
+**Persona Behavior（persona 行为）**
 
-- R4. Once dispatched, the persona self-scopes: identifies the framework, detects changed commands from the diff, and evaluates against the 7 principles from the standalone `cli-agent-readiness-reviewer` agent (used as reference material, not dispatched directly)
-- R5. The persona returns findings in ce:review's standard JSON findings schema (same as all other conditional personas). For design-level findings that span multiple files or concern missing capabilities, use the most relevant command handler file as the canonical location
-- R6. Severity mapping: Blocker -> P1, Friction -> P2, Optimization -> P3. The severity ceiling is P1 -- CLI readiness issues make the CLI harder for agents to use, they do not crash or corrupt
-- R7. Autofix class: all findings use autofix_class `manual` or `advisory` with owner `human`. CLI readiness findings are design decisions (JSON schema design, flag semantics, error message content) that should not be auto-applied
-- R8. Framework-idiomatic recommendations: findings reference the specific framework's patterns (e.g., "add `@click.option('--json', ...)` " for Click, not generic "add a --json flag")
+- R4. dispatch 后，persona self-scopes：识别 framework，从 diff 检测 changed commands，并按 standalone `cli-agent-readiness-reviewer` agent 的 7 principles 评估（作为 reference material 使用，不直接 dispatch）
+- R5. persona 按 ce:review 的 standard JSON findings schema 返回 findings（与其他 conditional personas 相同）。对跨多个 files 或涉及 missing capabilities 的 design-level findings，使用最相关 command handler file 作为 canonical location
+- R6. Severity mapping：Blocker -> P1，Friction -> P2，Optimization -> P3。severity ceiling 是 P1——CLI readiness issues 会让 CLI 更难被 agents 使用，但不会 crash 或 corrupt
+- R7. Autofix class：所有 findings 使用 autofix_class `manual` 或 `advisory`，owner 为 `human`。CLI readiness findings 是 design decisions（JSON schema design、flag semantics、error message content），不应 auto-applied
+- R8. Framework-idiomatic recommendations：findings 引用具体 framework 的 patterns（例如对 Click 写 “add `@click.option('--json', ...)`”，而不是 generic “add a --json flag”）
 
-**Integration**
+**Integration（集成）**
 
-- R9. Create a new lightweight persona agent file in `agents/review/` that distills the 7 principles into a code-review-oriented persona producing structured JSON findings. Add it to `ce-review/references/persona-catalog.md` in the cross-cutting conditional section with activation description and severity guidance
-- R10. The existing standalone `cli-agent-readiness-reviewer` agent stays unchanged -- it remains available for direct invocation and whole-CLI audits. The new persona references the same principles but is optimized for ce:review's dispatch pattern and output format
+- R9. 在 `agents/review/` 中创建新的 lightweight persona agent file，将 7 principles 精炼为面向 code review 的 persona，产出 structured JSON findings。把它加入 `ce-review/references/persona-catalog.md` 的 cross-cutting conditional section，包含 activation description 和 severity guidance。
+- R10. existing standalone `cli-agent-readiness-reviewer` agent 保持不变——它仍可 direct invocation 和 whole-CLI audits。new persona 引用相同 principles，但针对 ce:review 的 dispatch pattern 和 output format 优化
 
-## Success Criteria
+## 成功标准
 
-- A ce:review run on a PR that modifies CLI command handlers includes CLI readiness findings in the review report without the user asking
-- A ce:review run on a PR that only modifies React components or Rails views does not dispatch the CLI readiness persona
-- Findings use framework-specific language matching the CLI's detected framework
-- All findings have severity P1, P2, or P3 (never P0) and autofix_class `manual` or `advisory`
+- 在修改 CLI command handlers 的 PR 上运行 ce:review，会在用户没有请求的情况下，在 review report 中包含 CLI readiness findings
+- 在只修改 React components 或 Rails views 的 PR 上运行 ce:review，不会 dispatch CLI readiness persona
+- Findings 使用与检测到的 CLI framework 匹配的 framework-specific language
+- 所有 findings severity 都是 P1、P2 或 P3（绝不 P0），autofix_class 是 `manual` 或 `advisory`
 
-## Scope Boundaries
+## 范围边界
 
-- This does not modify the standalone `cli-agent-readiness-reviewer` agent
-- This does not add CLI awareness to ce:brainstorm or ce:plan (deferred -- ce:review alone covers the highest-value case)
-- This does not introduce autofix for CLI readiness findings
+- 不修改 standalone `cli-agent-readiness-reviewer` agent
+- 不把 CLI awareness 加入 ce:brainstorm 或 ce:plan（deferred——仅 ce:review 已覆盖最高价值场景）
+- 不为 CLI readiness findings 引入 autofix
 
-## Key Decisions
+## 关键决策
 
-- **New persona agent file**: A lightweight agent in `agents/review/` that distills the standalone agent's 7 principles into structured JSON findings. This matches how every other conditional persona works (security-reviewer, performance-reviewer, etc. are all separate agent files). The standalone agent's narrative report format doesn't match ce:review's JSON findings schema, and prompt surgery at dispatch time would be fragile.
-- **Conditional, not always-on**: Follows the existing pattern where the orchestrator selects personas based on diff content. The persona never runs on non-CLI diffs.
-- **Persona self-scopes**: The persona does its own framework detection and subcommand identification after dispatch. ce:review's orchestrator only decides whether to dispatch, not what framework is in use.
-- **No autofix**: All findings route to human review. CLI readiness issues require design judgment.
-- **Severity ceiling is P1**: CLI readiness issues don't crash the software -- they make it harder for agents to use. The highest reasonable severity is P1 (should fix), not P0 (must fix before merge).
+- **New persona agent file**：`agents/review/` 中的 lightweight agent，将 standalone agent 的 7 principles 精炼为 structured JSON findings。这与其他 conditional persona 的工作方式一致（security-reviewer、performance-reviewer 等都是 separate agent files）。standalone agent 的 narrative report format 不匹配 ce:review 的 JSON findings schema，而 dispatch-time prompt surgery 会很 fragile。
+- **Conditional, not always-on**：遵循现有 pattern，orchestrator 基于 diff content 选择 personas。persona 绝不在 non-CLI diffs 上运行。
+- **Persona self-scopes**：dispatch 后，persona 自己做 framework detection 和 subcommand identification。ce:review 的 orchestrator 只决定是否 dispatch，不判断使用什么 framework。
+- **No autofix**：所有 findings 都 route 到 human review。CLI readiness issues 需要 design judgment。
+- **Severity ceiling is P1**：CLI readiness issues 不会 crash software——它们让 agents 更难使用。最高合理 severity 是 P1（should fix），不是 P0（must fix before merge）。
 
-## Outstanding Questions
+## 待决问题
 
-### Deferred to Planning
+### 延后到 Planning
 
-- [Affects R9][Needs research] How much of the standalone agent's content should the new persona include directly vs. reference? The standalone agent is 24K+ (the largest review agent) -- the persona should be much smaller, distilling the principles into code-review-oriented checks rather than reproducing the full Framework Idioms Reference.
-- [Affects R4][Needs research] Should the persona evaluate all 7 principles on every dispatch, or should it prioritize principles by command type (as the standalone agent does) and cap findings to avoid flooding the review with low-signal items?
+- [Affects R9][Needs research] new persona 应直接包含 standalone agent content 的多少，多少只 reference？standalone agent 超过 24K（最大的 review agent）——persona 应小很多，把 principles 精炼成 code-review-oriented checks，而不是复刻完整 Framework Idioms Reference。
+- [Affects R4][Needs research] persona 是否应在每次 dispatch 时评估全部 7 principles，还是像 standalone agent 那样按 command type 优先排序，并限制 findings 数量以避免 review 被 low-signal items 淹没？
 
-## Next Steps
+## 下一步
 
--> `/ce:plan` for structured implementation planning
+-> `/ce:plan` 进行 structured implementation planning

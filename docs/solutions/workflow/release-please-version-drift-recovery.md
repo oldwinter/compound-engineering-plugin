@@ -1,5 +1,5 @@
 ---
-title: "Release-please version drift recovery"
+title: "Release-please version drift recovery（版本漂移恢复）"
 category: workflow
 date: 2026-04-24
 created: 2026-04-24
@@ -15,22 +15,22 @@ tags:
   - extra-files
 ---
 
-# Release-please version drift recovery
+# Release-please version drift recovery（version drift 恢复）
 
-## Problem
+## 问题
 
-Manual edits to a release-managed version field (any `plugin.json` listed in `extra-files`, `package.json`, or the release-please manifest) cause drift that:
+手动编辑由 release 管理的 version field（任何列在 `extra-files` 中的 `plugin.json`、`package.json`，或 release-please manifest）会造成 drift，后果包括：
 
-- Breaks `bun run release:validate` on every PR's CI
-- Can cause version regression on the next release-please run if left uncorrected
-- Is easy to introduce accidentally — a one-line edit during a feature commit
-- Has at least three valid recovery paths, each with different user-impact trade-offs
+- 在每个 PR 的 CI 上破坏 `bun run release:validate`
+- 如果不纠正，下一次 release-please run 可能导致 version regression
+- 很容易意外引入 -- feature commit 中的一行 edit 即可
+- 至少有三条有效 recovery paths，每条都有不同的 user-impact trade-offs
 
-This doc is the playbook when drift is detected. It exists because investigating from scratch takes significant effort and the wrong choice can make things worse.
+本文档是在检测到 drift 时使用的 playbook。它存在是因为从零调查成本很高，且错误选择可能让情况更糟。
 
-## File relationship map
+## 文件关系图（File relationship map）
 
-The repo has five release components. Each owns one or more files. Release-please reads the manifest and writes the extra-files.
+repo 有五个 release components。每个 component 拥有一个或多个 files。Release-please 读取 manifest，并写入 extra-files。
 
 ```
 .github/.release-please-manifest.json       (release-please memory: last released per component)
@@ -57,42 +57,42 @@ Each component's extra-files get rewritten by release-please when a release is c
   └── .codex-plugin/plugin.json
 ```
 
-**Key invariants:**
+**关键 invariants：**
 
-- Every file in a component's `extra-files` list must share the same version.
-- Because of `linked-versions`, **`cli` and `compound-engineering` must always be at the same version.** That means `package.json` (cli) and all three `compound-engineering/*/plugin.json` files move together.
-- Marketplace components (`.claude-plugin`, `.cursor-plugin`) are **independent** — they have their own versions and don't move with plugin bumps.
-- `bun run release:validate` enforces these invariants. Its error message names the file(s) that drifted.
+- component 的 `extra-files` list 中每个 file 必须共享同一 version。
+- 因为 `linked-versions`，**`cli` 与 `compound-engineering` 必须始终处于同一 version。** 这意味着 `package.json`（cli）和三个 `compound-engineering/*/plugin.json` files 一起移动。
+- Marketplace components（`.claude-plugin`、`.cursor-plugin`）是 **independent** -- 它们有自己的 versions，不随 plugin bumps 移动。
+- `bun run release:validate` enforce 这些 invariants。它的 error message 会指出发生 drift 的 file(s)。
 
-## How release-please tracks versions
+## Release-please 如何跟踪 versions
 
-Release-please treats the **manifest as the source of truth** for "last released version per component." Extra-files are outputs that release-please writes to during a release. The flow is:
+Release-please 把 **manifest 视为 "last released version per component" 的 source of truth**。Extra-files 是 release-please 在 release 期间写入的 outputs。流程是：
 
-1. Push to `main` triggers the `release-pr` workflow
-2. Release-please reads the manifest to know what was last released
-3. Release-please walks conventional commits since the last release tag
-4. Release-please computes the next version (`feat:` → minor, `fix:` → patch, etc.)
-5. Release-please opens or updates a "chore: release main" PR that:
-   - Bumps the manifest to the new version
-   - Bumps every `extra-file` to the new version
-6. When the release PR merges, the release is cut (git tag, optional npm publish)
+1. Push 到 `main` 触发 `release-pr` workflow
+2. Release-please 读取 manifest，了解上次 released version
+3. Release-please 遍历自上个 release tag 以来的 conventional commits
+4. Release-please 计算 next version（`feat:` → minor，`fix:` → patch 等）
+5. Release-please 打开或更新一个 "chore: release main" PR，其中：
+   - 将 manifest bump 到 new version
+   - 将每个 `extra-file` bump 到 new version
+6. release PR merge 后，cut release（git tag，可选 npm publish）
 
-Under normal operation, **humans never touch the manifest or the extra-files**. Both are updated together by release-please during a release PR. Drift is the state where this guarantee has been violated.
+正常操作下，**humans 永远不直接触碰 manifest 或 extra-files**。两者由 release-please 在 release PR 中一起更新。Drift 就是这个保证被破坏的状态。
 
-## Drift detection
+## Drift detection（drift 检测）
 
-`bun run release:validate` runs on every PR and on every push to `main` via `.github/workflows/ci.yml`. It fails when:
+`bun run release:validate` 通过 `.github/workflows/ci.yml` 在每个 PR 和每次 push 到 `main` 上运行。以下情况会失败：
 
-- Any two `extra-files` within the same component have different versions
-- A marketplace plugin-list is asymmetric across `.claude-plugin`, `.cursor-plugin`, and `.agents/plugins`
-- A Codex manifest is missing required fields or its `skills` directory
-- A description has drifted across Claude/Cursor/Codex plugin.json files (auto-corrected with `write: true`)
+- 同一 component 内任意两个 `extra-files` version 不一致
+- marketplace plugin-list 在 `.claude-plugin`、`.cursor-plugin` 和 `.agents/plugins` 之间不对称
+- Codex manifest 缺少 required fields 或其 `skills` directory
+- Claude/Cursor/Codex plugin.json files 之间 description drift（用 `write: true` 自动纠正）
 
-**Important:** the manifest's memory of last-released version is **not** directly validated against extra-files. This means a state where all extra-files agree at X.Y.Z but the manifest thinks the last release was W.X.Y (W<X) will pass `release:validate` today. It will fail the NEXT release-please run when release-please tries to bump back down from W.X.Y.
+**Important:** manifest 中 last-released version 的 memory 当前 **不会** 直接与 extra-files 校验。这意味着如果所有 extra-files 都一致为 X.Y.Z，但 manifest 认为 last release 是 W.X.Y（W<X），今天的 `release:validate` 会通过。它会在下一次 release-please run 中失败，因为 release-please 会尝试从 W.X.Y 往下 bump。
 
-## Recovery decision tree
+## Recovery decision tree（恢复决策树）
 
-When drift is detected, choose the recovery path before editing anything.
+检测到 drift 时，在编辑任何内容前先选择 recovery path。
 
 ```
 release:validate reports drift
@@ -110,98 +110,98 @@ release:validate reports drift
             → Backward-revert: revert the drifted file DOWN to match the rest
 ```
 
-### Path A: Forward-sync
+### Path A：Forward-sync（向前同步）
 
-Use when any user may have installed the drifted version locally (most common case — developers running `/plugin install` from a main checkout will have whatever version `.claude-plugin/plugin.json` says).
+当任何用户可能已在本地安装 drifted version 时使用（最常见 -- 从 main checkout 运行 `/plugin install` 的 developers 会得到 `.claude-plugin/plugin.json` 中的 version）。
 
-**Scope of changes:**
+**变更范围（Scope of changes）：**
 
-- All extra-files within the affected component(s) → bump up to the drifted version
-- `.github/.release-please-manifest.json` entry for the affected component → bump to match
-- **If the affected component is `compound-engineering` or `cli`:** because of `linked-versions`, bump BOTH:
-  - manifest's `plugins/compound-engineering` and `.` entries together
-  - `package.json` (cli's extra-file) and all three compound-engineering plugin.json files together
+- affected component(s) 内所有 extra-files → bump up 到 drifted version
+- affected component 的 `.github/.release-please-manifest.json` entry → bump 以匹配
+- **如果 affected component 是 `compound-engineering` 或 `cli`：** 因为 `linked-versions`，两者都要 bump：
+  - manifest 的 `plugins/compound-engineering` 与 `.` entries 一起更新
+  - `package.json`（cli 的 extra-file）和所有三个 compound-engineering plugin.json files 一起更新
 
-**Why the manifest edit is necessary:** without it, the next release-please run reads "last released was W.X.Y" (the stale manifest value), computes next version as W.X.(Y+1), and writes W.X.(Y+1) to extra-files — regressing any user at the forward-synced version.
+**Why the manifest edit is necessary:** 没有它时，下一次 release-please run 读取到 "last released was W.X.Y"（stale manifest value），计算 next version 为 W.X.(Y+1)，并把 W.X.(Y+1) 写到 extra-files -- 导致任何处在 forward-synced version 的用户 regression。
 
-**This is release-please's documented recovery pattern for out-of-band releases.** The manifest file is in git precisely so it can be manually corrected when a release happened outside release-please's normal flow.
+**这是 release-please 针对 out-of-band releases 的 documented recovery pattern。** manifest file 被纳入 git 正是为了在 release-please normal flow 外发生 release 时手动纠正。
 
-### Path B: Backward-revert
+### Path B：Backward-revert（向后回退）
 
-Use when you can verify no user is installed at the drifted version. Requires:
+当你能确认无人安装 drifted version 时使用。要求：
 
-- No git tag exists for the drifted version (e.g., `git tag -l | grep <version>`)
-- No npm publish exists (e.g., `npm view @every-env/compound-plugin versions`)
-- No marketplace release exists for the drifted version
-- No team member has pulled main since the drift was introduced (hard to verify; assume YES if drift has existed longer than ~an hour)
+- drifted version 没有 git tag（例如 `git tag -l | grep <version>`）
+- 没有 npm publish（例如 `npm view @every-env/compound-plugin versions`）
+- drifted version 没有 marketplace release
+- 自 drift 引入以来没有 team member pull main（很难验证；若 drift 已存在超过约一小时，假设 YES）
 
-**Scope of changes:**
+**变更范围（Scope of changes）：**
 
-- The drifted extra-file(s) → revert DOWN to the manifest's value
-- Manifest and `package.json` (cli) unchanged — they were already correct
+- drifted extra-file(s) → revert DOWN 到 manifest 的 value
+- Manifest 和 `package.json`（cli）不变 -- 它们已经正确
 
-**This is simpler** (fewer files changed, no manifest edit) **but risks user regression** if anyone was installed at the drifted high version. Their local cache dir (e.g., `~/.claude/plugins/cache/.../compound-engineering/<drifted>/`) becomes orphaned, and tooling that treats the version field as monotonic may refuse to downgrade or emit warnings.
+**This is simpler（这更简单）**（修改更少 files，无 manifest edit）**但有 user regression 风险**，如果任何人已安装 drifted high version。他们的 local cache dir（例如 `~/.claude/plugins/cache/.../compound-engineering/<drifted>/`）会变成 orphaned，而把 version field 视为 monotonic 的 tooling 可能拒绝 downgrade 或发出 warnings。
 
-### Path C: `release-as` pin
+### Path C（路径 C）：`release-as` pin
 
-Use when you want release-please itself to perform the sync via a normal release PR, instead of manually editing the manifest.
+当你希望 release-please 自己通过 normal release PR 执行 sync，而不是手动编辑 manifest 时使用。
 
-**Scope of changes:**
+**变更范围（Scope of changes）：**
 
-- Forward-sync all extra-files UP to the drifted version (same as Path A)
-- Add `"release-as": "<drifted+1>"` to each affected component in `.github/release-please-config.json`
-- Do NOT edit the manifest
-- Next release-please run produces a release PR bumping everything to `<drifted+1>`, which is above the drifted version and avoids regression
+- Forward-sync 所有 extra-files UP 到 drifted version（与 Path A 相同）
+- 在 `.github/release-please-config.json` 中为每个 affected component 添加 `"release-as": "<drifted+1>"`
+- 不编辑 manifest
+- 下一次 release-please run 生成 release PR，把所有东西 bump 到 `<drifted+1>`，高于 drifted version，从而避免 regression
 
-**Caveat:** after the release PR merges, the `release-as` pin must be removed — otherwise every subsequent release will be pinned to that same version. The repo has been bitten by stale `release-as` pins before (see `ab44d89b`), so Path C is usually more overhead than Path A. Prefer Path A unless there's a specific reason release-please should drive the bump.
+**Caveat（注意）：** release PR merge 后必须移除 `release-as` pin -- 否则后续每次 release 都会固定到同一 version。repo 曾被 stale `release-as` pins 咬过（见 `ab44d89b`），因此 Path C 通常比 Path A overhead 更大。除非有明确理由让 release-please drive bump，否则偏好 Path A。
 
-### Summary
+### 摘要（Summary）
 
 | Path | Files changed | When to use | Risk |
 |---|---|---|---|
-| A — forward-sync | 3–5 (extras + manifest + linked) | Anyone might be at drifted version (default) | None if execution is correct |
-| B — backward-revert | 1–2 (just the drifted extras) | Verified no one is at drifted version | User regression if verification was wrong |
-| C — `release-as` pin | 3–5 + config change + cleanup after | Want release-please to drive the bump | Requires remembering to remove pin |
+| A -- forward-sync | 3-5（extras + manifest + linked） | 任何人可能处在 drifted version（default） | 若执行正确，无风险 |
+| B -- backward-revert | 1-2（仅 drifted extras） | 已确认无人处在 drifted version | 若验证错误，会 user regression |
+| C -- `release-as` pin | 3-5 + config change + 后续 cleanup | 想让 release-please drive bump | 需要记得移除 pin |
 
-## Manifest manual edits
+## Manifest manual edits（manifest 手动编辑）
 
-**Release-please normally maintains `.github/.release-please-manifest.json`.** It's updated inside release PRs alongside the extra-files. Humans don't touch it under normal operation.
+**Release-please 通常维护 `.github/.release-please-manifest.json`。** 它会在 release PR 中与 extra-files 一起更新。正常操作下 humans 不触碰它。
 
-**Manual edits are legitimate** in exactly one case: recovery from out-of-band releases or version changes, as in Path A above. Release-please's own documentation calls this out — the manifest is tracked in git precisely so it can be corrected when reality diverges from what release-please remembers.
+**Manual edits 只有一种情况是正当的**：从 out-of-band releases 或 version changes 中 recovery，如上面的 Path A。Release-please 自己的文档也指出这一点 -- manifest tracked in git 正是为了在现实与 release-please 记忆 diverges 时纠正。
 
-If you find yourself editing the manifest for any reason other than Path A recovery, stop and reconsider. You're probably doing something release-please is meant to own.
+如果你发现自己出于 Path A recovery 以外的任何理由编辑 manifest，停下来重新考虑。你很可能正在做 release-please 本应 own 的事。
 
-## Worked example: 2026-04-24 incident
+## Worked example：2026-04-24 incident（案例）
 
-Between `chore: release main (#675)` (which cut 3.0.3) and PR #677, four direct-to-main merges (`1f20c384`, `f8720da3`, `22d493b1`, `47350c3e`) each bumped `.claude-plugin/plugin.json` by one patch version — 3.0.3 → 3.0.4 → 3.0.5 → 3.0.6 → 3.0.7 — without touching `.cursor-plugin`, `.codex-plugin`, the manifest, or `package.json`. The bumps were added inline with feature work, bypassing PR CI because they landed via direct merge to `main`.
+在 `chore: release main (#675)`（cut 3.0.3）与 PR #677 之间，四个 direct-to-main merges（`1f20c384`、`f8720da3`、`22d493b1`、`47350c3e`）各自把 `.claude-plugin/plugin.json` bump 一个 patch version -- 3.0.3 → 3.0.4 → 3.0.5 → 3.0.6 → 3.0.7 -- 但没有触碰 `.cursor-plugin`、`.codex-plugin`、manifest 或 `package.json`。这些 bumps 与 feature work 一起 inline 添加，因 direct merge 到 `main` 而绕过 PR CI。
 
-The drift was invisible until PR #677 opened. That PR's CI ran `release:validate` on its merge commit, which inherited main's drifted state (`.claude-plugin` at 3.0.7, everything else at 3.0.3). The validator failed on `.cursor-plugin/plugin.json` and `.codex-plugin/plugin.json` for not matching `.claude-plugin`.
+直到 PR #677 打开前，drift 一直不可见。该 PR 的 CI 在 merge commit 上运行 `release:validate`，继承了 main 的 drifted state（`.claude-plugin` 为 3.0.7，其他全为 3.0.3）。validator 因 `.cursor-plugin/plugin.json` 和 `.codex-plugin/plugin.json` 不匹配 `.claude-plugin` 而失败。
 
-Recovery used Path A (forward-sync to 3.0.7) because:
+Recovery 使用 Path A（forward-sync 到 3.0.7），原因是：
 
-- Developers installing `compound-engineering` from a local main checkout would have 3.0.7 in their plugin cache by then
-- Path B would have orphaned those caches and triggered version-regression warnings
-- Path C would have reintroduced a `release-as` pin that had just been cleaned up
+- 到那时，从 local main checkout 安装 `compound-engineering` 的 developers 会在 plugin cache 中拥有 3.0.7
+- Path B 会 orphan 这些 caches，并触发 version-regression warnings
+- Path C 会重新引入刚刚 cleanup 掉的 `release-as` pin
 
-PR #678 applied the full Path A fix across five fields in four files and updated a stale test assertion that was also hiding behind the release-validate failure (commit `1f20c384` renumbered steps in `lfg/SKILL.md` but didn't update `tests/review-skill-contract.test.ts`). See PR #678's commits for the exact diff.
+PR #678 在四个 files 的五个 fields 上应用了完整 Path A fix，并更新了一个同样藏在 release-validate failure 后的 stale test assertion（commit `1f20c384` 重新编号了 `lfg/SKILL.md` 中的 steps，但没有更新 `tests/review-skill-contract.test.ts`）。具体 diff 见 PR #678 commits。
 
-## Prevention
+## 预防
 
-Direct-to-main merges are the root cause. They bypass the PR CI that runs `release:validate`, test suites, and semantic title validation.
+Direct-to-main merges 是 root cause。它们绕过运行 `release:validate`、test suites 和 semantic title validation 的 PR CI。
 
-**Branch protection on `main`** is the enforcement. The `test` status check must be required before merge, and admin bypass should be off (or used only for true emergencies). Without branch protection, the AGENTS.md "don't manually bump" rule is honor-system only — which this incident showed is insufficient.
+**Branch protection on `main`** 是 enforcement。merge 前必须要求 `test` status check，且 admin bypass 应关闭（或只用于真正 emergencies）。没有 branch protection 时，AGENTS.md 的 "don't manually bump" rule 只靠 honor-system -- 这次 incident 证明它不够。
 
-Optional complementary guards:
+可选 complementary guards：
 
-- **Dedicated CI job** detecting manual version bumps on non-release-please PR authors. Attacks the cause rather than the symptom, with a clearer error message pointing at AGENTS.md.
-- **Pre-commit hook** running `release:validate` locally via `core.hooksPath`. Catches accidents before push. Bypassable with `--no-verify`, so it's a speed-bump, not a lock.
+- **Dedicated CI job** 检测 non-release-please PR authors 的 manual version bumps。它攻击 cause 而非 symptom，并提供更清晰 error message 指向 AGENTS.md。
+- **Pre-commit hook** 通过 `core.hooksPath` 在本地运行 `release:validate`。push 前抓 accident。可用 `--no-verify` 绕过，所以它是 speed-bump，不是 lock。
 
-These are nice-to-haves. Branch protection is the real fix.
+这些是 nice-to-haves。Branch protection 才是真正修复。
 
-## Related docs
+## 相关文档（Related docs）
 
-- `docs/solutions/workflow/manual-release-please-github-releases.md` — big-picture release model
-- `docs/solutions/plugin-versioning-requirements.md` — plugin-scoped contributor rules
-- `plugins/compound-engineering/AGENTS.md` — "Versioning Requirements" section with the don't-manually-bump rules
-- `.github/release-please-config.json` — the extra-files and linked-versions configuration this doc references
-- `src/release/metadata.ts` — the `syncReleaseMetadata` function that `release:validate` runs
+- `docs/solutions/workflow/manual-release-please-github-releases.md` -- big-picture release model
+- `docs/solutions/plugin-versioning-requirements.md` -- plugin-scoped contributor rules
+- `plugins/compound-engineering/AGENTS.md` -- 含 don't-manually-bump rules 的 "Versioning Requirements" section
+- `.github/release-please-config.json` -- 本文档引用的 extra-files 和 linked-versions configuration
+- `src/release/metadata.ts` -- `release:validate` 运行的 `syncReleaseMetadata` function

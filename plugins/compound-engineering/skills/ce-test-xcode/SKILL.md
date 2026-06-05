@@ -1,32 +1,32 @@
 ---
 name: ce-test-xcode
-description: "Build and test iOS apps on simulator using XcodeBuildMCP. Use after making iOS code changes, before creating a PR, or when verifying app behavior and checking for crashes on simulator."
-argument-hint: "[scheme name or 'current' to use default]"
+description: "使用 XcodeBuildMCP 在 simulator 上 build 和 test iOS apps。在完成 iOS code changes 后、创建 PR 前，或需要在 simulator 上验证 app behavior 并检查 crashes 时使用。"
+argument-hint: "[scheme name，或用 'current' 使用默认值]"
 disable-model-invocation: true
 ---
 
-# Xcode Test Skill
+# Xcode Test Skill（Xcode 测试 Skill）
 
-Build, install, and test iOS apps on the simulator using XcodeBuildMCP. Captures screenshots, logs, and verifies app behavior.
+使用 XcodeBuildMCP 在 simulator 上 build、install 和 test iOS apps。捕获 screenshots、logs，并验证 app behavior。
 
-## Prerequisites
+## Prerequisites（前置条件）
 
-- Xcode installed with command-line tools
-- XcodeBuildMCP MCP server connected
-- Valid Xcode project or workspace
-- At least one iOS Simulator available
+- 已安装带 command-line tools 的 Xcode
+- XcodeBuildMCP MCP server 已连接
+- 有效的 Xcode project 或 workspace
+- 至少一个 iOS Simulator 可用
 
-## Workflow
+## Workflow（工作流）
 
-### 0. Verify XcodeBuildMCP is Available
+### 0. 验证 XcodeBuildMCP 可用
 
-Check that the XcodeBuildMCP MCP server is connected by calling its `list_simulators` tool.
+通过调用 XcodeBuildMCP MCP server 的 `list_simulators` tool，检查它是否已连接。
 
-MCP tool names vary by platform:
-- Claude Code: `mcp__xcodebuildmcp__list_simulators`
-- Other platforms: use the equivalent MCP tool call for the `XcodeBuildMCP` server's `list_simulators` method
+MCP tool names 因平台而异：
+- Claude Code（Claude Code）: `mcp__xcodebuildmcp__list_simulators`
+- 其他平台：使用 `XcodeBuildMCP` server 的 `list_simulators` method 对应 MCP tool call
 
-If the tool is not found or errors, inform the user they need to add the XcodeBuildMCP MCP server:
+如果找不到 tool 或出现错误，告知用户需要添加 XcodeBuildMCP MCP server：
 
 ```
 XcodeBuildMCP not installed
@@ -41,64 +41,64 @@ Then add "XcodeBuildMCP" as an MCP server in your agent configuration
 and restart your agent.
 ```
 
-Do NOT proceed until XcodeBuildMCP is confirmed working.
+在确认 XcodeBuildMCP 正常工作前，Do NOT 继续。
 
-### 1. Discover Project and Scheme
+### 1. 发现 Project 和 Scheme
 
-Call XcodeBuildMCP's `discover_projs` tool to find available projects, then `list_schemes` with the project path to get available schemes.
+调用 XcodeBuildMCP 的 `discover_projs` tool 查找 available projects，然后用 project path 调用 `list_schemes` 获取 available schemes。
 
-If an argument was provided, use that scheme name. If "current", use the default/last-used scheme.
+如果提供了 argument，使用该 scheme name。如果是 "current"，使用 default/last-used scheme。
 
-### 2. Boot Simulator
+### 2. 启动 Simulator
 
-Call `list_simulators` to find available simulators. Boot the preferred simulator (iPhone 15 Pro recommended) using `boot_simulator` with the simulator's UUID.
+调用 `list_simulators` 查找 available simulators。使用 simulator UUID 调用 `boot_simulator` 启动 preferred simulator（推荐 iPhone 15 Pro）。
 
-Wait for the simulator to be ready before proceeding.
+等待 simulator ready 后再继续。
 
-### 3. Build the App
+### 3. Build App（构建 App）
 
-Call `build_ios_sim_app` with the project path and scheme name.
+使用 project path 和 scheme name 调用 `build_ios_sim_app`。
 
-**On failure:**
-- Capture build errors
-- Report to user with specific error details
+**On failure（失败时）：**
+- 捕获 build errors
+- 向用户报告具体 error details
 
-**On success:**
-- Note the built app path for installation
-- Proceed to step 4
+**On success（成功时）：**
+- 记录用于 installation 的 built app path
+- 进入 step 4
 
-### 4. Install and Launch
+### 4. Install and Launch（安装并启动）
 
-1. Call `install_app_on_simulator` with the built app path and simulator UUID
-2. Call `launch_app_on_simulator` with the bundle ID and simulator UUID
-3. Call `capture_sim_logs` with the simulator UUID and bundle ID to start log capture
+1. 使用 built app path 和 simulator UUID 调用 `install_app_on_simulator`
+2. 使用 bundle ID 和 simulator UUID 调用 `launch_app_on_simulator`
+3. 使用 simulator UUID 和 bundle ID 调用 `capture_sim_logs` 开始 log capture
 
-### 5. Test Key Screens
+### 5. 测试 Key Screens
 
-For each key screen in the app:
+对 app 中每个 key screen：
 
-**Take screenshot:**
-Call `take_screenshot` with the simulator UUID and a descriptive filename (e.g., `screen-home.png`).
+**Take screenshot（截图）：**
+使用 simulator UUID 和描述性 filename（例如 `screen-home.png`）调用 `take_screenshot`。
 
-**Review screenshot for:**
-- UI elements rendered correctly
-- No error messages visible
-- Expected content displayed
-- Layout looks correct
+**Review screenshot for（检查截图）：**
+- UI elements 正确渲染
+- 无可见 error messages
+- 显示 expected content
+- Layout 看起来正确
 
-**Check logs for errors:**
-Call `get_sim_logs` with the simulator UUID. Look for:
-- Crashes
-- Exceptions
-- Error-level log messages
-- Failed network requests
+**Check logs for errors（检查日志错误）：**
+使用 simulator UUID 调用 `get_sim_logs`。查找：
+- Crashes（崩溃）
+- Exceptions（异常）
+- Error-level log messages（error 级日志）
+- Failed network requests（失败的网络请求）
 
-**Known automation limitation — SwiftUI Text links:**
-Simulated taps (via XcodeBuildMCP or any simulator automation tool) do not trigger gesture recognizers on SwiftUI `Text` views with inline `AttributedString` links. Taps report success but have no effect. This is a platform limitation — inline links are not exposed as separate elements in the accessibility tree. When a tap on a Text link has no visible effect, prompt the user to tap manually in the simulator. If the target URL is known, `xcrun simctl openurl <device> <URL>` can open it directly as a fallback.
+**Known automation limitation — SwiftUI Text links（已知自动化限制）：**
+Simulated taps（通过 XcodeBuildMCP 或任何 simulator automation tool）不会触发带 inline `AttributedString` links 的 SwiftUI `Text` views 上的 gesture recognizers。Taps 会报告 success，但没有效果。这是 platform limitation：inline links 没有作为独立 elements 暴露在 accessibility tree 中。当点击 Text link 没有可见效果时，请用户在 simulator 中手动点击。如果 target URL 已知，`xcrun simctl openurl <device> <URL>` 可作为 fallback 直接打开它。
 
-### 6. Human Verification (When Required)
+### 6. Human Verification（需要时）
 
-Pause for human input when testing touches flows that require device interaction.
+当 testing 触及需要 device interaction 的 flows 时，暂停等待 human input。
 
 | Flow Type | What to Ask |
 |-----------|-------------|
@@ -109,7 +109,7 @@ Pause for human input when testing touches flows that require device interaction
 | Location | "Allow location access and verify map updates" |
 | SwiftUI Text links | "Please tap on [element description] manually — automated taps cannot trigger inline text links" |
 
-Ask the user using the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question:
+使用平台的 blocking question tool 询问用户：Claude Code 中的 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中的编号选项；不要仅因为需要加载 schema 就退回。绝不要静默跳过问题：
 
 ```
 Human Verification Needed
@@ -123,16 +123,16 @@ Did it work correctly?
 2. No - describe the issue
 ```
 
-### 7. Handle Failures
+### 7. 处理 Failures
 
-When a test fails:
+当 test 失败时：
 
-1. **Document the failure:**
-   - Take screenshot of error state
-   - Capture console logs
-   - Note reproduction steps
+1. **Document the failure（记录失败）：**
+   - 截取 error state screenshot
+   - 捕获 console logs
+   - 记录 reproduction steps
 
-2. **Ask the user how to proceed:**
+2. **询问用户如何继续：**
 
    ```
    Test Failed: [screen/feature]
@@ -145,12 +145,12 @@ When a test fails:
    2. Skip - continue testing other screens
    ```
 
-3. **If "Fix now":** investigate, propose a fix, rebuild and retest
-4. **If "Skip":** log as skipped, continue
+3. **如果 "Fix now"：** investigate、propose a fix、rebuild and retest
+4. **如果 "Skip"：** log as skipped，然后继续
 
-### 8. Test Summary
+### 8. Test Summary（测试摘要）
 
-After all tests complete, present a summary:
+所有 tests 完成后，呈现 summary：
 
 ```markdown
 ## Xcode Test Results
@@ -183,14 +183,14 @@ After all tests complete, present a summary:
 ### Result: [PASS / FAIL / PARTIAL]
 ```
 
-### 9. Cleanup
+### 9. Cleanup（清理）
 
-After testing:
+测试后：
 
-1. Call `stop_log_capture` with the simulator UUID
-2. Optionally call `shutdown_simulator` with the simulator UUID
+1. 使用 simulator UUID 调用 `stop_log_capture`
+2. 可选使用 simulator UUID 调用 `shutdown_simulator`
 
-## Quick Usage Examples
+## Quick Usage Examples（快速使用示例）
 
 ```bash
 # Test with default scheme
@@ -203,6 +203,6 @@ After testing:
 /ce-test-xcode current
 ```
 
-## Integration with ce-code-review
+## Integration with ce-code-review（与 ce-code-review 集成）
 
-When reviewing PRs that touch iOS code, the `ce-code-review` workflow can spawn an agent to run this skill, build on the simulator, test key screens, and check for crashes.
+当 review 触及 iOS code 的 PR 时，`ce-code-review` workflow 可以 spawn 一个 agent 运行此 skill，在 simulator 上 build、test key screens，并检查 crashes。

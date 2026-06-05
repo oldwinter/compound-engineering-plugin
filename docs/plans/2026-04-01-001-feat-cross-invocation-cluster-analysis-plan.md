@@ -1,81 +1,81 @@
 ---
-title: "feat(resolve-pr-feedback): cross-invocation cluster analysis"
+title: "feat(resolve-pr-feedback): cross-invocation cluster analysis（跨 invocation 聚类分析）"
 type: feat
 status: completed
 date: 2026-04-01
 origin: docs/brainstorms/2026-04-01-cross-invocation-cluster-analysis-requirements.md
 ---
 
-# Cross-Invocation Cluster Analysis for resolve-pr-feedback
+# resolve-pr-feedback 的 Cross-Invocation Cluster Analysis
 
-## Overview
+## 概览
 
-Replace the dead verify-loop re-entry gate signal in the resolve-pr-feedback skill with a cross-invocation awareness signal that detects recurring feedback patterns across multiple review rounds on the same PR. The change touches three files: the `get-pr-comments` script (data), the SKILL.md (orchestration), and the pr-comment-resolver agent (cluster handling).
+将 resolve-pr-feedback skill 中已经失效的 verify-loop re-entry gate signal，替换为 cross-invocation awareness signal，用于检测同一个 PR 多轮 review 中反复出现的 feedback patterns。该 change 触及三个文件：`get-pr-comments` script（data）、SKILL.md（orchestration）和 pr-comment-resolver agent（cluster handling）。
 
-## Problem Frame
+## 问题框架
 
-The skill's cluster analysis has two gates: volume (3+ items) and verify-loop re-entry (2nd+ pass within same invocation). The verify-loop gate is dead — automated reviewers post minutes after push, but verify runs seconds after. This leaves volume as the only gate, which misses the highest-value scenario: a reviewer posts 1-2 threads per round about the same class of problem across multiple rounds. Cross-invocation awareness detects this pattern by checking for resolved threads alongside new ones — evidence of multi-round review. (see origin: `docs/brainstorms/2026-04-01-cross-invocation-cluster-analysis-requirements.md`)
+该 skill 的 cluster analysis 有两个 gates：volume（3+ items）和 verify-loop re-entry（同一 invocation 的第 2+ pass）。verify-loop gate 已经失效 -- automated reviewers 在 push 后几分钟才 post，但 verify 在几秒后就运行。这使 volume 成为唯一 gate，并错过最高价值场景：reviewer 在多轮中每轮只发 1-2 个 threads，但都指向同一类问题。Cross-invocation awareness 通过同时检查 resolved threads 和 new ones 来检测这种 pattern -- 这是 multi-round review 的证据。（see origin: `docs/brainstorms/2026-04-01-cross-invocation-cluster-analysis-requirements.md`）
 
-## Requirements Trace
+## 需求追踪
 
-- R1. Cross-invocation awareness signal replaces verify-loop re-entry gate
-- R2. Prior resolutions + new feedback = re-entry signal, even with 1 new item
-- R3. Volume gate (3+) unchanged, OR'd with cross-invocation signal
-- R4. Clustering input includes new + prior threads (bounded to last N)
-- R5. Previously-resolved threads participate in category assignment and spatial grouping
-- R6. Three-mode resolver assessment: band-aid (redo), correct-but-incomplete (investigate siblings), sound-and-independent (context only)
-- R7. Cluster brief gains `<prior-resolutions>` element with metadata
-- R8. Within-session verify loop subsumes into cross-invocation signal
-- R9. Zero additional GraphQL calls — broaden existing query's jq filter
-- R10. Bounded lookback: last N resolved threads (simplified from "rounds" — see Key Technical Decisions)
+- R1. 用 cross-invocation awareness signal 替换 verify-loop re-entry gate
+- R2. Prior resolutions + new feedback = re-entry signal，即使只有 1 个 new item
+- R3. Volume gate（3+）不变，并与 cross-invocation signal 做 OR
+- R4. Clustering input 包含 new + prior threads（bounded to last N）
+- R5. Previously-resolved threads 参与 category assignment 和 spatial grouping
+- R6. 三模式 resolver 评估：band-aid（redo）、correct-but-incomplete（investigate siblings）、sound-and-independent（context only）
+- R7. Cluster brief 增加带 metadata 的 `<prior-resolutions>` element
+- R8. Session 内 verify loop 并入 cross-invocation signal
+- R9. 零 additional GraphQL calls -- broaden existing query's jq filter
+- R10. 有界回看：last N resolved threads（从 "rounds" 简化 -- 见关键技术决策）
 
-## Scope Boundaries
+## 范围边界
 
-- No persistent state files or `.context/` storage
-- No changes to the volume gate threshold or spatial grouping rules
-- No changes to standard (non-cluster) thread handling
-- No new scripts — extend the existing `get-pr-comments` script
+- 不添加 persistent state files 或 `.context/` storage
+- 不改变 volume gate threshold 或 spatial grouping rules
+- 不改变 standard（non-cluster）thread handling
+- 不新增 scripts -- 扩展 existing `get-pr-comments` script
 
-## Context & Research
+## 上下文与研究
 
-### Relevant Code and Patterns
+### 相关代码与模式
 
-- `plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md` — skill orchestration, steps 1-9
-- `plugins/compound-engineering/skills/resolve-pr-feedback/scripts/get-pr-comments` — GraphQL query + jq filter; already fetches resolved threads in the query but drops them in jq (`isResolved == false`)
-- `plugins/compound-engineering/agents/workflow/ce-pr-comment-resolver.agent.md` — resolver agent with standard and cluster modes
+- `plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md` -- skill orchestration，steps 1-9
+- `plugins/compound-engineering/skills/resolve-pr-feedback/scripts/get-pr-comments` -- GraphQL query + jq filter；query 已经 fetches resolved threads，但 jq 中将其 drop（`isResolved == false`）
+- `plugins/compound-engineering/agents/workflow/ce-pr-comment-resolver.agent.md` -- resolver agent，包含 standard 和 cluster modes
 
-### Institutional Learnings
+### 组织内经验
 
-- **Script-first architecture** (`docs/solutions/skill-design/script-first-skill-architecture.md`): Classification and filtering logic must live in the script, not in SKILL.md instructions. The script should output pre-computed analysis so the model receives structured decisions, not raw data to classify. 60-75% token savings.
-- **Explicit state machines** (`docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`): Model the cross-invocation gate as a decision table with explicit outcomes, not prose conditionals.
-- **Pass paths, not content** (`docs/solutions/skill-design/pass-paths-not-content-to-subagents.md`): The `<prior-resolutions>` element should contain metadata (thread IDs, categories, file paths, timestamps), not full comment bodies. The resolver reads full content on demand.
-- **Status-gated resolution** (`docs/solutions/workflow/todo-status-lifecycle.md`): Previously-resolved threads must be enforced at the dispatch boundary — they participate in clustering but are never individually dispatched.
+- **Script-first architecture（脚本优先架构）**（`docs/solutions/skill-design/script-first-skill-architecture.md`）：Classification 和 filtering logic 必须放在 script 中，而不是 SKILL.md instructions。script 应输出 pre-computed analysis，让 model 接收 structured decisions，而不是 raw data to classify。节省 60-75% tokens。
+- **Explicit state machines（显式状态机）**（`docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`）：将 cross-invocation gate 建模为 explicit outcomes 的 decision table，而不是 prose conditionals。
+- **Pass paths, not content（传路径而不是内容）**（`docs/solutions/skill-design/pass-paths-not-content-to-subagents.md`）：`<prior-resolutions>` element 应包含 metadata（thread IDs、categories、file paths、timestamps），而不是 full comment bodies。resolver 按需读取 full content。
+- **Status-gated resolution（状态门控 resolution）**（`docs/solutions/workflow/todo-status-lifecycle.md`）：Previously-resolved threads 必须在 dispatch boundary enforced -- 它们参与 clustering，但绝不 individually dispatched。
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **jq filter change, not GraphQL change**: The existing query fetches all threads including resolved ones. The `isResolved == false` filter is in jq. Broadening this filter adds resolved threads to the output at zero API cost. (see origin: R9)
-- **Any resolved thread is a prior resolution — no author matching needed**: The brainstorm originally required detecting the skill's own prior replies. The plan simplifies this: any resolved thread on the PR is evidence of a prior review round. This eliminates the `gh api user` call, `author.login` matching, reply pattern detection, and the `set -e` error handling complexity. Multi-round review is the signal, regardless of who resolved the threads.
-- **N bounds total resolved threads, not "rounds"**: The brainstorm defined "rounds" as groups of threads resolved in a single invocation, which required fragile timestamp-based clustering in jq. The plan simplifies to: take the last N resolved threads (by `createdAt` of the most recent comment). This is a trivial jq sort + limit. N=10 is the starting value (covering typical PR history without excessive data). Successive reviews naturally cluster around changed code, so thread-level bounding is sufficient.
-- **No spatial overlap check**: The brainstorm's R11 specified a lightweight overlap check before full clustering. The plan drops this: successive reviews almost always cluster around the same code areas, so the overlap check would almost always pass. The cost it prevents (clustering with ~10 resolved threads + 1-2 new ones) is small. Skipping it keeps the orchestration simpler.
-- **Script computes the cross-invocation envelope**: Per the script-first learning, the script outputs a `cross_invocation` object with `signal` (boolean) and `resolved_threads` (array). The SKILL.md receives pre-computed analysis.
+- **jq filter change, not GraphQL change（改 jq filter 而不是 GraphQL）**：现有 query 已经 fetch all threads including resolved ones。`isResolved == false` filter 位于 jq 中。扩展这个 filter 可以零 API 成本将 resolved threads 加入 output。（see origin: R9）
+- **Any resolved thread is a prior resolution -- no author matching needed（任意 resolved thread 都是 prior resolution）**：brainstorm 原本要求检测 skill 自己的 prior replies。本 plan 简化为：PR 上任意 resolved thread 都是 prior review round 的证据。这样消除了 `gh api user` call、`author.login` matching、reply pattern detection 和 `set -e` error handling complexity。无论谁 resolve 了 threads，multi-round review 都是信号。
+- **N bounds total resolved threads, not "rounds"（N 限制 thread 总数而不是 rounds）**：brainstorm 将 "rounds" 定义为单次 invocation 中 resolved 的 thread groups，这需要 fragile timestamp-based clustering in jq。本 plan 简化为：取 last N resolved threads（按 most recent comment 的 `createdAt`）。这是简单 jq sort + limit。N=10 作为初始值（覆盖 typical PR history，避免 excessive data）。Successive reviews 自然会聚集在 changed code 附近，因此 thread-level bounding 足够。
+- **No spatial overlap check（不做 spatial overlap check）**：brainstorm 的 R11 指定在 full clustering 前做 lightweight overlap check。本 plan 放弃它：successive reviews 几乎总会聚集在相同 code areas，因此 overlap check 几乎总会 pass。它避免的成本（用约 10 个 resolved threads + 1-2 个 new ones clustering）很小。跳过它能保持 orchestration simpler。
+- **Script computes the cross-invocation envelope（由 script 计算 cross-invocation envelope）**：按照 script-first learning，script 输出包含 `signal`（boolean）和 `resolved_threads`（array）的 `cross_invocation` object。SKILL.md 接收 pre-computed analysis。
 
-## Open Questions
+## 开放问题
 
-### Resolved During Planning
+### 规划期间已解决
 
-- **How to detect prior resolutions**: Any resolved thread = prior resolution. No author matching, no reply pattern matching, no user API call. Resolved threads exist alongside new ones in the script output.
-- **How to bound the lookback**: Last N=10 resolved threads by most-recent comment timestamp. Simple jq sort + slice.
-- **Whether to check spatial overlap first**: No. Successive reviews naturally cluster around changed code. The overlap check adds orchestration complexity for negligible token savings.
+- **如何检测 prior resolutions**：任何 resolved thread = prior resolution。无需 author matching、reply pattern matching 或 user API call。Resolved threads 会与 new ones 一起存在于 script output 中。
+- **如何限制回看范围**：按 most-recent comment timestamp 取 last N=10 resolved threads。Simple jq sort + slice。
+- **是否先检查 spatial overlap**：否。Successive reviews 自然聚集在 changed code 附近。overlap check 为 negligible token savings 增加 orchestration complexity。
 
-### Deferred to Implementation
+### 延后到实现阶段
 
-- **Optimal value of N**: Starting at 10. If PRs with extensive resolved thread history show performance issues, reduce. If patterns are missed, increase.
+- **N 的最佳取值**：从 10 开始。如果 resolved thread history 很多的 PR 出现 performance issues，则调低。如果 patterns 被 missed，则调高。
 
 ---
 
-## High-Level Technical Design
+## 高层技术设计
 
-> *This illustrates the intended approach and is directional guidance for review, not implementation specification. The implementing agent should treat it as context, not code to reproduce.*
+> *这说明预期 approach，是给 review 的方向性指导，不是 implementation specification。实现 agent 应把它当作 context，而不是要复写的代码。*
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -142,68 +142,68 @@ The skill's cluster analysis has two gates: volume (3+ items) and verify-loop re
 └──────────────────────────────────────────────────────┘
 ```
 
-## Implementation Units
+## 实现单元
 
-- [x] **Unit 1: Extend `get-pr-comments` script**
+- [x] **Unit 1：扩展 `get-pr-comments` script**
 
-**Goal:** Broaden the jq filter to include resolved threads and output a cross-invocation envelope alongside the existing data.
+**目标：** 扩展 jq filter，使其包含 resolved threads，并与 existing data 一起输出 cross-invocation envelope。
 
-**Requirements:** R1, R2, R9, R10
+**需求：** R1, R2, R9, R10
 
-**Dependencies:** None
+**依赖：** 无
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/resolve-pr-feedback/scripts/get-pr-comments`
+**文件：**
+- 修改：`plugins/compound-engineering/skills/resolve-pr-feedback/scripts/get-pr-comments`
 
-**Approach:**
-- Widen the jq filter: keep the existing `review_threads` array (unresolved, non-outdated, as before). Add a new selection for resolved threads (`isResolved == true`), sorted by most-recent comment `createdAt`, limited to the last N=10.
-- Output the existing three keys (`review_threads`, `pr_comments`, `review_bodies`) unchanged, plus a new `cross_invocation` object containing: `signal` (boolean — true when both resolved threads and unresolved review threads exist), and `resolved_threads` (array of objects with `thread_id`, `path`, `line`, `first_comment_body`, `last_comment_at`).
-- No `gh api user` call. No author matching. No reply pattern detection. The signal is simply: resolved threads exist AND new threads exist.
+**做法：**
+- 扩展 jq filter：保留 existing `review_threads` array（unresolved、non-outdated，as before）。为 resolved threads（`isResolved == true`）添加一个 new selection，按 most-recent comment `createdAt` 排序，限制为 last N=10。
+- 输出 existing three keys（`review_threads`、`pr_comments`、`review_bodies`）不变，另加一个 `cross_invocation` object，包含：`signal`（boolean -- resolved threads 和 unresolved review threads 同时存在时为 true）和 `resolved_threads`（objects array，含 `thread_id`、`path`、`line`、`first_comment_body`、`last_comment_at`）。
+- 无 `gh api user` call。无 author matching。无 reply pattern detection。signal 只是：resolved threads exist AND new threads exist。
 
-**Patterns to follow:**
-- Existing jq pipeline in `get-pr-comments` — extend the `$pr` extraction, don't restructure it
-- Keep all logic in jq
+**遵循的模式：**
+- 复用 `get-pr-comments` 中现有 jq pipeline -- 扩展 `$pr` extraction，不重构它
+- 保持全部 logic 在 jq 中
 
-**Test scenarios:**
-- Happy path: PR with 2 resolved threads and 1 new thread -> `cross_invocation.signal: true`, `resolved_threads` has 2 entries, `review_threads` has 1
-- Happy path: PR with no resolved threads -> `cross_invocation.signal: false`, `resolved_threads` empty
-- Happy path: PR with resolved threads but no unresolved threads -> `cross_invocation.signal: false` (nothing new to cluster)
-- Edge case: PR with 20 resolved threads -> only last 10 (by recency) included
-- Edge case: PR with resolved threads but all unresolved threads are outdated -> `review_threads` empty, signal false
+**测试场景：**
+- 正常路径：PR 有 2 个 resolved threads 和 1 个 new thread -> `cross_invocation.signal: true`，`resolved_threads` 有 2 entries，`review_threads` 有 1 个
+- 正常路径：PR 没有 resolved threads -> `cross_invocation.signal: false`，`resolved_threads` empty
+- 正常路径：PR 有 resolved threads 但没有 unresolved threads -> `cross_invocation.signal: false`（nothing new to cluster）
+- 边界情况：PR 有 20 个 resolved threads -> 只 included last 10（by recency）
+- 边界情况：PR 有 resolved threads 但所有 unresolved threads 都 outdated -> `review_threads` empty，signal false
 
-**Verification:**
-- Run against a test PR with known resolved threads and verify the output JSON shape
-- Existing `review_threads`, `pr_comments`, `review_bodies` output is identical to current behavior
+**验证：**
+- 针对一个已知有 resolved threads 的 test PR 运行，并 verify output JSON shape
+- Existing `review_threads`、`pr_comments`、`review_bodies` output 与当前 behavior 相同
 
 ---
 
-- [x] **Unit 2: Update SKILL.md orchestration**
+- [x] **Unit 2：更新 SKILL.md orchestration**
 
-**Goal:** Replace the verify-loop re-entry gate with the cross-invocation signal, update cluster brief format, enforce dispatch boundary for resolved threads, and simplify the verify loop.
+**目标：** 用 cross-invocation signal 替换 verify-loop re-entry gate，更新 cluster brief format，enforce dispatch boundary for resolved threads，并简化 verify loop。
 
-**Requirements:** R1, R2, R3, R4, R5, R7, R8
+**需求：** R1, R2, R3, R4, R5, R7, R8
 
-**Dependencies:** Unit 1 (script must output the cross-invocation envelope)
+**依赖：** Unit 1（script must output the cross-invocation envelope）
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md`
+**文件：**
+- 修改：`plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md`
 
-**Approach:**
+**做法：**
 
-*Step 1 (Fetch)*: No change — the script now returns the cross-invocation envelope automatically.
+*Step 1（Fetch）*: 无变更 -- script 现在会自动返回 cross-invocation envelope。
 
-*Step 2 (Triage)*: No changes. Triage classifies new vs already-handled among unresolved threads. Resolved threads from `cross_invocation` are not triage subjects — they're a separate input to clustering.
+*Step 2（Triage）*: 无变更。Triage 在 unresolved threads 中 classify new vs already-handled。来自 `cross_invocation` 的 resolved threads 不是 triage subjects -- 它们是 clustering 的独立 input。
 
-*Step 3 (Cluster Analysis)*: Replace the gate table:
+*Step 3（Cluster Analysis）*: 替换 gate table：
 
 | Gate signal | Check |
 |---|---|
 | **Volume** | 3+ new items from triage |
 | **Cross-invocation** | `cross_invocation.signal == true` |
 
-When cross-invocation gate fires: include resolved threads from `cross_invocation.resolved_threads` alongside new threads in category assignment and spatial grouping. Resolved threads get a `previously_resolved` marker.
+当 cross-invocation gate 触发：将 `cross_invocation.resolved_threads` 中的 resolved threads 与 new threads 一起用于 category assignment 和 spatial grouping。Resolved threads 标记为 `previously_resolved`。
 
-Update cluster brief XML to include `<prior-resolutions>`:
+更新 cluster brief XML，加入 `<prior-resolutions>`：
 ```xml
 <cluster-brief>
   <theme>[concern category]</theme>
@@ -217,101 +217,101 @@ Update cluster brief XML to include `<prior-resolutions>`:
 </cluster-brief>
 ```
 
-Remove the `<just-fixed-files>` element — subsumed by `<prior-resolutions>`.
+移除 `<just-fixed-files>` element -- 已由 `<prior-resolutions>` subsume。
 
-*Step 5 (Dispatch)*: Add dispatch boundary rule: resolved threads participate in clustering and appear in cluster briefs, but are NEVER individually dispatched. Only new threads get individual or cluster dispatch.
+*Step 5（Dispatch）*: 添加 dispatch boundary rule：resolved threads 参与 clustering 并出现在 cluster briefs 中，但 NEVER individually dispatched。只有 new threads 会进入 individual or cluster dispatch。
 
-*Step 8 (Verify)*: Simplify. Remove "Record which files were modified and which concern categories were addressed" and the verify-loop re-entry language. If new threads remain after 2 fix-verify cycles, escalate. Cross-invocation signal handles re-entry across sessions; within-session re-entry works because replies from earlier cycles make threads resolved on re-fetch.
+*Step 8（Verify）*: 简化。移除 "Record which files were modified and which concern categories were addressed" 和 verify-loop re-entry language。如果 2 个 fix-verify cycles 后仍有 new threads，escalate。Cross-invocation signal 处理跨 sessions 的 re-entry；within-session re-entry 也可工作，因为 earlier cycles 的 replies 在 re-fetch 后会使 threads 变为 resolved。
 
-**Patterns to follow:**
-- Existing gate table format in step 3
-- Existing cluster brief XML structure
-- Existing dispatch boundary logic in step 5
+**遵循的模式：**
+- step 3 中的 existing gate table format
+- 现有 cluster brief XML structure
+- step 5 中的 existing dispatch boundary logic
 
-**Test scenarios:**
-- Happy path: 1 new thread + cross-invocation signal -> cluster analysis runs, resolved threads included
-- Happy path: 3 new threads + no cross-invocation signal -> volume gate fires, no resolved threads
-- Happy path: 1 new thread + no cross-invocation signal -> both gates skip, no clustering
-- Edge case: cross-invocation cluster with 1 new + 2 resolved -> brief includes all 3, dispatch only addresses the new thread (plus siblings the resolver identifies)
-- Edge case: resolved thread in a cluster -> in the brief for context, NOT dispatched individually
-- Integration: verify loop re-fetches after this session's fixes, resolved threads from this cycle appear in `cross_invocation`
+**测试场景：**
+- 正常路径：1 new thread + cross-invocation signal -> cluster analysis runs，resolved threads included
+- 正常路径：3 new threads + no cross-invocation signal -> volume gate fires，no resolved threads
+- 正常路径：1 new thread + no cross-invocation signal -> both gates skip，no clustering
+- 边界情况：cross-invocation cluster 有 1 new + 2 resolved -> brief includes all 3，dispatch only addresses the new thread（plus siblings the resolver identifies）
+- 边界情况：resolved thread in a cluster -> 作为 context 放进 brief，NOT dispatched individually
+- 集成：verify loop 在本 session 的 fixes 后 re-fetches，本 cycle 的 resolved threads appear in `cross_invocation`
 
-**Verification:**
-- Gate table in step 3 has exactly two rows (Volume, Cross-invocation)
-- No references to "verify-loop re-entry" remain
-- `<just-fixed-files>` removed from cluster brief documentation
-- Step 5 has "resolved threads are cluster-only" rule
-- Step 8 no longer tracks files/categories or references re-entry as a gate signal
+**验证：**
+- step 3 中的 gate table exactly two rows（Volume, Cross-invocation）
+- 不再有 "verify-loop re-entry" references
+- `<just-fixed-files>` 从 cluster brief documentation 中移除
+- Step 5 有 "resolved threads are cluster-only" rule
+- Step 8 不再 track files/categories，也不再将 re-entry 作为 gate signal 引用
 
 ---
 
-- [x] **Unit 3: Update pr-comment-resolver agent for cross-invocation clusters**
+- [x] **Unit 3：更新 pr-comment-resolver agent 以支持 cross-invocation clusters**
 
-**Goal:** Add handling for the `<prior-resolutions>` element in cluster mode and implement the three-mode assessment for cross-invocation clusters.
+**目标：** 在 cluster mode 中添加对 `<prior-resolutions>` element 的 handling，并为 cross-invocation clusters 实现 three-mode assessment。
 
-**Requirements:** R6, R7
+**需求：** R6, R7
 
-**Dependencies:** Unit 2 (SKILL.md must send the new cluster brief format)
+**依赖：** Unit 2（SKILL.md must send the new cluster brief format）
 
-**Files:**
-- Modify: `plugins/compound-engineering/agents/workflow/ce-pr-comment-resolver.agent.md`
+**文件：**
+- 修改：`plugins/compound-engineering/agents/workflow/ce-pr-comment-resolver.agent.md`
 
-**Approach:**
+**做法：**
 
-Update the Cluster Mode Workflow section:
+更新 Cluster Mode Workflow section：
 
-Step 1 (Parse cluster brief): Add `<prior-resolutions>` to parsed elements.
+Step 1（Parse cluster brief）: 将 `<prior-resolutions>` 加入 parsed elements。
 
-Step 3 (Assess root cause): When `<prior-resolutions>` is present, expand from two modes (systemic vs coincidental) to three:
+Step 3（Assess root cause）: 当 `<prior-resolutions>` 存在时，从两个 modes（systemic vs coincidental）扩展为三个：
 
-- **Band-aid fixes** — prior fixes addressed symptoms, not root cause. Approach: re-examine prior fix locations, implement holistic fix.
-- **Correct but incomplete** — prior fixes were right for their files, but the recurring pattern likely exists in untouched sibling code. This is the highest-value mode. Approach: keep prior fixes, fix the new thread, proactively investigate files in the same directory/module for the same pattern. Report findings in cluster assessment.
-- **Sound and independent** — prior fixes adequate, new thread is genuinely unrelated. Approach: fix individually, use prior context for awareness only.
+- **Band-aid fixes** -- prior fixes 只处理 symptoms，未处理 root cause。做法：重新检查 prior fix locations，实施 holistic fix。
+- **Correct but incomplete** -- prior fixes 对其文件而言正确，但 recurring pattern 可能也存在于 untouched sibling code。这是 highest-value mode。做法：保留 prior fixes，修复 new thread，并主动调查 same directory/module 中的 files 是否存在相同 pattern。在 cluster assessment 中 report findings。
+- **Sound and independent** -- prior fixes adequate，new thread genuinely unrelated。做法：individual fix，仅将 prior context 用于 awareness。
 
-Add a cross-invocation example showing the "correct but incomplete" mode.
+添加一个 cross-invocation example，展示 "correct but incomplete" mode。
 
-Update `cluster_assessment` return to include which mode was applied and, for "correct but incomplete" mode, which additional files were investigated.
+更新 `cluster_assessment` return，使其包含 applied mode；对于 "correct but incomplete" mode，还要包含 investigated additional files。
 
-**Patterns to follow:**
-- Existing cluster mode workflow structure
-- Existing example format in `<examples>`
-- Existing `cluster_assessment` return structure
+**遵循的模式：**
+- 现有 cluster mode workflow structure
+- 现有 `<examples>` example format
+- 现有 `cluster_assessment` return structure
 
-**Test scenarios:**
-- Happy path: cluster with `<prior-resolutions>` where pattern extends to untouched code -> "correct but incomplete", investigates siblings
-- Happy path: cluster with `<prior-resolutions>` where prior fixes were shallow -> "band-aid", holistic fix
-- Happy path: cluster with `<prior-resolutions>` where new thread is unrelated -> "sound and independent"
-- Happy path: cluster WITHOUT `<prior-resolutions>` -> existing two-mode assessment, no behavior change
-- Edge case: `<prior-resolutions>` present but empty -> fall back to existing behavior
+**测试场景：**
+- 正常路径：带 `<prior-resolutions>` 的 cluster，pattern extends to untouched code -> "correct but incomplete"，investigates siblings
+- 正常路径：带 `<prior-resolutions>` 的 cluster，prior fixes were shallow -> "band-aid"，holistic fix
+- 正常路径：带 `<prior-resolutions>` 的 cluster，new thread is unrelated -> "sound and independent"
+- 正常路径：不带 `<prior-resolutions>` 的 cluster -> existing two-mode assessment，无 behavior change
+- 边界情况：`<prior-resolutions>` present but empty -> fall back to existing behavior
 
-**Verification:**
-- Cluster mode workflow mentions all three assessment modes
-- `<prior-resolutions>` is listed as a parsed element
-- New example demonstrates "correct but incomplete" mode
-- `cluster_assessment` format documented for all three modes
-- References to `<just-fixed-files>` removed (subsumed by `<prior-resolutions>`)
-- Existing standard mode and non-prior cluster mode unchanged
+**验证：**
+- Cluster mode workflow 提到全部三种 assessment modes
+- `<prior-resolutions>` 被列为 parsed element
+- 新 example 展示 "correct but incomplete" mode
+- `cluster_assessment` format 记录全部三种 modes
+- 移除对 `<just-fixed-files>` 的 references（已由 `<prior-resolutions>` subsume）
+- 现有 standard mode 和 non-prior cluster mode 不变
 
-## System-Wide Impact
+## 系统级影响
 
-- **Interaction graph:** `get-pr-comments` is called by SKILL.md step 1 and step 8 (verify). Both callers now receive the `cross_invocation` envelope. Step 8's re-fetch picks up this session's replies as resolved threads.
-- **Error propagation:** No new external calls to fail. The only change is a jq filter broadening — if resolved threads are missing from the GraphQL response, `cross_invocation.signal` is false (graceful degradation).
-- **API surface parity:** The script's existing three output keys are unchanged. Callers that don't read `cross_invocation` are unaffected.
-- **Unchanged invariants:** Targeted mode is unaffected. Volume gate threshold, spatial grouping rules, and individual dispatch logic are unchanged.
+- **Interaction graph（交互图）:** `get-pr-comments` 由 SKILL.md step 1 和 step 8（verify）调用。两个 callers 现在都会收到 `cross_invocation` envelope。Step 8 的 re-fetch 会把本 session 的 replies 作为 resolved threads 拾取。
+- **Error propagation（错误传播）:** 没有新的 external calls 会失败。唯一 change 是 jq filter broadening -- 如果 resolved threads 未出现在 GraphQL response 中，`cross_invocation.signal` 为 false（graceful degradation）。
+- **API surface parity（API surface 对等）:** script 现有三个 output keys 不变。不读取 `cross_invocation` 的 callers 不受影响。
+- **Unchanged invariants（不变 invariant）:** Targeted mode 不受影响。Volume gate threshold、spatial grouping rules 和 individual dispatch logic 不变。
 
-## Risks & Dependencies
+## 风险与依赖
 
-| Risk | Mitigation |
+| 风险 | 缓解 |
 |------|------------|
-| Resolved threads from manual (non-skill) resolution included as prior resolutions | Acceptable — any resolved thread is evidence of prior review attention. If it was manually resolved without a fix, clustering with it may produce a "sound and independent" assessment, which is the correct outcome |
-| Resolved threads with 50+ comments hit pagination limits | Existing query fetches `comments(first: 50)`. The `last_comment_at` timestamp comes from whatever comments are fetched — graceful degradation |
-| "Correct but incomplete" mode causes resolver to touch files not in review threads | Bounded by the cluster's `<area>` (directory path). Resolver already reads broadly in cluster mode |
-| Within-session verify loop depends on GitHub API reflecting resolved state quickly | GitHub's GraphQL is eventually consistent. If a just-resolved thread hasn't propagated, the cross-invocation signal won't fire for that thread on re-fetch — it will be caught on the next invocation instead. Acceptable degradation |
+| 手动（non-skill）resolve 的 resolved threads 被纳入 prior resolutions | Acceptable -- 任意 resolved thread 都是 prior review attention 的证据。如果它是手动 resolved 且未 fix，与其 clustering 可能产生 "sound and independent" assessment，这是正确结果 |
+| 含 50+ comments 的 resolved threads 触发 pagination limits | Existing query fetches `comments(first: 50)`。`last_comment_at` timestamp 来自已 fetch 的 comments -- graceful degradation |
+| "Correct but incomplete" mode 导致 resolver 触碰不在 review threads 中的 files | 由 cluster 的 `<area>`（directory path）bounded。Resolver 在 cluster mode 中本来就会 broader read |
+| Within-session verify loop 依赖 GitHub API 快速反映 resolved state | GitHub GraphQL eventually consistent。如果 just-resolved thread 尚未传播，re-fetch 中该 thread 不会触发 cross-invocation signal -- 会在下一次 invocation 捕获。Acceptable degradation |
 
-## Sources & References
+## 来源与参考
 
-- **Origin document:** [docs/brainstorms/2026-04-01-cross-invocation-cluster-analysis-requirements.md](docs/brainstorms/2026-04-01-cross-invocation-cluster-analysis-requirements.md)
-- Related skill: `plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md`
-- Related agent: `plugins/compound-engineering/agents/workflow/ce-pr-comment-resolver.agent.md`
-- Related script: `plugins/compound-engineering/skills/resolve-pr-feedback/scripts/get-pr-comments`
-- Learnings: `docs/solutions/skill-design/script-first-skill-architecture.md`, `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`
+- **Origin document（来源文档）：** [docs/brainstorms/2026-04-01-cross-invocation-cluster-analysis-requirements.md](docs/brainstorms/2026-04-01-cross-invocation-cluster-analysis-requirements.md)
+- Related skill（相关 skill）：`plugins/compound-engineering/skills/resolve-pr-feedback/SKILL.md`
+- Related agent（相关 agent）：`plugins/compound-engineering/agents/workflow/ce-pr-comment-resolver.agent.md`
+- Related script（相关 script）：`plugins/compound-engineering/skills/resolve-pr-feedback/scripts/get-pr-comments`
+- Learnings（经验沉淀）：`docs/solutions/skill-design/script-first-skill-architecture.md`, `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`

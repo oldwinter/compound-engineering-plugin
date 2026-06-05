@@ -1,17 +1,17 @@
-# Tier: Screenshot Reel
+# Tier：Screenshot Reel（截图动图）
 
-Render styled terminal frames from text and stitch into an animated GIF. Each frame shows one step of a CLI demo (command + output).
+从 text 渲染 styled terminal frames，并 stitch 成 animated GIF。每一帧展示 CLI demo 的一个步骤（command + output）。
 
-**Best for:** CLI tools shown as discrete steps (command -> output -> next command -> output). Also useful when VHS breaks on quoting or special characters.
-**Output:** GIF (silicon PNGs stitched via ffmpeg)
-**Label:** "Demo"
-**Required tools:** silicon, ffmpeg
+**Best for（适用场景）：** 以 discrete steps 展示的 CLI tools（command -> output -> next command -> output）。当 VHS 在 quoting 或 special characters 上出问题时也有用。
+**Output（输出）：** GIF（silicon PNGs stitched via ffmpeg）
+**Label（标签）：** "Demo"
+**Required tools（必需工具）：** silicon、ffmpeg
 
-## Step 1: Write Demo Content
+## Step 1：写 Demo Content
 
-Create a text file with `---` delimiters between frames. Each frame shows the terminal state for one step:
+创建一个 text file，用 `---` 作为 frames 之间的 delimiter。每帧展示一个步骤的 terminal state：
 
-Write to `[RUN_DIR]/demo-steps.txt`:
+写入 `[RUN_DIR]/demo-steps.txt`：
 
 ```
 $ your-cli-command --flag value
@@ -27,40 +27,40 @@ $ your-cli-command --verify
 All checks passed
 ```
 
-**Tips:**
-- Include the `$` prompt to show what the user types
-- Keep each frame under ~80 characters wide for readability
-- 3-5 frames is ideal -- enough to tell the story, not so many the GIF is huge
-- Strip unicode characters that silicon's default font can't render (checkmarks, fancy arrows)
+**Tips（提示）：**
+- 包含 `$` prompt，以展示用户输入什么
+- 为了 readability，每帧保持在约 80 characters 宽以内
+- 3-5 帧最理想，足够讲清故事，又不会让 GIF 过大
+- 移除 silicon 默认字体无法渲染的 unicode characters（checkmarks、fancy arrows）
 
-**Never write secrets into the demo text:**
-- Do not paste real credentials, API keys, tokens, or session IDs into any frame, even if copied from a real run
-- Do not substitute fake-looking credentials like `sk-xxxxxxxxx` either -- that produces a misleading artifact. Instead, rewrite the command to use an env var whose *name* appears without a value (e.g., `your-cli --api-key "$API_KEY"`), or demonstrate a different command that doesn't take a secret
-- If a sample output line would include a token, error trace with auth header, or other credential, edit that line out or pick a different scenario -- do not render it
+**永远不要把 secrets 写进 demo text：**
+- 不要把真实 credentials、API keys、tokens 或 session IDs 粘进任何 frame，即使它们来自真实运行
+- 也不要替换成 `sk-xxxxxxxxx` 这类看起来像假的 credentials；这会产生 misleading artifact。改为重写 command，使用只显示*名称*且没有 value 的 env var（例如 `your-cli --api-key "$API_KEY"`），或展示不需要 secret 的其他 command
+- 如果 sample output line 会包含 token、带 auth header 的 error trace 或其他 credential，删掉该行或选择不同 scenario；不要渲染它
 
-## Step 2: Split into Frame Files
+## Step 2：拆分为 Frame Files
 
-Split the demo content on `---` lines into separate text files, one per frame:
+按 `---` lines 拆分 demo content，生成独立 text files，每帧一个：
 
 - `[RUN_DIR]/frame-001.txt`
 - `[RUN_DIR]/frame-002.txt`
 - `[RUN_DIR]/frame-003.txt`
 - etc.
 
-## Step 3: Render and Stitch
+## Step 3：Render and Stitch（渲染并拼接）
 
-Use the capture pipeline script to render each text frame through silicon and stitch into an animated GIF in a single call:
+使用 capture pipeline script，在一次调用中通过 silicon 渲染每个 text frame，并 stitch 成 animated GIF：
 
 ```bash
 python3 scripts/capture-demo.py screenshot-reel --output [RUN_DIR]/demo.gif --duration 2.5 --text [RUN_DIR]/frame-001.txt [RUN_DIR]/frame-002.txt [RUN_DIR]/frame-003.txt
 ```
 
-The script handles silicon rendering, dimension normalization, two-pass palette generation, and automatic frame reduction if the GIF exceeds limits. Default duration is 2.5 seconds per frame (faster than browser reels since terminal frames are quicker to read).
+该 script 会处理 silicon rendering、dimension normalization、two-pass palette generation，并在 GIF 超过 limits 时自动 reduce frames。Default duration 是每帧 2.5 seconds（比 browser reels 更快，因为 terminal frames 读起来更快）。
 
-**If the script fails** (silicon rendering error, stitching error, empty output): fall back to static screenshots tier. Include the raw terminal output as a code block in the PR description instead. Label as "Terminal output", not "Screenshots".
+**如果 script 失败**（silicon rendering error、stitching error、empty output）：fallback 到 static screenshots tier。改为在 PR description 中用 code block 包含 raw terminal output。标记为 "Terminal output"，不要标为 "Screenshots"。
 
-## Step 4: Cleanup
+## Step 4：Cleanup（清理）
 
-Remove individual PNGs and text files. Keep only the final GIF for upload.
+移除单独的 PNGs 和 text files。只保留 final GIF 用于 upload。
 
-Proceed to `references/upload-and-approval.md`.
+继续进入 `references/upload-and-approval.md`。

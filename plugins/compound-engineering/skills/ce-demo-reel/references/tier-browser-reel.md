@@ -1,74 +1,74 @@
-# Tier: Browser Reel
+# Tier：Browser Reel（浏览器演示 GIF）
 
-Capture 3-5 browser screenshots at key UI states and stitch into an animated GIF.
+在关键 UI states 捕获 3-5 张 browser screenshots，并 stitch 成 animated GIF。
 
-**Best for:** Web apps, desktop apps accessible via localhost or CDP.
-**Output:** GIF (PNG screenshots stitched via ffmpeg two-pass palette)
-**Label:** "Demo"
-**Required tools:** agent-browser, ffmpeg
+**Best for（最适合）：** 可通过 localhost 或 CDP 访问的 web apps、desktop apps。
+**Output（输出）：** GIF (PNG screenshots stitched via ffmpeg two-pass palette)
+**Label（标签）：** "Demo"
+**Required tools（必需工具）：** agent-browser, ffmpeg
 
-If `agent-browser` is not installed, inform the user: "`agent-browser` is not installed. Run `/ce-setup` to install required dependencies." Then fall back to a lower tier (static screenshots or skip).
+如果未安装 `agent-browser`，告知用户："`agent-browser` is not installed. Run `/ce-setup` to install required dependencies." 然后 fallback 到较低 tier（static screenshots 或 skip）。
 
-## Step 1: Connect to the Application
+## Step 1：Connect to the Application（连接应用）
 
-**For web apps** -- verify the dev server is accessible:
+**对 web apps** -- 验证 dev server 可访问：
 
-- Read `package.json` `scripts` for `dev`, `start`, `serve` commands
-- Check `Procfile`, `Procfile.dev`, or `bin/dev` if they exist
-- Check `Gemfile` for Rails (`bin/rails server`) or Sinatra
-- Check for running processes on common ports (3000, 5000, 8080)
+- 读取 `package.json` `scripts` 中的 `dev`、`start`、`serve` commands
+- 如果存在，检查 `Procfile`、`Procfile.dev` 或 `bin/dev`
+- 检查 `Gemfile` 中的 Rails（`bin/rails server`）或 Sinatra
+- 检查 common ports（3000、5000、8080）上的 running processes
 
-If the server is not running:
+如果 server 未运行：
 
-- **Headless / background mode** (no blocking question tool available): try starting the server automatically using the detected start command in a background process. For Rails apps, run `bin/dev` or `bin/rails server` in the background. Poll until port 3000 (or the detected port) is accepting connections (max 30s). If it doesn't come up, fall back to static screenshots tier. Track the server PID so you can stop it in Step 4 cleanup.
-- **Interactive mode**: tell the user what start command was detected and ask them to start it. Do not start it automatically (it may require environment variables, database setup, etc.).
+- **Headless / background mode**（没有可用 blocking question tool）：尝试用 detected start command 在 background process 中自动启动 server。对 Rails apps，在 background 运行 `bin/dev` 或 `bin/rails server`。Poll 直到 port 3000（或 detected port）接受 connections（最多 30s）。如果启动失败，fallback 到 static screenshots tier。跟踪 server PID，以便 Step 4 cleanup 停止它。
+- **Interactive mode**：告诉用户检测到的 start command，并请他们启动。不要自动启动（它可能需要 environment variables、database setup 等）。
 
-If the server cannot be reached after the user confirms it should be running, fall back to static screenshots tier.
+如果用户确认 server 应已运行后仍无法访问，fallback 到 static screenshots tier。
 
-Once accessible, note the base URL (e.g., `http://localhost:3000`).
+可访问后，记录 base URL（例如 `http://localhost:3000`）。
 
-**For Electron/desktop apps** -- connect via Chrome DevTools Protocol (CDP):
+**对 Electron/desktop apps** -- 通过 Chrome DevTools Protocol（CDP）连接：
 
-1. Check if the app is already running with CDP enabled by probing common ports:
+1. 检查 app 是否已经以 CDP enabled 状态运行：probe common ports：
    ```bash
    curl -s http://localhost:9222/json/version
    ```
-   If that returns a JSON response, the app is ready -- connect agent-browser to it:
+   如果返回 JSON response，app 已 ready；连接 agent-browser：
    ```bash
    agent-browser connect 9222
    ```
 
-2. If not running, the app needs to be launched with `--remote-debugging-port`. Detect the entry point from `package.json` (look for the `main` field or `electron` in scripts), then ask the user to launch it with:
+2. 如果未运行，app 需要用 `--remote-debugging-port` 启动。从 `package.json` 检测 entry point（查找 `main` field 或 scripts 中的 `electron`），然后请用户用以下方式启动：
    ```
    your-electron-app --remote-debugging-port=9222
    ```
-   If port 9222 is busy, try 9223-9230.
+   如果 port 9222 被占用，尝试 9223-9230。
 
-3. Poll until CDP is ready (timeout after 30 seconds):
+3. Poll 直到 CDP ready（30 seconds 后 timeout）：
    ```bash
    curl -s http://localhost:9222/json/version
    ```
 
-4. Connect agent-browser:
+4. 连接 agent-browser：
    ```bash
    agent-browser connect 9222
    ```
 
-**CDP advantages:** Screenshots come from the renderer's frame buffer, not macOS screen capture -- no Accessibility or Screen Recording permissions needed.
+**CDP advantages：** Screenshots 来自 renderer frame buffer，而不是 macOS screen capture；不需要 Accessibility 或 Screen Recording permissions。
 
-**If CDP connection fails:** Fall back to static screenshots tier. Tell the user: "Could not connect to the app via CDP. Falling back to static screenshots."
+**如果 CDP connection 失败：** fallback 到 static screenshots tier。告诉用户："Could not connect to the app via CDP. Falling back to static screenshots."
 
-## Step 2: Capture Screenshots
+## Step 2：Capture Screenshots（捕获截图）
 
-Navigate to the relevant pages and capture 3-5 screenshots at key UI states:
+Navigate 到 relevant pages，并在关键 UI states 捕获 3-5 张 screenshots：
 
-1. **Initial/empty state** -- Before the feature is used
-2. **Navigation** -- How the user reaches the feature (if not the landing page)
-3. **Feature in action** -- The hero shot showing the feature working
-4. **Result state** -- After interaction (data present, items created, success message)
-5. **Detail view** (optional) -- Expanded item, settings panel, modal
+1. **Initial/empty state** -- feature 使用前
+2. **Navigation** -- 用户如何到达 feature（如果不是 landing page）
+3. **Feature in action** -- 展示 feature 工作的 hero shot
+4. **Result state** -- interaction 后（data present、items created、success message）
+5. **Detail view（详情视图）**（optional）-- expanded item、settings panel、modal
 
-For each screenshot, write to the concrete `RUN_DIR` created by the parent skill:
+对每个 screenshot，写入 parent skill 创建的具体 `RUN_DIR`：
 
 ```bash
 agent-browser open [URL]
@@ -86,38 +86,38 @@ agent-browser wait 1000
 agent-browser screenshot [RUN_DIR]/frame-01-initial.png
 ```
 
-**Capture tips:**
-- Use URL navigation (`agent-browser open URL`) rather than clicking SPA elements (clicks often fail on React/Vue/Svelte SPAs)
-- Wait for `--load networkidle` after navigation, then a short fixed buffer for any post-fetch render. A fixed `wait 2000` alone is not enough on SPAs that fetch data after paint -- screenshots will capture the empty shell.
-- For pages that keep network activity open (websockets, long-polling), use `agent-browser wait --text "<known content>"` to wait for a specific string from the populated UI, or `agent-browser wait --fn "<expression>"` for a custom readiness condition.
-- Capture the full viewport (sidebar, header give reviewers context)
+**Capture tips（捕获提示）：**
+- 使用 URL navigation（`agent-browser open URL`），而不是点击 SPA elements（clicks 在 React/Vue/Svelte SPAs 上经常失败）
+- Navigation 后等待 `--load networkidle`，然后再加一个短 fixed buffer 给 post-fetch render。单独固定 `wait 2000` 对 paint 后 fetch data 的 SPAs 不够；screenshots 会捕获 empty shell。
+- 对保持 network activity open 的 pages（websockets、long-polling），使用 `agent-browser wait --text "<known content>"` 等待 populated UI 中的特定 string，或用 `agent-browser wait --fn "<expression>"` 设置 custom readiness condition。
+- 捕获 full viewport（sidebar、header 会给 reviewers context）
 
-**Keep secrets out of frame:**
-- Do not open DevTools, the Network panel, or Application/Storage -- these expose auth headers, cookies, session storage, and tokens in plain view
-- Skip pages that display raw credentials (unmasked API-key settings, OAuth consent screens, `.env` viewers, billing/payment detail)
-- Check the URL bar before each screenshot -- if it carries a session token or credential query param (`?access_token=`, `?api_key=`, `#id_token=`), navigate to the clean canonical URL first
-- Prefer a demo account or seeded fixture data over a real logged-in account when the screenshot will include account identifiers that are themselves sensitive
+**Keep secrets out of frame（不要让 secrets 入镜）：**
+- 不要打开 DevTools、Network panel 或 Application/Storage；这些会明文暴露 auth headers、cookies、session storage 和 tokens
+- 跳过显示 raw credentials 的 pages（unmasked API-key settings、OAuth consent screens、`.env` viewers、billing/payment detail）
+- 每次 screenshot 前检查 URL bar；如果它带 session token 或 credential query param（`?access_token=`、`?api_key=`、`#id_token=`），先 navigate 到干净 canonical URL
+- 当 screenshot 会包含本身敏感的 account identifiers 时，优先使用 demo account 或 seeded fixture data，而不是真实 logged-in account
 
-## Step 3: Stitch into GIF
+## Step 3：Stitch into GIF（拼接成 GIF）
 
-Use the capture pipeline script to normalize frame dimensions, stitch with two-pass palette, and auto-reduce if over 10 MB:
+使用 capture pipeline script normalize frame dimensions、用 two-pass palette stitch，并在超过 10 MB 时 auto-reduce：
 
 ```bash
 python3 scripts/capture-demo.py stitch [RUN_DIR]/demo.gif [RUN_DIR]/frame-*.png
 ```
 
-The script handles dimension normalization (via ffprobe + ffmpeg padding), concat demuxer stitching, palette generation, and automatic frame reduction if the GIF exceeds GitHub's 10 MB inline limit. Default is 3 seconds per frame. To adjust:
+该 script 处理 dimension normalization（通过 ffprobe + ffmpeg padding）、concat demuxer stitching、palette generation，并在 GIF 超过 GitHub 10 MB inline limit 时自动 reduce frames。Default 为每帧 3 seconds。要调整：
 
 ```bash
 python3 scripts/capture-demo.py stitch --duration 2.0 [RUN_DIR]/demo.gif [RUN_DIR]/frame-*.png
 ```
 
-**If stitching fails:** Fall back to static screenshots tier using the individual PNGs already captured. If no PNGs were captured, report the failure.
+**如果 stitching 失败：** 使用已捕获的 individual PNGs fallback 到 static screenshots tier。如果没有捕获 PNGs，报告 failure。
 
-## Step 4: Secrets Scan and Cleanup
+## Step 4：Secrets Scan and Cleanup（Secret 扫描与清理）
 
-Before uploading, inspect the final GIF for any credential material visible on-screen. If any appears, discard the GIF and recapture with the offending page or state routed out of frame. Do not upload, do not blur.
+上传前，检查 final GIF 中是否有任何 credential material 在屏幕上可见。如果出现，丢弃 GIF，并将 offending page 或 state 移出 frame 后重新 capture。不要 upload，不要 blur。
 
-After a clean GIF is confirmed, remove individual PNG frames. Keep only the final GIF for upload. If you auto-started the dev server in Step 1 (headless mode), stop it now using the tracked PID.
+确认 GIF 干净后，移除 individual PNG frames。只保留 final GIF 用于 upload。如果在 Step 1（headless mode）中 auto-started dev server，现在用 tracked PID 停止它。
 
-Proceed to `references/upload-and-approval.md`.
+继续进入 `references/upload-and-approval.md`。

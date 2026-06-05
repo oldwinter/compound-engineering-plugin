@@ -3,83 +3,83 @@ date: 2026-03-14
 topic: ce-plan-rewrite
 ---
 
-# Rewrite `ce:plan` to Separate Planning from Implementation
+# 重写 `ce:plan`：分离 Planning 与 Implementation
 
-## Problem Frame
+## 问题框架
 
-`ce:plan` sits between `ce:brainstorm` and `ce:work`, but the current skill mixes issue authoring, technical planning, and pseudo-implementation. That makes plans brittle and pushes the planning phase to predict details that are often only discoverable during implementation. PR #246 intensifies this by asking plans to include complete code, exact commands, and micro-step TDD and commit choreography. The rewrite should keep planning strong enough for a capable agent or engineer to execute, while moving code-writing, test-running, and execution-time learning back into `ce:work`.
+`ce:plan` 位于 `ce:brainstorm` 和 `ce:work` 之间，但当前 skill 混合了 issue authoring、technical planning 和 pseudo-implementation。这会让 plans 变脆，并迫使 planning phase 预测许多其实只能在 implementation 期间发现的 details。PR #246 加剧了这一点，它要求 plans 包含 complete code、exact commands，以及 micro-step TDD 和 commit choreography。rewrite 应让 planning 强到足以让 capable agent 或 engineer 执行，同时把 code-writing、test-running 和 execution-time learning 放回 `ce:work`。
 
-## Requirements
+## 需求
 
-- R1. `ce:plan` must accept either a raw feature description or a requirements document produced by `ce:brainstorm` as primary input.
-- R2. `ce:plan` must preserve compound-engineering's planning strengths: repo pattern scan, institutional learnings, conditional external research, and requirements-gap checks when warranted.
-- R3. `ce:plan` must produce a durable implementation plan focused on decisions, sequencing, file paths, dependencies, risks, and test scenarios, not implementation code.
-- R4. `ce:plan` must not instruct the planner to run tests, generate exact implementation snippets, or learn from execution-time results. Those belong to `ce:work`.
-- R5. Plan tasks and subtasks must be right-sized for implementation handoff, but sized as logical units or atomic commits rather than 2-5 minute copy-paste steps.
-- R6. Plans must remain shareable and portable as documents or issues without tool-specific executor litter such as TodoWrite instructions, `/ce:work` choreography, or git command recipes in the artifact itself.
-- R7. `ce:plan` must carry forward product decisions, scope boundaries, success criteria, and deferred questions from `ce:brainstorm` without re-inventing them.
-- R8. `ce:plan` must explicitly distinguish what gets resolved during planning from what is intentionally deferred to implementation-time discovery.
-- R9. `ce:plan` must hand off cleanly to `ce:work`, giving enough information for task creation without pre-writing code.
-- R10. If detail levels remain, they must change depth of analysis and documentation, not the planning philosophy. A small plan can be terse while still staying decision-first.
-- R11. If an upstream requirements document contains unresolved `Resolve Before Planning` items, `ce:plan` must classify whether they are true product blockers or misfiled technical questions before proceeding.
-- R12. `ce:plan` must not plan past unresolved product decisions that would change behavior, scope, or success criteria, but it may absorb technical or research questions by reclassifying them into planning-owned investigation.
-- R13. When true blockers remain, `ce:plan` must pause helpfully: surface the blockers, allow the user to convert them into explicit assumptions or decisions, or route them back to `ce:brainstorm`.
+- R1. `ce:plan` 必须接受 raw feature description 或 `ce:brainstorm` 产出的 requirements document 作为 primary input。
+- R2. `ce:plan` 必须保留 compound-engineering 的 planning strengths：repo pattern scan、institutional learnings、conditional external research，以及必要时的 requirements-gap checks。
+- R3. `ce:plan` 必须产出 durable implementation plan，聚焦 decisions、sequencing、file paths、dependencies、risks 和 test scenarios，而不是 implementation code。
+- R4. `ce:plan` 不得指示 planner 运行 tests、生成 exact implementation snippets，或从 execution-time results 学习。这些属于 `ce:work`。
+- R5. Plan tasks 和 subtasks 必须适合 implementation handoff，但 sizing 应是 logical units 或 atomic commits，而不是 2-5 分钟的 copy-paste steps。
+- R6. Plans 必须作为 documents 或 issues 保持 shareable 和 portable，artifact 本身不要包含 TodoWrite instructions、`/ce:work` choreography 或 git command recipes 这类 tool-specific executor litter。
+- R7. `ce:plan` 必须 carry forward `ce:brainstorm` 中的 product decisions、scope boundaries、success criteria 和 deferred questions，而不是重新发明它们。
+- R8. `ce:plan` 必须明确区分哪些内容在 planning 中 resolved，哪些 intentional deferred 到 implementation-time discovery。
+- R9. `ce:plan` 必须 cleanly hand off 到 `ce:work`，提供足够 task creation 信息，但不预写 code。
+- R10. 如果 detail levels 保留，它们必须改变 analysis 和 documentation depth，而不是 planning philosophy。small plan 可以 terse，但仍应 decision-first。
+- R11. 如果 upstream requirements document 包含 unresolved `Resolve Before Planning` items，`ce:plan` 必须在继续前 classify 它们是真正 product blockers，还是 misfiled technical questions。
+- R12. `ce:plan` 不得越过会改变 behavior、scope 或 success criteria 的 unresolved product decisions 去 plan，但可以把 technical 或 research questions reclassify 为 planning-owned investigation 并吸收。
+- R13. 当 true blockers 仍存在时，`ce:plan` 必须 helpful 地 pause：surface blockers，允许用户把它们转换为 explicit assumptions 或 decisions，或 route 回 `ce:brainstorm`。
 
-## Success Criteria
+## 成功标准
 
-- A fresh implementer can start work from the plan without needing clarifying questions, but the plan does not contain implementation code.
-- `ce:work` can derive actionable tasks from the plan without relying on micro-step commands or embedded git/test instructions.
-- Plans stay accurate longer as repo context changes because they capture decisions and boundaries rather than speculative code.
-- A requirements document from `ce:brainstorm` flows into planning without losing decisions, scope boundaries, or success criteria.
-- Plans do not proceed past unresolved product blockers unless the user explicitly converts them into assumptions or decisions.
-- For the same feature, the rewritten `ce:plan` produces output that is materially shorter and less brittle than the current skill or PR #246's proposed format while remaining execution-ready.
+- fresh implementer 可以从 plan 开始工作，不需要 clarifying questions，但 plan 不包含 implementation code。
+- `ce:work` 可以从 plan 派生 actionable tasks，而不依赖 micro-step commands 或 embedded git/test instructions。
+- 随着 repo context 变化，plans 更长久 accurate，因为它们捕获 decisions 和 boundaries，而不是 speculative code。
+- 来自 `ce:brainstorm` 的 requirements document 进入 planning 后，不丢失 decisions、scope boundaries 或 success criteria。
+- 除非用户显式把 unresolved product blockers 转换为 assumptions 或 decisions，否则 plans 不会越过它们继续。
+- 对同一 feature，rewritten `ce:plan` 产出的 output 比当前 skill 或 PR #246 proposed format materially shorter 且 less brittle，同时仍 execution-ready。
 
-## Scope Boundaries
+## 范围边界
 
-- Do not redesign `ce:brainstorm`'s product-definition role.
-- Do not remove decomposition, file paths, verification, or risk analysis from `ce:plan`.
-- Do not move planning into a vague, under-specified artifact that leaves execution to guess.
-- Do not change `ce:work` in this phase beyond possible follow-up clarification of what plan structure it should prefer.
-- Do not require heavyweight PRD ceremony for small or straightforward work.
+- 不 redesign `ce:brainstorm` 的 product-definition role。
+- 不从 `ce:plan` 移除 decomposition、file paths、verification 或 risk analysis。
+- 不把 planning 移入 vague、under-specified artifact，让 execution 猜测。
+- 此阶段不改变 `ce:work`，除了可能的 follow-up clarification：它应偏好什么 plan structure。
+- 不要求 small 或 straightforward work 采用 heavyweight PRD ceremony。
 
-## Key Decisions
+## 关键决策
 
-- Use a hybrid model: keep compound-engineering's research and handoff strengths, but adopt iterative-engineering's "decisions, not code" boundary.
-- Planning stops before execution: no running tests, no fail/pass learning, no exact implementation snippets, and no commit shell commands in the plan.
-- Use logical tasks and subtasks sized around atomic changes or commit units rather than 2-5 minute micro-steps.
-- Keep explicit verification and test scenarios, but express them as expected coverage and validation outcomes rather than commands with predicted output.
-- Preserve `ce:brainstorm` as the preferred upstream input when available, with clear handling for deferred technical questions.
-- Treat `Resolve Before Planning` as a classification gate: planning first distinguishes true product blockers from technical questions, then investigates only the latter.
+- 使用 hybrid model：保留 compound-engineering 的 research 和 handoff strengths，但采用 iterative-engineering 的 “decisions, not code” boundary。
+- Planning 在 execution 前停止：不运行 tests、不做 fail/pass learning、不放 exact implementation snippets、不在 plan 中放 commit shell commands。
+- 使用围绕 atomic changes 或 commit units sizing 的 logical tasks 和 subtasks，而不是 2-5 分钟 micro-steps。
+- 保留 explicit verification 和 test scenarios，但把它们表达为 expected coverage 和 validation outcomes，而不是带 predicted output 的 commands。
+- 当可用时保留 `ce:brainstorm` 作为 preferred upstream input，并清晰处理 deferred technical questions。
+- 将 `Resolve Before Planning` 视为 classification gate：planning 先区分 true product blockers 和 technical questions，然后只调查后者。
 
-## High-Level Direction
+## 高层方向
 
-- Phase 0: Resume existing plan work when relevant, detect brainstorm input, and assess scope.
-- Phase 1: Gather context through repo research, institutional learnings, and conditional external research.
-- Phase 2: Resolve planning-time technical questions and capture implementation-time unknowns separately.
-- Phase 3: Structure the plan around components, dependencies, files, test targets, risks, and verification.
-- Phase 4: Write a right-sized plan artifact whose depth varies by scope, but whose boundary stays planning-only.
-- Phase 5: Review and hand off to refinement, deeper research, issue sharing, or `ce:work`.
+- Phase 0：相关时 resume existing plan work，detect brainstorm input，并 assess scope。
+- Phase 1：通过 repo research、institutional learnings 和 conditional external research 收集 context。
+- Phase 2：resolve planning-time technical questions，并单独捕获 implementation-time unknowns。
+- Phase 3：围绕 components、dependencies、files、test targets、risks 和 verification 组织 plan。
+- Phase 4：写入 right-sized plan artifact；其 depth 随 scope 变化，但 boundary 保持 planning-only。
+- Phase 5：review 并 hand off 到 refinement、deeper research、issue sharing 或 `ce:work`。
 
-## Alternatives Considered
+## 考虑过的替代方案
 
-- Keep the current `ce:plan` and only reject PR #246.
-  Rejected because the underlying issue remains: the current skill already drifts toward issue-template output plus pseudo-implementation.
-- Adopt Superpowers `writing-plans` nearly wholesale.
-  Rejected because it is intentionally execution-script-oriented and collapses planning into detailed code-writing and command choreography.
-- Adopt iterative-engineering `tech-planning` wholesale.
-  Rejected because it would lose useful compound-engineering behaviors such as brainstorm-origin integration, institutional learnings, and richer post-plan handoff options.
+- 保留当前 `ce:plan`，只 reject PR #246。
+  Rejected，因为底层 issue 仍存在：当前 skill 已经 drift toward issue-template output plus pseudo-implementation。
+- 几乎 wholesale 采用 Superpowers `writing-plans`。
+  Rejected，因为它有意是 execution-script-oriented，会把 planning 折叠进 detailed code-writing 和 command choreography。
+- wholesale 采用 iterative-engineering `tech-planning`。
+  Rejected，因为这会丢失有用的 compound-engineering behaviors，例如 brainstorm-origin integration、institutional learnings 和 richer post-plan handoff options。
 
-## Dependencies / Assumptions
+## 依赖与假设
 
-- `ce:work` can continue creating its own actionable task list from a decision-first plan.
-- If `ce:work` later benefits from an explicit section such as `## Implementation Units` or `## Work Breakdown`, that should be a separate follow-up designed around execution needs rather than micro-step code generation.
+- `ce:work` 可以继续从 decision-first plan 创建自己的 actionable task list。
+- 如果 `ce:work` 之后受益于 explicit section，例如 `## Implementation Units` 或 `## Work Breakdown`，那应作为 separate follow-up，围绕 execution needs 设计，而不是 micro-step code generation。
 
-## Resolved During Planning
+## Planning 期间已解决
 
-- [Affects R10][Technical] Replaced `MINIMAL` / `MORE` / `A LOT` with `Lightweight` / `Standard` / `Deep` to align `ce:plan` with `ce:brainstorm`'s scope model.
-- [Affects R9][Technical] Updated `ce:work` to explicitly consume decision-first plan sections such as `Implementation Units`, `Requirements Trace`, `Files`, `Test Scenarios`, and `Verification`.
-- [Affects R2][Needs research] Kept SpecFlow as a conditional planning aid: use it for `Standard` or `Deep` plans when flow completeness is unclear rather than making it mandatory for every plan.
+- [Affects R10][Technical] 将 `MINIMAL` / `MORE` / `A LOT` 替换为 `Lightweight` / `Standard` / `Deep`，使 `ce:plan` 与 `ce:brainstorm` 的 scope model 对齐。
+- [Affects R9][Technical] 更新 `ce:work`，显式消费 decision-first plan sections，例如 `Implementation Units`、`Requirements Trace`、`Files`、`Test Scenarios` 和 `Verification`。
+- [Affects R2][Needs research] 保留 SpecFlow 作为 conditional planning aid：当 `Standard` 或 `Deep` plans 的 flow completeness 不清楚时使用它，而不是强制每个 plan 都用。
 
-## Next Steps
+## 下一步
 
--> Review, refine, and commit the `ce:plan` and `ce:work` rewrite
+-> Review、refine，并 commit `ce:plan` 和 `ce:work` rewrite

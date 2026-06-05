@@ -1,5 +1,5 @@
 ---
-title: "Branch-based plugin install and testing for Claude Code plugins"
+title: "Claude Code plugins 的 branch-based plugin install 和 testing"
 date: 2026-03-26
 problem_type: developer_experience
 category: developer-experience
@@ -15,13 +15,13 @@ tags:
   - git-clone
   - plugin-path
 symptoms:
-  - "No way to install or test a Claude Code plugin from a specific git branch"
-  - "install command always cloned the default branch from GitHub"
-  - "claude --plugin-dir only accepts a local filesystem path with no branch support"
-  - "Developers had to manually checkout branches to test others' plugin changes"
-root_cause_detail: "The CLI lacked any mechanism to target a specific git branch when installing or testing plugins. Claude Code's --plugin-dir flag only accepts local paths, and the install command had no --branch option."
-solution_summary: "Added a new plugin-path subcommand that clones a specific branch to a deterministic cache path (~/.cache/compound-engineering/branches/) and outputs it for use with claude --plugin-dir. Also added a --branch flag to the install command for non-Claude targets."
-key_insight: "Worktree-based development means multiple branches are active simultaneously and the repo root checkout can't serve as a reliable plugin source. A deterministic cache path based on the sanitized branch name enables branch-specific plugin testing without disrupting any checkout, and re-runs update in place via git fetch + reset --hard."
+  - "无法从特定 git branch 安装或测试 Claude Code plugin"
+  - "install command 总是从 GitHub clone default branch"
+  - "claude --plugin-dir 只接受 local filesystem path，没有 branch support"
+  - "Developers 必须手动 checkout branches 才能测试他人的 plugin changes"
+root_cause_detail: "CLI 缺少在安装或测试 plugins 时指定特定 git branch 的机制。Claude Code 的 --plugin-dir flag 只接受 local paths，install command 没有 --branch option。"
+solution_summary: "新增 plugin-path subcommand，将特定 branch clone 到 deterministic cache path（~/.cache/compound-engineering/branches/），并输出给 claude --plugin-dir 使用。也为 non-Claude targets 的 install command 添加 --branch flag。"
+key_insight: "Worktree-based development 意味着多个 branches 同时 active，repo root checkout 无法作为可靠 plugin source。基于 sanitized branch name 的 deterministic cache path 支持 branch-specific plugin testing，且不打扰任何 checkout；重复运行通过 git fetch + reset --hard 原地更新。"
 files_changed:
   - src/commands/plugin-path.ts
   - src/commands/install.ts
@@ -29,102 +29,102 @@ files_changed:
   - tests/plugin-path.test.ts
   - tests/cli.test.ts
 verification_steps:
-  - "Run bun test to confirm all tests pass including 5 new plugin-path tests and 1 new CLI test"
-  - "Test plugin-path subcommand outputs correct deterministic cache path for a given branch"
-  - "Test install --branch flag clones from the specified branch for non-Claude targets"
-  - "Verify re-running plugin-path on same branch updates via fetch+reset rather than re-cloning"
+  - "运行 bun test，确认所有 tests 通过，包括 5 个新的 plugin-path tests 和 1 个新的 CLI test"
+  - "测试 plugin-path subcommand 会为给定 branch 输出正确 deterministic cache path"
+  - "测试 install --branch flag 会为 non-Claude targets 从指定 branch clone"
+  - "验证在同一 branch 上重新运行 plugin-path 会通过 fetch+reset 更新，而不是重新 clone"
 related_docs:
   - docs/solutions/adding-converter-target-providers.md
   - docs/solutions/plugin-versioning-requirements.md
 ---
 
-## Problem
+## 问题
 
-The compound-engineering plugin CLI's `install` command always cloned the default branch from GitHub, and Claude Code's `--plugin-dir` flag only accepts local filesystem paths. Developers who wanted to test a plugin from a specific git branch had to manually check out that branch in their local repo, disrupting their working tree.
+compound-engineering plugin CLI 的 `install` command 总是从 GitHub clone default branch，而 Claude Code 的 `--plugin-dir` flag 只接受 local filesystem paths。想从特定 git branch 测试 plugin 的 developers 必须在本地 repo 中手动 checkout 该 branch，从而打断 working tree。
 
-This is especially painful in worktree-based workflows where `./plugins/compound-engineering` always points to whatever branch the main checkout is on. Two concrete scenarios:
+这在 worktree-based workflows 中尤其痛苦，因为 `./plugins/compound-engineering` 总是指向 main checkout 当前所在的 branch。两个具体场景：
 
-- **Cross-repo**: You're working in a different project and want to use a CE branch as your plugin. Without this, you'd have to switch the CE repo's checkout — which is likely WIP on something else.
-- **Same-repo**: You're working on CE itself — `feat/feature-2` in your main checkout, `feat/feature-1` in a worktree. You want to test feature-1's plugin while continuing to develop feature-2. The main checkout can't serve both purposes.
+- **Cross-repo**：你在另一个 project 中工作，并想使用某个 CE branch 作为 plugin。没有该能力时，你必须切换 CE repo 的 checkout，而它很可能正有其他 WIP。
+- **Same-repo**：你在 CE 自身工作，main checkout 是 `feat/feature-2`，某个 worktree 是 `feat/feature-1`。你想在继续开发 feature-1 的 plugin 时继续开发 feature-2。main checkout 无法同时服务两个目的。
 
-Note: the `--branch` flag works with pushed branches (those available on the remote). For unpushed local worktree branches, developers can point `--plugin-dir` directly at the worktree path (e.g., `claude --plugin-dir /path/to/worktree/plugins/compound-engineering`).
-
----
-
-## Symptoms
-
-- Running `bunx compound-engineering install <plugin>` always fetched the default branch regardless of what branch contained the changes under review.
-- `claude --plugin-dir` required a local path, so there was no way to point it at a remote branch without a manual `git clone` or `git checkout`.
-- Developers testing PR branches had to stash or commit their local work, switch branches, test, then switch back -- a disruptive and error-prone workflow.
-- In worktree-based workflows, `./plugins/compound-engineering` in the repo root always points to the main checkout's branch, not the worktree branch being developed. Developers working on multiple branches simultaneously had no ergonomic way to install from a specific worktree's branch.
-- No scripting path existed to spin up a branch-specific plugin directory for automated testing.
+注意：`--branch` flag 适用于 pushed branches（remote 上可用的 branches）。对于 unpushed local worktree branches，developers 可以直接将 `--plugin-dir` 指向 worktree path（例如 `claude --plugin-dir /path/to/worktree/plugins/compound-engineering`）。
 
 ---
 
-## What Didn't Work
+## 症状
 
-- **Using `/tmp/` for cloned branches** was rejected because temporary directories are cleared on reboot, forcing a full re-clone every session and losing the fast-update path.
-- **Random temp directory names** (e.g., `mktemp -d`) were rejected because they cause directory proliferation and make it impossible to re-run the same command and update in place.
-- **Extending `claude --plugin-dir` itself** was not an option -- that flag is owned by Claude Code and only accepts local filesystem paths; the solution had to live in the plugin CLI layer.
-- **Symlinking the bundled plugin** would not help because the bundled copy is always pinned to the installed CLI version, not an arbitrary remote branch.
-- **Naive branch sanitization** (`replace(/[^a-zA-Z0-9._-]/g, "-")`) collapsed distinct branches to the same cache path (e.g., `feat/foo-bar` and `feat-foo/bar` both became `feat-foo-bar`). An escape-then-replace scheme (`~` → `~~`, `/` → `~`) was attempted next but was still not injective — `feat~~foo` and `feat~//foo` both produced `feat~~~~foo`. The correct insight was that `~` is illegal in git branch names (`git-check-ref-format` reserves it for reflog notation), so a simple `/` → `~` replacement is injective without any escape step.
+- 运行 `bunx compound-engineering install <plugin>` 总是 fetch default branch，不管接受 review 的 changes 位于哪个 branch。
+- `claude --plugin-dir` 需要 local path，因此无法在不手动 `git clone` 或 `git checkout` 的情况下指向 remote branch。
+- 测试 PR branches 的 developers 必须 stash 或 commit 本地工作、切换 branches、测试，再切回来，这是 disruptive 且 error-prone 的 workflow。
+- 在 worktree-based workflows 中，repo root 的 `./plugins/compound-engineering` 总是指向 main checkout 的 branch，而不是正在开发的 worktree branch。同时处理多个 branches 的 developers 没有符合人体工学的方式从特定 worktree branch 安装。
+- 不存在为 automated testing 启动 branch-specific plugin directory 的 scripting path。
 
 ---
 
-## Solution
+## 无效做法
 
-Two complementary features were added:
+- **使用 `/tmp/` 存放 cloned branches** 被拒绝，因为 temporary directories 会在 reboot 时清除，迫使每个 session 完整 re-clone，并丢失 fast-update path。
+- **随机 temp directory names**（例如 `mktemp -d`）被拒绝，因为它们会导致 directory proliferation，并且无法重新运行同一命令进行原地更新。
+- **扩展 `claude --plugin-dir` 本身** 不可行，因为该 flag 归 Claude Code 所有，且只接受 local filesystem paths；solution 必须位于 plugin CLI layer。
+- **Symlinking bundled plugin** 无济于事，因为 bundled copy 总是 pinned 到已安装 CLI version，而不是任意 remote branch。
+- **Naive branch sanitization**（`replace(/[^a-zA-Z0-9._-]/g, "-")`）会将不同 branches 折叠到同一 cache path（例如 `feat/foo-bar` 和 `feat-foo/bar` 都变成 `feat-foo-bar`）。随后尝试 escape-then-replace scheme（`~` -> `~~`、`/` -> `~`），但仍不是 injective：`feat~~foo` 和 `feat~//foo` 都会产生 `feat~~~~foo`。正确 insight 是 `~` 在 git branch names 中非法（`git-check-ref-format` 将其保留给 reflog notation），因此简单的 `/` -> `~` replacement 无需 escape step 就是 injective。
 
-### 1. New `plugin-path` command (for Claude Code)
+---
 
-Clones a branch to a deterministic cache directory and prints the path for use with `claude --plugin-dir`.
+## 解决方案
+
+添加了两个互补 features：
+
+### 1. 新 `plugin-path` command（用于 Claude Code）
+
+将 branch clone 到 deterministic cache directory，并打印 path 供 `claude --plugin-dir` 使用。
 
 ```bash
 bun run src/index.ts plugin-path compound-engineering --branch feat/new-agents
 # Output: claude --plugin-dir ~/.cache/compound-engineering/branches/compound-engineering-feat~new-agents/plugins/compound-engineering
 ```
 
-Key implementation details in `src/commands/plugin-path.ts`:
+`src/commands/plugin-path.ts` 中的关键 implementation details：
 
-- Cache path: `~/.cache/compound-engineering/branches/<plugin>-<sanitized-branch>/`
-- Branch sanitization: `/` → `~`, then strip remaining non-`[a-zA-Z0-9._~-]` chars. This is injective because `~` is illegal in git branch names (`git-check-ref-format` reserves it for reflog notation), so no valid branch input contains `~` and the mapping is 1:1.
-- First run: `git clone --depth 1 --branch <name> <source> <dest>`
-- Re-run: `git fetch origin <branch>` + `git reset --hard origin/<branch>`
+- Cache path（缓存路径）：`~/.cache/compound-engineering/branches/<plugin>-<sanitized-branch>/`
+- Branch sanitization：`/` -> `~`，然后去掉剩余非 `[a-zA-Z0-9._~-]` 字符。这是 injective，因为 `~` 在 git branch names 中非法（`git-check-ref-format` 将其保留给 reflog notation），因此没有合法 branch input 包含 `~`，mapping 是 1:1。
+- 首次运行：`git clone --depth 1 --branch <name> <source> <dest>`
+- 重新运行：`git fetch origin <branch>` + `git reset --hard origin/<branch>`
 
-### 2. `--branch` flag on `install` command (for Codex, OpenCode, etc.)
+### 2. `install` command 上的 `--branch` flag（用于 Codex、OpenCode 等）
 
-Threads a branch name through the full resolution chain so `install` clones from the specified branch instead of the default.
+将 branch name 贯穿完整 resolution chain，让 `install` 从指定 branch 而不是 default clone。
 
 ```bash
 bun run src/index.ts install compound-engineering --to codex --branch feat/new-agents
 ```
 
-Changes in `src/commands/install.ts`:
+`src/commands/install.ts` 中的变更：
 
-- When `--branch` is provided, skips bundled plugin lookup (user explicitly wants a remote version)
-- Threaded through `resolvePluginPath` -> `resolveGitHubPluginPath` -> `cloneGitHubRepo`
-- `cloneGitHubRepo` conditionally adds `--branch <name>` to `git clone --depth 1`
+- 提供 `--branch` 时，跳过 bundled plugin lookup（用户明确想要 remote version）
+- 贯穿 `resolvePluginPath` -> `resolveGitHubPluginPath` -> `cloneGitHubRepo`
+- `cloneGitHubRepo` 有条件地向 `git clone --depth 1` 添加 `--branch <name>`
 
-### Key difference between the two
+### 二者关键区别
 
-`plugin-path` caches the checkout in `~/.cache/` for reuse across sessions. `install --branch` uses an ephemeral temp directory that's cleaned up after the install completes -- it only needs the clone long enough to read and convert the plugin.
-
----
-
-## Why This Works
-
-The root issue was a missing indirection layer: the CLI assumed "install" always means "use the default branch," and Claude Code assumes "plugin directory" always means "a path that already exists locally." The solution bridges that gap by:
-
-- **Deterministic cache paths** mean the same branch always maps to the same directory. No proliferation, no ambiguity.
-- **Fetch + hard reset on re-run** keeps the cached checkout current without requiring a full re-clone, making iteration fast.
-- **`~/.cache/`** follows XDG conventions, persists across reboots, and is understood by users and tooling as a safe-to-delete cache layer.
-- **The `COMPOUND_PLUGIN_GITHUB_SOURCE` env var** works with both features, allowing tests to use local git repos and avoiding network dependency.
+`plugin-path` 将 checkout 缓存在 `~/.cache/`，以便跨 sessions 复用。`install --branch` 使用 ephemeral temp directory，install 完成后会清理；它只需要 clone 存活到读取并转换 plugin 为止。
 
 ---
 
-## Prevention
+## 为什么有效
 
-- **Test coverage**: `tests/plugin-path.test.ts` (6 tests: clone-to-cache, slash sanitization, update-on-rerun, slash-placement collision resistance, nonexistent branch error, nonexistent plugin error) and `tests/cli.test.ts` (1 test: install --branch clones specific branch). All tests use local git repos via `COMPOUND_PLUGIN_GITHUB_SOURCE`.
-- **Cache directory convention**: Any future features that need ephemeral or semi-persistent clones should use `~/.cache/compound-engineering/<purpose>/` with deterministic, sanitized subdirectory names. Avoid `/tmp/` for anything that benefits from surviving a reboot.
-- **Branch sanitization**: Always sanitize branch names before using them in filesystem paths. Using `~` as the slash replacement is injective because `~` is illegal in git branch names (`git-check-ref-format`). A naive `replace(/[^a-zA-Z0-9._-]/g, "-")` is insufficient because it collapses branches like `feat/foo-bar` and `feat-foo/bar` into the same path.
-- **Resolution chain threading**: When adding new resolution strategies to the CLI, thread optional parameters through the full `resolvePluginPath -> resolveGitHubPluginPath -> cloneGitHubRepo` chain rather than branching at the top level. This keeps the resolution logic composable.
+根本问题是缺少 indirection layer：CLI 假设 "install" 总是意味着“使用 default branch”，而 Claude Code 假设 "plugin directory" 总是意味着“本地已经存在的 path”。该 solution 通过以下方式弥合差距：
+
+- **Deterministic cache paths** 意味着同一 branch 始终映射到同一 directory。无 proliferation，无歧义。
+- **重新运行时 fetch + hard reset** 可保持 cached checkout 最新，而不需要完整 re-clone，使 iteration 快速。
+- **`~/.cache/`** 遵循 XDG conventions，跨 reboot 保留，并被 users 和 tooling 理解为可安全删除的 cache layer。
+- **`COMPOUND_PLUGIN_GITHUB_SOURCE` env var** 适用于两个 features，允许 tests 使用 local git repos 并避免 network dependency。
+
+---
+
+## 预防
+
+- **Test coverage**：`tests/plugin-path.test.ts`（6 个 tests：clone-to-cache、slash sanitization、update-on-rerun、slash-placement collision resistance、nonexistent branch error、nonexistent plugin error）和 `tests/cli.test.ts`（1 个 test：install --branch clones specific branch）。所有 tests 都通过 `COMPOUND_PLUGIN_GITHUB_SOURCE` 使用 local git repos。
+- **Cache directory convention**：任何未来需要 ephemeral 或 semi-persistent clones 的 features，都应使用带 deterministic、sanitized subdirectory names 的 `~/.cache/compound-engineering/<purpose>/`。对任何受益于跨 reboot 保留的内容，避免使用 `/tmp/`。
+- **Branch sanitization**：在 filesystem paths 中使用 branch names 前，始终 sanitize。使用 `~` 作为 slash replacement 是 injective，因为 `~` 在 git branch names 中非法（`git-check-ref-format`）。Naive `replace(/[^a-zA-Z0-9._-]/g, "-")` 不足，因为它会将 `feat/foo-bar` 和 `feat-foo/bar` 这样的 branches 折叠到同一路径。
+- **Resolution chain threading**：向 CLI 添加新的 resolution strategies 时，将 optional parameters 贯穿完整 `resolvePluginPath -> resolveGitHubPluginPath -> cloneGitHubRepo` chain，而不是在 top level 分支。这能保持 resolution logic 可组合。

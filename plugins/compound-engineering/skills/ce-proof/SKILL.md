@@ -1,6 +1,6 @@
 ---
 name: ce-proof
-description: Run human-in-the-loop review loops over markdown via Proof (proofeditor.ai) — share, view, comment on, edit, and sync collaborative docs. Use when the user says "view this in proof", "share to proof", "HITL this doc", or wants a shared markdown review surface for a spec, plan, or draft, including handoffs from ce-brainstorm, ce-ideate, or ce-plan. Do not trigger on "proof" meaning evidence, math proofs, proof-of-concept, or "proofread this".
+description: 通过 Proof（proofeditor.ai）在 markdown 上运行 human-in-the-loop review loops：share、view、comment、edit 和 sync collaborative docs。当用户说 "view this in proof"、"share to proof"、"HITL this doc"，或想为 spec、plan、draft 提供 shared markdown review surface 时使用，包括来自 ce-brainstorm、ce-ideate 或 ce-plan 的 handoffs。不要因表示 evidence、math proofs、proof-of-concept 或 "proofread this" 的 "proof" 触发。
 allowed-tools:
   - Bash
   - Read
@@ -8,34 +8,34 @@ allowed-tools:
   - WebFetch
 ---
 
-# Proof - Collaborative Markdown Editor
+# Proof - Collaborative Markdown Editor（协作式 Markdown 编辑器）
 
-Proof is a collaborative document editor for humans and agents. It supports two modes:
+Proof 是面向 humans 和 agents 的 collaborative document editor。它支持两种模式：
 
-1. **Web API** - Create and edit shared documents via HTTP (no install needed)
-2. **Local Bridge** - Drive the macOS Proof app via localhost:9847
+1. **Web API** - 通过 HTTP 创建和编辑 shared documents（无需安装）
+2. **Local Bridge** - 通过 localhost:9847 驱动 macOS Proof app
 
-## Identity and Attribution
+## Identity and Attribution（身份与署名）
 
-Every write to a Proof doc must be attributed. Two fields carry the agent's identity:
+写入 Proof doc 的每次操作都必须 attribution。两个字段携带 agent identity：
 
-- **Machine ID (`by` on every op, `X-Agent-Id` header):** `ai:compound-engineering` — stable, lowercase-hyphenated, machine-parseable. Appears in marks, events, and the API response.
-- **Display name (`name` on `POST /presence`):** `Compound Engineering` — human-readable, shown in Proof's presence chips and comment-author badges.
+- **Machine ID（每个 op 上的 `by`、`X-Agent-Id` header）：** `ai:compound-engineering` — stable、lowercase-hyphenated、machine-parseable。出现在 marks、events 和 API response 中。
+- **Display name（`POST /presence` 上的 `name`）：** `Compound Engineering` — human-readable，显示在 Proof 的 presence chips 和 comment-author badges 中。
 
-Set the display name once per doc session by posting to presence with the `X-Agent-Id` header; Proof binds the name to that agent ID for the session. These values are the defaults for any caller of this skill; callers running HITL review (`references/hitl-review.md`) may pass a different `identity` pair if a distinct sub-agent should own the doc. Do not use `ai:compound` or other ad-hoc variants — identity stays uniform unless a caller explicitly overrides it.
+每个 doc session 通过带 `X-Agent-Id` header 的 presence post 设置一次 display name；Proof 会在该 session 中将 name 绑定到该 agent ID。这些值是此 skill 任何 caller 的默认值；运行 HITL review（`references/hitl-review.md`）的 callers 如果需要 distinct sub-agent 拥有 doc，可以传入不同的 `identity` pair。不要使用 `ai:compound` 或其他 ad-hoc variants：除非 caller 明确 override，否则 identity 保持统一。
 
-## Human-in-the-Loop Review Mode
+## Human-in-the-Loop Review Mode（人工参与 Review 模式）
 
-Human-in-the-loop iteration over an existing local markdown file: upload to Proof, let the user annotate in Proof's web UI, ingest feedback as in-thread replies and agreed edits, and sync the final doc back to disk. Two entry points, identical mechanics — load `references/hitl-review.md` for the full loop spec (invocation contract, mark classification, idempotent ingest passes, exception-based terminal reporting, end-sync atomic write) in either case:
+对 existing local markdown file 进行 human-in-the-loop iteration：上传到 Proof，让用户在 Proof web UI 中 annotate，将 feedback 作为 in-thread replies 和 agreed edits ingest，并将 final doc sync 回磁盘。两个入口，机制相同：无论哪种情况，都加载 `references/hitl-review.md` 获取完整 loop spec（invocation contract、mark classification、idempotent ingest passes、exception-based terminal reporting、end-sync atomic write）：
 
-- **Direct user request** — a bare user phrase naming a local markdown file and asking to iterate collaboratively via Proof: "share this to proof so we can iterate", "iterate with proof on this doc", "HITL this file with me", "let's get feedback on this in proof", "open this in proof editor so I can review". The file is whichever markdown the user just created, edited, or referenced; if ambiguous, ask which file. This is a first-class entry point — do not require an upstream caller.
-- **Upstream skill handoff** — `ce-brainstorm`, `ce-ideate`, or `ce-plan` finishes a draft and hands it off for human review before the next phase, passing the file path and title explicitly.
+- **Direct user request** — 用户直接说出 local markdown file，并要求通过 Proof 协作 iterate，例如："share this to proof so we can iterate"、"iterate with proof on this doc"、"HITL this file with me"、"let's get feedback on this in proof"、"open this in proof editor so I can review"。文件就是用户刚创建、编辑或引用的 markdown；如果模糊，询问是哪一个文件。这是一等入口：不要要求 upstream caller。
+- **Upstream skill handoff** — `ce-brainstorm`、`ce-ideate` 或 `ce-plan` 完成 draft，并在下一 phase 前 handoff 给 human review，显式传入 file path 和 title。
 
-## Web API (Primary for Sharing)
+## Web API（分享的主要方式）
 
-### Create a Shared Document
+### 创建 Shared Document（共享文档）
 
-No authentication required. Returns a shareable URL with access token.
+不需要 authentication。返回带 access token 的 shareable URL。
 
 ```bash
 curl -X POST https://www.proofeditor.ai/share/markdown \
@@ -43,7 +43,7 @@ curl -X POST https://www.proofeditor.ai/share/markdown \
   -d '{"title":"My Doc","markdown":"# Hello\n\nContent here."}'
 ```
 
-**Response format:**
+**Response format（响应格式）：**
 ```json
 {
   "slug": "abc123",
@@ -57,89 +57,89 @@ curl -X POST https://www.proofeditor.ai/share/markdown \
 }
 ```
 
-Use the `tokenUrl` as the shareable link. The `_links` give you the exact API paths.
+使用 `tokenUrl` 作为 shareable link。`_links` 提供精确 API paths。
 
-### Read a Shared Document
+### 读取 Shared Document（共享文档）
 
-If you already have a shared Proof URL, no browser automation is needed. Fetch the URL directly with content negotiation:
+如果已有 shared Proof URL，不需要 browser automation。直接用 content negotiation fetch URL：
 
 ```bash
 curl -s -H "Accept: application/json" "https://www.proofeditor.ai/d/{slug}?token=<token>"
 curl -s -H "Accept: text/markdown" "https://www.proofeditor.ai/d/{slug}?token=<token>"
 ```
 
-The JSON response includes the markdown, API links, and agent auth hints. Use `/state` when you need mutation metadata, marks, or presence:
+JSON response 包含 markdown、API links 和 agent auth hints。需要 mutation metadata、marks 或 presence 时使用 `/state`：
 
 ```bash
 curl -s "https://www.proofeditor.ai/api/agent/{slug}/state" \
   -H "x-share-token: <token>"
 ```
 
-For comment-ingest workflows, prefer the server-side filter:
+对于 comment-ingest workflows，优先使用 server-side filter：
 
 ```bash
 curl -s "https://www.proofeditor.ai/api/agent/{slug}/state?kinds=comment" \
   -H "x-share-token: <token>"
 ```
 
-`state.marks` is a union of comments, suggestions, and provenance/authorship marks. The `?kinds=comment` filter avoids treating human-authored provenance marks as review comments.
+`state.marks` 是 comments、suggestions 和 provenance/authorship marks 的 union。`?kinds=comment` filter 可以避免把 human-authored provenance marks 当作 review comments。
 
-### Edit a Shared Document
+### 编辑 Shared Document（共享文档）
 
-Comment, suggestion, and rewrite operations go to `POST https://www.proofeditor.ai/api/agent/{slug}/ops`. Block edits use `/api/agent/{slug}/edit/v2`.
+Comment、suggestion 和 rewrite operations 发送到 `POST https://www.proofeditor.ai/api/agent/{slug}/ops`。Block edits 使用 `/api/agent/{slug}/edit/v2`。
 
-**Note:** Use the `/api/agent/{slug}/ops` path (from `_links` in create response), NOT `/api/documents/{slug}/ops`.
+**Note：** 使用 `/api/agent/{slug}/ops` path（来自 create response 中的 `_links`），不要使用 `/api/documents/{slug}/ops`。
 
-**Authentication for protected docs:**
-- Header: `x-share-token: <token>` or `Authorization: Bearer <token>`
-- Token comes from the URL parameter: `?token=xxx` or the `accessToken` from create response
-- Header: `X-Agent-Id: ai:compound-engineering` (required for presence; include on ops for consistent attribution)
+**Authentication for protected docs（受保护文档的认证）：**
+- Header：`x-share-token: <token>` 或 `Authorization: Bearer <token>`
+- Token 来自 URL parameter：`?token=xxx`，或 create response 中的 `accessToken`
+- Header：`X-Agent-Id: ai:compound-engineering`（presence 必需；ops 中也包含它以保持 consistent attribution）
 
-**Wire-format reminder.** `/api/agent/{slug}/ops` uses a top-level `type` field; `/api/agent/{slug}/edit/v2` uses an `operations` array where each entry has `op`. Do not mix — sending `op` to `/ops` returns 422.
+**Wire-format reminder。** `/api/agent/{slug}/ops` 使用 top-level `type` field；`/api/agent/{slug}/edit/v2` 使用 `operations` array，其中每个 entry 有 `op`。不要混用：向 `/ops` 发送 `op` 会返回 422。
 
-**Every mutation requires a `baseToken`.** Reuse the `mutationBase.token` from the most recent `/state` or `/snapshot` read, then update it from successful mutation responses (`.mutationBase.token`). On `BASE_TOKEN_REQUIRED` or `STALE_BASE`, re-read and retry once. Only do a pre-mutation read if no prior read has happened in this session or you need fresh document/comment/snapshot content. See the baseToken recipe in `references/hitl-review.md`.
+**每个 mutation 都需要 `baseToken`。** 复用最近一次 `/state` 或 `/snapshot` read 得到的 `mutationBase.token`，然后从 successful mutation responses（`.mutationBase.token`）中更新它。遇到 `BASE_TOKEN_REQUIRED` 或 `STALE_BASE` 时，重新读取并重试一次。只有当本 session 中还没有 prior read，或需要 fresh document/comment/snapshot content 时，才做 pre-mutation read。参见 `references/hitl-review.md` 中的 baseToken recipe。
 
-`/edit/v2` block refs are a separate concern: they can drift across revisions, so re-fetch `/snapshot` for fresh refs before a block edit if any writes have landed since your last snapshot.
+`/edit/v2` block refs 是另一项 concern：它们可能跨 revisions drift，所以如果自上次 snapshot 后已有 writes landed，在 block edit 前重新 fetch `/snapshot` 获取 fresh refs。
 
-### Edit Strategy: Avoid Whole-Doc Rewrite
+### Edit Strategy（编辑策略）：避免 Whole-Doc Rewrite
 
-Do not default to full-document replacement. Pick the narrowest edit primitive that matches the requested change:
+不要默认做 full-document replacement。选择与 requested change 匹配的最窄 edit primitive：
 
-1. **Literal repeated change:** use `/edit/v2` with `find_replace_in_doc` (optionally constrained by `fromRef`, `toRef`, or `block_filter`). This is the fastest and least error-prone path for terminology renames, punctuation/style sweeps, and other exact text substitutions.
-2. **Known block or section change:** use `/edit/v2` block operations from a fresh `/snapshot`: `replace_block`, `insert_before`, `insert_after`, `delete_block`, `replace_range`, or `find_replace_in_block`.
-3. **Visible track-changes desired:** use `/ops` `suggestion.add` (pending or `status: "accepted"`) when the user should see a suggestion mark and reject/revert affordance for that specific edit.
-4. **Whole-doc replacement:** use `rewrite.apply` only as a last resort when the user explicitly asks to replace the entire document, when the intended change is genuinely global and cannot be expressed as block/range/find-replace operations, and when no live clients are present. Before rewriting, read current state, preserve comments/marks expectations, and mention that the rewrite is broad.
+1. **Literal repeated change：** 使用带 `find_replace_in_doc` 的 `/edit/v2`（可选用 `fromRef`、`toRef` 或 `block_filter` 约束）。这是 terminology renames、punctuation/style sweeps 和其他 exact text substitutions 最快且最不易出错的路径。
+2. **Known block or section change：** 基于 fresh `/snapshot` 使用 `/edit/v2` block operations：`replace_block`、`insert_before`、`insert_after`、`delete_block`、`replace_range` 或 `find_replace_in_block`。
+3. **需要 visible track-changes：** 当用户应看到特定 edit 的 suggestion mark 和 reject/revert affordance 时，使用 `/ops` `suggestion.add`（pending 或 `status: "accepted"`）。
+4. **Whole-doc replacement：** 仅在用户明确要求替换整个 document、intended change 真正 global 且无法表达为 block/range/find-replace operations，并且没有 live clients 时，才把 `rewrite.apply` 作为 last resort。rewrite 前读取 current state，保留 comments/marks expectations，并说明 rewrite 很 broad。
 
-When in doubt, start with `/snapshot` and build a small `/edit/v2` batch. A narrow failed edit is easier to inspect and retry than a broad rewrite, and it avoids clobbering concurrent human work.
+拿不准时，从 `/snapshot` 开始，构建小型 `/edit/v2` batch。窄 failed edit 比 broad rewrite 更容易 inspect 和 retry，也避免 clobber concurrent human work。
 
-**Retry discipline after mutation errors — verify before retrying.** An error response is not proof that nothing was written.
+**Retry discipline after mutation errors：重试前先验证。** Error response 不能证明没有写入任何内容。
 
-- `STALE_BASE`, `BASE_TOKEN_REQUIRED`, `MISSING_BASE`, `INVALID_BASE_TOKEN` — pre-commit, token-related. Re-read `/state`, rebuild the request body with a fresh `baseToken`, and retry once with a new `Idempotency-Key`.
-- `ANCHOR_NOT_FOUND`, `ANCHOR_AMBIGUOUS` — pre-commit, but the `quote` no longer uniquely matches content. Re-reading does not help by itself; the caller must tighten or regenerate the anchor before retrying. Do not auto-retry blindly.
-- `INVALID_OPERATIONS`, `INVALID_REQUEST`, `INVALID_REF`, `INVALID_BLOCK_MARKDOWN`, `INVALID_RANGE`, `INVALID_MARKDOWN`, 422 — pre-commit, but the payload is wrong. Do not retry blindly; fix the payload first.
-- `COLLAB_SYNC_FAILED`, `REWRITE_BARRIER_FAILED`, `PROJECTION_STALE`, `INTERNAL_ERROR`, 5xx, network timeout, and any **202 with `collab.status: "pending"`** — the canonical doc may have been written even though the call looks like a failure. Before any retry, re-read `/state` and check whether the intended mark/edit is already present; only retry if it isn't.
-- `Idempotency-Key` (see below) protects against double-apply *on the same request* (e.g., TCP-level retry). It does not help if you build a new request body and send a second call — that is a new logical write with a new key.
+- `STALE_BASE`、`BASE_TOKEN_REQUIRED`、`MISSING_BASE`、`INVALID_BASE_TOKEN` — pre-commit、token-related。重新读取 `/state`，用 fresh `baseToken` 重建 request body，并用新的 `Idempotency-Key` 重试一次。
+- `ANCHOR_NOT_FOUND`、`ANCHOR_AMBIGUOUS` — pre-commit，但 `quote` 不再唯一匹配 content。单纯重新读取没有帮助；caller 必须在重试前 tighten 或 regenerate anchor。不要 blindly auto-retry。
+- `INVALID_OPERATIONS`、`INVALID_REQUEST`、`INVALID_REF`、`INVALID_BLOCK_MARKDOWN`、`INVALID_RANGE`、`INVALID_MARKDOWN`、422 — pre-commit，但 payload 错误。不要 blindly retry；先修 payload。
+- `COLLAB_SYNC_FAILED`、`REWRITE_BARRIER_FAILED`、`PROJECTION_STALE`、`INTERNAL_ERROR`、5xx、network timeout，以及任何 **202 with `collab.status: "pending"`**：canonical doc 可能已经写入，即使 call 看起来失败。任何 retry 前，重新读取 `/state` 并检查 intended mark/edit 是否已存在；只有不存在时才 retry。
+- `Idempotency-Key`（见下方）防止 *同一 request* double-apply（例如 TCP-level retry）。如果你构建新的 request body 并发送第二个 call，它没有帮助：那是带新 key 的新 logical write。
 
-Duplicate-mark incidents usually come from retrying a `comment.add` or `suggestion.add` after a timeout without verifying. When in doubt: re-read, diff, then decide.
+Duplicate-mark incidents 通常来自 timeout 后未验证就重试 `comment.add` 或 `suggestion.add`。拿不准时：re-read、diff，再决定。
 
-**`Idempotency-Key` header** is recommended on every mutation for safe automation retries; required when `/state.contract.idempotencyRequired` is true. Use the same key only when resending the exact same serialized request body. If the body changes — including because you replaced `baseToken` after `STALE_BASE` — mint a new key or Proof will reject it as key reuse with a different payload.
+**`Idempotency-Key` header** 建议用于每个 mutation，以支持 safe automation retries；当 `/state.contract.idempotencyRequired` 为 true 时必需。只有在重发完全相同的 serialized request body 时才使用同一个 key。如果 body 改变（包括因为 `STALE_BASE` 后替换了 `baseToken`），生成新 key，否则 Proof 会将其作为不同 payload 的 key reuse 拒绝。
 
-**Comment on text:**
+**Comment on text（对文本评论）：**
 ```json
 {"type": "comment.add", "quote": "text to comment on", "by": "ai:compound-engineering", "text": "Your comment here", "baseToken": "<token>"}
 ```
 
-**Reply to a comment:**
+**Reply to a comment（回复评论）：**
 ```json
 {"type": "comment.reply", "markId": "<id>", "by": "ai:compound-engineering", "text": "Reply text", "baseToken": "<token>"}
 ```
 
-**Reply and resolve in one mutation:**
+**Reply and resolve in one mutation（一次 mutation 中回复并 resolve）：**
 ```json
 {"type": "comment.reply", "markId": "<id>", "by": "ai:compound-engineering", "text": "Fixed.", "resolve": true, "baseToken": "<token>"}
 ```
 
-**Batch existing-thread comment mutations:**
+**Batch existing-thread comment mutations（批量处理既有 thread comment mutations）：**
 ```json
 {"by": "ai:compound-engineering", "baseToken": "<token>", "operations": [
   {"type": "comment.reply", "markId": "<id-1>", "text": "Fixed.", "resolve": true},
@@ -147,42 +147,42 @@ Duplicate-mark incidents usually come from retrying a `comment.add` or `suggesti
 ]}
 ```
 
-Batch `/ops` supports `comment.reply`, `comment.resolve`, and `comment.unresolve` for existing threads. Use it for HITL ingest passes instead of issuing separate reply and resolve requests per thread.
+Batch `/ops` 支持针对 existing threads 的 `comment.reply`、`comment.resolve` 和 `comment.unresolve`。HITL ingest passes 应使用它，而不是为每个 thread 分别发 reply 和 resolve requests。
 
-**Resolve / unresolve a comment:**
+**Resolve / unresolve a comment（resolve / unresolve 评论）：**
 ```json
 {"type": "comment.resolve", "markId": "<id>", "by": "ai:compound-engineering", "baseToken": "<token>"}
 {"type": "comment.unresolve", "markId": "<id>", "by": "ai:compound-engineering", "baseToken": "<token>"}
 ```
 
-**Suggest a replacement (pending — user must accept/reject):**
+**Suggest a replacement（pending — user must accept/reject，建议替换）：**
 ```json
 {"type": "suggestion.add", "kind": "replace", "quote": "original text", "by": "ai:compound-engineering", "content": "replacement text", "baseToken": "<token>"}
 ```
 
-**Suggest and immediately apply (tracked but committed — user can reject to revert):**
+**Suggest and immediately apply（tracked but committed — user can reject to revert，建议并立即应用）：**
 ```json
 {"type": "suggestion.add", "kind": "replace", "quote": "original text", "by": "ai:compound-engineering", "content": "replacement text", "status": "accepted", "baseToken": "<token>"}
 ```
 
-`status: "accepted"` creates the suggestion mark and commits the change in one call. The mark persists as an audit trail with per-edit attribution and a reject-to-revert affordance. Works with `kind: "insert" | "delete" | "replace"`.
+`status: "accepted"` 会在一次 call 中创建 suggestion mark 并 commit change。该 mark 作为 audit trail 持久存在，带有 per-edit attribution 和 reject-to-revert affordance。适用于 `kind: "insert" | "delete" | "replace"`。
 
-**Accept or reject an existing suggestion:**
+**Accept or reject an existing suggestion（接受或拒绝既有 suggestion）：**
 ```json
 {"type": "suggestion.accept", "markId": "<id>", "by": "ai:compound-engineering", "baseToken": "<token>"}
 {"type": "suggestion.reject", "markId": "<id>", "by": "ai:compound-engineering", "baseToken": "<token>"}
 ```
 
-`suggestion.resolve` is not supported — use accept or reject instead.
+不支持 `suggestion.resolve`：改用 accept 或 reject。
 
-**Whole-doc rewrite (last resort):**
+**Whole-doc rewrite（last resort，最后手段）：**
 ```json
 {"type": "rewrite.apply", "content": "full new markdown", "by": "ai:compound-engineering", "baseToken": "<token>"}
 ```
 
-Prefer `find_replace_in_doc` or block-level `/edit/v2` operations first. `rewrite.apply` is broad, disruptive, and blocked while live clients are connected.
+优先使用 `find_replace_in_doc` 或 block-level `/edit/v2` operations。`rewrite.apply` 范围 broad、具有 disruptive，并且 live clients connected 时会被阻塞。
 
-**Block-level edits via `/edit/v2`** (separate endpoint, separate shape):
+**通过 `/edit/v2` 做 block-level edits**（独立 endpoint、独立 shape）：
 ```bash
 curl -X POST "https://www.proofeditor.ai/api/agent/{slug}/edit/v2" \
   -H "Content-Type: application/json" \
@@ -199,9 +199,9 @@ curl -X POST "https://www.proofeditor.ai/api/agent/{slug}/edit/v2" \
   }'
 ```
 
-Per-op body shape (singular `block` vs plural `blocks` is load-bearing — sending the wrong one returns 422):
+Per-op body shape（单数 `block` 与复数 `blocks` 是 load-bearing：发错会返回 422）：
 
-| op | body fields |
+| op | body fields（body 字段） |
 |---|---|
 | `replace_block` | `ref`, `block: {markdown}` |
 | `insert_after` | `ref`, `blocks: [{markdown}, ...]` |
@@ -211,34 +211,34 @@ Per-op body shape (singular `block` vs plural `blocks` is load-bearing — sendi
 | `find_replace_in_block` | `ref`, `find`, `replace`, `occurrence: "first" \| "all"` |
 | `find_replace_in_doc` | `find`, `replace`, `occurrence: "first" \| "all"`, optional `fromRef`, `toRef`, `block_filter` |
 
-Read `/snapshot` to get block `ref` IDs and `mutationBase.token`. `ref` values are opaque request tokens tied to the snapshot/baseToken; re-read `/snapshot` before follow-up block edits if writes have landed. `operations` commits atomically — either every op lands or none do — so one `/edit/v2` call can batch dozens of block edits safely and efficiently (see the bulk-sweep guidance in `references/hitl-review.md` Phase 2.4). Successful full responses include the next `mutationBase.token` and fresh `snapshot.blocks[].ref` values for chaining.
+读取 `/snapshot` 获取 block `ref` IDs 和 `mutationBase.token`。`ref` values 是绑定到 snapshot/baseToken 的 opaque request tokens；如果已有 writes landed，在 follow-up block edits 前重新读取 `/snapshot`。`operations` 原子提交：要么每个 op 都 landed，要么都不 landed，所以一个 `/edit/v2` call 可以安全高效地 batch 数十个 block edits（见 `references/hitl-review.md` Phase 2.4 中的 bulk-sweep guidance）。成功的 full responses 包含下一个 `mutationBase.token` 和用于 chaining 的 fresh `snapshot.blocks[].ref` values。
 
-For literal doc-wide sweeps, prefer `find_replace_in_doc` over many block replacements or a whole-doc rewrite. Validate large batches with `?dryRun=1` or `?validate=1`; use `?return=minimal` when you only need `ok`, `revision`, `appliedCount`, and the next `mutationBase`.
+对于 literal doc-wide sweeps，优先使用 `find_replace_in_doc`，而不是大量 block replacements 或 whole-doc rewrite。用 `?dryRun=1` 或 `?validate=1` 验证 large batches；当你只需要 `ok`、`revision`、`appliedCount` 和下一个 `mutationBase` 时，使用 `?return=minimal`。
 
-**Editing while a client is connected is fine.** `/edit/v2`, `suggestion.add` (including `status: "accepted"`), and all comment ops work during active collab. Only `rewrite.apply` is blocked by `LIVE_CLIENTS_PRESENT` — it would clobber in-flight Yjs edits.
+**client connected 时编辑是可以的。** `/edit/v2`、`suggestion.add`（包括 `status: "accepted"`）和所有 comment ops 都能在 active collab 中工作。只有 `rewrite.apply` 会被 `LIVE_CLIENTS_PRESENT` 阻塞，因为它会 clobber in-flight Yjs edits。
 
-**When the loop breaks.** If a mutation keeps failing after a fresh read and one retry, or state across reads looks inconsistent, call `POST https://www.proofeditor.ai/api/bridge/report_bug` with the failing request ID, slug, and raw response. The server enriches and files an issue.
+**When the loop breaks。** 如果 mutation 在 fresh read 和一次 retry 后仍持续失败，或多次 reads 之间 state 看起来不一致，调用 `POST https://www.proofeditor.ai/api/bridge/report_bug`，附上 failing request ID、slug 和 raw response。server 会 enrich 并 file an issue。
 
-### Known Limitations (Web API)
+### Known Limitations（Web API 已知限制）
 
-- Bridge-style endpoints (`/d/{slug}/bridge/*`) require client version headers (`x-proof-client-version`, `x-proof-client-build`, `x-proof-client-protocol`) and return 426 CLIENT_UPGRADE_REQUIRED without them. Use `/api/agent/{slug}/ops` instead.
+- Bridge-style endpoints（`/d/{slug}/bridge/*`）需要 client version headers（`x-proof-client-version`、`x-proof-client-build`、`x-proof-client-protocol`），缺少时会返回 426 CLIENT_UPGRADE_REQUIRED。改用 `/api/agent/{slug}/ops`。
 
-## Local Bridge (macOS App)
+## Local Bridge（macOS App 本地桥接）
 
-Requires Proof.app running. Bridge at `http://localhost:9847`.
+需要 Proof.app 正在运行。Bridge 位于 `http://localhost:9847`。
 
-**Required headers:**
-- `X-Agent-Id: ai:compound-engineering` (identity for presence; keep aligned with `by`)
+**Required headers（必需 headers）：**
+- `X-Agent-Id: ai:compound-engineering`（presence identity；与 `by` 保持一致）
 - `Content-Type: application/json`
-- `X-Window-Id: <uuid>` (when multiple docs open)
+- `X-Window-Id: <uuid>`（多个 docs 打开时）
 
-### Key Endpoints
+### Key Endpoints（关键端点）
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/windows` | List open documents |
-| GET | `/state` | Read markdown, cursor, word count |
-| GET | `/marks` | List all suggestions and comments |
+| GET | `/windows` | 列出 open documents |
+| GET | `/state` | 读取 markdown、cursor、word count |
+| GET | `/marks` | 列出所有 suggestions 和 comments |
 | POST | `/marks/suggest-replace` | `{"quote":"old","by":"ai:compound-engineering","content":"new"}` |
 | POST | `/marks/suggest-insert` | `{"quote":"after this","by":"ai:compound-engineering","content":"insert"}` |
 | POST | `/marks/suggest-delete` | `{"quote":"delete this","by":"ai:compound-engineering"}` |
@@ -251,18 +251,18 @@ Requires Proof.app running. Bridge at `http://localhost:9847`.
 | POST | `/presence` | `{"status":"reading","summary":"..."}` |
 | GET | `/events/pending` | Poll for user actions |
 
-### Presence Statuses
+### Presence Statuses（Presence 状态）
 
 `thinking`, `reading`, `idle`, `acting`, `waiting`, `completed`
 
-## Workflow: Review a Shared Document
+## Workflow: Review a Shared Document（审阅共享文档）
 
-When given a Proof URL like `https://www.proofeditor.ai/d/abc123?token=xxx`:
+给定类似 `https://www.proofeditor.ai/d/abc123?token=xxx` 的 Proof URL 时：
 
-1. Extract the slug (`abc123`) and token from the URL
-2. Read the document via content negotiation on the shared URL or via `/api/agent/{slug}/state` when you need marks/mutation metadata
-3. For content edits, prefer `/edit/v2` `find_replace_in_doc` or block operations; use `/ops` for comments, suggestions, and comment replies/resolution
-4. The author sees changes in real-time
+1. 从 URL 中提取 slug（`abc123`）和 token
+2. 通过 shared URL 上的 content negotiation 读取 document；当需要 marks/mutation metadata 时，通过 `/api/agent/{slug}/state` 读取
+3. 对 content edits，优先使用 `/edit/v2` 的 `find_replace_in_doc` 或 block operations；对 comments、suggestions 和 comment replies/resolution 使用 `/ops`
+4. author 会实时看到 changes
 
 ```bash
 SHARE_URL="https://www.proofeditor.ai/d/abc123?token=xxx"
@@ -318,7 +318,7 @@ curl -X POST "https://www.proofeditor.ai/api/agent/abc123/edit/v2?return=minimal
   -d "$(jq -n --arg base "$EDIT_BASE" '{by:"ai:compound-engineering",baseToken:$base,operations:[{op:"find_replace_in_doc",find:"old",replace:"new",occurrence:"all"}]}')"
 ```
 
-## Workflow: Create and Share a New Document
+## Workflow: Create and Share a New Document（创建并分享新文档）
 
 ```bash
 # 1. Create
@@ -365,13 +365,13 @@ curl -X POST "https://www.proofeditor.ai/api/agent/$SLUG/edit/v2?return=minimal"
   -d "$(jq -n --arg base "$EDIT_BASE" '{by:"ai:compound-engineering",baseToken:$base,operations:[{op:"find_replace_in_doc",find:"Content",replace:"Updated content",occurrence:"all"}]}')"
 ```
 
-## Workflow: Pull a Proof Doc to Local
+## Workflow: Pull a Proof Doc to Local（将 Proof doc 拉取到本地）
 
-Sync the current Proof doc state to a local markdown file. Used by:
+将当前 Proof doc state sync 到 local markdown file。用于：
 
-- HITL review end-sync (`references/hitl-review.md` Phase 5) when the doc originated from a local file
-- Ad-hoc snapshots of a Proof doc to disk (before closing the tab, archiving, handing off)
-- Refreshing a local working copy against the live Proof version
+- 当 doc 源自 local file 时，HITL review end-sync（`references/hitl-review.md` Phase 5）
+- 将 Proof doc 的 ad-hoc snapshots 写到磁盘（关闭 tab、archiving、handoff 前）
+- 根据 live Proof version 刷新 local working copy
 
 ```bash
 SLUG=<slug>
@@ -390,15 +390,15 @@ jq -jr '.markdown' "$STATE_TMP" > "$TMP" && mv "$TMP" "$LOCAL"
 rm "$STATE_TMP"
 ```
 
-`jq -jr` (`-j` no trailing newline, `-r` raw string) streams the markdown bytes straight to the temp file without going through a shell variable, so trailing newlines survive intact. `mv` within the same filesystem is atomic — a crashed write leaves the original untouched rather than a half-written file.
+`jq -jr`（`-j` no trailing newline，`-r` raw string）会将 markdown bytes 直接 stream 到 temp file，不经过 shell variable，因此 trailing newlines 能完整保留。同一 filesystem 内的 `mv` 是 atomic：crashed write 会保留原文件不动，而不是留下 half-written file。
 
-**Confirm before writing when the pull isn't directly asked for.** If a workflow ends up pulling as a side-effect of a different action (e.g., HITL review completion), surface the impending write with a short confirm like "Sync reviewed doc to `<localPath>`?" A silent overwrite is surprising — the user may have forgotten the local file exists in that session, or expected Proof to stay canonical until they explicitly asked to pull.
+**当 pull 不是用户直接要求时，写入前先确认。** 如果某个 workflow 最终把 pull 作为另一动作的 side-effect（例如 HITL review completion），用简短确认提示即将写入，例如 "Sync reviewed doc to `<localPath>`?" 静默覆盖会让人意外：用户可能忘了该 session 中存在 local file，或预期在明确要求 pull 前 Proof 保持 canonical。
 
-## Safety
+## Safety（安全）
 
-- Use `/state` content as source of truth before editing
-- During active collab use `edit/v2` (direct block changes) or `suggestion.add` (tracked changes); reserve `rewrite.apply` for no-client scenarios since it's blocked by `LIVE_CLIENTS_PRESENT` when anyone is connected
-- Prefer `find_replace_in_doc` and block-level `/edit/v2` edits before considering `rewrite.apply`
-- Don't span table cells in a single replace
-- Always include `by: "ai:compound-engineering"` on every op and `X-Agent-Id: ai:compound-engineering` in headers for consistent attribution
-- Reuse `baseToken` from your most recent `/state` or `/snapshot` read; on `STALE_BASE`, re-read and retry once
+- 编辑前使用 `/state` content 作为 source of truth
+- active collab 期间使用 `edit/v2`（direct block changes）或 `suggestion.add`（tracked changes）；将 `rewrite.apply` 留给 no-client scenarios，因为有人连接时它会被 `LIVE_CLIENTS_PRESENT` 阻塞
+- 考虑 `rewrite.apply` 前，优先使用 `find_replace_in_doc` 和 block-level `/edit/v2` edits
+- 不要在单次 replace 中跨越 table cells
+- 每个 op 都始终包含 `by: "ai:compound-engineering"`，headers 中包含 `X-Agent-Id: ai:compound-engineering`，以保持 consistent attribution
+- 复用最近一次 `/state` 或 `/snapshot` read 得到的 `baseToken`；遇到 `STALE_BASE` 时，重新读取并重试一次

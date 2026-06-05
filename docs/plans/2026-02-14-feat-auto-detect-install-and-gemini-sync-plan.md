@@ -1,5 +1,5 @@
 ---
-title: Auto-detect install targets and add Gemini sync
+title: 自动检测 install targets 并添加 Gemini sync
 type: feat
 status: completed
 date: 2026-02-14
@@ -8,18 +8,18 @@ completed_by: "Claude Opus 4.6"
 actual_effort: "Completed in one session"
 ---
 
-# Auto-detect Install Targets and Add Gemini Sync
+# 自动检测 Install Targets 并添加 Gemini Sync
 
-## Overview
+## 概览
 
-Two related improvements to the converter CLI:
+converter CLI 的两项相关改进：
 
-1. **`install --to all`** — Auto-detect which AI coding tools are installed and convert to all of them in one command
-2. **`sync --target gemini`** — Add Gemini CLI as a sync target (currently missing), then add `sync --target all` to sync personal config to every detected tool
+1. **`install --to all`** -- auto-detect 已安装的 AI coding tools，并用一条 command convert to all of them
+2. **`sync --target gemini`** -- 添加 Gemini CLI 作为 sync target（当前缺失），然后添加 `sync --target all`，将 personal config sync 到所有 detected tools
 
-## Problem Statement
+## 问题陈述
 
-Users currently must run 6 separate commands to install to all targets:
+用户当前必须运行 6 条 separate commands 才能 install to all targets：
 
 ```bash
 bunx @every-env/compound-plugin install compound-engineering --to opencode
@@ -30,38 +30,38 @@ bunx @every-env/compound-plugin install compound-engineering --to pi
 bunx @every-env/compound-plugin install compound-engineering --to gemini
 ```
 
-Similarly, sync requires separate commands per target. And Gemini sync doesn't exist yet.
+同样，sync 也需要 per target 单独运行 commands。而且 Gemini sync 还不存在。
 
-## Acceptance Criteria
+## 验收标准
 
-### Auto-detect install
+### Auto-detect install（自动检测安装）
 
-- [x]`install --to all` detects installed tools and installs to each
-- [x]Detection checks config directories and/or binaries for each tool
-- [x]Prints which tools were detected and which were skipped
-- [x]Tools with no detection signal are skipped (not errored)
-- [x]`convert --to all` also works (same detection logic)
-- [x]Existing `--to <target>` behavior unchanged
-- [x]Tests for detection logic and `all` target handling
+- [x] `install --to all` 检测已安装 tools，并 install 到每一个
+- [x] Detection 检查每个 tool 的 config directories 和/或 binaries
+- [x] 打印哪些 tools 被 detected、哪些被 skipped
+- [x] 没有 detection signal 的 tools 会被 skipped（not errored）
+- [x] `convert --to all` 也可用（same detection logic）
+- [x] Existing `--to <target>` behavior unchanged（既有行为不变）
+- [x] detection logic 和 `all` target handling 有 tests
 
-### Gemini sync
+### Gemini sync（Gemini 同步）
 
-- [x]`sync --target gemini` symlinks skills and writes MCP servers to `.gemini/settings.json`
-- [x]MCP servers merged into existing `settings.json` (same pattern as writer)
-- [x]`gemini` added to `validTargets` in `sync.ts`
-- [x]Tests for Gemini sync
+- [x] `sync --target gemini` symlink skills，并将 MCP servers 写入 `.gemini/settings.json`
+- [x] MCP servers merged into existing `settings.json`（与 writer 使用相同 pattern）
+- [x] `gemini` 已添加到 `sync.ts` 的 `validTargets`
+- [x] Gemini sync 有 tests
 
-### Sync all
+### Sync all（同步全部）
 
-- [x]`sync --target all` syncs to all detected tools
-- [x]Reuses same detection logic as install
-- [x]Prints summary of what was synced where
+- [x] `sync --target all` sync 到所有 detected tools
+- [x] 复用与 install 相同的 detection logic
+- [x] 打印 synced 内容与位置的 summary
 
-## Implementation
+## 实现
 
-### Phase 1: Tool Detection Utility
+### Phase 1：Tool Detection Utility（tool 检测工具）
 
-**Create `src/utils/detect-tools.ts`**
+**创建 `src/utils/detect-tools.ts`**
 
 ```typescript
 import os from "os"
@@ -109,7 +109,7 @@ export async function getDetectedTargetNames(): Promise<string[]> {
 }
 ```
 
-**Detection heuristics:**
+**Detection heuristics（检测启发式）：**
 
 | Tool | Check paths | Notes |
 |------|------------|-------|
@@ -120,11 +120,11 @@ export async function getDetectedTargetNames(): Promise<string[]> {
 | Pi | `~/.pi/` | Global only |
 | Gemini | `.gemini/`, `~/.gemini/` | Project-local or global |
 
-### Phase 2: Gemini Sync
+### Phase 2：Gemini Sync（Gemini 同步）
 
-**Create `src/sync/gemini.ts`**
+**创建 `src/sync/gemini.ts`**
 
-Follow the Cursor sync pattern (`src/sync/cursor.ts`) since both use JSON config with `mcpServers` key:
+Follow the Cursor sync pattern（`src/sync/cursor.ts`），因为两者都使用包含 `mcpServers` key 的 JSON config：
 
 ```typescript
 import path from "path"
@@ -185,15 +185,15 @@ function convertMcpServers(servers: Record<string, ClaudeMcpServer>) {
 }
 ```
 
-**Update `src/commands/sync.ts`:**
+**更新 `src/commands/sync.ts`：**
 
-- Add `"gemini"` to `validTargets` array
-- Import `syncToGemini` from `../sync/gemini`
-- Add case in switch for `"gemini"` calling `syncToGemini(skills, mcpServers, outputRoot)`
+- 将 `"gemini"` 添加到 `validTargets` array
+- 从 `../sync/gemini` import `syncToGemini`
+- 在 switch 中添加 `"gemini"` case，调用 `syncToGemini(skills, mcpServers, outputRoot)`
 
-### Phase 3: Wire `--to all` into Install and Convert
+### Phase 3：将 `--to all` 接入 Install 和 Convert
 
-**Modify `src/commands/install.ts`:**
+**修改 `src/commands/install.ts`：**
 
 ```typescript
 import { detectInstalledTools } from "../utils/detect-tools"
@@ -238,11 +238,11 @@ if (targetName === "all") {
 }
 ```
 
-**Same change in `src/commands/convert.ts`** with its version of `resolveTargetOutputRoot`.
+**在 `src/commands/convert.ts` 中做相同变更**，使用它自己的 `resolveTargetOutputRoot` version。
 
-### Phase 4: Wire `--target all` into Sync
+### Phase 4：将 `--target all` 接入 Sync
 
-**Modify `src/commands/sync.ts`:**
+**修改 `src/commands/sync.ts`：**
 
 ```typescript
 import { detectInstalledTools } from "../utils/detect-tools"
@@ -268,40 +268,40 @@ if (targetName === "all") {
 }
 ```
 
-### Phase 5: Tests
+### Phase 5：Tests（测试）
 
-**Create `tests/detect-tools.test.ts`**
+**创建 `tests/detect-tools.test.ts`**
 
-- Test detection with mocked directories (create temp dirs, check detection)
-- Test `getDetectedTargetNames` returns only detected tools
-- Test empty detection returns empty array
+- 使用 mocked directories 测试 detection（create temp dirs, check detection）
+- 测试 `getDetectedTargetNames` 只返回 detected tools
+- 测试 empty detection returns empty array
 
-**Create `tests/gemini-sync.test.ts`**
+**创建 `tests/gemini-sync.test.ts`**
 
-Follow `tests/sync-cursor.test.ts` pattern:
+遵循 `tests/sync-cursor.test.ts` pattern:
 
-- Test skills are symlinked to `.gemini/skills/`
-- Test MCP servers merged into `settings.json`
-- Test existing `settings.json` is backed up
-- Test empty skills/servers produce no output
+- 测试 skills are symlinked to `.gemini/skills/`
+- 测试 MCP servers merged into `settings.json`
+- 测试 existing `settings.json` is backed up
+- 测试 empty skills/servers produce no output
 
-**Update `tests/cli.test.ts`**
+**更新 `tests/cli.test.ts`**
 
-- Test `--to all` flag is accepted
-- Test `sync --target all` is accepted
-- Test `sync --target gemini` is accepted
+- 测试 `--to all` flag is accepted
+- 测试 `sync --target all` is accepted
+- 测试 `sync --target gemini` is accepted
 
-### Phase 6: Documentation
+### Phase 6：Documentation（文档）
 
-**Update `README.md`:**
+**更新 `README.md`：**
 
-Add to install section:
+添加到 install section:
 ```bash
 # auto-detect installed tools and install to all
 bunx @every-env/compound-plugin install compound-engineering --to all
 ```
 
-Add to sync section:
+添加到 sync section:
 ```bash
 # Sync to Gemini
 bunx @every-env/compound-plugin sync --target gemini
@@ -310,51 +310,51 @@ bunx @every-env/compound-plugin sync --target gemini
 bunx @every-env/compound-plugin sync --target all
 ```
 
-## What We're NOT Doing
+## 不做什么
 
-- Not adding binary detection (`which cursor`, `which gemini`) — directory checks are sufficient and don't require shell execution
-- Not adding interactive prompts ("Install to Cursor? y/n") — auto-detect is fire-and-forget
-- Not adding `--exclude` flag for skipping specific targets — can use `--to X --also Y` for manual selection
-- Not adding Gemini to the `sync` symlink watcher (no watcher exists for any target)
+- 不添加 binary detection（`which cursor`, `which gemini`）-- directory checks 足够，且不需要 shell execution
+- 不添加 interactive prompts（"Install to Cursor? y/n"）-- auto-detect 是 fire-and-forget
+- 不添加用于跳过 specific targets 的 `--exclude` flag -- 可用 `--to X --also Y` 做 manual selection
+- 不把 Gemini 加入 `sync` symlink watcher（任何 target 都没有 watcher）
 
-## Complexity Assessment
+## 复杂度评估
 
-**Low-medium change.** All patterns are established:
-- Detection utility is new but simple (pathExists checks)
-- Gemini sync follows cursor sync pattern exactly
-- `--to all` is plumbing — iterate detected tools through existing handlers
-- No new dependencies needed
+**Low-medium change.** 所有 patterns 都已建立：
+- Detection utility 是新的但简单（pathExists checks）
+- Gemini sync 精确遵循 cursor sync pattern
+- `--to all` 是 plumbing -- iterate detected tools through existing handlers
+- 无 new dependencies needed
 
-## References
+## 参考资料
 
-- Cursor sync (reference pattern): `src/sync/cursor.ts`
-- Gemini writer (merge pattern): `src/targets/gemini.ts`
-- Install command: `src/commands/install.ts`
-- Sync command: `src/commands/sync.ts`
-- File utilities: `src/utils/files.ts`
-- Symlink utilities: `src/utils/symlink.ts`
+- Cursor sync（reference pattern，参考模式）：`src/sync/cursor.ts`
+- Gemini writer（merge pattern，合并模式）：`src/targets/gemini.ts`
+- Install command（install command，安装命令）：`src/commands/install.ts`
+- Sync command（sync command，同步命令）：`src/commands/sync.ts`
+- File utilities（file utilities，文件工具）：`src/utils/files.ts`
+- Symlink utilities（symlink utilities，symlink 工具）：`src/utils/symlink.ts`
 
-## Completion Summary
+## 完成摘要
 
-### What Was Delivered
-- Tool detection utility (`src/utils/detect-tools.ts`) with `detectInstalledTools()` and `getDetectedTargetNames()`
-- Gemini sync (`src/sync/gemini.ts`) following cursor sync pattern — symlinks skills, merges MCP servers into `settings.json`
-- `install --to all` and `convert --to all` auto-detect and install to all detected tools
-- `sync --target gemini` added to sync command
-- `sync --target all` syncs to all detected tools with summary output
-- 8 new tests across 2 test files (detect-tools + sync-gemini)
+### 交付内容
+- Tool detection utility（`src/utils/detect-tools.ts`），包含 `detectInstalledTools()` 和 `getDetectedTargetNames()`
+- Gemini sync（`src/sync/gemini.ts`），遵循 cursor sync pattern -- symlinks skills，merges MCP servers into `settings.json`
+- `install --to all` 和 `convert --to all` 会 auto-detect，并 install to all detected tools
+- `sync --target gemini` 已添加到 sync command
+- `sync --target all` 会 sync 到所有 detected tools，并输出 summary
+- 2 个 test files 中新增 8 个 tests（detect-tools + sync-gemini）
 
-### Implementation Statistics
-- 4 new files, 3 modified files
-- 139 tests passing (8 new + 131 existing)
-- No new dependencies
+### 实现统计
+- 4 个 new files，3 个 modified files
+- 139 tests passing（8 new + 131 existing；139 个测试通过）
+- 无 new dependencies
 
-### Git Commits
+### Git Commits（Git commits，Git 提交）
 - `e4d730d` feat: add detect-tools utility and Gemini sync with tests
 - `bc655f7` feat: wire --to all into install/convert and --target all/gemini into sync
 - `877e265` docs: add auto-detect and Gemini sync to README, bump to 0.8.0
 
-### Completion Details
-- **Completed By:** Claude Opus 4.6
-- **Date:** 2026-02-14
-- **Session:** Single session, TDD approach
+### 完成详情
+- **Completed By（完成者）：** Claude Opus 4.6
+- **Date（日期）：** 2026-02-14
+- **Session（会话）：** Single session, TDD approach

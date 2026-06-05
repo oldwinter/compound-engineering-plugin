@@ -1,9 +1,9 @@
-# Architecture - DHH Rails Style
+# Architecture - DHH Rails Style（架构）
 
 <routing>
-## Routing
+## Routing（路由）
 
-Everything maps to CRUD. Nested resources for related actions:
+一切都映射到 CRUD。相关 actions 使用 nested resources：
 
 ```ruby
 Rails.application.routes.draw do
@@ -19,28 +19,28 @@ Rails.application.routes.draw do
 end
 ```
 
-**Verb-to-noun conversion:**
-| Action | Resource |
+**Verb-to-noun conversion（动词转名词）：**
+| Action（动作） | Resource（资源） |
 |--------|----------|
 | close a card | `card.closure` |
 | watch a board | `board.watching` |
 | mark as golden | `card.goldness` |
 | archive a card | `card.archival` |
 
-**Shallow nesting** - avoid deep URLs:
+**Shallow nesting（浅层嵌套）** - 避免 deep URLs：
 ```ruby
 resources :boards do
   resources :cards, shallow: true  # /boards/:id/cards, but /cards/:id
 end
 ```
 
-**Singular resources** for one-per-parent:
+用于 one-per-parent 的 **Singular resources**：
 ```ruby
 resource :closure   # not resources
 resource :goldness
 ```
 
-**Resolve for URL generation:**
+用于 URL generation 的 **Resolve**：
 ```ruby
 # config/routes.rb
 resolve("Comment") { |comment| [comment.card, anchor: dom_id(comment)] }
@@ -50,9 +50,9 @@ resolve("Comment") { |comment| [comment.card, anchor: dom_id(comment)] }
 </routing>
 
 <multi_tenancy>
-## Multi-Tenancy (Path-Based)
+## Multi-Tenancy (Path-Based)（基于路径的多租户）
 
-**Middleware extracts tenant** from URL prefix:
+**Middleware 从 URL prefix 提取 tenant**：
 
 ```ruby
 # lib/tenant_extractor.rb
@@ -72,7 +72,7 @@ class TenantExtractor
 end
 ```
 
-**Cookie scoping** per tenant:
+按 tenant 做 **Cookie scoping**：
 ```ruby
 # Cookies scoped to tenant path
 cookies.signed[:session_id] = {
@@ -81,7 +81,7 @@ cookies.signed[:session_id] = {
 }
 ```
 
-**Background job context** - serialize tenant:
+**Background job context（后台任务 context）** - serialize tenant：
 ```ruby
 class ApplicationJob < ActiveJob::Base
   around_perform do |job, block|
@@ -90,7 +90,7 @@ class ApplicationJob < ActiveJob::Base
 end
 ```
 
-**Recurring jobs** must iterate all tenants:
+**Recurring jobs** 必须 iterate all tenants：
 ```ruby
 class DailyDigestJob < ApplicationJob
   def perform
@@ -103,7 +103,7 @@ class DailyDigestJob < ApplicationJob
 end
 ```
 
-**Controller security** - always scope through tenant:
+**Controller security（Controller 安全）** - 始终通过 tenant scope：
 ```ruby
 # Good - scoped through user's accessible records
 @card = Current.user.accessible_cards.find(params[:id])
@@ -114,9 +114,9 @@ end
 </multi_tenancy>
 
 <authentication>
-## Authentication
+## Authentication（认证）
 
-Custom passwordless magic link auth (~150 lines total):
+Custom passwordless magic link auth（总计约 150 行）：
 
 ```ruby
 # app/models/session.rb
@@ -141,13 +141,13 @@ class MagicLink < ApplicationRecord
 end
 ```
 
-**Why not Devise:**
-- ~150 lines vs massive dependency
-- No password storage liability
-- Simpler UX for users
-- Full control over flow
+**为什么不用 Devise：**
+- 约 150 行 vs massive dependency
+- 没有 password storage liability
+- 对 users 来说 UX 更简单
+- 完全控制 flow
 
-**Bearer token** for APIs:
+APIs 使用 **Bearer token**：
 ```ruby
 module Authentication
   extend ActiveSupport::Concern
@@ -171,9 +171,9 @@ end
 </authentication>
 
 <background_jobs>
-## Background Jobs
+## Background Jobs（后台任务）
 
-Jobs are shallow wrappers calling model methods:
+Jobs 是调用 model methods 的 shallow wrappers：
 
 ```ruby
 class NotifyWatchersJob < ApplicationJob
@@ -183,9 +183,9 @@ class NotifyWatchersJob < ApplicationJob
 end
 ```
 
-**Naming convention:**
-- `_later` suffix for async: `card.notify_watchers_later`
-- `_now` suffix for immediate: `card.notify_watchers_now`
+**Naming convention（命名约定）：**
+- async 使用 `_later` suffix：`card.notify_watchers_later`
+- immediate 使用 `_now` suffix：`card.notify_watchers_now`
 
 ```ruby
 module Watchable
@@ -205,18 +205,18 @@ module Watchable
 end
 ```
 
-**Database-backed** with Solid Queue:
-- No Redis required
-- Same transactional guarantees as your data
-- Simpler infrastructure
+用 Solid Queue 做 **Database-backed（数据库支持）**：
+- 不需要 Redis
+- 与你的 data 拥有相同 transactional guarantees
+- 更简单的 infrastructure
 
-**Transaction safety:**
+**Transaction safety（事务安全）：**
 ```ruby
 # config/application.rb
 config.active_job.enqueue_after_transaction_commit = true
 ```
 
-**Error handling** by type:
+按 type 做 **Error handling（错误处理）**：
 ```ruby
 class DeliveryJob < ApplicationJob
   # Transient errors - retry with backoff
@@ -231,7 +231,7 @@ class DeliveryJob < ApplicationJob
 end
 ```
 
-**Batch processing** with continuable:
+使用 continuable 做 **Batch processing**：
 ```ruby
 class ProcessCardsJob < ApplicationJob
   include ActiveJob::Continuable
@@ -247,9 +247,9 @@ end
 </background_jobs>
 
 <database_patterns>
-## Database Patterns
+## Database Patterns（数据库模式）
 
-**UUIDs as primary keys** (time-sortable UUIDv7):
+**UUIDs as primary keys（UUID 作为主键）**（time-sortable UUIDv7）：
 ```ruby
 # migration
 create_table :cards, id: :uuid do |t|
@@ -257,9 +257,9 @@ create_table :cards, id: :uuid do |t|
 end
 ```
 
-Benefits: No ID enumeration, distributed-friendly, client-side generation.
+Benefits：没有 ID enumeration、distributed-friendly、client-side generation。
 
-**State as records** (not booleans):
+**State as records（用 records 表示状态）**（not booleans）：
 ```ruby
 # Instead of closed: boolean
 class Card::Closure < ApplicationRecord
@@ -272,7 +272,7 @@ Card.joins(:closure)          # closed
 Card.where.missing(:closure)  # open
 ```
 
-**Hard deletes** - no soft delete:
+**Hard deletes（硬删除）** - no soft delete：
 ```ruby
 # Just destroy
 card.destroy!
@@ -281,9 +281,9 @@ card.destroy!
 card.record_event(:deleted, by: Current.user)
 ```
 
-Simplifies queries, uses event logs for auditing.
+简化 queries，并使用 event logs 做 auditing。
 
-**Counter caches** for performance:
+用于 performance 的 **Counter caches**：
 ```ruby
 class Comment < ApplicationRecord
   belongs_to :card, counter_cache: true
@@ -292,7 +292,7 @@ end
 # card.comments_count available without query
 ```
 
-**Account scoping** on every table:
+每张 table 都做 **Account scoping**：
 ```ruby
 class Card < ApplicationRecord
   belongs_to :account
@@ -302,9 +302,9 @@ end
 </database_patterns>
 
 <current_attributes>
-## Current Attributes
+## Current Attributes（当前属性）
 
-Use `Current` for request-scoped state:
+使用 `Current` 存放 request-scoped state：
 
 ```ruby
 # app/models/current.rb
@@ -320,7 +320,7 @@ class Current < ActiveSupport::CurrentAttributes
 end
 ```
 
-Set in controller:
+在 controller 中设置：
 ```ruby
 class ApplicationController < ActionController::Base
   before_action :set_current_request
@@ -334,7 +334,7 @@ class ApplicationController < ActionController::Base
 end
 ```
 
-Use throughout app:
+在整个 app 中使用：
 ```ruby
 class Card < ApplicationRecord
   belongs_to :creator, default: -> { Current.user }
@@ -343,21 +343,21 @@ end
 </current_attributes>
 
 <caching>
-## Caching
+## Caching（缓存）
 
-**HTTP caching** with ETags:
+使用 ETags 的 **HTTP caching**：
 ```ruby
 fresh_when etag: [@card, Current.user.timezone]
 ```
 
-**Fragment caching:**
+**Fragment caching（片段缓存）：**
 ```erb
 <% cache card do %>
   <%= render card %>
 <% end %>
 ```
 
-**Russian doll caching:**
+**Russian doll caching（俄罗斯套娃缓存）：**
 ```erb
 <% cache @board do %>
   <% @board.cards.each do |card| %>
@@ -368,30 +368,30 @@ fresh_when etag: [@card, Current.user.timezone]
 <% end %>
 ```
 
-**Cache invalidation** via `touch: true`:
+通过 `touch: true` 做 **Cache invalidation**：
 ```ruby
 class Card < ApplicationRecord
   belongs_to :board, touch: true
 end
 ```
 
-**Solid Cache** - database-backed:
-- No Redis required
-- Consistent with application data
-- Simpler infrastructure
+**Solid Cache** - database-backed（数据库后端）：
+- 不需要 Redis
+- 与 application data consistent
+- 更简单的 infrastructure
 </caching>
 
 <configuration>
-## Configuration
+## Configuration（配置）
 
-**ENV.fetch with defaults:**
+带 defaults 的 **ENV.fetch**：
 ```ruby
 # config/application.rb
 config.active_job.queue_adapter = ENV.fetch("QUEUE_ADAPTER", "solid_queue").to_sym
 config.cache_store = ENV.fetch("CACHE_STORE", "solid_cache").to_sym
 ```
 
-**Multiple databases:**
+**Multiple databases（多数据库）：**
 ```yaml
 # config/database.yml
 production:
@@ -408,12 +408,12 @@ production:
     migrations_paths: db/cache_migrate
 ```
 
-**Switch between SQLite and MySQL via ENV:**
+通过 ENV 在 SQLite 和 MySQL 之间切换：
 ```ruby
 adapter = ENV.fetch("DATABASE_ADAPTER", "sqlite3")
 ```
 
-**CSP extensible via ENV:**
+通过 ENV 让 **CSP extensible**：
 ```ruby
 config.content_security_policy do |policy|
   policy.default_src :self
@@ -423,9 +423,9 @@ end
 </configuration>
 
 <testing>
-## Testing
+## Testing（测试）
 
-**Minitest**, not RSpec:
+**Minitest**，不是 RSpec：
 ```ruby
 class CardTest < ActiveSupport::TestCase
   test "closing a card creates a closure" do
@@ -439,7 +439,7 @@ class CardTest < ActiveSupport::TestCase
 end
 ```
 
-**Fixtures** instead of factories:
+使用 **Fixtures**，不用 factories：
 ```yaml
 # test/fixtures/cards.yml
 one:
@@ -453,7 +453,7 @@ two:
   creator: bob
 ```
 
-**Integration tests** for controllers:
+面向 controllers 的 **Integration tests**：
 ```ruby
 class CardsControllerTest < ActionDispatch::IntegrationTest
   test "closing a card" do
@@ -468,15 +468,15 @@ class CardsControllerTest < ActionDispatch::IntegrationTest
 end
 ```
 
-**Tests ship with features** - same commit, not TDD-first but together.
+**Tests 与 features 一起 ship** - 同一个 commit，不是 TDD-first，而是 together。
 
-**Regression tests for security fixes** - always.
+**Security fixes 的 regression tests** - always。
 </testing>
 
 <events>
-## Event Tracking
+## Event Tracking（事件追踪）
 
-Events are the single source of truth:
+Events 是 single source of truth：
 
 ```ruby
 class Event < ApplicationRecord
@@ -487,7 +487,7 @@ class Event < ApplicationRecord
 end
 ```
 
-**Eventable concern:**
+**Eventable concern（Eventable concern 模块）：**
 ```ruby
 module Eventable
   extend ActiveSupport::Concern
@@ -506,13 +506,13 @@ module Eventable
 end
 ```
 
-**Webhooks driven by events** - events are the canonical source.
+**Webhooks driven by events** - events 是 canonical source。
 </events>
 
 <email_patterns>
-## Email Patterns
+## Email Patterns（邮件模式）
 
-**Multi-tenant URL helpers:**
+**Multi-tenant URL helpers（多租户 URL helpers）：**
 ```ruby
 class ApplicationMailer < ActionMailer::Base
   def default_url_options
@@ -525,7 +525,7 @@ class ApplicationMailer < ActionMailer::Base
 end
 ```
 
-**Timezone-aware delivery:**
+**Timezone-aware delivery（时区感知投递）：**
 ```ruby
 class NotificationMailer < ApplicationMailer
   def daily_digest(user)
@@ -538,13 +538,13 @@ class NotificationMailer < ApplicationMailer
 end
 ```
 
-**Batch delivery:**
+**Batch delivery（批量投递）：**
 ```ruby
 emails = users.map { |user| NotificationMailer.digest(user) }
 ActiveJob.perform_all_later(emails.map(&:deliver_later))
 ```
 
-**One-click unsubscribe (RFC 8058):**
+**One-click unsubscribe（一键退订，RFC 8058）：**
 ```ruby
 class ApplicationMailer < ActionMailer::Base
   after_action :set_unsubscribe_headers
@@ -559,9 +559,9 @@ end
 </email_patterns>
 
 <security_patterns>
-## Security Patterns
+## Security Patterns（安全模式）
 
-**XSS prevention** - escape in helpers:
+**XSS prevention** - 在 helpers 中 escape：
 ```ruby
 def formatted_content(text)
   # Escape first, then mark safe
@@ -569,7 +569,7 @@ def formatted_content(text)
 end
 ```
 
-**SSRF protection:**
+**SSRF protection（SSRF 防护）：**
 ```ruby
 # Resolve DNS once, pin the IP
 def fetch_safely(url)
@@ -589,7 +589,7 @@ def private_ip?(ip)
 end
 ```
 
-**Content Security Policy:**
+**Content Security Policy（内容安全策略）：**
 ```ruby
 # config/initializers/content_security_policy.rb
 Rails.application.configure do
@@ -604,7 +604,7 @@ Rails.application.configure do
 end
 ```
 
-**ActionText sanitization:**
+**ActionText sanitization（ActionText 清理）：**
 ```ruby
 # config/initializers/action_text.rb
 Rails.application.config.after_initialize do
@@ -616,9 +616,9 @@ end
 </security_patterns>
 
 <active_storage>
-## Active Storage Patterns
+## Active Storage Patterns（Active Storage 模式）
 
-**Variant preprocessing:**
+**Variant preprocessing（variant 预处理）：**
 ```ruby
 class User < ApplicationRecord
   has_one_attached :avatar do |attachable|
@@ -628,13 +628,13 @@ class User < ApplicationRecord
 end
 ```
 
-**Direct upload expiry** - extend for slow connections:
+**Direct upload expiry** - 为 slow connections 延长：
 ```ruby
 # config/initializers/active_storage.rb
 Rails.application.config.active_storage.service_urls_expire_in = 48.hours
 ```
 
-**Avatar optimization** - redirect to blob:
+**Avatar optimization** - redirect 到 blob：
 ```ruby
 def show
   expires_in 1.year, public: true
@@ -642,7 +642,7 @@ def show
 end
 ```
 
-**Mirror service** for migrations:
+用于 migrations 的 **Mirror service**：
 ```yaml
 # config/storage.yml
 production:

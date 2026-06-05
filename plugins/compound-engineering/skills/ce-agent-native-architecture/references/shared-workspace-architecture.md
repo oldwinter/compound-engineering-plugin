@@ -1,15 +1,15 @@
 <overview>
-Agents and users should work in the same data space, not separate sandboxes. When the agent writes a file, the user can see it. When the user edits something, the agent can read the changes. This creates transparency, enables collaboration, and eliminates the need for sync layers.
+Agents 和 users 应在同一个 data space 中工作，而不是 separate sandboxes。agent 写入 file 时，user 可以看到。user 编辑内容时，agent 可以读取 changes。这创造 transparency，支持 collaboration，并消除 sync layers 的需求。
 
-**Core principle:** The agent operates in the same filesystem as the user, not a walled garden.
+**Core principle：** agent 在与 user 相同的 filesystem 中运行，而不是 walled garden。
 </overview>
 
 <why_shared_workspace>
-## Why Shared Workspace?
+## Why Shared Workspace?（为什么使用 Shared Workspace？）
 
-### The Sandbox Anti-Pattern
+### The Sandbox Anti-Pattern（Sandbox 反模式）
 
-Many agent implementations isolate the agent:
+许多 agent implementations 会 isolate agent：
 
 ```
 ┌─────────────────┐     ┌─────────────────┐
@@ -21,14 +21,14 @@ Many agent implementations isolate the agent:
 └─────────────────┘     └─────────────────┘
 ```
 
-Problems:
-- Need a sync layer to move data between spaces
-- User can't easily inspect agent work
-- Agent can't build on user contributions
-- Duplication of state
-- Complexity in keeping spaces consistent
+Problems（问题）：
+- 需要 sync layer 在 spaces 间移动 data
+- User 难以 inspect agent work（检查 agent 工作）
+- Agent 不能 build on user contributions（基于用户贡献继续）
+- state 被 duplicated（状态重复）
+- 保持 spaces consistent 的 complexity
 
-### The Shared Workspace Pattern
+### The Shared Workspace Pattern（Shared Workspace Pattern，共享工作区模式）
 
 ```
 ┌─────────────────────────────────────────┐
@@ -48,20 +48,20 @@ Problems:
        (UI)               (Tools)
 ```
 
-Benefits:
-- Users can inspect, edit, and extend agent work
-- Agents can build on user contributions
-- No synchronization layer needed
-- Complete transparency
-- Single source of truth
+Benefits（收益）：
+- Users 可以 inspect、edit 和 extend agent work（检查、编辑并扩展 agent 工作）
+- Agents 可以 build on user contributions（基于用户贡献继续）
+- 不需要 synchronization layer
+- 完全 transparency
+- Single source of truth（单一真源）
 </why_shared_workspace>
 
 <directory_structure>
-## Designing Your Shared Workspace
+## Designing Your Shared Workspace（设计你的 Shared Workspace）
 
-### Structure by Domain
+### Structure by Domain（按 Domain 组织）
 
-Organize by what the data represents, not who created it:
+按 data 代表什么来组织，而不是按谁创建它来组织：
 
 ```
 Documents/
@@ -79,7 +79,7 @@ Documents/
 └── profile.md                   # Agent generates from photos
 ```
 
-### Don't Structure by Actor
+### Don't Structure by Actor（不要按 Actor 组织）
 
 ```
 # BAD - Separates by who created it
@@ -92,11 +92,11 @@ Documents/
     └── config.json
 ```
 
-This creates artificial boundaries and makes collaboration harder.
+这会创建 artificial boundaries，让 collaboration 更难。
 
-### Use Conventions for Metadata
+### Use Conventions for Metadata（用约定表达 Metadata）
 
-If you need to track who created/modified something:
+如果需要 track 谁 created/modified 了某个东西：
 
 ```markdown
 <!-- introduction.md -->
@@ -115,9 +115,9 @@ and refined by you on January 16th.
 </directory_structure>
 
 <file_tools>
-## File Tools for Shared Workspace
+## File Tools for Shared Workspace（Shared Workspace 的 File Tools）
 
-Give the agent the same file primitives the app uses:
+给 agent 与 app 使用的相同 file primitives：
 
 ```swift
 // iOS/Swift implementation
@@ -195,7 +195,7 @@ struct FileTools {
 }
 ```
 
-### TypeScript/Node.js Implementation
+### TypeScript/Node.js Implementation（TypeScript/Node.js 实现）
 
 ```typescript
 const fileTools = [
@@ -250,11 +250,11 @@ const fileTools = [
 </file_tools>
 
 <ui_integration>
-## UI Integration with Shared Workspace
+## UI Integration with Shared Workspace（Shared Workspace 的 UI 集成）
 
-The UI should observe the same files the agent writes to:
+UI 应 observe agent 写入的同一批 files：
 
-### Pattern 1: File-Based Reactivity (iOS)
+### Pattern 1：File-Based Reactivity（iOS，基于文件的响应式）
 
 ```swift
 class ResearchViewModel: ObservableObject {
@@ -288,9 +288,9 @@ struct ResearchView: View {
 }
 ```
 
-### Pattern 2: Shared Data Store
+### Pattern 2：Shared Data Store（共享 Data Store）
 
-When file-watching isn't practical, use a shared data store:
+当 file-watching 不 practical 时，使用 shared data store：
 
 ```swift
 // Shared service that both UI and agent tools use
@@ -326,9 +326,9 @@ struct FeedView: View {
 }
 ```
 
-### Pattern 3: Hybrid (Files + Index)
+### Pattern 3：Hybrid（Files + Index，混合模式）
 
-Use files for content, database for indexing:
+Files 用于 content，database 用于 indexing：
 
 ```
 Documents/
@@ -363,9 +363,9 @@ for item in items {
 </ui_integration>
 
 <collaboration_patterns>
-## Agent-User Collaboration Patterns
+## Agent-User Collaboration Patterns（Agent-User 协作模式）
 
-### Pattern: Agent Drafts, User Refines
+### Pattern：Agent Drafts, User Refines（Agent 起草，User 润色）
 
 ```
 1. Agent generates introduction.md
@@ -375,7 +375,7 @@ for item in items {
 5. Future agent work builds on user refinements
 ```
 
-The agent's system prompt should acknowledge this:
+agent 的 system prompt 应 acknowledge 这一点：
 
 ```markdown
 ## Working with User Content
@@ -388,7 +388,7 @@ If a file exists and has been modified by the user (check the metadata or
 compare to your last known version), ask before overwriting.
 ```
 
-### Pattern: User Seeds, Agent Expands
+### Pattern：User Seeds, Agent Expands（User 播种，Agent 扩展）
 
 ```
 1. User creates notes.md with initial thoughts
@@ -398,9 +398,9 @@ compare to your last known version), ask before overwriting.
 5. User continues building on agent additions
 ```
 
-### Pattern: Append-Only Collaboration
+### Pattern：Append-Only Collaboration（仅追加协作）
 
-For chat logs or activity streams:
+用于 chat logs 或 activity streams：
 
 ```markdown
 <!-- activity.md - Both append, neither overwrites -->
@@ -418,11 +418,11 @@ For chat logs or activity streams:
 </collaboration_patterns>
 
 <security_considerations>
-## Security in Shared Workspace
+## Security in Shared Workspace（Shared Workspace 安全）
 
-### Scope the Workspace
+### Scope the Workspace（限定 Workspace 范围）
 
-Don't give agents access to the entire filesystem:
+不要给 agents 整个 filesystem 的 access：
 
 ```swift
 // GOOD: Scoped to app's documents
@@ -443,7 +443,7 @@ tool("read_file", { path }) {
 }
 ```
 
-### Protect Sensitive Files
+### Protect Sensitive Files（保护敏感文件）
 
 ```swift
 let protectedPaths = [".env", "credentials.json", "secrets/"]
@@ -456,9 +456,9 @@ tool("read_file", { path }) {
 }
 ```
 
-### Audit Agent Actions
+### Audit Agent Actions（审计 Agent Actions）
 
-Log what the agent reads/writes:
+Log agent reads/writes 的内容：
 
 ```swift
 func logFileAccess(action: String, path: String, agentId: String) {
@@ -473,9 +473,9 @@ tool("write_file", { path, content }) {
 </security_considerations>
 
 <examples>
-## Real-World Example: Every Reader
+## Real-World Example：Every Reader（真实案例）
 
-The Every Reader app uses shared workspace for research:
+Every Reader app 使用 shared workspace 做 research：
 
 ```
 Documents/
@@ -492,24 +492,24 @@ Documents/
 └── profile.md                       # Agent generated from photos
 ```
 
-**How it works:**
+**工作方式：**
 
-1. User adds "Moby Dick" to library
-2. User starts research agent
-3. Agent downloads full text to `Research/book_moby_dick/full_text.txt`
-4. Agent researches and writes to `sources/`
-5. Agent generates `introduction.md` based on user's reading profile
-6. User can view all files in the app or Files.app
-7. User can edit `introduction.md` to refine it
-8. Chat agent can read all of this context when answering questions
+1. User 将 "Moby Dick" 添加到 library
+2. User 启动 research agent
+3. Agent 将 full text 下载到 `Research/book_moby_dick/full_text.txt`
+4. Agent researches 并写入 `sources/`
+5. Agent 基于 user's reading profile 生成 `introduction.md`
+6. User 可以在 app 或 Files.app 中查看所有 files
+7. User 可以 edit `introduction.md` 来 refine it
+8. Chat agent 在回答问题时可以读取所有这些 context
 </examples>
 
 <icloud_sync>
-## iCloud File Storage for Multi-Device Sync (iOS)
+## iCloud File Storage for Multi-Device Sync（iOS，多设备同步）
 
-For agent-native iOS apps, use iCloud Drive's Documents folder for your shared workspace. This gives you **free, automatic multi-device sync** without building a sync layer or running a server.
+对 agent-native iOS apps，使用 iCloud Drive 的 Documents folder 作为 shared workspace。这会提供**免费、automatic multi-device sync**，无需构建 sync layer 或运行 server。
 
-### Why iCloud Documents?
+### Why iCloud Documents?（为什么使用 iCloud Documents？）
 
 | Approach | Cost | Complexity | Offline | Multi-Device |
 |----------|------|------------|---------|--------------|
@@ -517,14 +517,14 @@ For agent-native iOS apps, use iCloud Drive's Documents folder for your shared w
 | CloudKit database | Free tier limits | Medium | Manual | Yes |
 | **iCloud Documents** | Free (user's storage) | Low | Automatic | Automatic |
 
-iCloud Documents:
-- Uses user's existing iCloud storage (free 5GB, most users have more)
-- Automatic sync across all user's devices
-- Works offline, syncs when online
-- Files visible in Files.app for transparency
-- No server costs, no sync code to maintain
+iCloud Documents（iCloud 文档）：
+- 使用 user 现有 iCloud storage（免费 5GB，多数 users 更多）
+- 在 user 所有 devices 间 automatic sync
+- offline 可用，online 时 sync
+- Files 在 Files.app 中 visible，提供 transparency
+- 无 server costs，无需维护 sync code
 
-### Implementation Pattern
+### Implementation Pattern（实现模式）
 
 ```swift
 // Get the iCloud Documents container
@@ -558,7 +558,7 @@ class SharedWorkspace {
 }
 ```
 
-### Directory Structure in iCloud
+### Directory Structure in iCloud（iCloud 中的目录结构）
 
 ```
 iCloud Drive/
@@ -578,9 +578,9 @@ iCloud Drive/
                 └── sources.md
 ```
 
-### Handling Sync Conflicts
+### Handling Sync Conflicts（处理同步冲突）
 
-iCloud handles conflicts automatically, but you should design for it:
+iCloud 会 automatically handle conflicts，但你仍应为它设计：
 
 ```swift
 // Check for conflicts when reading
@@ -612,16 +612,16 @@ func writeJournalEntry(_ entry: JournalEntry, to url: URL) throws {
 }
 ```
 
-### What This Enables
+### What This Enables（这会带来什么）
 
-1. **User starts experiment on iPhone** → Agent creates `Experiments/sleep-tracking/config.json`
-2. **User opens app on iPad** → Same experiment visible, no sync code needed
-3. **Agent logs observation on iPhone** → Syncs to iPad automatically
-4. **User edits journal on iPad** → iPhone sees the edit
+1. **User starts experiment on iPhone** → Agent 创建 `Experiments/sleep-tracking/config.json`
+2. **User opens app on iPad** → 同一个 experiment visible，不需要 sync code
+3. **Agent logs observation on iPhone** → 自动 sync 到 iPad
+4. **User edits journal on iPad** → iPhone 看到 edit
 
-### Entitlements Required
+### Entitlements Required（必需 Entitlements）
 
-Add to your app's entitlements:
+添加到 app 的 entitlements：
 
 ```xml
 <key>com.apple.developer.icloud-container-identifiers</key>
@@ -638,43 +638,43 @@ Add to your app's entitlements:
 </array>
 ```
 
-### When NOT to Use iCloud Documents
+### When NOT to Use iCloud Documents（何时不要使用 iCloud Documents）
 
-- **Sensitive data** - Use Keychain or encrypted local storage instead
-- **High-frequency writes** - iCloud sync has latency; use local + periodic sync
-- **Large media files** - Consider CloudKit Assets or on-demand resources
-- **Shared between users** - iCloud Documents is single-user; use CloudKit for sharing
+- **Sensitive data（敏感数据）** - 改用 Keychain 或 encrypted local storage
+- **High-frequency writes（高频写入）** - iCloud sync 有 latency；使用 local + periodic sync
+- **Large media files（大型媒体文件）** - 考虑 CloudKit Assets 或 on-demand resources
+- **Shared between users（用户间共享）** - iCloud Documents 是 single-user；sharing 使用 CloudKit
 </icloud_sync>
 
 <checklist>
-## Shared Workspace Checklist
+## Shared Workspace Checklist（Shared Workspace 检查清单）
 
-Architecture:
-- [ ] Single shared directory for agent and user data
-- [ ] Organized by domain, not by actor
-- [ ] File tools scoped to workspace (no escape)
-- [ ] Protected paths for sensitive files
+Architecture（架构）：
+- [ ] agent 和 user data 使用 single shared directory
+- [ ] 按 domain 组织，而不是按 actor
+- [ ] File tools scoped to workspace（no escape，不能逃逸 workspace）
+- [ ] sensitive files 有 protected paths
 
-Tools:
-- [ ] `read_file` - Read any file in workspace
-- [ ] `write_file` - Write any file in workspace
-- [ ] `list_files` - Browse directory structure
-- [ ] `search_text` - Find content across files (optional)
+Tools（工具）：
+- [ ] `read_file` - 读取 workspace 中任意 file
+- [ ] `write_file` - 写入 workspace 中任意 file
+- [ ] `list_files` - 浏览 directory structure
+- [ ] `search_text` - 跨 files 查找 content（optional）
 
-UI Integration:
-- [ ] UI observes same files agent writes
-- [ ] Changes reflect immediately (file watching or shared store)
-- [ ] User can edit agent-created files
-- [ ] Agent reads user modifications before overwriting
+UI Integration（UI 集成）：
+- [ ] UI observes agent 写入的相同 files
+- [ ] Changes 立即 reflect（file watching 或 shared store）
+- [ ] User 可以 edit agent-created files
+- [ ] Agent overwriting 前读取 user modifications
 
-Collaboration:
-- [ ] System prompt acknowledges user may edit files
-- [ ] Agent checks for user modifications before overwriting
-- [ ] Metadata tracks who created/modified (optional)
+Collaboration（协作）：
+- [ ] System prompt acknowledges user may edit files（system prompt 承认 user 可能编辑 files）
+- [ ] Agent overwriting 前检查 user modifications
+- [ ] Metadata tracks who created/modified（optional，可选）
 
-Multi-Device (iOS):
-- [ ] Use iCloud Documents for shared workspace (free sync)
-- [ ] Fallback to local Documents if iCloud unavailable
-- [ ] Handle `.icloud` placeholder files (trigger download)
-- [ ] Use NSFileCoordinator for conflict-safe writes
+Multi-Device（多设备，iOS）：
+- [ ] 使用 iCloud Documents 作为 shared workspace（free sync）
+- [ ] iCloud unavailable 时 fallback 到 local Documents
+- [ ] 处理 `.icloud` placeholder files（trigger download）
+- [ ] 使用 NSFileCoordinator 做 conflict-safe writes
 </checklist>

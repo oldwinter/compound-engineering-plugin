@@ -1,49 +1,49 @@
 ---
 name: ce-agent-native-audit
-description: Run comprehensive agent-native architecture review with scored principles
-argument-hint: "[optional: specific principle to audit]"
+description: 运行带原则评分的 comprehensive agent-native architecture review
+argument-hint: "[可选：要 audit 的 specific principle]"
 disable-model-invocation: true
 ---
 
-# Agent-Native Architecture Audit
+# Agent-Native Architecture Audit（Agent-Native 架构审计）
 
-Conduct a comprehensive review of the codebase against agent-native architecture principles, launching parallel sub-agents for each principle and producing a scored report.
+根据 agent-native architecture principles 对 codebase 进行 comprehensive review，为每个 principle 启动 parallel sub-agents，并生成带评分的 report。
 
-## Core Principles to Audit
+## 要 Audit 的 Core Principles
 
-1. **Action Parity** - "Whatever the user can do, the agent can do"
-2. **Tools as Primitives** - "Tools provide capability, not behavior"
-3. **Context Injection** - "System prompt includes dynamic context about app state"
-4. **Shared Workspace** - "Agent and user work in the same data space"
-5. **CRUD Completeness** - "Every entity has full CRUD (Create, Read, Update, Delete)"
-6. **UI Integration** - "Agent actions immediately reflected in UI"
-7. **Capability Discovery** - "Users can discover what the agent can do"
-8. **Prompt-Native Features** - "Features are prompts defining outcomes, not code"
+1. **Action Parity** - "Whatever the user can do, the agent can do"（用户能做的，agent 也能做）
+2. **Tools as Primitives** - "Tools provide capability, not behavior"（Tools 提供 capability，而不是 behavior）
+3. **Context Injection** - "System prompt includes dynamic context about app state"（System prompt 包含 app state 的 dynamic context）
+4. **Shared Workspace** - "Agent and user work in the same data space"（Agent 和 user 在同一 data space 中工作）
+5. **CRUD Completeness** - "Every entity has full CRUD (Create, Read, Update, Delete)"（每个 entity 都有完整 CRUD）
+6. **UI Integration** - "Agent actions immediately reflected in UI"（Agent actions 会立即反映到 UI）
+7. **Capability Discovery** - "Users can discover what the agent can do"（Users 能发现 agent 可以做什么）
+8. **Prompt-Native Features** - "Features are prompts defining outcomes, not code"（Features 是定义 outcomes 的 prompts，而不是 code）
 
-## Workflow
+## Workflow（工作流）
 
-### Step 1: Load the Agent-Native Skill
+### Step 1：加载 Agent-Native Skill
 
-First, invoke the agent-native-architecture skill to understand all principles:
+首先调用 agent-native-architecture skill，理解所有 principles：
 
 ```
 /ce-agent-native-architecture
 ```
 
-Select option 7 (action parity) to load the full reference material.
+选择 option 7（action parity）以加载完整 reference material。
 
-### Step 2: Launch Parallel Sub-Agents
+### Step 2：启动 Parallel Sub-Agents（并行 Sub-Agents）
 
-Launch 8 parallel sub-agents using the platform's subagent primitive (`Agent` with `subagent_type: Explore` in Claude Code, `spawn_agent` with `agent_type: "explorer"` in Codex, `subagent` with `agent: "scout"` in Pi via the `pi-subagents` extension), one for each principle. Each agent should:
+使用平台的 subagent primitive 启动 8 个 parallel sub-agents（Claude Code 中用带 `subagent_type: Explore` 的 `Agent`，Codex 中用带 `agent_type: "explorer"` 的 `spawn_agent`，Pi 中通过 `pi-subagents` extension 使用带 `agent: "scout"` 的 `subagent`），每个 principle 一个 agent。每个 agent 应该：
 
-1. Enumerate ALL instances in the codebase (user actions, tools, contexts, data stores, etc.)
-2. Check compliance against the principle
-3. Provide a SPECIFIC SCORE like "X out of Y (percentage%)"
-4. List specific gaps and recommendations
+1. 枚举 codebase 中的 ALL instances（user actions、tools、contexts、data stores 等）
+2. 根据该 principle 检查 compliance
+3. 提供 SPECIFIC SCORE，例如 "X out of Y (percentage%)"
+4. 列出具体 gaps 和 recommendations
 
 <sub-agents>
 
-**Agent 1: Action Parity**
+**Agent 1：Action Parity（Action Parity 审计）**
 ```
 Audit for ACTION PARITY - "Whatever the user can do, the agent can do."
 
@@ -65,7 +65,7 @@ Format:
 ### Recommendations
 ```
 
-**Agent 2: Tools as Primitives**
+**Agent 2：Tools as Primitives（Tools as Primitives 审计）**
 ```
 Audit for TOOLS AS PRIMITIVES - "Tools provide capability, not behavior."
 
@@ -85,7 +85,7 @@ Format:
 ### Recommendations
 ```
 
-**Agent 3: Context Injection**
+**Agent 3：Context Injection（Context Injection 审计）**
 ```
 Audit for CONTEXT INJECTION - "System prompt includes dynamic context about app state"
 
@@ -109,7 +109,7 @@ Format:
 ### Recommendations
 ```
 
-**Agent 4: Shared Workspace**
+**Agent 4：Shared Workspace（Shared Workspace 审计）**
 ```
 Audit for SHARED WORKSPACE - "Agent and user work in the same data space"
 
@@ -127,7 +127,7 @@ Format:
 ### Recommendations
 ```
 
-**Agent 5: CRUD Completeness**
+**Agent 5：CRUD Completeness（CRUD 完整性审计）**
 ```
 Audit for CRUD COMPLETENESS - "Every entity has full CRUD"
 
@@ -149,7 +149,7 @@ Format:
 ### Recommendations
 ```
 
-**Agent 6: UI Integration**
+**Agent 6：UI Integration（UI 集成审计）**
 ```
 Audit for UI INTEGRATION - "Agent actions immediately reflected in UI"
 
@@ -172,7 +172,7 @@ Format:
 ### Recommendations
 ```
 
-**Agent 7: Capability Discovery**
+**Agent 7：Capability Discovery（Capability Discovery 审计）**
 ```
 Audit for CAPABILITY DISCOVERY - "Users can discover what the agent can do"
 
@@ -196,7 +196,7 @@ Format:
 ### Recommendations
 ```
 
-**Agent 8: Prompt-Native Features**
+**Agent 8：Prompt-Native Features（Prompt-Native Features 审计）**
 ```
 Audit for PROMPT-NATIVE FEATURES - "Features are prompts defining outcomes, not code"
 
@@ -218,9 +218,9 @@ Format:
 
 </sub-agents>
 
-### Step 3: Compile Summary Report
+### Step 3：Compile Summary Report（汇总 Summary Report）
 
-After all agents complete, compile a summary with:
+所有 agents 完成后，编译一份 summary：
 
 ```markdown
 ## Agent-Native Architecture Review: [Project Name]
@@ -240,34 +240,34 @@ After all agents complete, compile a summary with:
 
 **Overall Agent-Native Score: X%**
 
-### Status Legend
-- ✅ Excellent (80%+)
-- ⚠️ Partial (50-79%)
-- ❌ Needs Work (<50%)
+### Status Legend（状态图例）
+- ✅ Excellent（80%+）
+- ⚠️ Partial（50-79%）
+- ❌ Needs Work（<50%）
 
-### Top 10 Recommendations by Impact
+### Top 10 Recommendations by Impact（按 Impact 排序的 Top 10 Recommendations）
 
 | Priority | Action | Principle | Effort |
 |----------|--------|-----------|--------|
 
-### What's Working Excellently
+### What's Working Excellently（表现优秀的地方）
 
 [List top 5 strengths]
 ```
 
-## Success Criteria
+## Success Criteria（成功标准）
 
-- [ ] All 8 sub-agents complete their audits
-- [ ] Each principle has a specific numeric score (X/Y format)
-- [ ] Summary table shows all scores and status indicators
-- [ ] Top 10 recommendations are prioritized by impact
-- [ ] Report identifies both strengths and gaps
+- [ ] 全部 8 个 sub-agents 完成各自 audits
+- [ ] 每个 principle 都有 specific numeric score（X/Y format）
+- [ ] Summary table 展示所有 scores 和 status indicators
+- [ ] Top 10 recommendations 按 impact 排序
+- [ ] Report 同时识别 strengths 和 gaps
 
-## Optional: Single Principle Audit
+## Optional：Single Principle Audit（单原则审计）
 
-If $ARGUMENTS specifies a single principle (e.g., "action parity"), only run that sub-agent and provide detailed findings for that principle alone.
+如果 $ARGUMENTS 指定单个 principle（例如 "action parity"），只运行该 sub-agent，并仅为该 principle 提供 detailed findings。
 
-Valid arguments:
+Valid arguments（有效参数）：
 - `action parity` or `1`
 - `tools` or `primitives` or `2`
 - `context` or `injection` or `3`

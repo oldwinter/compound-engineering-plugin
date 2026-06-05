@@ -1,7 +1,7 @@
 {
   "name": "coding-tutor",
   "version": "1.3.0",
-  "description": "Personalized coding tutorials that use your actual codebase for examples with spaced repetition quizzes",
+  "description": "个性化 coding tutorials：使用你的实际 codebase 作为示例，并用 spaced repetition quizzes 巩固学习",
   "author": {
     "name": "Nityesh Agarwal"
   },
@@ -16,8 +16,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Coding Tutor",
-    "shortDescription": "Personalized coding tutorials that use your actual codebase for examples with spaced repetition quizzes",
-    "longDescription": "Coding Tutor guides you through lessons that draw examples from the repo you're working in, then reinforces what you learned with spaced repetition quizzes. Skills install natively via Codex; Codex does not yet register plugin-declared commands, so the slash commands this plugin ships (e.g., quiz scheduling) require the companion Bun converter (see README).",
+    "shortDescription": "个性化 coding tutorials：使用你的实际 codebase 作为示例，并用 spaced repetition quizzes 巩固学习",
+    "longDescription": "Coding Tutor 会基于你正在工作的 repo 提供示例，引导你完成 lessons，并用 spaced repetition quizzes 巩固所学内容。Skills 会通过 Codex native install；Codex 目前还不会注册 plugin-declared commands，因此此 plugin 自带的 slash commands（例如 quiz scheduling）需要配套 Bun converter（见 README）。",
     "developerName": "Nityesh Agarwal",
     "category": "Coding",
     "capabilities": [
@@ -25,8 +25,8 @@
       "Read"
     ],
     "defaultPrompt": [
-      "Teach me about the auth flow in this codebase",
-      "Quiz me on what I learned last week"
+      "教我理解这个 codebase 中的 auth flow",
+      "根据我上周学过的内容 quiz me"
     ],
     "screenshots": []
   }

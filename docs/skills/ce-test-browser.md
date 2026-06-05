@@ -1,107 +1,107 @@
 # `ce-test-browser`
 
-> Run end-to-end browser tests on pages affected by current PR or branch — uses `agent-browser` exclusively.
+> 对当前 PR 或 branch 影响到的页面运行 end-to-end browser tests；只使用 `agent-browser`。
 
-`ce-test-browser` is the **end-to-end browser testing** skill. It maps changed files to testable routes, starts (or verifies) the dev server, navigates to each affected page via `agent-browser`, captures snapshots and screenshots, exercises critical interactions, pauses for human verification on flows that require external interaction (OAuth, email, payments, SMS), and produces a structured test summary. Headed mode lets you watch tests run; headless is faster and runs in the background.
+`ce-test-browser` 是 **end-to-end browser testing** skill。它把 changed files 映射到可测试 routes，启动（或验证）dev server，通过 `agent-browser` 打开每个 affected page，捕获 snapshots 和 screenshots，执行 critical interactions，在 OAuth、email、payments、SMS 等需要外部交互的 flows 上暂停等待 human verification，并产出 structured test summary。Headed mode 便于你观看测试过程；headless 更快，适合后台运行。
 
 ---
 
-## TL;DR
+## 摘要（TL;DR）
 
-| Question | Answer |
+| 问题 | 回答 |
 |----------|--------|
-| What does it do? | Maps changed files to routes, navigates each via agent-browser, captures snapshots and screenshots, asks for human verification on external-flow steps |
-| When to use it | After UI changes, before opening a PR, when verifying page behavior on a branch or PR |
-| What it produces | Per-page status table, console errors, human verifications confirmed, screenshots, overall result (PASS / FAIL / PARTIAL) |
-| Modes | Manual (default; user controls server), Pipeline (`mode:pipeline` — auto-starts server, scans for free port) |
+| 它做什么？ | 将 changed files 映射到 routes，用 agent-browser 打开每个 route，捕获 snapshots/screenshots，并在 external-flow steps 上请求 human verification |
+| 何时使用 | UI changes 后、打开 PR 前、验证 branch 或 PR 上的 page behavior 时 |
+| 产出什么 | Per-page status table、console errors、human verifications confirmed、screenshots、overall result（PASS / FAIL / PARTIAL） |
+| 模式 | Manual（default；用户控制 server）、Pipeline（`mode:pipeline`：auto-start server，扫描 free port） |
 
 ---
 
-## The Problem
+## 问题
 
-End-to-end browser testing is fragmented across tools and easy to skip:
+End-to-end browser testing 常被工具碎片化，也很容易跳过：
 
-- **Wrong browser tool** — Playwright, Puppeteer, MCP Chrome, IDE built-ins; each works differently
-- **Manual test mapping** — figuring out "which routes did this PR affect" is its own task
-- **Server orchestration** — tests fail because the dev server wasn't running, or the wrong port, or stale state
-- **Console errors silently slip through** — the page renders fine but JS errors pile up unnoticed
-- **External flows skipped** — OAuth, payments, email delivery need a human; without a structured pause, they get marked "pass" without actually being checked
-- **No artifact** — screenshots end up in the developer's filesystem, not the PR description
+- **Browser tool 用错**：Playwright、Puppeteer、MCP Chrome、IDE built-ins；行为各不相同
+- **手动 test mapping**：判断 "which routes did this PR affect" 本身就是一项任务
+- **Server orchestration**：dev server 没跑、port 错、state stale，都会让 tests 失败
+- **Console errors 静默溜过**：页面看起来渲染了，但 JS errors 在后台堆积
+- **External flows 被跳过**：OAuth、payments、email delivery 需要 human；没有 structured pause 时，会被误标为 pass
+- **没有 artifact**：screenshots 留在 developer filesystem，而不是 PR description 中
 
-## The Solution
+## 方案
 
-`ce-test-browser` runs end-to-end tests as a structured flow:
+`ce-test-browser` 把 E2E tests 作为 structured flow：
 
-- **`agent-browser` exclusively** — one tool, predictable behavior; never falls back to Chrome MCP or IDE-specific browser tools
-- **File-to-route mapping** translates changed files into the URLs that need testing
-- **Server orchestration** — manual mode requires the user-started server; pipeline mode auto-starts and scans for a free port
-- **Per-page test loop** — navigate, snapshot, verify elements, exercise critical interactions, capture screenshots
-- **Human verification step** for flows that require external interaction
-- **Failure handling asks how to proceed** — fix now (debug + retest) or skip (continue)
-- **Structured test summary** suitable for PR descriptions
+- **只使用 `agent-browser`**：一个工具、predictable behavior；绝不 fallback 到 Chrome MCP 或 IDE-specific browser tools
+- **File-to-route mapping** 将 changed files 转成需要测试的 URLs
+- **Server orchestration**：manual mode 要求用户已启动 server；pipeline mode 自动启动并扫描 free port
+- **Per-page test loop（逐页测试循环）**：navigate、snapshot、verify elements、exercise critical interactions、capture screenshots
+- 对需要外部交互的 flows 加 **human verification step**
+- **Failure handling asks how to proceed**：fix now（debug + retest）或 skip（继续）
+- **Structured test summary** 可用于 PR descriptions
 
 ---
 
-## What Makes It Novel
+## 独特之处
 
-### 1. `agent-browser` exclusively
+### 1. 只使用 `agent-browser`
 
-The skill enforces a single browser-automation substrate: **the `agent-browser` CLI**. Not Chrome MCP, not IDE built-ins, not alternative browser-control tools. Specific reasons:
+Skill 强制使用单一 browser-automation substrate：**`agent-browser` CLI**。不是 Chrome MCP，不是 IDE built-ins，也不是其他 browser-control tools。原因：
 
-- Predictable behavior — one tool's quirks, not three
-- Same commands work in headed and headless modes
-- Same snapshot/click/screenshot pattern across all tests
-- Platform-specific hints (e.g., "in Claude Code, do not use `mcp__claude-in-chrome__*`") are explicit
+- Predictable behavior：只处理一个工具的 quirks
+- Headed 和 headless modes 使用相同 commands
+- 所有 tests 共享相同 snapshot/click/screenshot pattern
+- Platform-specific hints 会明确写出（例如 Claude Code 中不要用 `mcp__claude-in-chrome__*`）
 
-When `agent-browser` isn't installed, the skill stops with `/ce-setup` as the install path — it doesn't try to fall back.
+如果未安装 `agent-browser`，skill 会停止，并指向 `/ce-setup` 作为安装路径；不会尝试 fallback。
 
-### 2. File-to-route mapping table
+### 2. File-to-route mapping table（文件到 route 映射表）
 
-Mapping changed files to URLs that need testing is a recurring task. The skill carries an explicit mapping table:
+Changed files 到 URLs 的 mapping 是重复任务。Skill 携带 explicit mapping table：
 
 | File pattern | Routes |
 |--------------|--------|
 | `app/views/users/*` | `/users`, `/users/:id`, `/users/new` |
 | `app/controllers/settings_controller.rb` | `/settings` |
-| `app/javascript/controllers/*_controller.js` | Pages using that Stimulus controller |
-| `app/components/*_component.rb` | Pages rendering that component |
-| `app/views/layouts/*` | All pages (test homepage at minimum) |
-| `app/assets/stylesheets/*` | Visual regression on key pages |
-| `src/app/*` _(Next.js)_ | Corresponding routes |
-| `src/components/*` | Pages using those components |
+| `app/javascript/controllers/*_controller.js` | 使用该 Stimulus controller 的 pages |
+| `app/components/*_component.rb` | 渲染该 component 的 pages |
+| `app/views/layouts/*` | 所有 pages（至少 test homepage） |
+| `app/assets/stylesheets/*` | key pages 上的 visual regression |
+| `src/app/*` _(Next.js)_ | 对应 routes |
+| `src/components/*` | 使用这些 components 的 pages |
 
-This is a starting point, not exhaustive — the skill applies judgment for project-specific layouts.
+这只是 starting point，不是 exhaustive；skill 会根据 project-specific layouts 判断。
 
-### 3. Two modes — Manual (default) and Pipeline
+### 3. Two modes：Manual（default）和 Pipeline
 
 | Mode | Server | Port | Browser default |
 |------|--------|------|-----------------|
-| **Manual** _(default)_ | User-started | Use preferred port as-is; user controls | Asks: headed or headless |
-| **Pipeline** _(`mode:pipeline`)_ | Auto-started in background | Scans for free port; never assumes 3000 is free | Defaults to headless |
+| **Manual** _(default)_ | 用户启动 | 直接使用 preferred port；用户控制 | 询问 headed or headless |
+| **Pipeline** _(`mode:pipeline`)_ | 后台 auto-started | 扫描 free port；不假设 3000 空闲 | 默认 headless |
 
-Pipeline mode exists for LFG and other automated runners where multiple agents may be on the same machine and 3000 might be claimed.
+Pipeline mode 面向 LFG 和其他 automated runners：同一机器可能有多个 agents，3000 可能被占用。
 
-### 4. Port detection cascade
+### 4. Port detection cascade（port 检测级联）
 
-The preferred port comes from a priority list:
+Preferred port 来源优先级：
 
-1. Explicit argument (`--port 5000`)
-2. Project instructions (`AGENTS.md`, `CLAUDE.md`)
-3. `package.json` (dev/start scripts)
-4. Environment files (`.env`, `.env.local`, `.env.development`)
-5. Default `3000`
+1. Explicit argument（显式参数，例如 `--port 5000`）
+2. Project instructions（项目说明，例如 `AGENTS.md`、`CLAUDE.md`）
+3. `package.json`（dev/start scripts，dev/start 脚本）
+4. Environment files（环境文件，例如 `.env`、`.env.local`、`.env.development`）
+5. Default `3000`（默认 `3000`）
 
-In pipeline mode, the skill verifies that port is actually free and scans upward if not. In manual mode, it uses the preferred port as-is — the user controls their own server.
+Pipeline mode 会验证该 port 是否空闲，不空闲则向上扫描。Manual mode 直接使用 preferred port，因为 server 由用户控制。
 
-### 5. Headed vs headless choice
+### 5. Headed vs headless choice（可见或无头运行）
 
-In manual mode, the skill asks whether to run **headed** (visible browser, watch tests run) or **headless** (faster, runs in background). Headed mode is useful when you're iterating on a tricky interaction and need to see what's happening. Headless is faster for routine sweeps.
+Manual mode 中，skill 会询问运行 **headed**（可见 browser，可观看 tests）还是 **headless**（更快、后台运行）。Headed 适合 tricky interaction 的迭代；headless 适合 routine sweeps。
 
-### 6. Human verification for external flows
+### 6. Human verification for external flows（外部流程人工确认）
 
-Some flows can't be automated:
+一些 flows 无法自动化：
 
-| Flow | What human verification asks |
+| Flow | Human verification 会询问内容 |
 |------|------------------------------|
 | OAuth | "Please sign in with [provider] and confirm it works" |
 | Email | "Check your inbox for the test email and confirm receipt" |
@@ -109,130 +109,130 @@ Some flows can't be automated:
 | SMS | "Verify you received the SMS code" |
 | External APIs | "Confirm the [service] integration is working" |
 
-The skill pauses with a blocking question, the user does the thing, then answers yes (continue) or no (describe issue). External flows become explicit rather than silently skipped.
+Skill 用 blocking question 暂停；用户完成操作后回答 yes（continue）或 no（describe issue）。External flows 因此显式化，而不是 silently skipped。
 
-### 7. Failure handling — fix now or skip
+### 7. Failure handling（失败处理）：fix now or skip
 
-When a route fails (console error, missing element, broken interaction), the skill captures error state (screenshot + reproduction steps) and asks: fix now (debug, propose fix, retest) or skip (continue testing other pages). Either path is valid; the choice is explicit.
+Route 失败时（console error、missing element、broken interaction），skill 捕获 error state（screenshot + reproduction steps），并询问：fix now（debug、propose fix、retest）或 skip（继续测试其他 pages）。两条路都有效；关键是 choice explicit。
 
-### 8. Structured test summary
+### 8. Structured test summary（结构化测试摘要）
 
-After all routes are tested, a markdown summary lands:
+所有 routes 测完后，输出 markdown summary：
 
-- Test scope (PR / branch)
-- Server URL
-- Per-route status table (Pass / Fail / Skip with notes)
-- Console errors found
-- Human verifications completed
-- Failures (route + issue description)
-- Overall result (PASS / FAIL / PARTIAL)
+- Test scope（PR / branch；测试范围）
+- Server URL（server URL，server 地址）
+- Per-route status table（Pass / Fail / Skip with notes；逐 route 状态表）
+- Console errors found（发现的 console errors）
+- Human verifications completed（已完成的 human verifications）
+- Failures（route + issue description；失败项）
+- Overall result（PASS / FAIL / PARTIAL；整体结果）
 
-Suitable for pasting into a PR description as test evidence.
-
----
-
-## Quick Example
-
-You finish a notification settings page and a layout change. You invoke `/ce-test-browser`.
-
-The skill verifies `agent-browser` is installed. Asks whether to run headed or headless — you pick headed (you want to watch). Determines test scope from `git diff --name-only main...HEAD`: `app/views/layouts/application.html.erb`, `app/views/settings/notifications.html.erb`, `app/javascript/controllers/notification_toggle_controller.js`.
-
-Maps to routes: `/` (layout change affects every page; test homepage), `/settings/notifications` (the new page), and other pages that render the toggle controller. Detects port 3000 from `bin/dev` config; verifies the user's dev server is running on that port.
-
-Tests each route: opens with `agent-browser open`, calls `agent-browser snapshot -i` for the interactive element list, verifies primary content rendered. Takes screenshots. Exercises the toggle on `/settings/notifications` (`agent-browser click @e3`).
-
-The settings flow includes an OAuth sign-in step in this app — when the test reaches a protected route, the skill pauses for human verification: "Please sign in with Google and confirm the redirect back works." You do it on the visible browser; answer yes.
-
-All routes pass. Summary surfaces: 4 routes tested, 0 console errors, 1 human verification confirmed, overall PASS.
+可直接放入 PR description 作为 test evidence。
 
 ---
 
-## When to Reach For It
+## 快速示例
 
-Reach for `ce-test-browser` when:
+你完成 notification settings page 和 layout change，调用 `/ce-test-browser`。
 
-- You changed views, components, controllers, layouts, or stylesheets and want to verify pages still work
-- You want to exercise the actual UI before opening the PR
-- The change touches OAuth, payments, or other external flows that need human-in-the-loop verification
-- You want test evidence (per-page status + screenshots) for the PR description
+Skill 验证 `agent-browser` 已安装。询问 headed 或 headless；你选择 headed，因为想观看过程。它从 `git diff --name-only main...HEAD` 判断 test scope：`app/views/layouts/application.html.erb`、`app/views/settings/notifications.html.erb`、`app/javascript/controllers/notification_toggle_controller.js`。
 
-Skip `ce-test-browser` when:
+映射 routes：`/`（layout change 影响所有页面，至少 test homepage）、`/settings/notifications`（new page），以及使用 toggle controller 的其他 pages。它从 `bin/dev` config 检测 port 3000，并验证用户 dev server 正在该 port 运行。
 
-- The change is backend-only (no observable browser-visible behavior)
-- `agent-browser` isn't installed → run `/ce-setup` first
-- You want unit / integration tests, not E2E → use the project's test runner
-- The dev server can't be brought up locally (cloud-only setup) → use a different testing approach
+它逐个 route 测试：`agent-browser open`，`agent-browser snapshot -i` 获取 interactive element list，验证 primary content rendered。截图。然后在 `/settings/notifications` 上 exercise toggle（`agent-browser click @e3`）。
+
+Settings flow 包含 OAuth sign-in step；测试到 protected route 时，skill 暂停 human verification："Please sign in with Google and confirm the redirect back works." 你在可见 browser 中完成，然后回答 yes。
+
+所有 routes pass。Summary 显示：4 routes tested、0 console errors、1 human verification confirmed、overall PASS。
 
 ---
 
-## Use as Part of the Workflow
+## 何时使用
 
-`ce-test-browser` is invoked at the verification side of the chain:
+在以下情况使用 `ce-test-browser`：
 
-- **`/ce-code-review` Tier 2** — for browser-affecting PRs, can spawn this skill to verify behavior in addition to static review
-- **`/ce-work` Phase 3** — appropriate before opening the PR for UI-heavy work; the test summary becomes part of the PR description's verification narrative
+- 改了 views、components、controllers、layouts 或 stylesheets，想验证页面仍工作
+- 打开 PR 前想 exercise actual UI
+- Change 触及 OAuth、payments 或其他需要 HITL verification 的 external flows
+- 想为 PR description 提供 test evidence（per-page status + screenshots）
 
-`mode:report-only` for `ce-code-review` is the only review mode safe to run concurrently with this skill on the same checkout — other modes mutate, which would interfere with the running dev server's state.
+以下情况跳过 `ce-test-browser`：
 
----
-
-## Use Standalone
-
-The skill works directly:
-
-- **Current branch** — `/ce-test-browser`
-- **Specific PR** — `/ce-test-browser 847`
-- **Specific branch** — `/ce-test-browser feature/new-dashboard`
-- **Custom port** — `/ce-test-browser --port 5000`
-- **Pipeline mode** — `/ce-test-browser mode:pipeline` (auto-starts server, scans for free port)
-
-When the dev server isn't running in manual mode, the skill informs the user with the right start command and stops. In pipeline mode, the skill auto-starts via `bin/dev`, `bin/rails server`, or `npm run dev` (whichever the project uses).
+- Change backend-only，没有 observable browser-visible behavior
+- `agent-browser` 未安装 -> 先运行 `/ce-setup`
+- 想要 unit / integration tests，而不是 E2E -> 使用 project test runner
+- Dev server 无法本地启动（cloud-only setup）-> 使用其他 testing approach
 
 ---
 
-## Reference
+## 作为 Workflow 的一部分使用
 
-| Argument | Effect |
+`ce-test-browser` 位于 chain 的 verification 侧：
+
+- **`/ce-code-review` Tier 2**：browser-affecting PRs 可 spawn 此 skill 来验证 behavior，补充 static review
+- **`/ce-work` Phase 3**：UI-heavy work 打开 PR 前很适合；test summary 成为 PR description 的 verification narrative
+
+`ce-code-review` 只有 `mode:report-only` 是与此 skill 在同一 checkout 并发运行安全的 review mode；其他 modes 会 mutate，干扰 running dev server state。
+
+---
+
+## 单独使用
+
+Skill 可直接运行：
+
+- **Current branch（当前 branch）**：`/ce-test-browser`
+- **Specific PR（指定 PR）**：`/ce-test-browser 847`
+- **Specific branch（指定 branch）**：`/ce-test-browser feature/new-dashboard`
+- **Custom port（自定义 port）**：`/ce-test-browser --port 5000`
+- **Pipeline mode**：`/ce-test-browser mode:pipeline`（auto-starts server，扫描 free port）
+
+Manual mode 中 dev server 未运行时，skill 会告知正确 start command 并停止。Pipeline mode 会通过 `bin/dev`、`bin/rails server` 或 `npm run dev`（project-detected）auto-start。
+
+---
+
+## 参考
+
+| 参数 | 效果 |
 |----------|--------|
-| _(empty)_ | Tests current branch's changes |
-| `<PR number>` | Tests that PR's affected routes |
-| `<branch name>` | Tests that branch's affected routes |
-| `current` | Tests current branch (explicit) |
-| `--port <number>` | Override port detection |
-| `mode:pipeline` | Auto-start server, scan for free port, default headless |
+| _(empty)_ | 测试 current branch 的 changes |
+| `<PR number>` | 测试该 PR 影响的 routes |
+| `<branch name>` | 测试该 branch 影响的 routes |
+| `current` | 测试 current branch（explicit） |
+| `--port <number>` | 覆盖 port detection |
+| `mode:pipeline` | Auto-start server，scan for free port，default headless |
 
-Required: `agent-browser` CLI installed (run `/ce-setup` if missing). Local dev server running (manual mode) or available start command (pipeline mode).
+Required：已安装 `agent-browser` CLI（缺失时运行 `/ce-setup`）。Manual mode 需要 local dev server running；pipeline mode 需要可用 start command。
 
-Key `agent-browser` commands the skill uses: `open <url>`, `snapshot -i` (interactive elements with refs `@e1`, `@e2`), `click @ref`, `fill @ref "text"`, `screenshot out.png`, `screenshot --full`, `--headed` flag for visible browser.
-
----
-
-## FAQ
-
-**Why `agent-browser` exclusively?**
-Predictable behavior across platforms and modes. Falling back to Chrome MCP or IDE built-ins means three tools' quirks instead of one. The skill is explicit about it: do not use `mcp__claude-in-chrome__*` in Claude Code; do not substitute unrelated browsing tools in Codex.
-
-**Headed or headless?**
-Headed when you're iterating on a tricky interaction and need to see what's happening. Headless when you want speed for a routine sweep. Manual mode asks; pipeline mode defaults to headless.
-
-**What does pipeline mode do differently?**
-Pipeline mode is for automated runners (LFG, multi-agent on the same machine) where 3000 might be claimed. It scans for a free port starting from the preferred one, auto-starts the dev server in the background, defaults to headless, and skips the headed/headless question.
-
-**What if my project layout doesn't match the file-to-route table?**
-The mapping table is a starting point. The skill applies judgment for project-specific layouts. You can also test specific routes directly by adjusting the test scope detection — e.g., reviewing a known-affected route by passing the branch name.
-
-**What if the dev server isn't running?**
-Manual mode informs you with the right start command and stops. Pipeline mode auto-starts it via `bin/dev`, `bin/rails server`, or `npm run dev` (project-detected) and waits up to 30 seconds for the server to come up.
-
-**Can it run concurrent with `ce-code-review`?**
-Only when code review uses `mode:report-only` (read-only). Other review modes mutate the checkout, which would break the running dev server's state. Pair browser tests with read-only review, or run code review separately in an isolated worktree.
+Skill 使用的关键 `agent-browser` commands：`open <url>`、`snapshot -i`（interactive elements with refs `@e1`, `@e2`）、`click @ref`、`fill @ref "text"`、`screenshot out.png`、`screenshot --full`、visible browser 的 `--headed` flag。
 
 ---
 
-## See Also
+## 常见问题
 
-- [`ce-code-review`](./ce-code-review.md) — can spawn this skill for browser-affecting PRs (use `mode:report-only` for concurrent runs on the same checkout)
-- [`ce-test-xcode`](./ce-test-xcode.md) — sibling skill for iOS simulator testing
-- [`ce-demo-reel`](./ce-demo-reel.md) — captures visual evidence for PR descriptions; complementary to test summary
-- [`ce-work`](./ce-work.md) — orchestrator that may invoke this skill during Phase 3 verification
-- [`ce-setup`](./ce-setup.md) — installs `agent-browser` and other dependencies
+**为什么只用 `agent-browser`？**
+为了跨 platforms 和 modes 的 predictable behavior。Fallback 到 Chrome MCP 或 IDE built-ins 意味着处理三个工具的 quirks，而不是一个。Skill 明确要求：Claude Code 中不要用 `mcp__claude-in-chrome__*`；Codex 中不要替换成无关 browsing tools。
+
+**Headed 还是 headless？**
+Tricky interaction 迭代时选 headed，因为你需要看发生了什么。Routine sweep 想要速度时选 headless。Manual mode 会询问；pipeline mode 默认 headless。
+
+**Pipeline mode 有什么不同？**
+Pipeline mode 面向 automated runners（LFG、同一机器 multi-agent），3000 可能被占用。它从 preferred port 开始扫描 free port，后台 auto-start dev server，默认 headless，并跳过 headed/headless 问题。
+
+**如果 project layout 不匹配 file-to-route table 怎么办？**
+Mapping table 是 starting point。Skill 会对 project-specific layouts 做判断。你也可以通过调整 test scope detection 来直接测试 known-affected route，例如传 branch name review。
+
+**Dev server 没跑怎么办？**
+Manual mode 会给出正确 start command 并停止。Pipeline mode 会根据 project detection 通过 `bin/dev`、`bin/rails server` 或 `npm run dev` auto-start，并等待最多 30 秒。
+
+**能和 `ce-code-review` 并发吗？**
+只有 code review 使用 read-only 的 `mode:report-only` 时可以。其他 review modes 会 mutate checkout，破坏 running dev server state。要么配合 read-only review，要么在 isolated worktree 中分开运行。
+
+---
+
+## 另见
+
+- [`ce-code-review`](./ce-code-review.md) - 可为 browser-affecting PRs spawn 此 skill（同一 checkout 并发时使用 `mode:report-only`）
+- [`ce-test-xcode`](./ce-test-xcode.md) - iOS simulator testing 的 sibling skill
+- [`ce-demo-reel`](./ce-demo-reel.md) - 捕获 PR descriptions 的 visual evidence；complementary to test summary
+- [`ce-work`](./ce-work.md) - Phase 3 verification 中可能调用此 skill 的 orchestrator
+- [`ce-setup`](./ce-setup.md) - 安装 `agent-browser` 和其他 dependencies

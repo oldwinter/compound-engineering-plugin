@@ -1,108 +1,108 @@
-# HITL Review Mode
+# HITL Review Mode（人工参与 Review 模式）
 
-Human-in-the-loop iteration loop for a markdown document shared via Proof. Invoked either by an upstream skill (`ce-brainstorm`, `ce-ideate`, `ce-plan`) handing off a draft it produced, or directly by the user asking to iterate on an existing markdown file they already have on disk ("share this to proof and iterate", "HITL this doc with me"). Mechanics are identical in both cases: upload the local doc, let the user annotate in Proof's web UI, ingest feedback as in-thread replies and agreed edits, and sync the final doc back to disk.
+面向通过 Proof 共享的 markdown document 的 human-in-the-loop iteration loop。它可以由 upstream skill（`ce-brainstorm`、`ce-ideate`、`ce-plan`）交接自己生成的 draft 调用，也可以由用户直接要求迭代磁盘上已有 markdown 文件时调用（“share this to proof and iterate”、“HITL this doc with me”）。两种情况的 mechanics 相同：上传 local doc，让用户在 Proof 的 web UI 中批注，摄取 feedback 作为 in-thread replies 和 agreed edits，再把 final doc sync 回磁盘。
 
-This mode assumes a local markdown file exists. There is no "from scratch" entry — if the user wants a fresh doc, create one with the normal proof create workflow first, then invoke HITL.
+此 mode 假设本地 markdown file 已存在。没有 “from scratch” entry；如果用户想要 fresh doc，先用常规 proof create workflow 创建，再调用 HITL。
 
-Load this file when HITL review mode is requested — whether by an upstream caller or directly by the user.
+当请求 HITL review mode 时加载此文件——不管是 upstream caller 还是用户直接请求。
 
 ---
 
-## Invocation Contract
+## Invocation Contract（调用契约）
 
-Inputs:
+Inputs（输入）：
 
-- **Source file path** (required): absolute or repo-relative path to the local markdown file. When an upstream caller invokes this mode, it passes the path explicitly. When the user invokes directly ("share that doc to proof and let's iterate"), derive the path from conversation context — the file the user just referenced, created, or edited. If ambiguous, ask the user which file.
-- **Doc title** (required): display title for the Proof doc. Upstream callers pass this explicitly; on direct-user invocation, default to the file's H1 heading, falling back to the filename (minus extension) if no H1 exists.
-- **Recommended next step** (optional, caller-specific): short string the caller wants echoed in the final terminal output (e.g., "Recommended next: `/ce-plan`"). Not used on direct-user invocation — the terminal report simply summarizes the iteration and asks what's next.
+- **Source file path**（required）：本地 markdown file 的 absolute 或 repo-relative path。upstream caller 调用此 mode 时会显式传入 path。用户直接调用时（“share that doc to proof and let's iterate”），从 conversation context 推导 path：用户刚刚引用、创建或编辑的文件。如果有歧义，询问用户是哪一个文件。
+- **Doc title**（required）：Proof doc 的 display title。Upstream callers 会显式传入；direct-user invocation 默认用文件的 H1 heading；如果没有 H1，则 fallback 到 filename（去掉 extension）。
+- **Recommended next step**（optional，caller-specific）：caller 希望在 final terminal output 中回显的短字符串（例如 “Recommended next: `/ce-plan`”）。direct-user invocation 不使用；terminal report 只总结 iteration 并询问下一步。
 
-Agent identity is fixed, not a parameter: every API call uses agent ID `ai:compound-engineering` and display name `Compound Engineering`. Callers do not override this.
+Agent identity 固定，不是参数：每个 API call 都使用 agent ID `ai:compound-engineering` 和 display name `Compound Engineering`。Callers 不覆盖它。
 
-Return shape (used by upstream callers to resume their handoff; also shown to the user in the terminal when invoked directly):
+Return shape（返回结构，供 upstream callers 恢复 handoff，也会在 direct invocation 时显示给 terminal 用户）：
 
 - `status`: `proceeded` | `done_for_now` | `aborted`
-- `localPath`: the source file path (same as input)
-- `localSynced`: `true` if Phase 5 wrote the reviewed doc back to `localPath`; `false` if the user declined the sync and local is stale. Only present on `proceeded`.
-- `docUrl`: the tokenUrl for the Proof doc
-- `openThreadCount`: number of unresolved threads still in the doc
-- `revision`: final doc revision after end-sync (only on `proceeded`)
+- `localPath`: source file path（与 input 相同）
+- `localSynced`: 如果 Phase 5 已把 reviewed doc 写回 `localPath`，为 `true`；如果用户拒绝 sync 且 local 已 stale，为 `false`。仅在 `proceeded` 时出现。
+- `docUrl`: Proof doc 的 tokenUrl
+- `openThreadCount`: doc 中 unresolved threads 数量
+- `revision`: end-sync 后的 final doc revision（仅在 `proceeded` 时）
 
 ---
 
-## Phase 1: Upload and Wait
+## Phase 1：Upload and Wait（上传并等待）
 
-1. Read the local markdown file into memory. Remember this content as `uploadedMarkdown` — Phase 5 compares against it to detect whether anything changed during the session.
-2. `POST https://www.proofeditor.ai/share/markdown` with `{title, markdown}` → capture `slug`, `accessToken`, `tokenUrl`
-3. `POST /api/agent/{slug}/presence` with `X-Agent-Id: ai:compound-engineering`, `x-share-token: <token>`, body `{"name":"Compound Engineering","status":"reading","summary":"Uploaded doc for review"}`
-4. Display prominently in the terminal:
+1. 读取本地 markdown file 到内存。把这份内容记为 `uploadedMarkdown`——Phase 5 会用它比较 session 中是否发生了任何变化。
+2. `POST https://www.proofeditor.ai/share/markdown`，body 为 `{title, markdown}` → 捕获 `slug`、`accessToken`、`tokenUrl`
+3. `POST /api/agent/{slug}/presence`，带 `X-Agent-Id: ai:compound-engineering`、`x-share-token: <token>`，body 为 `{"name":"Compound Engineering","status":"reading","summary":"Uploaded doc for review"}`
+4. 在 terminal 中醒目展示：
 
    ```
    Doc ready for review: <tokenUrl>
    ```
 
-5. Ask the user with the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
+5. 使用平台阻塞式问题工具询问用户：Claude Code 中为 `AskUserQuestion`（如果 schema 未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`），Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`（需 `pi-ask-user` extension）。只有在 harness 中不存在 blocking tool 或调用报错时（例如 Codex edit modes），才 fallback 到在 chat 中展示 options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
 
-   **Question:** "Highlight text in Proof to leave a comment. The agent will read each one, reply in-thread or apply the fix, then sync changes back to your local file. What's next?"
+   **Question（问题）:** "在 Proof 中高亮文本即可留下 comment。agent 会读取每条 comment，在线程中回复或应用 fix，然后把 changes sync 回你的本地文件。下一步怎么做？"
 
-   **Options:**
-   - **I'm done with feedback — read it and apply**
-   - **I have no feedback — proceed**
+   **Options（选项）:**
+   - **我已经完成 feedback — 读取并应用**
+   - **我没有 feedback — 继续**
 
-   If the user is still reviewing, they leave the prompt open — the blocking question waits naturally. A third "still working" option would be a no-op wrapper for that.
+   如果用户仍在 reviewing，他们会让 prompt 保持打开；blocking question 会自然等待。第三个 “still working” option 只是 no-op wrapper，不需要提供。
 
-   On **I have no feedback — proceed**: skip to Phase 5 (end-sync); return to caller with `status: proceeded`.
+   选择 **我没有 feedback — 继续**：跳到 Phase 5（end-sync）；以 `status: proceeded` 返回 caller。
 
-   On **I'm done with feedback**: continue to Phase 2.
+   选择 **我已经完成 feedback**：继续 Phase 2。
 
 ---
 
-## Phase 2: Ingest Pass
+## Phase 2：Ingest Pass（摄取回合）
 
-A single pass over the current doc state. Deterministic, idempotent, derivable from marks — no session cache, no sidecar state.
+对当前 doc state 做一次 pass。Deterministic、idempotent，且可从 marks 推导——没有 session cache，没有 sidecar state。
 
-At the start of the pass, update presence to `status: "acting"` with a short summary like `"Reading your feedback"` so anyone watching the Proof tab sees the agent is live on their comments. Update to `status: "waiting"` before the Phase 3 terminal report so the tab signals "ball is in your court" while the terminal asks for the next signal. Same `POST /presence` call as Phase 1 — just different `status`/`summary`.
+pass 开始时，将 presence 更新为 `status: "acting"`，summary 类似 `"Reading your feedback"`，这样正在看 Proof tab 的人会看到 agent 正在处理他们的 comments。在 Phase 3 terminal report 之前更新为 `status: "waiting"`，这样 tab 会在 terminal 询问下一步信号时显示 “ball is in your court”。使用与 Phase 1 相同的 `POST /presence` call，只是 `status`/`summary` 不同。
 
-### 2.1 Read fresh state
+### 2.1 读取 fresh state
 
 ```
 GET /api/agent/{slug}/state?kinds=comment
 Headers: x-share-token: <token>
 ```
 
-Capture:
-- `markdown` (current body — includes any user direct edits and accepted suggestions)
+捕获：
+- `markdown`（当前正文——包含任何用户 direct edits 和 accepted suggestions）
 - `revision`
-- `marks` (object keyed by markId, filtered to comment marks)
-- `mutationBase.token` — the baseToken required for this round's mutations
+- `marks`（以 markId 为 key 的 object，filtered to comment marks）
+- `mutationBase.token`——本轮 mutations 所需的 baseToken
 
-### 2.2 Identify marks that need attention
+### 2.2 识别需要 attention 的 marks
 
-Filter `marks` to items where **all** of the following hold:
+把 `marks` 过滤为同时满足以下条件的 items：
 
-- `kind` is `comment` (the `?kinds=comment` read should already guarantee this, but keep the local guard)
-- `by` starts with `human:` (authored by a human, not the agent)
-- `resolved` is `false`
-- Either `thread` has no entry authored by any `ai:*` identity, **OR** the latest entry in `thread` is authored by `human:*` with an `at` timestamp newer than the latest `ai:*` entry (user responded to a prior agent reply)
+- `kind` 是 `comment`（`?kinds=comment` 读取应已保证这一点，但保留 local guard）
+- `by` 以 `human:` 开头（由 human authored，而不是 agent）
+- `resolved` 是 `false`
+- 要么 `thread` 中没有任何 `ai:*` identity authored 的 entry，**要么** `thread` 最新 entry 是 `human:*` authored，且其 `at` timestamp 新于最新 `ai:*` entry（用户回复了先前的 agent reply）
 
-Skip everything else. Agent-authored marks, resolved threads, non-comment marks, and threads already replied to with no new human response are done. Do not build needs-reply filters from `by` alone — Proof's full `marks` bag can include provenance/authored marks that share a `human:` prefix but are not review comments.
+跳过其他所有内容。Agent-authored marks、resolved threads、non-comment marks，以及已经回复且没有新 human response 的 threads 都已完成。不要只根据 `by` 构造 needs-reply filters：Proof 的完整 `marks` bag 可能包含 provenance/authored marks，它们也共享 `human:` prefix，但不是 review comments。
 
-### 2.3 Read each mark and decide how to respond
+### 2.3 阅读每个 mark 并决定如何回应
 
-The point of HITL is to give the user a natural way to steer the doc without dragging every decision into the terminal. Most feedback can be auto-applied. Only escalate when the agent genuinely can't make a confident call alone.
+HITL 的重点是给用户一个自然方式来 steer 文档，而不把每个 decision 都拖入 terminal。大多数 feedback 可以 auto-apply。只有当 agent 确实无法自信决策时才 escalate。
 
-Real feedback blends types — "this is wrong, rename to Y" is both objection and directive; "why X? I'd prefer Z" is both question and suggestion. Don't force a clean classification. Read the comment text, the anchored `quote`, and any prior thread replies, and decide:
+真实 feedback 会混合多种类型——“this is wrong, rename to Y” 同时是 objection 和 directive；“why X? I'd prefer Z” 同时是 question 和 suggestion。不要强行 clean classification。阅读 comment text、anchored `quote` 和 prior thread replies，然后决定：
 
-**Can the agent apply a fix directly with confidence?** Imperatives ("rename X to Y", "remove this", "add a section about Z") usually qualify. Apply the edit, reply with a one-line summary of what changed, resolve.
+**Can the agent apply a fix directly with confidence?（agent 能否有信心直接应用 fix？）** Imperatives（“rename X to Y”、“remove this”、“add a section about Z”）通常符合。应用 edit，用一行 summary 回复改了什么，然后 resolve。
 
-**Is this a question with a clear answer?** Answer in-thread. Resolve if the answer stands on its own. If answering surfaces a new decision the user should weigh in on, leave open and surface it in the terminal report.
+**Is this a question with a clear answer?（这是否是有清晰答案的问题？）** 在 thread 中回答。如果答案自足，resolve。如果回答暴露出需要用户参与的新 decision，则保持 open，并在 terminal report 中展示。
 
-**Is this a disagreement?** ("this is wrong", "contradicts §2", "this won't work"). Evaluate the claim against current content. If the agent agrees, fix and reply "Agreed — updated to X". If the agent disagrees, reply with the reasoning and leave open. Don't silently apply an objection without evaluating it — the whole point is that the user flagged it *because* they think the plan is wrong.
+**Is this a disagreement?（这是否是 disagreement？）**（“this is wrong”、“contradicts §2”、“this won't work”）。根据当前 content 评估 claim。如果 agent 同意，则 fix 并回复 “Agreed — updated to X”。如果 agent 不同意，回复 reasoning 并保持 open。不要在不评估的情况下静默应用 objection——用户标记它，正是因为他们认为 plan 错了。
 
-**Is the intent genuinely unclear?** First try: attempt the most reasonable interpretation, apply it, and reply "I read this as X — let me know if I should revert." That's cheaper than a round-trip when stakes are low. Ask for clarification only when the interpretations lead to meaningfully different outcomes. When asking, use the platform's blocking question tool for a quick multiple-choice when the options are discrete, or leave it as an open thread comment when free-form response is more natural. Either way the thread stays open so the next pass picks up the user's reply.
+**Is the intent genuinely unclear?（intent 是否真的不清楚？）** 第一尝试：采用最合理 interpretation，应用它，并回复 “I read this as X — let me know if I should revert.” 低风险场景下这比 round-trip 更便宜。只有当多种 interpretations 会导致 meaningfully different outcomes 时，才请求 clarification。询问时，如果 options 离散，使用平台 blocking question tool 做快速 multiple-choice；如果 free-form response 更自然，则留作 open thread comment。无论哪种方式，thread 保持 open，以便下一 pass 捕捉用户回复。
 
-**Invariant:** every attention-needing mark ends the pass with an agent reply in its thread. Unreplied = "still to do" — the next pass re-classifies it. This is what makes the loop idempotent without a sidecar: mark state *is* the state. Even when the agent disagrees or can't decide, reply (with reasoning or a question) rather than silently skip.
+**Invariant:** 每个需要 attention 的 mark 在本 pass 结束时都必须有 agent reply。Unreplied = “still to do”——下一 pass 会重新 classify。即使 agent 不同意或无法决定，也要 reply（带 reasoning 或 question），不要静默 skip。
 
-**Batch thread replies and resolves.** Build all thread responses during the pass, then write them with a single `/ops` batch whenever possible. `comment.reply` accepts `resolve: true`, so a handled thread should usually be one operation, not `reply` plus `resolve`. The batched `/ops` shape uses one `baseToken` and one mutation:
+**Batch thread replies and resolves.** 在 pass 中构建所有 thread responses，然后尽可能用单个 `/ops` batch 写入。`comment.reply` 支持 `resolve: true`，因此一个 handled thread 通常应是一个 operation，而不是 `reply` 加 `resolve` 两个 operation。batched `/ops` shape 使用一个 `baseToken` 和一个 mutation：
 
 ```json
 {"by":"ai:compound-engineering","baseToken":"<token>","operations":[
@@ -111,28 +111,28 @@ Real feedback blends types — "this is wrong, rename to Y" is both objection an
 ]}
 ```
 
-Only include existing-thread comment mutations in a batch: `comment.reply`, `comment.resolve`, and `comment.unresolve`. Leave `resolve` off (or set it false) when the thread remains open for a user decision. This replaces the older pattern of N separate reply/resolve calls or sub-agent parallelism; batching is faster, easier to reason about, and creates one authoritative marks mutation.
+batch 中只包含 existing-thread comment mutations：`comment.reply`、`comment.resolve` 和 `comment.unresolve`。当 thread 仍需用户 decision 而保持 open 时，不带 `resolve`（或设为 false）。这替代旧的 N 个 separate reply/resolve calls 或 sub-agent parallelism；batching 更快、更容易推理，并产生一个 authoritative marks mutation。
 
-### 2.4 Apply edits
+### 2.4 应用 edits
 
-The user is collaborating in the doc, not waiting on approval. Every mutation works with live clients — only whole-doc `rewrite.apply` is gated. Pick the tool that matches intent:
+用户正在 doc 中协作，不是在等待 approval。每个 mutation 都与 live clients 协同工作——只有 whole-doc `rewrite.apply` 被 gated。按 intent 选择工具：
 
-**Default: `/edit/v2` for agent-applied content changes.** The comment thread is the review/audit trail: the user asked for the change, the agent applies it, then replies in-thread with what changed. Use block edits for direct fixes, insertions, deletions, and coordinated rewrites so the doc does not accumulate extra suggestion marks for work the user already requested.
+**Default: 对 agent-applied content changes 使用 `/edit/v2`。** comment thread 是 review/audit trail：用户请求变更，agent 应用变更，然后在 thread 中回复改了什么。对 direct fixes、insertions、deletions 和 coordinated rewrites 使用 block edits，避免 doc 为用户已请求的 work 积累额外 suggestion marks。
 
-**Use `suggestion.add` with `status: "accepted"`** when a visible track-change mark is itself valuable — for example, the user asked to preserve a reject-to-revert affordance for a specific edit, or the change is judgment-sensitive enough that the visible suggestion trail is clearer than only replying in the comment thread. One call creates the suggestion mark *and* commits the change.
+**Use `suggestion.add` with `status: "accepted"`** 当 visible track-change mark 本身有价值时——例如用户请求为某个具体 edit 保留 reject-to-revert affordance，或该 change 足够 judgment-sensitive，visible suggestion trail 比只在 comment thread 中回复更清楚。一次 call 会创建 suggestion mark 并提交 change。
 
 ```json
 {"type":"suggestion.add","kind":"replace","quote":"<anchor>","content":"<new>","by":"ai:compound-engineering","status":"accepted","baseToken":"<token>"}
 ```
 
-Use `kind: "insert" | "delete" | "replace"` as appropriate; all three support `status: "accepted"`.
+按需使用 `kind: "insert" | "delete" | "replace"`；三者都支持 `status: "accepted"`。
 
-**Use `/edit/v2` especially when:**
+**尤其在以下情况使用 `/edit/v2`：**
 
-- **Atomicity is required** — multiple coordinated edits must commit together or not at all (e.g., insert new section + update a reference in another block + delete the obsolete paragraph). `/edit/v2` takes an `operations` array that commits atomically; separate `suggestion.add` calls can partially succeed.
-- **Pre-user self-correction** — the agent is fixing its own output *before* the user has looked at the doc (e.g., spotted a mistake mid-ingest-pass). A tracked mark would imply "there was an old version," which is misleading from the user's perspective.
-- **Pure structural insertion with no quote anchor** — adding an entirely new block/section where no existing text serves as an anchor. `suggestion.add` requires a `quote`; `/edit/v2` has `insert_before` / `insert_after` keyed on block `ref`.
-- **Structural list-item or block removal** — `suggestion.add` with `kind: "delete"` only deletes the text inside a list item; the bullet marker (`*`, `-`, or numeric `1.`) stays behind as an orphan line. Use `/edit/v2 delete_block` to remove an entire block, or `find_replace_in_block` to splice out the item plus its surrounding whitespace cleanly.
+- **Atomicity is required** —— 多个 coordinated edits 必须一起 commit 或一起不 commit（例如 insert new section + update another block 中的 reference + delete obsolete paragraph）。`/edit/v2` 接受 `operations` array 并原子提交；separate `suggestion.add` calls 可能部分成功。
+- **Pre-user self-correction** —— agent 在用户看文档之前修正自己的 output（例如 ingest-pass 中发现错误）。tracked mark 会暗示“曾有旧版本”，从用户视角看会误导。
+- **Pure structural insertion with no quote anchor** —— 在没有 existing text 可作为 anchor 的地方添加全新 block/section。`suggestion.add` 需要 `quote`；`/edit/v2` 有基于 block `ref` 的 `insert_before` / `insert_after`。
+- **Structural list-item or block removal** —— `suggestion.add` with `kind: "delete"` 只删除 list item 内部 text；bullet marker（`*`、`-` 或 numeric `1.`）会作为 orphan line 留下。使用 `/edit/v2 delete_block` 删除整个 block，或用 `find_replace_in_block` 干净地移除 item 及其周围 whitespace。
 
 ```bash
 # Get snapshot for block refs + baseToken
@@ -144,7 +144,7 @@ curl -X POST "https://www.proofeditor.ai/api/agent/{slug}/edit/v2" \
   -d '{"by":"ai:compound-engineering","baseToken":"<token>","operations":[...]}'
 ```
 
-Per-op body shape (singular `block` for `replace_block`; plural `blocks:[{markdown},...]` for anything that can add content; the server returns 422 on the wrong shape):
+Per-op body shape（`replace_block` 使用 singular `block`；所有可添加 content 的操作使用 plural `blocks:[{markdown},...]`；shape 错误时 server 返回 422）：
 
 ```json
 {"op":"replace_block","ref":"b8","block":{"markdown":"new content"}}
@@ -156,113 +156,113 @@ Per-op body shape (singular `block` for `replace_block`; plural `blocks:[{markdo
 {"op":"replace_range","fromRef":"b2","toRef":"b5","blocks":[{"markdown":"..."}]}
 ```
 
-Block `ref` values are opaque request tokens tied to the snapshot/baseToken. Re-fetch `/snapshot` for fresh refs before another `/edit/v2` call if any writes have landed since the last snapshot. Full successful `/edit/v2` responses include a fresh `mutationBase.token` and, unless `?return=minimal` was used, a fresh snapshot for chaining.
+Block `ref` values 是绑定到 snapshot/baseToken 的 opaque request tokens。如果上次 snapshot 后已有任何 writes landed，则在下一次 `/edit/v2` call 前重新 fetch `/snapshot` 获取 fresh refs。完整成功的 `/edit/v2` responses 会包含 fresh `mutationBase.token`；除非使用了 `?return=minimal`，还会包含 fresh snapshot，便于 chaining。
 
-**Bulk mechanical sweep — prefer `find_replace_in_doc` when the rule is literal.** For terminology renames, punctuation swaps, or other literal doc-wide replacements, use one `/edit/v2` operation:
+**Bulk mechanical sweep —— 当规则是 literal 时优先使用 `find_replace_in_doc`。** 对 terminology renames、punctuation swaps 或其他 literal doc-wide replacements，使用一个 `/edit/v2` operation：
 
 ```json
 {"op":"find_replace_in_doc","find":"old term","replace":"new term","occurrence":"all"}
 ```
 
-Run the same payload through `/edit/v2?dryRun=1` first for large sweeps; dry-run returns `valid`, `appliedCount`, and per-op `results[]` without writing. For the real write, use `/edit/v2?return=minimal` when you only need `ok`, `revision`, `appliedCount`, and the next `mutationBase.token`. Responses with `operationResults` include per-block match counts; treat those refs as reporting/display data and re-read `/snapshot` before follow-up block-ref mutations.
+大型 sweeps 先通过 `/edit/v2?dryRun=1` 运行同一 payload；dry-run 返回 `valid`、`appliedCount` 和每个 op 的 `results[]`，不写入。真实写入时，如果只需要 `ok`、`revision`、`appliedCount` 和下一个 `mutationBase.token`，使用 `/edit/v2?return=minimal`。带 `operationResults` 的 responses 包含 per-block match counts；把这些 refs 只当作 reporting/display data，后续 block-ref mutations 前重新读取 `/snapshot`。
 
-When the edit is semantic rather than literal, batch `replace_block`, `insert_*`, `delete_block`, or `replace_range` operations in one `/edit/v2` call. Use `suggestion.add` + `accepted` when edits are distinct and each deserves its own visible reject-to-revert trail.
+当 edit 是 semantic 而不是 literal 时，在一个 `/edit/v2` call 中 batch `replace_block`、`insert_*`、`delete_block` 或 `replace_range` operations。当 edits 彼此独立且每个都值得自己的 visible reject-to-revert trail 时，使用 `suggestion.add` + `accepted`。
 
-**Use pending `suggestion.add` (no status)** when the change is judgment-sensitive enough that the agent wants explicit user approval before commit — rare in HITL, since the point of auto-applied edits is to reduce round-trips. Most judgment-sensitive cases are better handled by leaving the thread open with a clarifying question.
+**Use pending `suggestion.add`（no status）** 当 change 足够 judgment-sensitive，agent 希望在 commit 前获得 explicit user approval——这在 HITL 中很少见，因为 auto-applied edits 的目的就是减少 round-trips。大多数 judgment-sensitive cases 更适合通过 clarifying question 保持 thread open。
 
-**`rewrite.apply` is not needed during a live review.** It's blocked by `LIVE_CLIENTS_PRESENT` anyway.
+**live review 期间不需要 `rewrite.apply`。** 它也会被 `LIVE_CLIENTS_PRESENT` 阻塞。
 
-**Mutation requirements (every write, including replies and resolves):**
+**Mutation requirements（每次 write，包括 replies 和 resolves）：**
 
-- Top-level field is `type` on single `/ops` writes; top-level `operations` on `/ops` comment batches; `operations[].op` on `/edit/v2`. Do not mix `/ops` `type` entries with `/edit/v2` `op` entries.
-- Include `baseToken` from `/state.mutationBase.token` (or `/snapshot.mutationBase.token` for `/edit/v2`).
-- Set `by: "ai:compound-engineering"` and header `X-Agent-Id: ai:compound-engineering`.
-- Include an `Idempotency-Key` header. Reuse the same key only for an exact same-body resend; if you rebuild the body with a fresh `baseToken`, mint a new key.
-- Successful mutation responses include the next `mutationBase.token`; reuse it for the next write instead of re-reading only to get a token.
-- Reply and resolve together when done: `{"type":"comment.reply","markId":"<id>","text":"...","resolve":true}` inside a `/ops` batch. Reopen if needed: `{"type":"comment.unresolve", ...}`.
+- single `/ops` writes 的 top-level field 是 `type`；`/ops` comment batches 的 top-level 是 `operations`；`/edit/v2` 中是 `operations[].op`。不要混用 `/ops` 的 `type` entries 和 `/edit/v2` 的 `op` entries。
+- 包含来自 `/state.mutationBase.token` 的 `baseToken`（或 `/edit/v2` 用来自 `/snapshot.mutationBase.token` 的 token）。
+- 设置 `by: "ai:compound-engineering"` 和 header `X-Agent-Id: ai:compound-engineering`。
+- 包含 `Idempotency-Key` header。只有 exact same-body resend 才复用同一个 key；如果用 fresh `baseToken` 重建 body，就 mint new key。
+- 成功 mutation responses 包含下一个 `mutationBase.token`；下一次 write 直接复用它，不要只为获取 token 而重新读取。
+- 完成时 reply 和 resolve 放在一起：`{"type":"comment.reply","markId":"<id>","text":"...","resolve":true}` inside a `/ops` batch。需要 reopen 时用：`{"type":"comment.unresolve", ...}`。
 
-**Retry after any error is verify-first, not retry-first.** The Proof API can commit canonically and still return a non-2xx or a 202 with `collab.status: "pending"`; network timeouts can hit after the server has already written. Retrying without verifying is the most common cause of duplicate marks (same comment twice, same suggestion twice) that then need a manual cleanup pass.
+**Retry after any error is verify-first, not retry-first.** Proof API 可能已 canonically commit，但仍返回 non-2xx，或返回带 `collab.status: "pending"` 的 202；network timeouts 也可能发生在 server 已写入之后。不先 verify 就 retry，是产生 duplicate marks（同一 comment 两次、同一 suggestion 两次）的最常见原因，之后还要手动 cleanup。
 
-- On `STALE_BASE` / `BASE_TOKEN_REQUIRED` / `MISSING_BASE` / `INVALID_BASE_TOKEN`: pre-commit, token-related. Re-read `/state`, rebuild the request body with a fresh `baseToken`, and retry once with a new `Idempotency-Key`. The `mutate()` helper below auto-retries these.
-- On `ANCHOR_NOT_FOUND` / `ANCHOR_AMBIGUOUS`: pre-commit, but the `quote` no longer matches uniquely. Re-read is not enough; the caller must tighten or regenerate the anchor before retrying. The helper surfaces the error instead of auto-retrying.
-- On `INVALID_OPERATIONS` / `INVALID_REQUEST` / `INVALID_REF` / `INVALID_BLOCK_MARKDOWN` / `INVALID_RANGE` / `INVALID_MARKDOWN` / 422: the payload is wrong. Do not retry — fix the payload and send a new write.
-- On `COLLAB_SYNC_FAILED` / `REWRITE_BARRIER_FAILED` / `PROJECTION_STALE` / `INTERNAL_ERROR` / 5xx / network error / timeout / **202 with `collab.status: "pending"`**: the write may have landed. Re-read `/state`, diff against the intended change (mark exists? suggestion applied? quote replaced?), and only retry if the server did not actually commit it. If the diff shows the write did land, treat the call as successful even though the response said otherwise.
+- 对 `STALE_BASE` / `BASE_TOKEN_REQUIRED` / `MISSING_BASE` / `INVALID_BASE_TOKEN`：pre-commit、token-related。重新读取 `/state`，用 fresh `baseToken` 重建 request body，并用 new `Idempotency-Key` retry 一次。下方 `mutate()` helper 会自动 retry 这些。
+- 对 `ANCHOR_NOT_FOUND` / `ANCHOR_AMBIGUOUS`：pre-commit，但 `quote` 不再唯一匹配。只 re-read 不够；caller 必须 tighten 或 regenerate anchor 后再 retry。helper 会 surface error，而不是 auto-retry。
+- 对 `INVALID_OPERATIONS` / `INVALID_REQUEST` / `INVALID_REF` / `INVALID_BLOCK_MARKDOWN` / `INVALID_RANGE` / `INVALID_MARKDOWN` / 422：payload 错误。不要 retry——修复 payload 后发送新 write。
+- 对 `COLLAB_SYNC_FAILED` / `REWRITE_BARRIER_FAILED` / `PROJECTION_STALE` / `INTERNAL_ERROR` / 5xx / network error / timeout / **带 `collab.status: "pending"` 的 202**：write 可能已经 landed。重新读取 `/state`，对 intended change 做 diff（mark exists? suggestion applied? quote replaced?），只有当 server 确实没有 commit 时才 retry。如果 diff 显示 write 已 landed，即使 response 说失败，也视为成功。
 
-**When the loop breaks.** If a mutation keeps failing after a fresh read and a verified-needed retry, or two reads disagree about state, call `POST https://www.proofeditor.ai/api/bridge/report_bug` with the request ID, slug, and raw response body before falling back. Don't silently skip — that loses the audit trail the user is relying on.
-
----
-
-## Phase 3: Terminal Report
-
-Exception-based. Don't replay what the user can already see in the Proof doc — the full reasoning for each thread lives there. The terminal is for the decisions the user needs to make next.
-
-Every report covers three things, phrased naturally for the current state:
-
-- **What got handled** (e.g., how many comments resolved, any edits auto-applied)
-- **What's still open** — if any escalations remain, each one gets one line of anchored quote plus one line of the agent's reply or question. Fuller context stays in the Proof thread
-- **The doc URL** — always include it; the user may have closed the tab
-
-Keep the whole report scannable at a glance. Three common shapes fall out of this naturally:
-
-- A clean pass with everything handled collapses to a single line plus the doc URL
-- An escalation pass lists the open threads compactly after a one-line summary of what was handled
-- A pass with no new feedback just notes that and points to the doc
-
-Phrase them in whatever voice matches the situation rather than matching a template — "handled 4, 1 still needs you" and "all 5 addressed, doc's ready" are both fine.
+**When the loop breaks.** 如果 mutation 在 fresh read 和 verified-needed retry 后仍然失败，或两次 reads 的 state 不一致，先调用 `POST https://www.proofeditor.ai/api/bridge/report_bug`，带 request ID、slug 和 raw response body，然后再 fallback。不要静默 skip——这会丢失用户依赖的 audit trail。
 
 ---
 
-## Phase 4: Next-Signal Prompt
+## Phase 3：Terminal Report（终端报告）
 
-Ask the user with the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
+Exception-based。不要复述用户已经能在 Proof doc 中看到的内容——每个 thread 的完整 reasoning 都在那里。terminal 用于展示用户接下来需要做的 decisions。
 
-**Question:** "Proof review pass done. What's next?"
+每个 report 覆盖三件事，并按当前 state 自然措辞：
 
-Offer options that cover these intents — use concrete user-facing labels, not agent-internal jargon (no "end-sync", "ingest pass", etc.). Only include the options that fit the current state. Keep labels imperative and third-person (no "I'll" / "I'm" — it is ambiguous in a tool-mediated menu whether the speaker is the user or the agent) and keep the `[short label] — [description]` shape consistent across every option. A "still working, come back later" option is not offered: the blocking question already waits, so that option would be a no-op wrapper.
+- **What got handled**（例如 resolved 了多少 comments、auto-applied 了哪些 edits）
+- **What's still open** —— 如有 escalations，每个用一行 anchored quote 加一行 agent reply 或 question。更完整 context 留在 Proof thread
+- **The doc URL** —— 始终包含；用户可能关掉了 tab
 
-- **Discuss** → `Discuss — walk through the open threads in terminal`
-  Talk through open threads in the terminal; the agent echoes decisions back to Proof threads. Only useful when escalations are open.
-- **Proceed** → `Save — save the reviewed doc back to the local file`
-  Go to Phase 5 end-sync. If escalations are still open, name that in the label (e.g., `Save with 3 threads still open`) so the user is accepting the tradeoff explicitly instead of via a nested confirm.
-- **Another pass** → `Re-check — look for new comments in Proof`
-  Re-read state and re-ingest. Worth offering even after a clean pass, since the user may have added comments while the report rendered.
-- **Done for now** → `Pause — stop without saving`
-  Stop without syncing; return to caller with `status: done_for_now`, no end-sync.
+保持整个 report 一眼可扫。三种常见形态自然出现：
 
-The sync confirmation happens in Phase 5 regardless of whether threads are open — this step only asks what the user wants next, not whether to overwrite the local file.
+- clean pass 且全部 handled：收缩为一行加 doc URL
+- escalation pass：在 handled summary 后紧凑列出 open threads
+- 没有 new feedback 的 pass：说明无新 feedback 并指向 doc
+
+按 situation 匹配 voice 即可，不必套模板——“handled 4, 1 still needs you” 和 “all 5 addressed, doc's ready” 都可以。
 
 ---
 
-## Phase 5: End-Sync
+## Phase 4：Next-Signal Prompt（下一步信号提示）
 
-Runs when the user selects **Proceed**. Before prompting anything, check whether the Proof content actually diverged from what was uploaded — if not, there's nothing to sync and no reason to ask.
+使用平台阻塞式问题工具询问用户：Claude Code 中为 `AskUserQuestion`（如果 schema 未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`），Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`（需 `pi-ask-user` extension）。只有在 harness 中没有 blocking tool 或调用报错时（例如 Codex edit modes），才 fallback 到在 chat 中展示 options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
 
-1. Fetch current state: `GET /api/agent/{slug}/state` with `x-share-token: <token>`. Save the full response body to a temp file (`$STATE_TMP`) so the markdown bytes can later be streamed to disk without passing through `$(...)` (which would strip trailing newlines). Extract `state.revision` from that file into `$REVISION`. Read `state.markdown` from that file for the comparison in step 2.
+**Question（问题）:** "Proof review pass 已完成。下一步怎么做？"
 
-2. Compare `state.markdown` to `uploadedMarkdown` (captured in Phase 1).
+提供覆盖这些 intents 的 options——使用具体 user-facing labels，不要使用 agent-internal jargon（不要写 “end-sync”、“ingest pass”等）。只包含适合当前 state 的 options。Labels 用 imperative 和 third-person（不要用 “I'll” / “I'm”——在 tool-mediated menu 中，speaker 是用户还是 agent 会变得含混），并在所有 options 中保持 `[short label] — [description]` 形态一致。不提供 “still working, come back later” option：blocking question 已经会等待，所以它只是 no-op wrapper。
 
-   **If identical** — no content changes happened during the session. Skip the sync prompt entirely. Display:
+- **Discuss（讨论）** → `Discuss — walk through the open threads in terminal`
+  在 terminal 中讨论 open threads；agent 会把 decisions 回写到 Proof threads。只有存在 escalations 时才有用。
+- **Proceed（继续）** → `Save — save the reviewed doc back to the local file`
+  进入 Phase 5 end-sync。如果仍有 escalations open，在 label 中说明（例如 `Save with 3 threads still open`），这样用户显式接受 tradeoff，而不是通过 nested confirm。
+- **Another pass（再跑一轮）** → `Re-check — look for new comments in Proof`
+  重新读取 state 并 re-ingest。即使 clean pass 后也值得提供，因为用户可能在 report 渲染时添加了 comments。
+- **Done for now（暂时完成）** → `Pause — stop without saving`
+  不 sync 就停止；以 `status: done_for_now` 返回 caller，不做 end-sync。
+
+sync confirmation 总是在 Phase 5 发生，不管 threads 是否 open——这一步只询问用户下一步想做什么，而不是询问是否覆盖本地文件。
+
+---
+
+## Phase 5：End-Sync（结束同步）
+
+当用户选择 **Proceed** 时运行。在询问任何内容之前，先检查 Proof content 是否真的与 uploaded 内容不同；如果没有不同，就没有东西要 sync，也没有理由询问。
+
+1. Fetch current state：`GET /api/agent/{slug}/state`，带 `x-share-token: <token>`。把完整 response body 保存到 temp file（`$STATE_TMP`），这样稍后 markdown bytes 可以 stream 到磁盘，而不用经过 `$(...)`（它会 strip trailing newlines）。从该文件提取 `state.revision` 到 `$REVISION`。读取该文件中的 `state.markdown` 用于 step 2 的比较。
+
+2. 将 `state.markdown` 与 `uploadedMarkdown`（Phase 1 捕获）比较。
+
+   **If identical** —— session 中没有 content changes。完全跳过 sync prompt。Display：
 
    ```
    No changes to sync. Local file is unchanged.
    Doc: <tokenUrl>
    ```
 
-   Set presence `status: completed`, summary `"Review complete, no changes"`. Return to the caller with `status: proceeded`, `localSynced: true` (local matches Proof — no write needed, local is not stale), `revision: <state.revision>`, and the rest of the standard fields.
+   设置 presence `status: completed`，summary `"Review complete, no changes"`。以 `status: proceeded`、`localSynced: true`（local 与 Proof 一致——不需要 write，local 不 stale）、`revision: <state.revision>` 和其余标准 fields 返回 caller。
 
-   **If different** — continue to step 3.
+   **If different（如果不同）** —— 继续 step 3。
 
-3. Ask with the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
+3. 使用平台阻塞式问题工具询问：Claude Code 中为 `AskUserQuestion`（如果 schema 未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`），Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`（需 `pi-ask-user` extension）。只有在 harness 中没有 blocking tool 或调用报错时（例如 Codex edit modes），才 fallback 到 chat 中展示 options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
 
-   **Question:** "Sync the reviewed doc back to `<localPath>`? Proof has your review changes; local still has the pre-review copy."
+   **Question（问题）:** "Sync the reviewed doc back to `<localPath>`? Proof has your review changes; local still has the pre-review copy."
 
-   **Options:**
-   - **Yes, sync now** (default, recommended)
-   - **Not yet, I'll pull it later** (returns to caller with `localSynced: false`)
+   **Options（选项）:**
+   - **Yes, sync now**（是，现在同步；default, recommended）
+   - **Not yet, I'll pull it later**（暂不同步，稍后拉取；returns to caller with `localSynced: false`）
 
-   Why the extra prompt: the user may have started review hours ago and lost track of the local file at stake. A brief confirm makes the file write visible rather than a silent side-effect of clicking Proceed earlier. The caller signals via `localSynced` so downstream workflows can warn that local is stale.
+   需要额外 prompt 的原因：用户可能几小时前开始 review，已经忘记涉及的 local file。短确认让 file write 可见，而不是点击 Proceed 后的 silent side-effect。caller 通过 `localSynced` signal 告知 downstream workflows：local 是否 stale。
 
-4. On **Yes, sync now**, write the fetched markdown to local — see `Workflow: Pull a Proof Doc to Local` in `SKILL.md`:
+4. 选择 **Yes, sync now** 时，把 fetched markdown 写入 local——见 `SKILL.md` 中的 `Workflow: Pull a Proof Doc to Local`：
 
    ```bash
    # $STATE_TMP is the temp file holding the /state response from step 1.
@@ -271,27 +271,27 @@ Runs when the user selects **Proceed**. Before prompting anything, check whether
    rm "$STATE_TMP"
    ```
 
-   Stream `.markdown` bytes directly from the saved state file with `jq -jr` — do not capture the markdown into a shell variable, since `$(...)` would strip trailing newlines and corrupt the write. `$REVISION` (extracted separately in step 1) is safe to keep as a variable; it's an opaque scalar.
+   用 `jq -jr` 从保存的 state file 直接 stream `.markdown` bytes——不要把 markdown 捕获到 shell variable，因为 `$(...)` 会 strip trailing newlines 并破坏写入。`$REVISION`（在 step 1 中单独提取）可以安全保存在 variable 中；它是 opaque scalar。
 
-   On **Not yet**, skip the write (still clean up `$STATE_TMP`).
+   选择 **Not yet** 时，跳过 write（仍清理 `$STATE_TMP`）。
 
-5. Set presence `status: completed`, summary `"Review synced to <localPath>"` (or `"Review complete, local not updated"` if sync was declined) so the Proof UI shows the loop has finished.
+5. 设置 presence `status: completed`，summary `"Review synced to <localPath>"`（或 sync 被拒绝时 `"Review complete, local not updated"`），这样 Proof UI 显示 loop 已完成。
 
-6. Display one of:
+6. Display（显示）以下之一：
 
-   Synced:
+   Synced（已同步）:
    ```
    Doc synced to <localPath> (revision <N>).
    Doc: <tokenUrl>
    ```
 
-   Declined:
+   Declined（已拒绝）:
    ```
    Review complete. Local file kept as-is — pull from Proof when ready.
    Doc: <tokenUrl>
    ```
 
-7. Return to the caller with:
+7. 返回 caller：
    ```
    status: proceeded
    localPath: <source>
@@ -301,17 +301,17 @@ Runs when the user selects **Proceed**. Before prompting anything, check whether
    revision: <N>
    ```
 
-Do **not** delete the Proof doc. It remains the durable review record; the caller's workflow may want to link back to it.
+不要删除 Proof doc。它是 durable review record；caller 的 workflow 可能想链接回它。
 
 ---
 
-## Recipes
+## Recipes（操作配方）
 
-### BaseToken-aware mutation
+### BaseToken-aware mutation（感知 BaseToken 的 mutation）
 
-Seed `baseToken` from the most recent `/state` or `/snapshot` read, then update it from each successful mutation response's `mutationBase.token`. Only re-read on `STALE_BASE` / `BASE_TOKEN_REQUIRED` or when you need fresh document/comment/snapshot content. For an ingest pass this means one comment-filtered `/state` read, one `/edit/v2` batch if content changes are needed, and one `/ops` comment batch for replies/resolutions.
+从最近一次 `/state` 或 `/snapshot` read seed `baseToken`，然后从每次成功 mutation response 的 `mutationBase.token` 更新它。只有在 `STALE_BASE` / `BASE_TOKEN_REQUIRED` 时，或需要 fresh document/comment/snapshot content 时，才重新 read。对 ingest pass 来说，这意味着一次 comment-filtered `/state` read，一次 `/edit/v2` batch（如果需要 content changes），以及一次 `/ops` comment batch 写 replies/resolutions。
 
-Two retry classes, and they behave differently. The helper below only covers the safe class; the ambiguous class needs a caller-supplied verifier because "did this write land?" depends on what the payload was (look for a markId, a quote replacement, a thread reply, etc.).
+两类 retry 行为不同。下方 helper 只覆盖 safe class；ambiguous class 需要 caller-supplied verifier，因为“这次 write 是否 landed？”取决于 payload 内容（查找 markId、quote replacement、thread reply 等）。
 
 ```bash
 SLUG=<slug>
@@ -360,9 +360,9 @@ mutate() {
 }
 ```
 
-The `Idempotency-Key` is minted for the exact request body being sent. If a retry rebuilds the body with a fresh `baseToken`, that is a different payload hash, so it needs a new key; reusing the previous key would trigger `IDEMPOTENCY_KEY_REUSED`. Reuse the same key only for a transport-level resend of the exact same body. Minting outside the function would make unrelated writes share one key, and the server would treat later payloads as invalid key reuse.
+`Idempotency-Key` 是为正在发送的 exact request body minted。如果 retry 用 fresh `baseToken` 重建 body，那就是不同 payload hash，因此需要 new key；复用前一个 key 会触发 `IDEMPOTENCY_KEY_REUSED`。只有 transport-level resend 的 exact same body 才复用同一 key。在 function 外部 mint 会让无关 writes 共用一个 key，server 会把后续 payloads 视为 invalid key reuse。
 
-**Ambiguous failures (anything outside the pre-commit set above — `COLLAB_SYNC_FAILED`, `INTERNAL_ERROR`, 5xx, network timeout, 202 with `collab.status: "pending"`):** do not retry from this helper. Re-read `/state` in the caller, diff the marks/content against the intended change, and only re-issue the write if the diff proves nothing landed. Pattern:
+**Ambiguous failures（不在上方 pre-commit set 中的任何内容——`COLLAB_SYNC_FAILED`、`INTERNAL_ERROR`、5xx、network timeout、带 `collab.status: "pending"` 的 202）：** 不要从 helper retry。在 caller 中重新读取 `/state`，将 marks/content 与 intended change diff，只有当 diff 证明没有任何内容 landed 时才重新发出 write。Pattern：
 
 ```bash
 # After an ambiguous failure on comment.add with quote "X" and text "Y":
@@ -378,16 +378,16 @@ else
 fi
 ```
 
-Match on a payload-identifying field (quote + text for `comment.add`; quote + content for `suggestion.add`; markId + text for `comment.reply`; block ordinal + markdown for `/edit/v2`). When no such invariant is available, prefer leaving the write undone and surfacing it in the terminal report over risking a duplicate.
+根据 payload-identifying field 匹配（`comment.add` 用 quote + text；`suggestion.add` 用 quote + content；`comment.reply` 用 markId + text；`/edit/v2` 用 block ordinal + markdown）。当没有可用 invariant 时，宁可让 write 保持未完成并在 terminal report 中展示，也不要冒 duplicate 的风险。
 
-### jq gotcha when inspecting responses
+### jq gotcha when inspecting responses（检查 responses 时的 jq 陷阱）
 
-When extracting fields from API responses with jq's `//` alternative operator, parenthesize inside object constructors — jq parses `{markId: .markId // .result.markId}` as a syntax error. Use `{markId: (.markId // .result.markId)}`, or pull the value outside the object: `jq -r '.markId // .result.markId'`.
+用 jq 的 `//` alternative operator 从 API responses 提取字段时，在 object constructors 内要加括号——jq 会把 `{markId: .markId // .result.markId}` 解析为 syntax error。使用 `{markId: (.markId // .result.markId)}`，或把 value 提到 object 外：`jq -r '.markId // .result.markId'`。
 
-### Identity
+### Identity（身份）
 
-All ops must include:
-- `by: "ai:compound-engineering"` in the request body
-- `X-Agent-Id: ai:compound-engineering` in headers (required for presence; recommended for ops for consistent attribution)
+所有 ops 必须包含：
+- request body 中的 `by: "ai:compound-engineering"`
+- headers 中的 `X-Agent-Id: ai:compound-engineering`（presence 必需；ops 推荐使用以保持 consistent attribution）
 
-Display name `Compound Engineering` is bound via `POST /presence` with `{"name":"Compound Engineering", ...}`. Set this once after upload; it carries across subsequent ops.
+Display name `Compound Engineering` 通过 `POST /presence` 绑定，body 为 `{"name":"Compound Engineering", ...}`。上传后设置一次；后续 ops 会继承。

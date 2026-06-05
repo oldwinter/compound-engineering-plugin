@@ -1,8 +1,8 @@
-# Codex Spec (Config, Prompts, Skills, Subagents, MCP)
+# Codex Spec（Codex 规格：Config、Prompts、Skills、Subagents、MCP）
 
-Last verified: 2026-04-19
+最后验证：2026-04-19
 
-## Primary sources
+## 主要来源
 
 ```
 https://developers.openai.com/codex/config-basic
@@ -15,66 +15,66 @@ https://developers.openai.com/codex/guides/agents-md
 https://developers.openai.com/codex/mcp
 ```
 
-## Config location and precedence
+## Config location and precedence（配置位置与优先级）
 
-- Codex reads local settings from `~/.codex/config.toml`, shared by the CLI and IDE extension. citeturn2view0
-- Configuration precedence is: CLI flags → profile values → root-level values in `config.toml` → built-in defaults. citeturn2view0
-- Codex stores local state under `CODEX_HOME` (defaults to `~/.codex`) and includes `config.toml` there. citeturn4view0
+- Codex 从 `~/.codex/config.toml` 读取 local settings；该文件由 CLI 和 IDE extension 共享。 citeturn2view0
+- Configuration precedence 是：CLI flags → profile values → `config.toml` 中的 root-level values → built-in defaults。 citeturn2view0
+- Codex 将 local state 存在 `CODEX_HOME` 下（默认 `~/.codex`），其中包括 `config.toml`。 citeturn4view0
 
-## Profiles and providers
+## Profiles and providers（profiles 与 providers）
 
-- Profiles are defined under `[profiles.<name>]` and selected with `codex --profile <name>`. citeturn4view0
-- A top-level `profile = "<name>"` sets the default profile; CLI flags can override it. citeturn4view0
-- Profiles are experimental and not supported in the IDE extension. citeturn4view0
-- Custom model providers can be defined with base URL, wire API, and optional headers, then referenced via `model_provider`. citeturn4view0
+- Profiles 定义在 `[profiles.<name>]` 下，并通过 `codex --profile <name>` 选择。 citeturn4view0
+- Top-level `profile = "<name>"` 设置 default profile；CLI flags 可以覆盖它。 citeturn4view0
+- Profiles 是 experimental，IDE extension 不支持。 citeturn4view0
+- Custom model providers 可用 base URL、wire API 和 optional headers 定义，再通过 `model_provider` 引用。 citeturn4view0
 
-## Custom prompts (slash commands)
+## Custom prompts（custom prompts，slash commands，自定义 prompts）
 
-- Custom prompts are Markdown files stored under `~/.codex/prompts/`. citeturn3view0
-- Custom prompts require explicit invocation and aren’t shared through the repository; use skills to share or auto-invoke. citeturn3view0
-- Prompts are invoked as `/prompts:<name>` in the slash command UI. citeturn3view0
-- Prompt front matter supports `description:` and `argument-hint:`. citeturn3view0turn2view3
-- Prompt arguments support `$1`–`$9`, `$ARGUMENTS`, and named placeholders like `$FILE` provided as `KEY=value`. citeturn2view3
-- Codex ignores non-Markdown files in the prompts directory. citeturn2view3
+- Custom prompts 是存储在 `~/.codex/prompts/` 下的 Markdown files。 citeturn3view0
+- Custom prompts 需要显式调用，且不会通过 repository 共享；需要共享或 auto-invoke 时使用 skills。 citeturn3view0
+- Prompts 在 slash command UI 中以 `/prompts:<name>` 调用。 citeturn3view0
+- Prompt front matter 支持 `description:` 和 `argument-hint:`。 citeturn3view0turn2view3
+- Prompt arguments 支持 `$1`–`$9`、`$ARGUMENTS`，以及以 `KEY=value` 提供的 named placeholders，如 `$FILE`。 citeturn2view3
+- Codex 会忽略 prompts directory 中的 non-Markdown files。 citeturn2view3
 
-## AGENTS.md instructions
+## AGENTS.md instructions（AGENTS.md 指令）
 
-- Codex reads `AGENTS.md` files before doing any work and builds a combined instruction chain. citeturn3view1
-- Discovery order: global (`~/.codex`, using `AGENTS.override.md` then `AGENTS.md`) then project directory traversal from repo root to CWD, with override > AGENTS > fallback names. citeturn3view1
-- Codex concatenates files from root down; files closer to the working directory appear later and override earlier guidance. citeturn3view1
+- Codex 在做任何 work 之前读取 `AGENTS.md` files，并构建 combined instruction chain。 citeturn3view1
+- Discovery order（发现顺序）：global（`~/.codex`，先 `AGENTS.override.md` 再 `AGENTS.md`），然后从 repo root 到 CWD 进行 project directory traversal，且 override > AGENTS > fallback names。 citeturn3view1
+- Codex 从 root 向下 concatenate files；更接近 working directory 的 files 出现在后面，并覆盖更早 guidance。 citeturn3view1
 
-## Skills (Agent Skills)
+## Skills（Agent Skills，agent skills，agent skills）
 
-- A skill is a folder containing `SKILL.md` plus optional `scripts/`, `references/`, and `assets/`. citeturn3view3turn3view4
-- `SKILL.md` uses YAML front matter and requires `name` and `description`. citeturn3view3turn3view4
-- Required fields are single-line with length limits (name ≤ 100 chars, description ≤ 500 chars). citeturn3view4
-- At startup, Codex loads only each skill’s name/description; full content is injected when invoked. citeturn3view3turn3view4
-- Skills can be repo-scoped in `.agents/skills/` and are discovered from the current working directory up to the repository root. User-scoped skills live in `~/.agents/skills/`. citeturn1view1turn1view4
-- Inference: some existing tooling and user setups still use `.codex/skills/` and `~/.codex/skills/` as compatibility paths, but those locations are not documented in the current OpenAI Codex skills docs linked above.
-- Compound Engineering should avoid `~/.agents/skills` for managed installs because that shared root can shadow Copilot's native plugin skills. Use the Codex-specific compatibility root `~/.codex/skills/compound-engineering/<skill-name>/SKILL.md` for CE Codex skills, and track generated files with a CE manifest.
-- Codex also supports admin-scoped skills in `/etc/codex/skills` plus built-in system skills bundled with Codex. citeturn1view4
-- Skills can be invoked explicitly using `/skills` or `$skill-name`. citeturn3view3
+- skill 是包含 `SKILL.md` 以及 optional `scripts/`、`references/` 和 `assets/` 的 folder。 citeturn3view3turn3view4
+- `SKILL.md` 使用 YAML front matter，并要求 `name` 和 `description`。 citeturn3view3turn3view4
+- Required fields 是 single-line，且有长度限制（name ≤ 100 chars，description ≤ 500 chars）。 citeturn3view4
+- 启动时，Codex 只加载每个 skill 的 name/description；完整内容在 invoked 时注入。 citeturn3view3turn3view4
+- Skills 可 repo-scoped 放在 `.agents/skills/`，并从 current working directory 向上到 repository root 发现。User-scoped skills 位于 `~/.agents/skills/`。 citeturn1view1turn1view4
+- Inference：部分 existing tooling 和 user setups 仍使用 `.codex/skills/` 和 `~/.codex/skills/` 作为 compatibility paths，但这些位置没有记录在上方链接的当前 OpenAI Codex skills docs 中。
+- Compound Engineering managed installs 应避免使用 `~/.agents/skills`，因为这个 shared root 可能 shadow Copilot 的 native plugin skills。CE Codex skills 使用 Codex-specific compatibility root：`~/.codex/skills/compound-engineering/<skill-name>/SKILL.md`，并用 CE manifest 跟踪 generated files。
+- Codex 还支持 `/etc/codex/skills` 中的 admin-scoped skills，以及 Codex bundled 的 built-in system skills。 citeturn1view4
+- Skills 可通过 `/skills` 或 `$skill-name` 显式调用。 citeturn3view3
 
-## Subagents and custom agents
+## Subagents 和 custom agents
 
-- Codex subagent workflows are enabled by default in current releases.
-- Codex only spawns subagents when explicitly asked.
-- Custom agent files are standalone TOML files under `~/.codex/agents/` for personal agents or `.codex/agents/` for project-scoped agents.
-- Each TOML file defines one custom agent. Required fields:
+- 当前 releases 中，Codex subagent workflows 默认 enabled。
+- Codex 只在用户明确要求时 spawn subagents。
+- Custom agent files 是 standalone TOML files，personal agents 位于 `~/.codex/agents/`，project-scoped agents 位于 `.codex/agents/`。
+- 每个 TOML file 定义一个 custom agent。Required fields：
   - `name`
   - `description`
   - `developer_instructions`
-- Optional fields can include `nickname_candidates`, `model`, `model_reasoning_effort`, `sandbox_mode`, `mcp_servers`, and `skills.config`.
-- The TOML `name` field is the source of truth; matching the filename to the agent name is only a convention.
-- CE converts Claude Markdown agents into Codex custom-agent TOML files under `~/.codex/agents/compound-engineering/`.
-- CE keeps generated agents under `~/.codex/agents`, not `~/.agents/skills`, because `~/.agents` is shared across harnesses and can shadow native plugin installs.
-- Generated TOML agent names preserve CE's hyphenated naming and include the source category, such as `review-ce-correctness-reviewer` and `research-ce-repo-research-analyst`.
-- Empirical test on 2026-04-19 confirmed Codex discovers nested custom-agent TOML files under `~/.codex/agents/compound-engineering/` and accepts hyphenated TOML `name` values.
-- Empirical plugin test on 2026-04-19 found Codex native plugins did not register custom agents bundled under plugin-local `agents/`, plugin-local `.codex/agents/`, or an undocumented plugin manifest `agents` field. Therefore CE still needs the custom Bun Codex installer for agent-heavy workflows.
+- Optional fields 可包括 `nickname_candidates`、`model`、`model_reasoning_effort`、`sandbox_mode`、`mcp_servers` 和 `skills.config`。
+- TOML `name` field 是 source of truth；让 filename 匹配 agent name 只是 convention。
+- CE 会把 Claude Markdown agents 转换成 Codex custom-agent TOML files，放在 `~/.codex/agents/compound-engineering/` 下。
+- CE 将 generated agents 保持在 `~/.codex/agents` 下，而不是 `~/.agents/skills`，因为 `~/.agents` 在 harnesses 之间共享，可能 shadow native plugin installs。
+- Generated TOML agent names 保留 CE 的 hyphenated naming，并包含 source category，例如 `review-ce-correctness-reviewer` 和 `research-ce-repo-research-analyst`。
+- 2026-04-19 的 empirical test 确认 Codex 会发现 `~/.codex/agents/compound-engineering/` 下的 nested custom-agent TOML files，并接受 hyphenated TOML `name` values。
+- 2026-04-19 的 empirical plugin test 发现 Codex native plugins 不会注册 bundled 在 plugin-local `agents/`、plugin-local `.codex/agents/` 或 undocumented plugin manifest `agents` field 下的 custom agents。因此，CE 的 agent-heavy workflows 仍需要 custom Bun Codex installer。
 
-## MCP (Model Context Protocol)
+## MCP (Model Context Protocol，MCP 协议)
 
-- MCP configuration lives in `~/.codex/config.toml` and is shared by the CLI and IDE extension. citeturn3view2turn3view5
-- Each server is configured under `[mcp_servers.<server-name>]`. citeturn3view5
-- STDIO servers support `command` (required), `args`, `env`, `env_vars`, and `cwd`. citeturn3view5
-- Streamable HTTP servers support `url` (required), `bearer_token_env_var`, `http_headers`, and `env_http_headers`. citeturn3view5
+- MCP configuration 位于 `~/.codex/config.toml`，由 CLI 和 IDE extension 共享。 citeturn3view2turn3view5
+- 每个 server 配置在 `[mcp_servers.<server-name>]` 下。 citeturn3view5
+- STDIO servers 支持 `command`（required）、`args`、`env`、`env_vars` 和 `cwd`。 citeturn3view5
+- Streamable HTTP servers 支持 `url`（required）、`bearer_token_env_var`、`http_headers` 和 `env_http_headers`。 citeturn3view5

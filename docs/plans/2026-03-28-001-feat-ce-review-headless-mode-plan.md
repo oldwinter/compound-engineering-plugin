@@ -1,89 +1,89 @@
 ---
-title: "feat(ce-review): Add headless mode for programmatic callers"
+title: "feat(ce-review): 为 programmatic callers 添加 headless mode"
 type: feat
 status: completed
 date: 2026-03-28
 origin: docs/brainstorms/2026-03-28-ce-review-headless-mode-requirements.md
 ---
 
-# feat(ce-review): Add headless mode for programmatic callers
+# feat(ce-review): 为 programmatic callers 添加 headless mode
 
-## Overview
+## 概览
 
-Add `mode:headless` to ce:review so other skills can invoke it programmatically and receive structured findings without interactive prompts. Follows the pattern established by document-review's headless mode (PR #425).
+向 ce:review 添加 `mode:headless`，让其他 skills 可以 programmatically invoke 它，并在没有 interactive prompts 的情况下接收 structured findings。遵循 document-review headless mode（PR #425）已建立的 pattern。
 
-## Problem Frame
+## 问题框架
 
-ce:review has three modes (interactive, autofix, report-only), but none is designed for skill-to-skill invocation where the caller wants structured findings returned as parseable output. Autofix applies fixes and writes todos; report-only is read-only and outputs a human-readable report. Neither returns structured output for a calling workflow to consume and route. (see origin: `docs/brainstorms/2026-03-28-ce-review-headless-mode-requirements.md`)
+ce:review 有三个 modes（interactive、autofix、report-only），但没有一个是为 skill-to-skill invocation 设计的；这类 caller 想要 structured findings 作为 parseable output 返回。Autofix 会 applies fixes 并 writes todos；report-only 是 read-only，输出 human-readable report。两者都不会返回 calling workflow 可 consume and route 的 structured output。（see origin: `docs/brainstorms/2026-03-28-ce-review-headless-mode-requirements.md`）
 
-## Requirements Trace
+## 需求追踪
 
-- R1. Add `mode:headless` argument, parsed alongside existing mode flags
-- R2. In headless mode, apply `safe_auto` fixes silently (matching autofix behavior)
-- R3. Return all non-auto findings as structured text output, preserving severity, autofix_class, owner, requires_verification, confidence, evidence[], pre_existing
-- R4. No `AskUserQuestion` or other interactive prompts in headless mode
-- R5. End with a clear completion signal so callers can detect when the review is done
-- R6. Follow document-review's structural output *pattern* (completion header, metadata block, autofix-class-grouped findings, trailing sections) while using ce:review's own section headings and per-finding fields
+- R1. 添加 `mode:headless` argument，与 existing mode flags 一起 parsed
+- R2. 在 headless mode 中，silently apply `safe_auto` fixes（matching autofix behavior）
+- R3. 将所有 non-auto findings 作为 structured text output 返回，preserving severity、autofix_class、owner、requires_verification、confidence、evidence[]、pre_existing
+- R4. headless mode 中没有 `AskUserQuestion` 或其他 interactive prompts
+- R5. 以 clear completion signal 结束，让 callers 能检测 review done
+- R6. 遵循 document-review 的 structural output *pattern*（completion header、metadata block、autofix-class-grouped findings、trailing sections），但使用 ce:review 自己的 section headings 和 per-finding fields
 
-## Scope Boundaries
+## 范围边界
 
-- Not changing existing three modes (interactive, autofix, report-only)
-- Not adding new reviewer personas or changing the review pipeline (Stages 3-5)
-- Not building a specific caller workflow — just enabling the capability
-- Not adding headless invocations to existing orchestrators (lfg, slfg) in this change
+- 不修改 existing three modes（interactive、autofix、report-only）
+- 不添加 new reviewer personas，也不改变 review pipeline（Stages 3-5）
+- 不构建 specific caller workflow -- 只 enable capability
+- 不在本 change 中把 headless invocations 加入 existing orchestrators（lfg, slfg）
 
-## Context & Research
+## 背景与调研
 
-### Relevant Code and Patterns
+### 相关代码和模式
 
-- `plugins/compound-engineering/skills/ce-review/SKILL.md` — the skill to modify (mode detection at line 32, argument parsing at line 19, post-review flow at line 440)
-- `plugins/compound-engineering/skills/ce-review/references/review-output-template.md` — existing output template with pipe-delimited tables and severity-grouped sections
-- `plugins/compound-engineering/skills/ce-review/references/findings-schema.json` — ce:review's findings schema with `safe_auto|gated_auto|manual|advisory` autofix_class and `review-fixer|downstream-resolver|human|release` owner
-- `plugins/compound-engineering/skills/document-review/SKILL.md` — headless mode pattern to follow (Phase 0 parsing, Phase 4 headless output, Phase 5 immediate return)
-- `tests/review-skill-contract.test.ts` — contract test to extend
+- `plugins/compound-engineering/skills/ce-review/SKILL.md` -- 要修改的 skill（mode detection at line 32, argument parsing at line 19, post-review flow at line 440）
+- `plugins/compound-engineering/skills/ce-review/references/review-output-template.md` -- existing output template，含 pipe-delimited tables 和 severity-grouped sections
+- `plugins/compound-engineering/skills/ce-review/references/findings-schema.json` -- ce:review findings schema，含 `safe_auto|gated_auto|manual|advisory` autofix_class 和 `review-fixer|downstream-resolver|human|release` owner
+- `plugins/compound-engineering/skills/document-review/SKILL.md` -- 要遵循的 headless mode pattern（Phase 0 parsing, Phase 4 headless output, Phase 5 immediate return）
+- `tests/review-skill-contract.test.ts` -- 需要扩展的 contract test
 
-### Institutional Learnings
+### 组织内 learnings
 
-- `docs/solutions/skill-design/beta-promotion-orchestration-contract.md` — contract tests must be extended atomically with new mode flags
-- `docs/solutions/skill-design/compound-refresh-skill-improvements.md` — explicit opt-in only for autonomous modes (no auto-detection from tool availability); conservative treatment of borderline cases
-- `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md` — walk all mode x state combinations when adding a new mode branch
-- `docs/solutions/agent-friendly-cli-principles.md` — structured parseable output with stable field contracts for programmatic callers
+- `docs/solutions/skill-design/beta-promotion-orchestration-contract.md` -- new mode flags 必须与 contract tests atomic extend
+- `docs/solutions/skill-design/compound-refresh-skill-improvements.md` -- autonomous modes 只 explicit opt-in（不从 tool availability auto-detect）；borderline cases 保守处理
+- `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md` -- 添加 new mode branch 时，walk all mode x state combinations
+- `docs/solutions/agent-friendly-cli-principles.md` -- 面向 programmatic callers 的 structured parseable output with stable field contracts
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **Headless is a fourth explicit mode, not an overlay**: Each mode is self-contained with its own complete behavior specification. This avoids whack-a-mole regressions from overlay interactions (per state-machine learning). Headless has its own rules section parallel to autofix and report-only.
+- **Headless is a fourth explicit mode, not an overlay**：每个 mode 都是 self-contained，并有自己的 complete behavior specification。这避免 overlay interactions 带来的 whack-a-mole regressions（per state-machine learning）。Headless 拥有与 autofix 和 report-only 平行的独立 rules section。
 
-- **No shared checkout switching, but NOT safe for concurrent use**: Headless follows report-only's checkout guard — if a PR/branch target is passed, headless must run in an isolated worktree or stop. However, unlike report-only, headless mutates files (applies safe_auto fixes). Callers must not run headless concurrently with other mutating operations on the same checkout. The headless rules section should explicitly state this.
+- **No shared checkout switching, but NOT safe for concurrent use**：Headless 遵循 report-only 的 checkout guard -- 如果传入 PR/branch target，headless 必须在 isolated worktree 中运行或 stop。但与 report-only 不同，headless 会 mutate files（applies safe_auto fixes）。Callers 绝不能让 headless 与同一 checkout 上的其他 mutating operations 并发运行。headless rules section 应明确说明。
 
-- **Single-pass, no re-review rounds**: Headless applies `safe_auto` fixes in one pass and returns. No bounded fixer loop. Rationale: autofix uses max_rounds:2 because it operates autonomously within a larger workflow; headless returns structured output to a caller that can re-invoke if needed. The caller owns the iteration decision, keeping headless simple and predictable. Applied fixes that introduce new issues will be caught on a subsequent invocation if the caller chooses to re-review.
+- **Single-pass, no re-review rounds**：Headless 只 apply `safe_auto` fixes 一次，然后返回。不做 bounded fixer loop。Rationale：autofix 使用 max_rounds:2，是因为它在更大 workflow 内 autonomous operates；headless 会把 structured output 返回给 caller，由 caller 决定是否 re-invoke。这样 headless 保持 simple and predictable。Applied fixes 若引入 new issues，可在 caller 选择 subsequent invocation 时被捕捉。
 
-- **Write run artifacts, skip todos**: Run artifacts (`.context/compound-engineering/ce-review/<run-id>/`) provide an audit trail of what headless did. Todo files are skipped because the caller receives structured findings and routes downstream work itself.
+- **Write run artifacts, skip todos**：Run artifacts（`.context/compound-engineering/ce-review/<run-id>/`）提供 headless 做了什么的 audit trail。Todo files 会跳过，因为 caller 会收到 structured findings，并自行 route downstream work。
 
-- **Reject conflicting mode flags**: `mode:headless` is incompatible with `mode:autofix` and `mode:report-only`. If multiple mode tokens appear, emit an error and stop. This follows the "fail fast with actionable errors" principle.
+- **Reject conflicting mode flags**：`mode:headless` incompatible with `mode:autofix` and `mode:report-only`。如果多个 mode tokens 出现，emit error and stop。遵循 "fail fast with actionable errors" principle。
 
-- **Require diff scope with structured error**: Like document-review requiring a document path in headless mode, ce:review headless requires that a diff scope is determinable (branch, PR, or `base:` ref). If scope cannot be determined, emit a structured error: `Review failed (headless mode). Reason: <no diff scope detected | merge-base unresolved | conflicting mode flags>`. No agents are dispatched. The same structured error format applies to conflicting mode flags.
+- **Require diff scope with structured error**：像 document-review 在 headless mode 中要求 document path 一样，ce:review headless 要求 diff scope 可确定（branch、PR 或 `base:` ref）。如果 scope cannot be determined，emit structured error：`Review failed (headless mode). Reason: <no diff scope detected | merge-base unresolved | conflicting mode flags>`。不 dispatch agents。相同 structured error format 也用于 conflicting mode flags。
 
-## Open Questions
+## 开放问题
 
-### Resolved During Planning
+### 规划期间已解决
 
-- **Fourth mode vs overlay?** Fourth mode. Self-contained behavior avoids overlay ambiguity. (Grounded in state-machine learning and the fact that all three existing modes have independent rules sections.)
-- **Artifacts and todos?** Write artifacts (audit trail), skip todos (caller routes findings). Headless owns mutation but not downstream handoff.
-- **Checkout behavior?** No shared checkout switching. Same guard as report-only, since headless callers need stable checkouts.
-- **Re-review rounds?** Single-pass. Callers can re-invoke if needed.
+- **Fourth mode vs overlay?** Fourth mode。Self-contained behavior avoids overlay ambiguity。（基于 state-machine learning，以及现有三个 modes 都有 independent rules sections 这一事实。）
+- **Artifacts and todos?** Write artifacts（audit trail），skip todos（caller routes findings）。Headless 拥有 mutation，但不拥有 downstream handoff。
+- **Checkout behavior?** No shared checkout switching。Same guard as report-only，因为 headless callers 需要 stable checkouts。
+- **Re-review rounds?** Single-pass。Callers 可在需要时 re-invoke。
 
-### Deferred to Implementation
+### 延后到实现阶段
 
-- **Conflicting flags and missing scope error messages**: Decision made (reject with structured error), but exact wording and error envelope format deferred to implementation
-- Whether the run artifact format needs any headless-specific metadata (e.g., marking the run as headless)
+- **Conflicting flags and missing scope error messages**：decision 已定（reject with structured error），但 exact wording 和 error envelope format deferred to implementation
+- run artifact format 是否需要 headless-specific metadata（例如 marking the run as headless）
 
-## High-Level Technical Design
+## 高层技术设计
 
-> *This illustrates the intended approach and is directional guidance for review, not implementation specification. The implementing agent should treat it as context, not code to reproduce.*
+> *这说明预期做法，并作为 review 的方向性指导，而不是实现规范。实现 agent 应把它当作上下文，而不是要逐字复刻的代码。*
 
-### Mode x Behavior Decision Matrix
+### Mode x behavior decision matrix（mode 行为决策矩阵）
 
-| Behavior | Interactive | Autofix | Report-only | **Headless** |
+| 行为 | Interactive | Autofix | Report-only | **Headless** |
 |----------|------------|---------|-------------|--------------|
 | User questions | Yes | No | No | **No** |
 | Checkout switching | Yes | Yes | No (worktree or stop) | **No (worktree or stop)** |
@@ -98,9 +98,9 @@ ce:review has three modes (interactive, autofix, report-only), but none is desig
 | Completion signal | N/A | Stops after artifacts | Stops after report | **"Review complete"** |
 | Safe for concurrent use | No | No | Yes (read-only) | **No (mutates files)** |
 
-### Headless Output Envelope
+### Headless output envelope（headless 输出信封）
 
-Follows document-review's structural pattern adapted for ce:review's schema:
+遵循 document-review 的 structural pattern，并适配 ce:review 的 schema：
 
 ```
 Code review complete (headless mode).
@@ -142,189 +142,189 @@ Testing gaps:
 - <gap>
 ```
 
-The `[needs-verification]` marker appears only on findings where `requires_verification: true`. The `Artifact:` line gives callers the path to the full run artifact for machine-readable access to the complete findings schema. The text envelope is the primary handoff; the artifact is for debugging and full-fidelity access.
+`[needs-verification]` marker 只出现在 `requires_verification: true` 的 findings 上。`Artifact:` line 给 callers 提供 full run artifact 路径，以便 machine-readable access to complete findings schema。text envelope 是 primary handoff；artifact 用于 debugging 和 full-fidelity access。
 
-Findings with `owner: release` appear in the Advisory section (they are operational/rollout items, not code fixes). Findings with `pre_existing: true` appear in the Pre-existing section regardless of autofix_class.
+`owner: release` 的 findings 出现在 Advisory section（它们是 operational/rollout items，而不是 code fixes）。`pre_existing: true` 的 findings 无论 autofix_class 如何，都出现在 Pre-existing section。
 
-Omit any section with zero items. If all reviewers fail or time out, emit a degraded signal: `Code review degraded (headless mode). Reason: 0 of N reviewers returned results.` followed by "Review complete" so the caller can detect the failure and decide how to proceed.
+Omit any section with zero items。如果所有 reviewers fail 或 time out，emit degraded signal：`Code review degraded (headless mode). Reason: 0 of N reviewers returned results.` followed by "Review complete"，让 caller 能检测 failure 并决定下一步。
 
-Then output "Review complete" as the terminal signal.
+然后输出 "Review complete" 作为 terminal signal。
 
-## Implementation Units
+## 实现单元
 
-- [ ] **Unit 1: Mode Infrastructure**
+- [ ] **Unit 1：Mode infrastructure（模式基础设施）**
 
-**Goal:** Add `mode:headless` to argument parsing, mode detection, and error handling for conflicting flags / missing scope.
+**目标:** 将 `mode:headless` 加入 argument parsing、mode detection，以及 conflicting flags / missing scope 的 error handling。
 
-**Requirements:** R1, R4
+**需求:** R1, R4
 
-**Dependencies:** None
+**依赖:** None
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-review/SKILL.md`
+**文件:**
+- 修改: `plugins/compound-engineering/skills/ce-review/SKILL.md`
 
-**Approach:**
-- Add `mode:headless` row to the Argument Parsing token table (alongside `mode:autofix` and `mode:report-only`)
-- Add headless row to the Mode Detection table with behavior summary
-- Add a "Headless mode rules" subsection parallel to "Autofix mode rules" and "Report-only mode rules"
-- Update the `argument-hint` frontmatter to include `mode:headless`
-- Add conflicting-flag guard: if multiple mode tokens appear in arguments, emit an error message listing the conflict and stop
-- Add scope-required guard: if headless mode cannot determine diff scope without user interaction, emit an error with re-invocation syntax (matching document-review's nil-path pattern)
+**做法:**
+- 将 `mode:headless` row 加到 Argument Parsing token table（与 `mode:autofix` 和 `mode:report-only` 并列）
+- 将 headless row 加到 Mode Detection table，并给出 behavior summary
+- 添加 "Headless mode rules" subsection，与 "Autofix mode rules" 和 "Report-only mode rules" 平行
+- 更新 `argument-hint` frontmatter，包含 `mode:headless`
+- 添加 conflicting-flag guard：如果 arguments 中出现多个 mode tokens，emit error message listing the conflict and stop
+- 添加 scope-required guard：如果 headless mode 无法 without user interaction 确定 diff scope，emit error with re-invocation syntax（matching document-review's nil-path pattern）
 
-**Patterns to follow:**
-- Existing mode detection table structure at SKILL.md line 34
-- Existing mode rules subsections at SKILL.md lines 40-54
-- document-review Phase 0 parsing and nil-path guard at document-review SKILL.md lines 12-37
+**遵循的模式:**
+- SKILL.md line 34 处 existing mode detection table structure
+- SKILL.md lines 40-54 处 existing mode rules subsections
+- document-review SKILL.md lines 12-37 处 document-review Phase 0 parsing and nil-path guard
 
-**Test scenarios:**
-- Happy path: `mode:headless` token is parsed and headless mode is activated
-- Happy path: `mode:headless` with a branch name or PR number parses both correctly
-- Error path: `mode:headless mode:autofix` is rejected with a clear error
-- Error path: `mode:headless mode:report-only` is rejected with a clear error
-- Edge case: `mode:headless` alone with no branch/PR and no determinable scope emits a scope-required error
+**测试场景:**
+- 成功路径：`mode:headless` token 被 parsed，且 headless mode 被 activated
+- 成功路径：`mode:headless` 搭配 branch name 或 PR number 时，两者都能正确 parse
+- 错误路径：`mode:headless mode:autofix` 被 rejected，并返回清晰 error
+- 错误路径：`mode:headless mode:report-only` 被 rejected，并返回清晰 error
+- 边界情况：只有 `mode:headless` 且无 branch/PR、无法确定 scope 时，emit scope-required error
 
-**Verification:**
-- SKILL.md contains `mode:headless` in argument-hint, token table, mode detection table, and a dedicated rules subsection
-- Conflicting-flag and missing-scope guard text is present
-
----
-
-- [ ] **Unit 2: Pipeline Behavior Adjustments**
-
-**Goal:** Add headless-specific behavior for Stage 1 (checkout guard) and Stage 2 (intent ambiguity).
-
-**Requirements:** R1, R4
-
-**Dependencies:** Unit 1
-
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-review/SKILL.md`
-
-**Approach:**
-- In Stage 1 scope detection, add headless to the checkout guard alongside report-only: `mode:headless` and `mode:report-only` must not run `gh pr checkout` or `git checkout` on the shared checkout. They must run in an isolated worktree or stop. When headless stops due to the checkout guard, emit a structured error with re-invocation syntax (e.g., "Re-invoke with base:\<ref\> to review the current checkout, or run from an isolated worktree.").
-- In Stage 1 untracked file handling, add headless behavior: if the UNTRACKED list is non-empty, proceed with tracked changes only and note excluded files in the Coverage section of the structured output. Never stop to ask the user — this matches the "infer conservatively" pattern.
-- In Stage 2 intent discovery, add headless to the non-interactive path alongside autofix and report-only: infer intent conservatively, note uncertainty in Coverage/Verdict reasoning instead of blocking.
-- All changes are small additions to existing conditional text — add headless to the existing mode lists where report-only and autofix are already distinguished.
-
-**Patterns to follow:**
-- Existing report-only checkout guard at SKILL.md line 53 ("mode:report-only cannot switch the shared checkout")
-- Existing autofix/report-only intent handling at SKILL.md (~line 298)
-
-**Test scenarios:**
-- Happy path: headless mode with a PR target uses a worktree or stops instead of switching the shared checkout
-- Happy path: headless mode infers intent conservatively when diff metadata is thin
-- Happy path: headless mode with untracked files proceeds with tracked changes only and notes exclusions
-- Error path: headless stops due to checkout guard and emits re-invocation syntax
-
-**Verification:**
-- SKILL.md mentions headless alongside report-only in checkout guard sections
-- SKILL.md mentions headless alongside autofix/report-only in intent discovery sections
-- SKILL.md specifies headless behavior for untracked files (proceed, don't prompt)
+**验证:**
+- SKILL.md 在 argument-hint、token table、mode detection table 和 dedicated rules subsection 中包含 `mode:headless`
+- Conflicting-flag 和 missing-scope guard text 存在
 
 ---
 
-- [ ] **Unit 3: Headless Output Format and Post-Review Flow**
+- [ ] **Unit 2：Pipeline behavior adjustments（流水线行为调整）**
 
-**Goal:** Define the headless structured text output and the headless post-review behavior (apply safe_auto, write artifacts, skip todos, output structured text, return completion signal).
+**目标:** 为 Stage 1（checkout guard）和 Stage 2（intent ambiguity）添加 headless-specific behavior。
 
-**Requirements:** R2, R3, R4, R5, R6
+**需求:** R1, R4
 
-**Dependencies:** Unit 1, Unit 2
+**依赖:** Unit 1
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-review/SKILL.md`
-- Modify: `plugins/compound-engineering/skills/ce-review/references/review-output-template.md`
+**文件:**
+- 修改: `plugins/compound-engineering/skills/ce-review/SKILL.md`
 
-**Approach:**
+**做法:**
+- 在 Stage 1 scope detection 中，将 headless 与 report-only 一起加入 checkout guard：`mode:headless` 和 `mode:report-only` 不得在 shared checkout 上运行 `gh pr checkout` 或 `git checkout`。它们必须在 isolated worktree 中运行或 stop。当 headless 因 checkout guard stop 时，emit structured error with re-invocation syntax（例如 "Re-invoke with base:\<ref\> to review the current checkout, or run from an isolated worktree."）。
+- 在 Stage 1 untracked file handling 中添加 headless behavior：如果 UNTRACKED list 非空，则只处理 tracked changes，并在 structured output 的 Coverage section 记录 excluded files。Never stop to ask the user -- matches "infer conservatively" pattern。
+- 在 Stage 2 intent discovery 中，将 headless 加入 non-interactive path，与 autofix 和 report-only 并列：conservatively infer intent，并把 uncertainty 记录在 Coverage/Verdict reasoning 中，而不是 blocking。
+- 所有 changes 都是对 existing conditional text 的 small additions -- 在 report-only 和 autofix 已经区分的位置，把 headless 加入 existing mode lists。
 
-*Stage 6 output:*
-- Add a headless-specific output section to SKILL.md that defines the structured text envelope format
-- The envelope follows document-review's structural pattern: completion header, metadata (scope/intent/reviewers/verdict), applied fixes count, findings grouped by autofix_class with severity/route/file/line per finding, trailing sections (pre-existing, residual risks, testing gaps)
-- Per-finding format: `[severity][autofix_class -> owner] File: <file:line> -- <title> (<reviewer>, confidence <N>)` with Why and Suggested fix lines
-- Omit sections with zero items
-- In headless mode, output this structured text instead of the interactive pipe-delimited table report
+**遵循的模式:**
+- SKILL.md line 53 处 existing report-only checkout guard（"mode:report-only cannot switch the shared checkout"）
+- SKILL.md（~line 298）处 existing autofix/report-only intent handling
 
-*Post-review flow (After Review section):*
-- Add "Headless mode" to Step 2 (Choose policy by mode) parallel to autofix and report-only
-- Headless rules: ask no questions; apply `safe_auto -> review-fixer` queue in a single pass (no re-review rounds); skip Step 3's bounded loop entirely
-- Step 4 (Emit artifacts): headless writes run artifacts (like autofix) but does NOT create todo files (caller handles routing from structured output)
-- Step 5: headless stops after structured text output and "Review complete" signal. No commit/push/PR.
+**测试场景:**
+- 成功路径：headless mode with a PR target 使用 worktree 或 stop，而不是 switching shared checkout
+- 成功路径：headless mode 在 diff metadata thin 时 conservatively infers intent
+- 成功路径：headless mode with untracked files 只处理 tracked changes，并 notes exclusions
+- 错误路径：headless 因 checkout guard stop，并 emit re-invocation syntax
 
-*Review output template:*
-- Add a "Headless mode format" section to `review-output-template.md` with the structured text template and formatting rules
-- Update the Mode line documentation to include `headless`
-
-**Patterns to follow:**
-- document-review headless output format at document-review SKILL.md lines 219-248
-- Existing autofix and report-only post-review steps at SKILL.md lines 471-483
-- Existing review-output-template.md formatting rules
-
-**Test scenarios:**
-- Happy path: headless mode with safe_auto findings applies fixes and returns structured output listing remaining findings
-- Happy path: headless mode with no actionable findings returns "Applied 0 safe_auto fixes" and the completion signal
-- Happy path: headless mode with mixed findings (safe_auto + gated_auto + manual + advisory) applies safe_auto, returns all others in structured output grouped by autofix_class
-- Edge case: headless mode with only advisory findings returns structured output with no fixes applied
-- Edge case: headless mode with only pre-existing findings separates them into the pre-existing section
-- Integration: headless output includes Verdict line so callers can make merge decisions
-- Integration: run artifact is written under `.context/compound-engineering/ce-review/<run-id>/`
-- Error path: clean review (zero findings) returns the completion signal with no findings sections
-
-**Verification:**
-- SKILL.md has a headless output format section with the structured text envelope
-- review-output-template.md includes headless mode format
-- Post-review flow has a headless branch in Steps 2, 4, and 5
-- No AskUserQuestion or interactive prompts reachable in headless mode
+**验证:**
+- SKILL.md 在 checkout guard sections 中将 headless 与 report-only 并列提及
+- SKILL.md 在 intent discovery sections 中将 headless 与 autofix/report-only 并列提及
+- SKILL.md specifies headless behavior for untracked files（SKILL.md 明确 untracked files 的 headless behavior：proceed, don't prompt）
 
 ---
 
-- [ ] **Unit 4: Contract Test Extension**
+- [ ] **Unit 3：Headless output format 和 post-review flow（headless 输出格式与 review 后流程）**
 
-**Goal:** Extend `tests/review-skill-contract.test.ts` to assert headless mode contract invariants.
+**目标:** 定义 headless structured text output 和 headless post-review behavior（apply safe_auto, write artifacts, skip todos, output structured text, return completion signal）。
 
-**Requirements:** R1, R4, R5
+**需求:** R2, R3, R4, R5, R6
 
-**Dependencies:** Units 1-3
+**依赖:** Unit 1, Unit 2
 
-**Files:**
-- Modify: `tests/review-skill-contract.test.ts`
-- Test: `tests/review-skill-contract.test.ts`
+**文件:**
+- 修改: `plugins/compound-engineering/skills/ce-review/SKILL.md`
+- 修改: `plugins/compound-engineering/skills/ce-review/references/review-output-template.md`
 
-**Approach:**
-- Add assertions to the existing "documents explicit modes and orchestration boundaries" test for headless mode presence
-- Add a new test case for headless-specific contract invariants: completion signal text, no-checkout-switching guard, artifact behavior, no-todo rule, structured output format presence, conflicting-flags guard
-- Assert `mode:headless` appears in argument-hint and mode detection table
-- Assert headless rules section exists with key behavioral commitments
+**做法:**
 
-**Patterns to follow:**
-- Existing contract test structure at `tests/review-skill-contract.test.ts` — string containment assertions against SKILL.md content
+*Stage 6 output（Stage 6 输出）：*
+- 在 SKILL.md 中添加 headless-specific output section，定义 structured text envelope format
+- envelope 遵循 document-review 的 structural pattern：completion header、metadata（scope/intent/reviewers/verdict）、applied fixes count、按 autofix_class 分组的 findings（每个 finding 含 severity/route/file/line）、trailing sections（pre-existing、residual risks、testing gaps）
+- Per-finding format：`[severity][autofix_class -> owner] File: <file:line> -- <title> (<reviewer>, confidence <N>)`，并带 Why 和 Suggested fix lines
+- Omit sections with zero items（省略零条目的 sections）
+- 在 headless mode 中输出这个 structured text，而不是 interactive pipe-delimited table report
 
-**Test scenarios:**
-- Happy path: contract test passes with all headless mode assertions
-- Edge case: if any headless rule text is accidentally removed from SKILL.md, the contract test fails
+*Post-review flow（After Review section，review 后流程）：*
+- 在 Step 2（Choose policy by mode）中添加 "Headless mode"，与 autofix 和 report-only 平行
+- Headless rules（headless 规则）：不提问；single pass apply `safe_auto -> review-fixer` queue（no re-review rounds）；完全跳过 Step 3 的 bounded loop
+- Step 4（Emit artifacts）：headless writes run artifacts（like autofix），但不创建 todo files（caller handles routing from structured output）
+- Step 5：headless 在 structured text output 和 "Review complete" signal 后停止。No commit/push/PR。
 
-**Verification:**
+*Review output template（review 输出模板）:*
+- 在 `review-output-template.md` 中添加 "Headless mode format" section，包含 structured text template 和 formatting rules（格式规则）
+- 更新 Mode line documentation（Mode line 文档），使其包含 `headless`
+
+**遵循的模式:**
+- document-review SKILL.md lines 219-248 处 document-review headless output format（headless 输出格式）
+- SKILL.md lines 471-483 处 existing autofix and report-only post-review steps（已有 review 后步骤）
+- Existing review-output-template.md formatting rules（现有 formatting rules）
+
+**测试场景:**
+- 成功路径：headless mode with safe_auto findings applies fixes，并返回列出 remaining findings 的 structured output
+- 成功路径：headless mode with no actionable findings 返回 "Applied 0 safe_auto fixes" 和 completion signal
+- 成功路径：headless mode with mixed findings（safe_auto + gated_auto + manual + advisory）applies safe_auto，并在 structured output 中按 autofix_class 返回其余 findings
+- 边界情况：headless mode with only advisory findings 返回 structured output，且不应用 fixes
+- 边界情况：headless mode with only pre-existing findings 将它们分到 pre-existing section
+- 集成：headless output 包含 Verdict line，让 callers 可以做 merge decisions
+- 集成：run artifact 写入 `.context/compound-engineering/ce-review/<run-id>/`
+- 错误路径：clean review（zero findings）返回 completion signal，且没有 findings sections
+
+**验证:**
+- SKILL.md 有 headless output format section，包含 structured text envelope
+- review-output-template.md includes headless mode format（review-output-template.md 包含 headless mode format）
+- Post-review flow 在 Steps 2、4 和 5 中有 headless branch
+- headless mode 中没有可达的 AskUserQuestion 或 interactive prompts
+
+---
+
+- [ ] **Unit 4：Contract test extension（契约测试扩展）**
+
+**目标:** 扩展 `tests/review-skill-contract.test.ts`，assert headless mode contract invariants。
+
+**需求:** R1, R4, R5
+
+**依赖:** Units 1-3
+
+**文件:**
+- 修改: `tests/review-skill-contract.test.ts`
+- 测试: `tests/review-skill-contract.test.ts`
+
+**做法:**
+- 在 existing "documents explicit modes and orchestration boundaries" test 中加入 headless mode presence assertions
+- 为 headless-specific contract invariants 添加 new test case：completion signal text、no-checkout-switching guard、artifact behavior、no-todo rule、structured output format presence、conflicting-flags guard
+- Assert `mode:headless` appears in argument-hint and mode detection table（断言 `mode:headless` 出现在 argument-hint 和 mode detection table 中）
+- Assert headless rules section exists with key behavioral commitments（断言 headless rules section 存在且包含关键行为承诺）
+
+**遵循的模式:**
+- `tests/review-skill-contract.test.ts` 中 existing contract test structure -- 对 SKILL.md content 做 string containment assertions
+
+**测试场景:**
+- 成功路径：contract test 带所有 headless mode assertions 通过
+- 边界情况：如果任何 headless rule text 被意外从 SKILL.md 移除，contract test fails
+
+**验证:**
 - `bun test tests/review-skill-contract.test.ts` passes
-- Test covers: mode detection, checkout guard, artifact/todo behavior, completion signal, conflicting flags guard
+- Test covers（测试覆盖）：mode detection、checkout guard、artifact/todo behavior、completion signal、conflicting flags guard
 
-## System-Wide Impact
+## 系统级影响
 
-- **Interaction graph:** No new callbacks or middleware. Headless mode is a new branch in existing mode-dispatch logic. Existing callers (lfg, slfg) are not changed — they continue using autofix and report-only.
-- **Error propagation:** New error paths (conflicting flags, missing scope) emit text errors and stop. No cascading failure risk.
-- **State lifecycle risks:** Headless writes run artifacts but not todos. A caller that expects todos from headless would get none — this is intentional and documented.
-- **API surface parity:** Headless mode is a new API surface for skill-to-skill invocation. Future orchestrators may adopt it, but existing ones are unchanged.
-- **Unchanged invariants:** Stages 3-5 (reviewer selection, sub-agent dispatch, merge/dedup pipeline) are completely unchanged. The findings schema is unchanged. The confidence threshold (0.60) is unchanged.
+- **Interaction graph:** 无 new callbacks 或 middleware。Headless mode 是 existing mode-dispatch logic 中的新 branch。Existing callers（lfg, slfg）不变 -- 继续使用 autofix 和 report-only。
+- **Error propagation:** 新 error paths（conflicting flags, missing scope）emit text errors and stop。无 cascading failure risk。
+- **State lifecycle risks:** Headless writes run artifacts but not todos。若 caller 期待 headless 创建 todos，将不会得到 -- 这是 intentional and documented。
+- **API surface parity:** Headless mode 是 skill-to-skill invocation 的 new API surface。Future orchestrators 可采用它，但 existing ones unchanged。
+- **Unchanged invariants:** Stages 3-5（reviewer selection、sub-agent dispatch、merge/dedup pipeline）完全 unchanged。findings schema unchanged。confidence threshold（0.60）unchanged。
 
-## Risks & Dependencies
+## 风险与依赖
 
-| Risk | Mitigation |
+| 风险 | 缓解 |
 |------|------------|
-| Headless checkout guard text diverges from report-only over time | Both share the same guard language — mention headless alongside report-only in the same sentences so they stay in sync |
-| Caller assumes headless creates todos and depends on them | Headless rules section explicitly states no todos; contract test asserts it |
-| Structured output format drifts from document-review's envelope | Format is documented in review-output-template.md and tested by contract; changes require deliberate updates |
+| Headless checkout guard text 随时间与 report-only diverges | 二者共享相同 guard language -- 在同一句中 alongside report-only mention headless，使它们保持同步 |
+| Caller assumes headless creates todos and depends on them | Headless rules section explicitly states no todos；contract test asserts it |
+| Structured output format drifts from document-review's envelope | Format documented in review-output-template.md and tested by contract；changes require deliberate updates |
 
-## Sources & References
+## 来源与参考
 
-- **Origin document:** [docs/brainstorms/2026-03-28-ce-review-headless-mode-requirements.md](docs/brainstorms/2026-03-28-ce-review-headless-mode-requirements.md)
-- Related code: `plugins/compound-engineering/skills/ce-review/SKILL.md`, `plugins/compound-engineering/skills/document-review/SKILL.md`
-- Related PRs: #425 (document-review headless mode)
-- Learnings: `docs/solutions/skill-design/beta-promotion-orchestration-contract.md`, `docs/solutions/skill-design/compound-refresh-skill-improvements.md`, `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`
+- **Origin document（来源文档）:** [docs/brainstorms/2026-03-28-ce-review-headless-mode-requirements.md](docs/brainstorms/2026-03-28-ce-review-headless-mode-requirements.md)
+- 相关代码: `plugins/compound-engineering/skills/ce-review/SKILL.md`, `plugins/compound-engineering/skills/document-review/SKILL.md`
+- 相关 PRs: #425（document-review headless mode）
+- Learnings（learnings）: `docs/solutions/skill-design/beta-promotion-orchestration-contract.md`, `docs/solutions/skill-design/compound-refresh-skill-improvements.md`, `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md`

@@ -1,48 +1,48 @@
-# Compound Engineering -- local config
-# Copy to .compound-engineering/config.local.yaml in your project root.
-# All settings are optional. Invalid values fall through to defaults.
+# Compound Engineering -- local config（本地配置）
+# 复制到 project root 的 .compound-engineering/config.local.yaml。
+# 所有 settings 都是 optional。Invalid values 会回退到 defaults。
 
-# --- Work delegation (Codex) ---
+# --- Work delegation (Codex，工作委托) ---
 
 # work_delegate: codex           # codex | false (default: false)
 # work_delegate_consent: true    # true | false (default: false)
 # work_delegate_sandbox: yolo    # yolo | full-auto (default: yolo)
 # work_delegate_decision: auto   # auto | ask (default: auto)
-# work_delegate_model: gpt-5.4   # any valid codex model (omit to use ~/.codex/config.toml default)
-# work_delegate_effort: high     # minimal | low | medium | high | xhigh (omit to use ~/.codex/config.toml default)
+# work_delegate_model: gpt-5.4   # 任意 valid codex model（省略则使用 ~/.codex/config.toml default）
+# work_delegate_effort: high     # minimal | low | medium | high | xhigh（省略则使用 ~/.codex/config.toml default）
 
-# --- Product pulse ---
-# Settings written by /ce-product-pulse first-run interview. Re-run the skill with
-# argument `setup` or `reconfigure` to edit interactively.
+# --- Product pulse（产品脉搏） ---
+# /ce-product-pulse first-run interview 写入的 settings。重新运行该 skill，并使用
+# argument `setup` 或 `reconfigure` 以交互式编辑。
 
-# pulse_product_name: "Spiral"                          # used in report titles (no default)
+# pulse_product_name: "Spiral"                          # 用于 report titles（无 default）
 # pulse_lookback_default: 24h                           # 1h | 24h | 7d | 30d (default: 24h)
-# pulse_primary_event: "session_started"                # the event that means "user showed up"
-# pulse_value_event: "task_completed"                   # the event that means "user got value"
-# pulse_completion_events: "onboarded,first_purchase"   # comma-separated, 0-3 events
-# pulse_quality_scoring: false                          # true | false (default: false; AI products only)
-# pulse_quality_dimension: "answer accuracy"            # dimension scored 1-5 when pulse_quality_scoring is true
-# pulse_analytics_source: posthog                       # posthog | mixpanel | custom (no default)
-# pulse_tracing_source: sentry                          # sentry | datadog | custom (no default)
-# pulse_payments_source: stripe                         # stripe | custom (no default)
-# pulse_db_enabled: false                               # true | false (default: false; read-only DB if true)
-# pulse_metric_sources: "retention_d7=posthog,nps=delighted"  # strategy-metric -> source overrides; comma-separated 'metric=source' pairs; unlisted metrics fall back to pulse_analytics_source
-# pulse_pending_metrics: "retention_d7,nps"             # comma-separated strategy metrics awaiting instrumentation; render as 'no data'
-# pulse_excluded_metrics: "north_star"                  # comma-separated strategy metrics intentionally not in pulse
+# pulse_primary_event: "session_started"                # 表示 "user showed up" 的 event
+# pulse_value_event: "task_completed"                   # 表示 "user got value" 的 event
+# pulse_completion_events: "onboarded,first_purchase"   # comma-separated，0-3 个 events
+# pulse_quality_scoring: false                          # true | false（default: false；仅 AI products）
+# pulse_quality_dimension: "answer accuracy"            # pulse_quality_scoring 为 true 时，按 1-5 评分的 dimension
+# pulse_analytics_source: posthog                       # posthog | mixpanel | custom（无 default）
+# pulse_tracing_source: sentry                          # sentry | datadog | custom（无 default）
+# pulse_payments_source: stripe                         # stripe | custom（无 default）
+# pulse_db_enabled: false                               # true | false（default: false；为 true 时使用 read-only DB）
+# pulse_metric_sources: "retention_d7=posthog,nps=delighted"  # strategy-metric -> source overrides；comma-separated 'metric=source' pairs；未列出 metrics 回退到 pulse_analytics_source
+# pulse_pending_metrics: "retention_d7,nps"             # comma-separated strategy metrics，等待 instrumentation；render 为 'no data'
+# pulse_excluded_metrics: "north_star"                  # comma-separated strategy metrics，故意不纳入 pulse
 
-# --- Output format ---
-# Per-skill output format default. Selects the exclusive format the artifact
-# is written in: `md` produces a markdown file, `html` produces a single
-# self-contained HTML file. The two are mutually exclusive -- there is no
-# sibling artifact. See DESIGN.md or your agent instructions to influence
-# HTML styling. CLI arguments override these defaults; pipeline contexts
-# (e.g., LFG, disable-model-invocation) always force `md` regardless.
+# --- Output format（输出格式） ---
+# Per-skill output format default。选择 artifact 写入时使用的 exclusive format：
+# `md` 产生 markdown file，`html` 产生单个 self-contained HTML file。
+# 两者 mutually exclusive，不会生成 sibling artifact。
+# 如需影响 HTML styling，见 DESIGN.md 或你的 agent instructions。
+# CLI arguments 会覆盖这些 defaults；pipeline contexts
+# （例如 LFG、disable-model-invocation）始终 force `md`。
 
 # plan_output: html              # md | html (default: md)
 # brainstorm_output: html        # md | html (default: md)
 
 # --- ce-promote ---
-# Written automatically when you decline the Spiral setup offer in /ce-promote.
-# Suppresses that one-time setup nudge in this project. Remove the key to re-enable.
+# 当你在 /ce-promote 中拒绝 Spiral setup offer 时自动写入。
+# 在此 project 中抑制该 one-time setup nudge。删除此 key 可重新启用。
 
-# ce_promote_spiral_optout: true   # true | (absent) (default: absent -- offer once)
+# ce_promote_spiral_optout: true   # true | (absent) (default: absent -- offer once，一次性提示)

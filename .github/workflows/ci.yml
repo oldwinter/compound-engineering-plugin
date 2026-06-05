@@ -14,7 +14,7 @@ jobs:
       pull-requests: read
 
     steps:
-      - name: Validate PR title
+      - name: 验证 PR title
         uses: amannn/action-semantic-pull-request@v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -38,16 +38,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup Bun
+      - name: 设置 Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Install dependencies
+      - name: 安装依赖
         run: bun install
 
-      - name: Validate release metadata
+      - name: 验证 release metadata
         run: bun run release:validate
 
-      - name: Run tests
+      - name: 运行 tests
         run: bun test

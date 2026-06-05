@@ -1,358 +1,358 @@
 ---
-title: "fix: Close ce-polish-beta detection gaps from PR #568 feedback"
+title: "fix: 关闭 PR #568 feedback 中指出的 ce-polish-beta detection gaps"
 type: fix
 status: active
 date: 2026-04-16
 ---
 
-# fix: Close ce-polish-beta detection gaps from PR #568 feedback
+# fix: 关闭 PR #568 feedback 中指出的 ce-polish-beta detection gaps
 
-## Overview
+## 概览
 
-Address four concrete detection/resolution gaps in `ce-polish-beta` raised by @tmchow on EveryInc/compound-engineering-plugin#568:
+处理 @tmchow 在 EveryInc/compound-engineering-plugin#568 中指出的 `ce-polish-beta` 四个具体 detection/resolution gaps：
 
-1. Framework coverage — Nuxt, SvelteKit, Remix, Astro fall through to `unknown` (the commenter calls them "table stakes alongside Next and Vite")
-2. Monorepo blind spot — `detect-project-type.sh` only inspects the repo root, so a Turborepo with `apps/web/next.config.js` returns `unknown`
-3. Package-manager detection is documented in prose but not implemented; Next/Vite stubs silently write `npm run dev` on pnpm/yarn/bun projects
-4. Port cascade is lossy — `.env` reader doesn't strip quotes or trailing comments, `AGENTS.md`/`CLAUDE.md` grep hits unrelated doc references, no probe of `next.config.*` / `vite.config.*` / `config/puma.rb` / `docker-compose.yml`
+1. Framework coverage - Nuxt、SvelteKit、Remix、Astro 会 fall through 到 `unknown`（commenter 称它们是 "table stakes alongside Next and Vite"）
+2. Monorepo blind spot - `detect-project-type.sh` 只检查 repo root，因此包含 `apps/web/next.config.js` 的 Turborepo 返回 `unknown`
+3. Package-manager detection 只在 prose 中有 documented，但未实现；Next/Vite stubs 在 pnpm/yarn/bun projects 中会静默写入 `npm run dev`
+4. Port cascade lossy - `.env` reader 不 strip quotes 或 trailing comments，`AGENTS.md`/`CLAUDE.md` grep 会命中无关 doc references，且不 probe `next.config.*` / `vite.config.*` / `config/puma.rb` / `docker-compose.yml`
 
-All four are detection/resolution bugs in an already-shipped beta skill (`disable-model-invocation: true`, so no auto-trigger regression risk). Fix scope is the skill's own `scripts/` and `references/` trees plus the Phase 3 wiring in `SKILL.md`.
+四项都是已发布 beta skill 中的 detection/resolution bugs（`disable-model-invocation: true`，因此没有 auto-trigger regression risk）。Fix scope 是该 skill 自己的 `scripts/` 与 `references/` trees，以及 `SKILL.md` 中 Phase 3 wiring。
 
-## Problem Frame
+## 问题框架
 
-Polish's dev-server lifecycle (Phase 3 in SKILL.md) has three resolution jobs:
+Polish 的 dev-server lifecycle（SKILL.md 中 Phase 3）有三项 resolution jobs：
 
-- **What project type is this?** → `scripts/detect-project-type.sh`
-- **How do I start it?** → per-type recipe in `references/dev-server-<type>.md`, substituted into a `launch.json` stub
-- **What port will it bind to?** → inline cascade documented in `references/dev-server-detection.md`
+- **这是什么 project type？** -> `scripts/detect-project-type.sh`
+- **如何启动它？** -> `references/dev-server-<type>.md` 中的 per-type recipe，被替换进 `launch.json` stub
+- **它会绑定哪个 port？** -> `references/dev-server-detection.md` 中已 documented 的 inline cascade
 
-All three jobs currently fail for common-but-unhandled shapes (monorepos, Nuxt/Astro, pnpm-only repos, quoted `.env` values). Users hit these gaps the first time they run polish on anything outside the four project types the skill was bootstrapped with (rails, next, vite, procfile). The fallback — "ask the user to author `.claude/launch.json`" — works but pushes onto the user a discovery problem the skill should do itself.
+这三项目前都会在常见但未处理的 shapes（monorepos、Nuxt/Astro、pnpm-only repos、quoted `.env` values）上失败。用户第一次在 skill bootstrap 时覆盖的四种 project types（rails、next、vite、procfile）之外运行 polish 时，就会遇到这些 gaps。Fallback - "ask the user to author `.claude/launch.json`" - 可用，但把 discovery problem 推给了用户，而这本该由 skill 自己完成。
 
-Feedback is the first real contact the skill has had with a reviewer outside the original plan, and it lines up with hazards already flagged in `references/dev-server-vite.md` ("SvelteKit, SolidStart, Qwik City, and Astro all use Vite… Different default ports apply") and `references/dev-server-next.md` ("Monorepo roots: users should set `cwd`… to the specific Next app"). The skill knew these were gaps and punted — this plan closes the punt.
+Feedback 是该 skill 与原计划之外 reviewer 的第一次真实接触，并且与 `references/dev-server-vite.md`（"SvelteKit, SolidStart, Qwik City, and Astro all use Vite... Different default ports apply"）和 `references/dev-server-next.md`（"Monorepo roots: users should set `cwd`... to the specific Next app"）中已经 flagged 的 hazards 对齐。Skill 早知道这些是 gaps 并 punt 了；本 plan 关闭这个 punt。
 
-## Requirements Trace
+## 需求追踪
 
-- **R1.** Nuxt, SvelteKit, Astro, and Remix are recognized first-class project types (no longer fall through to `unknown`).
-- **R2.** `detect-project-type.sh` finds a framework config inside a monorepo workspace (up to a bounded depth) and returns a type + relative `cwd`, so the stub-writer can populate `cwd` in `launch.json` without user intervention.
-- **R3.** Next and Vite stubs use the package manager indicated by the lockfile (`pnpm` / `yarn` / `bun` / `npm`) instead of hard-coding `npm`.
-- **R4.** Port resolution prefers authoritative config files (framework config, `config/puma.rb`, `Procfile.dev`, `docker-compose.yml`) over prose references. `.env` parsing correctly strips surrounding quotes and trailing `# comment`. The noisy `AGENTS.md`/`CLAUDE.md` grep is removed.
-- **R5.** Existing users are not regressed. Repos that previously detected correctly continue to detect the same type; repos with `.claude/launch.json` are unaffected (launch.json still wins).
-- **R6.** Each new or modified script has unit-test coverage in `tests/skills/` mirroring the existing `ce-polish-beta-dev-server.test.ts` harness (tmp git repo, Bun.spawn, exit-code + stdout assertions).
+- **R1.** Nuxt、SvelteKit、Astro 和 Remix 被识别为 first-class project types（不再 fall through 到 `unknown`）。
+- **R2.** `detect-project-type.sh` 在 monorepo workspace 内（bounded depth）找到 framework config，并返回 type + relative `cwd`，使 stub-writer 可在无用户介入时填充 `launch.json` 中的 `cwd`。
+- **R3.** Next 和 Vite stubs 使用 lockfile 指示的 package manager（`pnpm` / `yarn` / `bun` / `npm`），而不是 hard-coding `npm`。
+- **R4.** Port resolution 优先使用 authoritative config files（framework config、`config/puma.rb`、`Procfile.dev`、`docker-compose.yml`），而不是 prose references。`.env` parsing 正确 strip surrounding quotes 和 trailing `# comment`。移除 noisy `AGENTS.md`/`CLAUDE.md` grep。
+- **R5.** Existing users 不 regression。此前 correctly detected 的 repos 继续 detect 到相同 type；已有 `.claude/launch.json` 的 repos 不受影响（launch.json 仍 wins）。
+- **R6.** 每个 new 或 modified script 在 `tests/skills/` 中有 unit-test coverage，镜像现有 `ce-polish-beta-dev-server.test.ts` harness（tmp git repo、Bun.spawn、exit-code + stdout assertions）。
 
-## Scope Boundaries
+## 范围边界
 
-- **Not** adding Python (Django, Flask, FastAPI), Go, Elixir/Phoenix, Deno/Fresh, Angular, Gatsby, Expo, Electron, Tauri, Storybook, or Ruby non-Rails (Sinatra, Hanami). Trevor listed these as gaps; they each need their own recipe file and dev-server conventions, and together they would roughly double the skill's surface area. Defer to a follow-up plan.
-- **Not** changing `.claude/launch.json` priority — launch.json always wins over auto-detect. This plan only improves what auto-detect does when launch.json is absent.
-- **Not** rewriting the IDE handoff, kill-by-port, or reachability probe in Phase 3.5/3.6. Those are unaffected.
-- **Not** changing headless-mode semantics. All new scripts are probes; they don't mutate state, so headless rules ("never write .claude/launch.json, never kill without token") are preserved.
-- **Not** adding a framework config parser beyond a conservative regex. Arbitrary JS/TS config files can set `port` via computed expressions the regex won't catch; when the probe misses, the cascade falls through to framework defaults. Document this as best-effort, not authoritative.
-- **Not** bumping plugin version, marketplace version, or writing a release entry. Per repo `AGENTS.md`, release-please owns that.
+- **不**新增 Python（Django、Flask、FastAPI）、Go、Elixir/Phoenix、Deno/Fresh、Angular、Gatsby、Expo、Electron、Tauri、Storybook 或 Ruby non-Rails（Sinatra、Hanami）。Trevor 将这些列为 gaps；它们各自都需要 recipe file 和 dev-server conventions，合计会让 skill surface area 近乎翻倍。Defer to a follow-up plan。
+- **不**改变 `.claude/launch.json` priority - launch.json always wins over auto-detect。本 plan 只改善 launch.json absent 时 auto-detect 的行为。
+- **不**重写 IDE handoff、kill-by-port 或 Phase 3.5/3.6 的 reachability probe。它们不受影响。
+- **不**改变 headless-mode semantics。所有 new scripts 都是 probes；它们不 mutate state，因此 headless rules（"never write .claude/launch.json, never kill without token"）保持不变。
+- **不**新增超出 conservative regex 的 framework config parser。Arbitrary JS/TS config files 可以通过 computed expressions 设置 `port`，regex 捕获不到；probe miss 时，cascade fall through 到 framework defaults。记录为 best-effort，而非 authoritative。
+- **不**bump plugin version、marketplace version 或 writing a release entry。按 repo `AGENTS.md`，release-please owns that。
 
-## Context & Research
+## 背景与调研
 
-### Relevant Code and Patterns
+### 相关代码和模式
 
-- `plugins/compound-engineering/skills/ce-polish-beta/scripts/detect-project-type.sh` — current root-only classifier with precedence rules (rails beats procfile, `multiple` for real disambiguation)
-- `plugins/compound-engineering/skills/ce-polish-beta/scripts/read-launch-json.sh` — existing script that emits sentinel outputs (`__NO_LAUNCH_JSON__`, `__INVALID_LAUNCH_JSON__`, `__MISSING_CONFIGURATIONS__`, `__CONFIG_NOT_FOUND__`). The sentinel pattern is the convention new scripts should follow for signaling "no match, fall through"
-- `plugins/compound-engineering/skills/ce-polish-beta/scripts/parse-checklist.sh` — pattern for set-unsafe `set -u`, bash regex (`[[ =~ ]]`), and awk/jq composition within a single script. New scripts should match this style (no `set -euo pipefail`; the existing scripts use `set -u` only, by convention)
-- `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-<rails|next|vite|procfile>.md` — per-type recipe shape: Signature, Start command, Port, Stub generation, Common gotchas
-- `plugins/compound-engineering/skills/ce-polish-beta/references/launch-json-schema.md` — stub templates grouped by project type; the stub-writer block to parameterize
-- `tests/skills/ce-polish-beta-dev-server.test.ts` — test harness pattern: tmp git repo, touch signature files, invoke script via `Bun.spawn`, assert `exitCode` + `stdout.trim()`. All new scripts follow this shape.
-- `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` Phase 3.2 (lines 272-291) — project-type routing table; the surface that needs extending for new types and the `<type>@<cwd>` return variant
-- `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` Phase 3.3 (lines 293-303) — stub-writer; where package-manager substitution and `cwd` population land
+- `plugins/compound-engineering/skills/ce-polish-beta/scripts/detect-project-type.sh` - 当前 root-only classifier，含 precedence rules（rails beats procfile，真正 disambiguation 时返回 `multiple`）
+- `plugins/compound-engineering/skills/ce-polish-beta/scripts/read-launch-json.sh` - 现有 script 会 emit sentinel outputs（`__NO_LAUNCH_JSON__`、`__INVALID_LAUNCH_JSON__`、`__MISSING_CONFIGURATIONS__`、`__CONFIG_NOT_FOUND__`）。Sentinel pattern 是 new scripts signaling "no match, fall through" 时应遵循的 convention。
+- `plugins/compound-engineering/skills/ce-polish-beta/scripts/parse-checklist.sh` - set-unsafe `set -u`、bash regex（`[[ =~ ]]`）和 awk/jq composition within a single script 的 pattern。New scripts 应匹配该 style（不使用 `set -euo pipefail`；按 convention，existing scripts 只用 `set -u`）。
+- `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-<rails|next|vite|procfile>.md` - per-type recipe 形态：Signature、Start command、Port、Stub generation、Common gotchas
+- `plugins/compound-engineering/skills/ce-polish-beta/references/launch-json-schema.md` - 按 project type 分组的 stub templates；需要 parameterize 的 stub-writer block
+- `tests/skills/ce-polish-beta-dev-server.test.ts` - test harness pattern: tmp git repo、touch signature files、通过 `Bun.spawn` invoke script、assert `exitCode` + `stdout.trim()`。所有 new scripts 遵循此形态。
+- `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` Phase 3.2（lines 272-291）- project-type routing table；需要扩展以支持 new types 和 `<type>@<cwd>` return variant 的 surface
+- `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` Phase 3.3（lines 293-303）- stub-writer；package-manager substitution 与 `cwd` population 落地位置
 
-### Institutional Learnings
+### 组织内 learnings
 
-None directly applicable; this work extends patterns already proven in the same skill.
+没有直接适用项；此工作扩展的是同一 skill 中已 proven 的 patterns。
 
-### Cross-Repo Reference (informational only)
+### 跨仓库参考（仅供信息）
 
-`plugins/compound-engineering/skills/test-browser/SKILL.md` has an inline port cascade that polish's `dev-server-detection.md` is a copy of (per the self-contained-skill rule). This plan does not modify `test-browser` — the two cascades stay independent by design. Note for maintainers: if test-browser adopts a parallel resolve-port script later, the two skills will need the standard manual-sync note updated.
+`plugins/compound-engineering/skills/test-browser/SKILL.md` 有一个 inline port cascade；polish 的 `dev-server-detection.md` 是它的 copy（按 self-contained-skill rule）。本 plan 不修改 `test-browser`；两个 cascades 继续按设计保持 independent。Maintainers note：如果 test-browser 未来采用 parallel resolve-port script，需要更新两个 skills 的 standard manual-sync note。
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **Decision: detect-project-type.sh returns `<type>` at root and `<type>@<cwd>` for monorepo hits, never just `<cwd>`.** Rationale: keeps the existing single-token protocol intact for the 90% root-detection case; downstream readers split on `@` when present. `@` is chosen over `:` because `:` is reserved for the outer multi-hit separator (see below). Alternative considered: return structured JSON. Rejected because every other script in `scripts/` returns plain-text tokens and consumers use `case`/`awk` on them, and JSON would force `jq` onto a detector that today only uses bash builtins.
+- **决策：`detect-project-type.sh` 在 root 返回 `<type>`，对 monorepo hits 返回 `<type>@<cwd>`，绝不只返回 `<cwd>`。** 理由：为 90% root-detection case 保持 existing single-token protocol intact；downstream readers 在存在 `@` 时 split。选择 `@` 而非 `:`，因为 `:` 已保留给 outer multi-hit separator（见下方）。备选方案：返回 structured JSON。否决原因：`scripts/` 中其他 scripts 返回 plain-text tokens，consumers 用 `case`/`awk` 处理它们；JSON 会强迫一个今日只用 bash builtins 的 detector 依赖 `jq`。
 
-- **Decision: Output grammar is `<type>` or `<type>@<cwd>` for single hits, `multiple` or `multiple:<type>@<cwd>,<type>@<cwd>,...` for multi-hits.** The four concrete shapes are:
-  - `next` (single hit at root)
-  - `next@apps/web` (single hit in monorepo)
-  - `multiple` (multiple signatures at root — existing behavior, unchanged)
-  - `multiple:next@apps/web,rails@apps/api` (multiple hits across monorepo workspaces, always emitted as `type@path` pairs even when types are the same)
-  Rationale: `:` is the outer multi-hit delimiter and `@` is the inner type-path delimiter, making the grammar unambiguous under naive `awk -F:` or bash parameter expansion. Document this explicitly in the script header comment so callers cannot misread it.
+- **决策：Output grammar 对 single hits 使用 `<type>` 或 `<type>@<cwd>`，对 multi-hits 使用 `multiple` 或 `multiple:<type>@<cwd>,<type>@<cwd>,...`。** 四个具体 shapes：
+- `next`（root single hit）
+- `next@apps/web`（monorepo single hit）
+- `multiple`（root multiple signatures - existing behavior, unchanged）
+  - `multiple:next@apps/web,rails@apps/api`（跨 monorepo workspaces 的 multiple hits，即使 types 相同，也始终 emit 为 `type@path` pairs）
+  理由：`:` 是 outer multi-hit delimiter，`@` 是 inner type-path delimiter，使 grammar 在 naive `awk -F:` 或 bash parameter expansion 下无歧义。在 script header comment 中明确记录，避免 callers 误读。
 
-- **Decision: New scripts accept an optional path as a positional argument, not `--cwd`.** Rationale: every existing script in `scripts/` uses positional args (`parse-checklist.sh <path>`, `classify-oversized.sh <path> <path>`) or derives cwd from `git rev-parse --show-toplevel`. Flag-parsing would be a new convention. Follow the existing pattern: optional positional path defaults to `git rev-parse --show-toplevel`.
+- **决策：New scripts 接受 optional path 作为 positional argument，而不是 `--cwd`。** 理由：`scripts/` 中每个 existing script 都使用 positional args（`parse-checklist.sh <path>`、`classify-oversized.sh <path> <path>`），或通过 `git rev-parse --show-toplevel` derive cwd。Flag-parsing 会成为新 convention。遵循现有 pattern：optional positional path 默认是 `git rev-parse --show-toplevel`。
 
-- **Decision: Expected-no-result sentinels exit 0, not 1.** Rationale: the existing convention in `read-launch-json.sh` (header comment on lines 20-21 of that file) reserves non-zero exit for operational failure only (missing `jq`, no git root). `__NO_PACKAGE_JSON__` and similar sentinels exit 0 with the sentinel on stdout; callers pattern-match on stdout, not exit code.
+- **决策：Expected-no-result sentinels 以 0 退出，而不是 1。** 理由：`read-launch-json.sh` 中 existing convention（该文件 lines 20-21 header comment）将 non-zero exit 只保留给 operational failure（missing `jq`、no git root）。`__NO_PACKAGE_JSON__` 等 sentinels exit 0 并在 stdout 输出 sentinel；callers pattern-match stdout，而不是 exit code。
 
-- **Decision: No provenance output on stderr.** Rationale: stderr across all existing scripts is reserved for `ERROR: ...` messages only. Provenance ("resolved_from: framework_config") would break that convention. `resolve-port.sh` emits a single-line integer on stdout, matching the simplicity of existing scripts. If future debugging surfaces real demand for provenance, add a second script or a `--verbose` mode in a follow-up — not speculatively.
+- **决策：stderr 上不输出 provenance。** 理由：现有所有 scripts 的 stderr 都只保留给 `ERROR: ...` messages。Provenance（"resolved_from: framework_config"）会破坏该 convention。`resolve-port.sh` 在 stdout emit single-line integer，匹配 existing scripts 的 simplicity。如果未来 debugging 对 provenance 有真实需求，在 follow-up 中添加 second script 或 `--verbose` mode，而不是 speculative。
 
-- **Decision: Monorepo probe has a depth cap of 3 and walks only if root detection returned `unknown`.** Rationale: depth 3 covers the common layouts (`apps/web/next.config.js`, `packages/frontend/vite.config.ts`, `services/api/next.config.js`). Running unconditionally would slow the common case and risk false positives when the root is a known type with example configs nested elsewhere (fixtures, templates). Depth 3 is a hard cap because deeper nesting usually means the user already needs to author `launch.json`.
+- **决策：Monorepo probe 的 depth cap 是 3，且仅当 root detection 返回 `unknown` 时才 walk。** 理由：depth 3 覆盖常见 layouts（`apps/web/next.config.js`、`packages/frontend/vite.config.ts`、`services/api/next.config.js`）。无条件运行会拖慢 common case，并在 root 已是 known type 但 nested elsewhere 存在 example configs（fixtures、templates）时产生 false positives。Depth 3 是 hard cap，因为更深 nesting 通常意味着用户已经需要 author `launch.json`。
 
-- **Decision: Exclude `node_modules/`, `.git/`, `vendor/`, `dist/`, `build/`, `coverage/`, `.next/`, `.nuxt/`, `.svelte-kit/`, `.turbo/`, `tmp/`, `fixtures/` from the monorepo probe.** Rationale: these directories ship config files as fixtures or build output that the user doesn't own. Without exclusion, a Rails app with `node_modules/next/.../examples/` would register as Next, and a monorepo with test fixtures would surface false positives.
+- **决策：从 monorepo probe 中排除 `node_modules/`、`.git/`、`vendor/`、`dist/`、`build/`、`coverage/`、`.next/`、`.nuxt/`、`.svelte-kit/`、`.turbo/`、`tmp/`、`fixtures/`。** 理由：这些 directories 会携带作为 fixtures 或 build output 的 config files，并非用户拥有。若不排除，含 `node_modules/next/.../examples/` 的 Rails app 会被识别为 Next，含 test fixtures 的 monorepo 会 surface false positives。
 
-- **Decision: `resolve-package-manager.sh` returns one token (`npm` / `pnpm` / `yarn` / `bun`) plus the start command (stdout line 1 and line 2 respectively) so stub-writer substitution is deterministic.** Rationale: `pnpm dev` and `bun run dev` use different argv shapes. A single-token return would force the consumer to maintain a lookup table; emitting both the binary and the canonical args keeps all PM-specific knowledge in one place (the resolver).
+- **决策：`resolve-package-manager.sh` 返回一个 token（`npm` / `pnpm` / `yarn` / `bun`）和 start command（分别是 stdout line 1 与 line 2），使 stub-writer substitution 具备 deterministic。** 理由：`pnpm dev` 和 `bun run dev` 使用不同 argv shapes。只返回 single-token 会迫使 consumer 维护 lookup table；emit binary 和 canonical args 可把所有 PM-specific knowledge 保持在一个地方（resolver）。
 
-- **Decision: `resolve-port.sh` replaces the inline `dev-server-detection.md` cascade.** Rationale: the cascade lives in skill prose and has silently-buggy shell (unstripped quotes, noisy grep). Lifting it into a tested script with the sentinel-output convention makes the behavior assertable and fixes the bugs at the same site. `dev-server-detection.md` becomes a thin pointer to the script with the framework-default table retained.
+- **决策：`resolve-port.sh` 替代 inline `dev-server-detection.md` cascade。** 理由：cascade 当前位于 skill prose 且含 silently-buggy shell（unstripped quotes、noisy grep）。将其 lift 到 tested script，并遵循 sentinel-output convention，使 behavior 可 assert，并在同一处修 bugs。`dev-server-detection.md` 变成指向 script 的 thin pointer，同时保留 framework-default table。
 
-- **Decision: Port cascade probes authoritative config files first, `.env*` second, default last.** Rationale: Trevor's core complaint is that the current cascade prefers *prose* (AGENTS.md) over *config* (next.config.js, config/puma.rb). Flipping that ordering restores "the code is the source of truth."
+- **决策：Port cascade 先 probe authoritative config files，其次 `.env*`，最后 default。** 理由：Trevor 的核心 complaint 是当前 cascade 优先使用 *prose*（AGENTS.md）而不是 *config*（next.config.js、config/puma.rb）。翻转 ordering 恢复 "the code is the source of truth"。
 
-- **Decision: Drop the `AGENTS.md` / `CLAUDE.md` grep entirely.** Rationale: users who need to override have the explicit `--port` / `port:` CLI token and the `.claude/launch.json` escape hatch. Grepping instruction files for port numbers catches unrelated mentions ("connects to Stripe on port 8443", "example: localhost:3000") far more often than it captures a real override.
+- **决策：完全移除 `AGENTS.md` / `CLAUDE.md` grep。** 理由：需要 override 的用户有 explicit `--port` / `port:` CLI token 和 `.claude/launch.json` escape hatch。Grep instruction files for port numbers 更常命中 unrelated mentions（"connects to Stripe on port 8443"、"example: localhost:3000"），而不是 real override。
 
-- **Decision: Framework config probes use a conservative regex and treat misses as "no pin, fall through".** Rationale: parsing arbitrary JS/TS reliably requires a JS runtime, which polish doesn't ship with. A regex that catches `port: 3000`, `port: "3000"`, and `server: { port: 3000 }` literals covers the common patterns. Missed ports fall through to framework default — same behavior as today, just with more chances to catch an explicit value along the way.
+- **决策：Framework config probes 使用 conservative regex，并将 misses 视为 "no pin, fall through"。** 理由：可靠 parse arbitrary JS/TS 需要 JS runtime，而 polish 不 ship 这个。Regex 捕获 `port: 3000`、`port: "3000"` 和 `server: { port: 3000 }` literals，覆盖 common patterns。Missed ports fall through to framework default，与今日行为相同，只是多了更多捕获 explicit value 的机会。
 
-## Open Questions
+## 开放问题
 
-### Resolved During Planning
+### 规划期间已解决
 
-- **Should Remix get a dedicated signature or route through Vite?** Resolved: both. Classic Remix ships `remix.config.js` without Vite; Remix 2.x+ ships `vite.config.ts`. Classic pattern gets its own signature in the detector so it resolves without ambiguity; new Remix continues to resolve as `vite` (the existing Vite recipe already documents SvelteKit/Astro/etc. as framework-on-Vite). The `remix` recipe notes both paths.
+- **Remix 应该获得 dedicated signature，还是 route through Vite？** 结论：两者都要。Classic Remix 携带 `remix.config.js` 而无 Vite；Remix 2.x+ 携带 `vite.config.ts`。Classic pattern 在 detector 中有 own signature，因此无歧义 resolve；new Remix 继续 resolve 为 `vite`（现有 Vite recipe 已 document SvelteKit/Astro/etc. as framework-on-Vite）。`remix` recipe 记录两条 paths。
 
-- **Should the monorepo probe return all matches or just one?** Resolved: return one if there's a single match, `multiple` with `<type>@<path>` pairs if several. Multiple matches at depth ≤3 is the genuine disambiguation case the existing `multiple` sentinel was designed for; the new output is `multiple:next@apps/web,next@apps/admin` so the interactive prompt in Phase 3.2 can list the options.
+- **Monorepo probe 应该返回所有 matches，还是只返回一个？** 结论：如果只有 single match 返回一个；如果有 several，返回带 `<type>@<path>` pairs 的 `multiple`。Depth <=3 处有多个 matches 是 existing `multiple` sentinel 本来要处理的 genuine disambiguation case；new output 是 `multiple:next@apps/web,next@apps/admin`，使 Phase 3.2 中 interactive prompt 能列出 options。
 
-- **Where does SKILL.md document the new `<type>@<cwd>` format?** Resolved: extend the existing Phase 3.2 routing table with a "Paths with `@<cwd>` suffix" paragraph and update Phase 3.3 to substitute `cwd` when present. No new top-level section.
+- **SKILL.md 在哪里 document 新的 `<type>@<cwd>` format？** 结论：扩展现有 Phase 3.2 routing table，加入 "Paths with `@<cwd>` suffix" paragraph，并更新 Phase 3.3 在 present 时 substitute `cwd`。不新增 top-level section。
 
-- **Does the port resolver need to parse `docker-compose.yml`?** Resolved: yes, but lightly — grep for `- "<port>:<port>"` under a `ports:` key on the service named `web` / `app` / `frontend`. Full YAML parsing is out of scope; a line-anchored regex catches the common compose shape and misses gracefully on exotic configs.
+- **Port resolver 是否需要 parse `docker-compose.yml`？** 结论：需要，但只做轻量解析 - 在名为 `web` / `app` / `frontend` 的 service 下的 `ports:` key 中，grep `- "<port>:<port>"`。完整 YAML parsing out of scope；line-anchored regex 捕获 common compose shape，并在 exotic configs 上 gracefully miss。
 
-### Deferred to Implementation
+### 延后到实现阶段
 
-- **Exact regex for framework config port probes.** Start with `port:\s*[0-9]+` and `port:\s*["']?[0-9]+["']?`, tighten if tests surface false positives. Unit 4 owns this.
-- **Whether `pnpm dev` should be `pnpm dev` or `pnpm run dev`.** Both work; pick whichever is idiomatic per the current pnpm docs at the time of implementation and pin it in the resolver's lookup table.
-- **Whether to probe `bun.lock` ahead of `bun.lockb`.** Bun recently added a text lockfile format (`bun.lock`) alongside the binary (`bun.lockb`); priority likely doesn't matter (only one will be present) but the resolver should match whichever is there.
+- **Framework config port probes 的 exact regex。** 从 `port:\s*[0-9]+` 和 `port:\s*["']?[0-9]+["']?` 开始；如 tests 暴露 false positives 再 tighten。Unit 4 owns this。
+- **`pnpm dev` 应该是 `pnpm dev` 还是 `pnpm run dev`。** 两者都可用；按 implementation 时 current pnpm docs 中更 idiomatic 的选择，并 pin 到 resolver lookup table。
+- **是否应该先 probe `bun.lock` 再 probe `bun.lockb`。** Bun 最近在 binary (`bun.lockb`) 之外加入 text lockfile format（`bun.lock`）；priority 可能无关紧要（正常只存在一个），但 resolver 在两者同时存在时应 deterministic。
 
-## Implementation Units
+## 实现单元
 
-- [x] **Unit 1: Add first-class recipes for Nuxt, Astro, Remix, SvelteKit**
+- [x] **Unit 1: 为 Nuxt、Astro、Remix、SvelteKit 添加 first-class recipes**
 
-**Goal:** Give the four "table stakes" JS frontend frameworks their own reference recipes with correct ports, start commands, and stub templates, so they stop falling through to `unknown`.
+**目标:** 为四个 "table stakes" JS frontend frameworks 提供 own reference recipes，含 correct ports、start commands 和 stub templates，使它们不再 fall through 到 `unknown`。
 
-**Requirements:** R1, R6
+**需求:** R1, R6
 
-**Dependencies:** None (recipe files are additive; they don't activate until Unit 2 extends the detector)
+**依赖:** 无（recipe files 是 additive；直到 Unit 2 扩展 detector 才会 activate）
 
-**Files:**
-- Create: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-nuxt.md`
-- Create: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-astro.md`
-- Create: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-remix.md`
-- Create: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-sveltekit.md`
-- Modify: `plugins/compound-engineering/skills/ce-polish-beta/references/launch-json-schema.md` (add 4 stub templates)
+**文件:**
+- 新增: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-nuxt.md`
+- 新增: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-astro.md`
+- 新增: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-remix.md`
+- 新增: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-sveltekit.md`
+- 修改: `plugins/compound-engineering/skills/ce-polish-beta/references/launch-json-schema.md`（add 4 stub templates）
 
-**Approach:**
-- Mirror the structure of `dev-server-next.md` exactly: Signature / Start command / Port / Stub generation / Common gotchas
-- Defaults per the current framework docs: Nuxt port 3000, Astro port 4321, Remix port 3000 (classic) or 5173 (Vite), SvelteKit port 5173
-- Each recipe's "Common gotchas" section notes interactions users will actually hit: Nuxt's Nitro, Astro's SSR vs SSG dev behavior, Remix's classic-vs-Vite fork, SvelteKit's adapter-free dev mode
-- Stub templates in `launch-json-schema.md` match the existing Next/Vite/Rails/Procfile pattern
+**做法:**
+- 精确 mirror `dev-server-next.md` structure：Signature / Start command / Port / Stub generation / Common gotchas
+- 按 current framework docs 设置 defaults：Nuxt port 3000、Astro port 4321、Remix port 3000（classic）或 5173（Vite）、SvelteKit port 5173
+- 每个 recipe 的 "Common gotchas" section 记录用户实际会遇到的 interactions：Nuxt 的 Nitro、Astro 的 SSR vs SSG dev behavior、Remix 的 classic-vs-Vite fork、SvelteKit 的 adapter-free dev mode
+- `launch-json-schema.md` 中 stub templates 匹配现有 Next/Vite/Rails/Procfile pattern
 
-**Patterns to follow:**
-- `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-next.md` for overall shape
-- `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-vite.md` for framework-on-Vite notes (relevant to SvelteKit and new Remix)
+**遵循的模式:**
+- `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-next.md` 提供整体形态
+- `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-vite.md` 提供 framework-on-Vite notes（与 SvelteKit 和 new Remix relevant）
 
-**Test scenarios:** Test expectation: none — reference markdown is consumed by the model, not asserted. Unit 5's integration test covers that these recipes are selected correctly when their respective signatures are present.
+**测试场景:** Test expectation: none - reference markdown 由模型 consume，不 assert。Unit 5 integration test 覆盖当 respective signatures 存在时会正确选择这些 recipes。
 
-**Verification:**
-- Four new reference files exist with all five required sections
-- `launch-json-schema.md` has stub templates for all four new types
-- A reader landing on a new recipe can answer "what command do I run, at what port, with what launch.json stub?" without leaving the file
+**验证:**
+- 四个 new reference files 存在，并含全部五个 required sections
+- `launch-json-schema.md` 有所有四个 new types 的 stub templates
+- 读者进入新 recipe 后，无需离开文件即可回答 "what command do I run, at what port, with what launch.json stub?"
 
-- [x] **Unit 2: Extend detect-project-type.sh with new signatures and monorepo probe**
+- [x] **Unit 2: 用 new signatures 和 monorepo probe 扩展 detect-project-type.sh**
 
-**Goal:** The detector recognizes Nuxt/Astro/Remix/SvelteKit at the repo root and descends up to depth 3 into workspaces when root detection returns `unknown`, emitting `<type>` or `<type>@<cwd>` as appropriate.
+**目标:** Detector 在 repo root 识别 Nuxt/Astro/Remix/SvelteKit；当 root detection 返回 `unknown` 时，下降最多 depth 3 到 workspaces，按需 emit `<type>` 或 `<type>@<cwd>`。
 
-**Requirements:** R1, R2, R5
+**需求:** R1, R2, R5
 
-**Dependencies:** Unit 1 (new types must have recipes before the detector returns them, so Phase 3.2 routing in Unit 5 doesn't dead-end)
+**依赖:** Unit 1（detector 返回 new types 前，必须已有 recipes，否则 Phase 3.2 routing in Unit 5 会 dead-end）
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-polish-beta/scripts/detect-project-type.sh`
-- Create: `tests/skills/ce-polish-beta-project-type.test.ts`
+**文件:**
+- 修改: `plugins/compound-engineering/skills/ce-polish-beta/scripts/detect-project-type.sh`
+- 新增: `tests/skills/ce-polish-beta-project-type.test.ts`
 
-**Approach:**
-- Keep the existing root-scan precedence block intact (rails beats procfile, single-match returns `<type>`)
-- Add signature checks for `nuxt.config.{js,mjs,ts}`, `astro.config.{js,mjs,ts}`, `remix.config.{js,ts}`, and `svelte.config.{js,mjs,ts}` at root
-- When the root-scan yields zero matches, run a shallow `find` with `-maxdepth 3` excluding `node_modules`, `.git`, `vendor`, `dist`, `build`, `coverage`, `.next`, `.nuxt`, `.svelte-kit`, `.turbo`, `tmp`, `fixtures` looking for any supported signature filename
-- Collect hits as `(type, relative-dir)` pairs. Deduplicate on the pair
-- Single hit → emit `<type>@<cwd>` (or bare `<type>` when the hit is `.`)
-- Multiple hits → emit `multiple:<type1>@<cwd1>,<type2>@<cwd2>,...` (always include the type prefix so the grammar is unambiguous under naive `awk -F:` on the outer separator)
-- Zero monorepo hits → emit `unknown` unchanged
-- **Header comment requirements:** document the output grammar explicitly (the four concrete shapes: `<type>` / `<type>@<cwd>` / `multiple` / `multiple:<type>@<cwd>,...`), the depth cap of 3 with its rationale, and the exclusion list. Callers should not have to reverse-engineer the grammar from examples
-
-**Execution note:** Test-first — add the new test file with scenarios for each new signature, monorepo single-hit, monorepo multi-hit, exclusion of `node_modules`, and the unchanged-root-detection regression cases. Run the suite red, then modify the detector to go green. This script is load-bearing for dev-server startup and has no production telemetry; tests are the only safety net.
-
-**Patterns to follow:**
-- Existing `detect-project-type.sh` precedence block (rails-before-procfile)
-- `tests/skills/ce-polish-beta-dev-server.test.ts` for test harness shape
-
-**Test scenarios:**
-- Happy path: `nuxt.config.ts` at root → `nuxt`
-- Happy path: `astro.config.mjs` at root → `astro`
-- Happy path: `remix.config.js` at root → `remix`
-- Happy path: `svelte.config.js` at root → `sveltekit`
-- Happy path: `apps/web/next.config.js` in Turborepo layout → `next@apps/web`
-- Happy path: `packages/frontend/vite.config.ts` in pnpm-workspace layout → `vite@packages/frontend`
-- Edge case: `apps/web/next.config.js` and `apps/admin/next.config.js` → `multiple:next@apps/web,next@apps/admin`
-- Edge case: `apps/web/next.config.js` and `apps/api/Gemfile+bin/dev` → `multiple:next@apps/web,rails@apps/api`
-- Edge case: signature inside `node_modules/next/examples/...` → ignored (root returns `unknown`)
-- Edge case: signature at depth 4 (`projects/app/web/client/next.config.js`) → ignored
-- Edge case: signature alongside `bin/dev`+`Gemfile` at root → returns `rails` (root wins, no probe runs)
-- Regression: existing 4-type root detection unchanged when signatures present at root
-- Regression: `Procfile.dev` + `bin/dev` + `Gemfile` → still returns `rails`, not `multiple`
-
-**Verification:**
-- All 12 test scenarios pass
-- `bash scripts/detect-project-type.sh` run in a real Turborepo returns `next@apps/web` (or whichever app path matches)
-- Run in the plugin's own repo root still returns the existing detection (or `unknown`, matching prior behavior)
-
-- [x] **Unit 3: Package-manager resolver script**
-
-**Goal:** A new `resolve-package-manager.sh` emits the project's package manager (`npm` / `pnpm` / `yarn` / `bun`) plus the canonical dev-server argv, so the stub-writer can substitute both without in-agent judgment.
-
-**Requirements:** R3, R6
-
-**Dependencies:** None
-
-**Files:**
-- Create: `plugins/compound-engineering/skills/ce-polish-beta/scripts/resolve-package-manager.sh`
-- Create: `tests/skills/ce-polish-beta-package-manager.test.ts`
-
-**Approach:**
-- Accept an optional path as a positional argument (first positional); default to repo root via `git rev-parse --show-toplevel` when omitted
-- In the resolved path, check for lockfiles in priority order: `pnpm-lock.yaml` → `yarn.lock` → `bun.lockb` / `bun.lock` → `package-lock.json`
-- Emit two lines on stdout: line 1 = token (`npm` | `pnpm` | `yarn` | `bun`), line 2 = canonical command tail as a space-separated argv (e.g., `run dev` for npm/bun, `dev` for pnpm/yarn)
-- Fall through to `npm` + `run dev` only when a `package.json` is present and no lockfile matches (matches prior hardcoded behavior, so no regression for vanilla projects). If the path is a valid directory but contains no `package.json`, do not fall through to `npm` — emit the sentinel instead (see next bullet), so callers can distinguish "JavaScript project with no lockfile" from "not a JavaScript project at all"
-- If the path is a valid directory but contains no `package.json`, emit sentinel `__NO_PACKAGE_JSON__` on stdout and exit 0 (expected-no-match, matching `read-launch-json.sh` sentinel convention — callers pattern-match on stdout, not exit code)
-- When both `bun.lockb` (binary) and `bun.lock` (text) are present in the same directory, prefer `bun.lock` (text). Rationale: Bun's text lockfile is the newer, canonical format; the binary format is a legacy variant. Only one will normally be present, but the resolver must deterministically pick one when both exist
-- If the path itself does not exist or is not a directory, emit `ERROR:` on stderr and exit 1 (operational failure, distinct from expected-no-match)
-- **Header comment requirements:** document the two-line stdout grammar (line 1 = binary, line 2 = argv tail), the lockfile priority order and why, and the sentinel-vs-error exit-code split
-
-**Patterns to follow:**
-- `plugins/compound-engineering/skills/ce-polish-beta/scripts/read-launch-json.sh` for sentinel outputs and exit codes
-- Existing `detect-project-type.sh` for simple lockfile-presence checks
-
-**Test scenarios:**
-- Happy path: `pnpm-lock.yaml` present → stdout: `pnpm\ndev`
-- Happy path: `yarn.lock` present → stdout: `yarn\ndev`
-- Happy path: `bun.lockb` present → stdout: `bun\nrun dev`
-- Happy path: `bun.lock` (text format) present → stdout: `bun\nrun dev`
-- Happy path: `package-lock.json` present → stdout: `npm\nrun dev`
-- Happy path: no lockfile, `package.json` present → stdout: `npm\nrun dev` (safe default)
-- Edge case: both `pnpm-lock.yaml` and `yarn.lock` present → stdout: `pnpm\ndev` (priority order wins)
-- Edge case: positional path pointing to `apps/web` — reads lockfile from subdir, not repo root
-- Edge case: positional path to a directory without `package.json` → stdout `__NO_PACKAGE_JSON__`, exit 0 (expected-no-match sentinel)
-- Edge case: no positional arg, not in a git repo → stderr `ERROR:` + exit 1 (operational failure)
-- Edge case: positional path but directory doesn't exist → stderr `ERROR:` + exit 1 (operational failure)
-
-**Verification:**
-- All test scenarios pass
-- Running from a real pnpm repo returns `pnpm\ndev`
-- Running from a real npm repo returns `npm\nrun dev`
-
-- [x] **Unit 4: Port resolver script with authoritative config probes**
-
-**Goal:** A new `resolve-port.sh` probes config files in priority order (framework config → `config/puma.rb` → `Procfile.dev` → `docker-compose.yml` → `package.json` scripts → `.env*` → default), correctly parses `.env` values (stripping quotes and `# comment`), and drops the `AGENTS.md`/`CLAUDE.md` grep.
-
-**Requirements:** R4, R6
-
-**Dependencies:** None
-
-**Files:**
-- Create: `plugins/compound-engineering/skills/ce-polish-beta/scripts/resolve-port.sh`
-- Create: `tests/skills/ce-polish-beta-resolve-port.test.ts`
-- Modify: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-detection.md`
-
-**Approach:**
-- Accept optional positional path as the first positional argument (defaults to `git rev-parse --show-toplevel` when omitted) — consistent with `parse-checklist.sh` and the Unit 3 resolver
-- Accept optional `--type <rails|next|vite|nuxt|astro|remix|sveltekit|procfile>` flag to scope which probes run (e.g., skip `config/puma.rb` for Next). Type is a classification, not a path, so the flag form is appropriate and distinguishable from the positional path
-- Accept optional `--port <n>` flag as an explicit override (emit immediately when present, before any probing)
-- Probe order (first hit wins):
-  1. Explicit `--port` flag
-  2. Framework config: `next.config.*` / `vite.config.*` / `nuxt.config.*` / `astro.config.*` — conservative regex for `port:\s*["']?[0-9]+["']?` or `server.port\s*=\s*[0-9]+`. Numeric literals only; reject matches where the value is a variable reference (e.g., `process.env.PORT`, `getPort()`) so we do not emit a misleading default
-  3. Rails: `config/puma.rb` `port\s+[0-9]+`
-  4. Procfile: `Procfile.dev` `web:` line scanned for `-p <n>` / `--port <n>`
-  5. `docker-compose.yml`: in service named `web` / `app` / `frontend`, the first `"<n>:<n>"` line under `ports:`
-  6. `package.json` `dev`/`start` script for `--port <n>` / `-p <n>`
-  7. `.env*` files: check in override order **`.env.local` → `.env.development` → `.env`** (first hit wins, matching the convention most JS frameworks use where `.env.local` overrides `.env.development` which overrides `.env`). Parse `PORT=<n>`, stripping surrounding `"` or `'` and truncating at `#` (after trimming whitespace)
-  8. Framework default (emitted from a lookup table: rails/next/nuxt/remix=3000, vite/sveltekit=5173, astro=4321, procfile=3000, unknown=3000)
-- Emit the resolved port as a single line on stdout. Do **not** emit provenance — stderr is reserved for `ERROR:` messages, matching the existing convention in `read-launch-json.sh` and `parse-checklist.sh`. If future debugging demand surfaces, add a `--verbose` mode in a follow-up rather than speculatively
-- Rewrite `dev-server-detection.md`: the inline bash cascade is removed; the file becomes a navigable pointer ("Port resolution runs via `scripts/resolve-port.sh`") plus the framework-default table and probe-order rationale. Include an explicit **sync-note block** listing the three intentional divergences from `test-browser`'s inline cascade: (a) quote stripping on `.env` values, (b) comment stripping on `.env` values, (c) removal of the `AGENTS.md`/`CLAUDE.md` grep. The block tells a future maintainer of either skill exactly what not to "fix" back to symmetry
-- **Header comment requirements:** document the probe-order rationale (config-before-prose), the `.env` parsing contract (quote + comment stripping), and the reason `AGENTS.md`/`CLAUDE.md` grepping is deliberately omitted
-
-**Execution note:** Test-first — `.env` parsing bugs are the whole point. Write cases for quoted, single-quoted, comment-trailed, whitespace-padded, and multi-line forms first. Implement against those cases.
-
-**Patterns to follow:**
-- Existing cascade in `references/dev-server-detection.md` for probe order (improved, not replaced wholesale)
+**做法:**
+- 保持现有 root-scan precedence block intact（rails beats procfile，single-match 返回 `<type>`）
+- 添加 root signature checks：`nuxt.config.{js,mjs,ts}`、`astro.config.{js,mjs,ts}`、`remix.config.{js,ts}` 和 `svelte.config.{js,mjs,ts}`
+- 当 root-scan yields zero matches 时，运行 shallow `find` with `-maxdepth 3`，排除 `node_modules`、`.git`、`vendor`、`dist`、`build`、`coverage`、`.next`、`.nuxt`、`.svelte-kit`、`.turbo`、`tmp`、`fixtures`，寻找任何 supported signature filename
+- 将 hits 收集为 `(type, relative-dir)` pairs。按 pair deduplicate
+- Single hit -> emit `<type>@<cwd>`（如果 hit 是 `.`，则 emit bare `<type>`）
+- Multiple hits -> emit `multiple:<type1>@<cwd1>,<type2>@<cwd2>,...`（始终包含 type prefix，使 grammar 在 naive `awk -F:` 处理 outer separator 时无歧义）
+- Zero monorepo hits -> emit `unknown`，保持不变
+- **Header comment requirements:** 显式记录 output grammar（四种 concrete shapes：`<type>` / `<type>@<cwd>` / `multiple` / `multiple:<type>@<cwd>,...`）、depth cap 3 及 rationale、exclusion list。Callers 不应被迫从 examples reverse-engineer grammar。
+
+**执行备注:** Test-first - 添加 new test file，覆盖每个 new signature、monorepo single-hit、monorepo multi-hit、exclusion of `node_modules` 和 unchanged-root-detection regression cases。先 run suite red，再修改 detector 到 green。该 script 对 dev-server startup load-bearing 且无 production telemetry；tests 是唯一 safety net。
+
+**遵循的模式:**
+- 现有 `detect-project-type.sh` precedence block（rails-before-procfile）
+- `tests/skills/ce-polish-beta-dev-server.test.ts` 提供 test harness shape
+
+**测试场景:**
+- Happy path: root 中的 `nuxt.config.ts` -> `nuxt`
+- Happy path: root 中的 `astro.config.mjs` -> `astro`
+- Happy path: root 中的 `remix.config.js` -> `remix`
+- Happy path: root 中的 `svelte.config.js` -> `sveltekit`
+- Happy path: Turborepo layout 中的 `apps/web/next.config.js` -> `next@apps/web`
+- Happy path: pnpm-workspace layout 中的 `packages/frontend/vite.config.ts` -> `vite@packages/frontend`
+- Edge case: `apps/web/next.config.js` 和 `apps/admin/next.config.js` -> `multiple:next@apps/web,next@apps/admin`
+- Edge case: `apps/web/next.config.js` 和 `apps/api/Gemfile+bin/dev` -> `multiple:next@apps/web,rails@apps/api`
+- Edge case: `node_modules/next/examples/...` 内的 signature -> ignored（root returns `unknown`）
+- Edge case: depth 4 的 signature（`projects/app/web/client/next.config.js`）-> ignored
+- Edge case: signature 与 root 中的 `bin/dev`+`Gemfile` 并存 -> returns `rails`（root wins，no probe runs）
+- Regression: signatures present at root 时，existing 4-type root detection unchanged
+- 回归测试：`Procfile.dev` + `bin/dev` + `Gemfile` -> still returns `rails`，not `multiple`
+
+**验证:**
+- 全部 12 个 test scenarios pass
+- 在真实 Turborepo 中运行 `bash scripts/detect-project-type.sh` 返回 `next@apps/web`（或匹配的 app path）
+- 在 plugin 自身 repo root 中运行仍返回 existing detection（或 `unknown`，匹配 prior behavior）
+
+- [x] **Unit 3：Package-manager resolver script（package-manager 解析脚本）**
+
+**目标:** 新增 `resolve-package-manager.sh`，emit project package manager（`npm` / `pnpm` / `yarn` / `bun`）以及 canonical dev-server argv，使 stub-writer 可 deterministic substitute 两者，无需 in-agent judgment。
+
+**需求:** R3, R6
+
+**依赖:** 无
+
+**文件:**
+- 新增: `plugins/compound-engineering/skills/ce-polish-beta/scripts/resolve-package-manager.sh`
+- 新增: `tests/skills/ce-polish-beta-package-manager.test.ts`
+
+**做法:**
+- 接受 optional path 作为 positional argument（第一个 positional）；缺省时通过 `git rev-parse --show-toplevel` 默认到 repo root
+- 在 resolved path 中，按 priority order 检查 lockfiles：`pnpm-lock.yaml` -> `yarn.lock` -> `bun.lockb` / `bun.lock` -> `package-lock.json`
+- stdout emit 两行：line 1 = token（`npm` | `pnpm` | `yarn` | `bun`），line 2 = canonical command tail as space-separated argv（例如 npm/bun 为 `run dev`，pnpm/yarn 为 `dev`）
+- 仅当存在 `package.json` 且无匹配 lockfile 时 fall through 到 `npm` + `run dev`（匹配 prior hardcoded behavior，因此 vanilla projects 无 regression）。如果 path 是 valid directory 但没有 `package.json`，不要 fall through 到 `npm` - 而是 emit sentinel（见下一 bullet），使 callers 可区分 "JavaScript project with no lockfile" 和 "not a JavaScript project at all"
+- 如果 path 是 valid directory 但无 `package.json`，在 stdout emit sentinel `__NO_PACKAGE_JSON__` 并 exit 0（expected-no-match，匹配 `read-launch-json.sh` sentinel convention - callers pattern-match stdout，不看 exit code）
+- 当 `bun.lockb`（binary）和 `bun.lock`（text）同时存在于同一目录时，优先 `bun.lock`（text）。理由：Bun 的 text lockfile 是更新的 canonical format；binary format 是 legacy variant。正常只存在一个，但 resolver 在两者同时存在时必须 deterministic pick。
+- 如果 path 本身不存在或不是 directory，在 stderr emit `ERROR:` 并 exit 1（operational failure，与 expected-no-match 不同）
+- **Header comment requirements:** 记录 two-line stdout grammar（line 1 = binary，line 2 = argv tail）、lockfile priority order 及原因、sentinel-vs-error exit-code split
+
+**遵循的模式:**
+- `plugins/compound-engineering/skills/ce-polish-beta/scripts/read-launch-json.sh` 提供 sentinel outputs and exit codes 模式
+- Existing `detect-project-type.sh` 提供 simple lockfile-presence checks 模式
+
+**测试场景:**
+- Happy path: 存在 `pnpm-lock.yaml` -> stdout: `pnpm\ndev`
+- Happy path: 存在 `yarn.lock` -> stdout: `yarn\ndev`
+- Happy path: 存在 `bun.lockb` -> stdout: `bun\nrun dev`
+- Happy path: 存在 `bun.lock`（text format）-> stdout: `bun\nrun dev`
+- Happy path: 存在 `package-lock.json` -> stdout: `npm\nrun dev`
+- Happy path: 无 lockfile，但存在 `package.json` -> stdout: `npm\nrun dev`（safe default）
+- Edge case: 同时存在 `pnpm-lock.yaml` 和 `yarn.lock` -> stdout: `pnpm\ndev`（priority order wins）
+- Edge case: positional path 指向 `apps/web` - 从 subdir 读取 lockfile，而不是 repo root
+- Edge case: positional path 指向没有 `package.json` 的目录 -> stdout `__NO_PACKAGE_JSON__`, exit 0（expected-no-match sentinel）
+- Edge case: 无 positional arg，且不在 git repo 中 -> stderr `ERROR:` + exit 1（operational failure）
+- Edge case: positional path 存在但目录不存在 -> stderr `ERROR:` + exit 1（operational failure）
+
+**验证:**
+- 全部 test scenarios pass
+- 从真实 pnpm repo 运行返回 `pnpm\ndev`
+- 从真实 npm repo 运行返回 `npm\nrun dev`
+
+- [x] **Unit 4: 带 authoritative config probes 的 port resolver script**
+
+**目标:** 新增 `resolve-port.sh`，按 priority order probe config files（framework config -> `config/puma.rb` -> `Procfile.dev` -> `docker-compose.yml` -> `package.json` scripts -> `.env*` -> default），正确 parse `.env` values（strip quotes 和 `# comment`），并 drop `AGENTS.md`/`CLAUDE.md` grep。
+
+**需求:** R4, R6
+
+**依赖:** 无
+
+**文件:**
+- 新增: `plugins/compound-engineering/skills/ce-polish-beta/scripts/resolve-port.sh`
+- 新增: `tests/skills/ce-polish-beta-resolve-port.test.ts`
+- 修改: `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-detection.md`
+
+**做法:**
+- 接受 optional positional path 作为第一个 positional argument（缺省时为 `git rev-parse --show-toplevel`）- 与 `parse-checklist.sh` 和 Unit 3 resolver 一致
+- 接受 optional `--type <rails|next|vite|nuxt|astro|remix|sveltekit|procfile>` flag 以限定运行哪些 probes（例如为 Next 跳过 `config/puma.rb`）。Type 是 classification，不是 path，因此 flag form 合理且可与 positional path 区分
+- 接受 optional `--port <n>` flag 作为 explicit override（存在时立即 emit，先于任何 probing）
+- Probe order（probe 顺序，first hit wins）：
+  1. 显式 `--port` flag
+  2. Framework config: `next.config.*` / `vite.config.*` / `nuxt.config.*` / `astro.config.*` - 对 `port:\s*["']?[0-9]+["']?` 或 `server.port\s*=\s*[0-9]+` 使用 conservative regex。只接受 numeric literals；reject value 为 variable reference 的 matches（例如 `process.env.PORT`、`getPort()`），避免 emit misleading default
+  3. Rails：`config/puma.rb` `port\s+[0-9]+`
+  4. Procfile：扫描 `Procfile.dev` 的 `web:` line，查找 `-p <n>` / `--port <n>`
+  5. `docker-compose.yml`: service named `web` / `app` / `frontend` 下，`ports:` 中第一行 `"<n>:<n>"`
+  6. `package.json` 的 `dev`/`start` script，查找 `--port <n>` / `-p <n>`
+  7. `.env*` files: 按 override order **`.env.local` -> `.env.development` -> `.env`** 检查（first hit wins，匹配多数 JS frameworks 的 convention：`.env.local` overrides `.env.development` overrides `.env`）。Parse `PORT=<n>`，strip surrounding `"` 或 `'`，并在 trimming whitespace 后截断 `#`
+  8. Framework default（由 lookup table emit：rails/next/nuxt/remix=3000，vite/sveltekit=5173，astro=4321，procfile=3000，unknown=3000）
+- 在 stdout emit resolved port as single line。**不 emit provenance** - stderr 保留给 `ERROR:` messages，匹配 `read-launch-json.sh` 和 `parse-checklist.sh` 中现有 convention。如果未来 debugging demand 出现，在 follow-up 中添加 `--verbose` mode，而不是 speculative。
+- Rewrite `dev-server-detection.md`：移除 inline bash cascade；该文件成为 navigable pointer（"Port resolution runs via `scripts/resolve-port.sh`"），同时保留 framework-default table 和 probe-order rationale。加入 explicit **sync-note block**，列出与 `test-browser` inline cascade 的三个 intentional divergences：(a) quote stripping on `.env` values，(b) comment stripping on `.env` values，(c) removal of the `AGENTS.md`/`CLAUDE.md` grep。该 block 告诉 future maintainer 在任一 skill 中什么不应被 "fix" 回对称
+- **Header comment requirements:** 记录 probe-order rationale（config-before-prose）、`.env` parsing contract（quote + comment stripping），以及有意省略 `AGENTS.md`/`CLAUDE.md` grepping 的原因
+
+**执行备注:** Test-first - `.env` parsing bugs 是重点。先写 quoted、single-quoted、comment-trailed、whitespace-padded 和 multi-line forms 的 cases，再实现。
+
+**遵循的模式:**
+- `references/dev-server-detection.md` 中 existing cascade for probe order（improved, not replaced wholesale）
 - `scripts/parse-checklist.sh` for bash regex patterns and awk/sed composition
 - `scripts/read-launch-json.sh` for sentinel conventions and stderr-for-diagnostics
 
-**Test scenarios:**
-- Happy path: `--port 8080` explicit → `8080`
-- Happy path: `next.config.js` with `port: 4000` → `4000`
-- Happy path: `next.config.ts` with `server: { port: 4000 }` → `4000`
-- Happy path: `config/puma.rb` with `port 3001` → `3001` (rails type)
-- Happy path: `Procfile.dev` `web: bundle exec puma -p 4567` → `4567`
-- Happy path: `docker-compose.yml` with `web:\n  ports:\n    - "9000:9000"` → `9000`
-- Happy path: `package.json` `"dev": "next dev --port 4000"` → `4000`
-- Edge case: `.env` `PORT=3001` → `3001`
-- Edge case: `.env` `PORT="3001"` → `3001` (quotes stripped)
-- Edge case: `.env` `PORT='3001'` → `3001` (single quotes stripped)
-- Edge case: `.env` `PORT=3001 # dev only` → `3001` (comment stripped)
-- Edge case: `.env` `PORT="3001" # quoted+commented` → `3001`
-- Edge case: `.env` `  PORT = 3001  ` → `3001` (whitespace tolerated)
-- Edge case: `.env.local` `PORT=4000` + `.env` `PORT=3000` both present → `4000` (`.env.local` precedence)
-- Edge case: `.env.development` `PORT=4000` + `.env` `PORT=3000` both present → `4000` (`.env.development` precedence)
-- Edge case: `.env.local` `PORT=4000` + `.env.development` `PORT=5000` both present → `4000` (`.env.local` beats `.env.development`)
-- Edge case: multiple probes hit — framework config wins over `.env` (priority order)
-- Edge case: no probe matches, `--type next` → `3000` (default)
-- Edge case: no probe matches, `--type vite` → `5173`
-- Edge case: no probe matches, `--type astro` → `4321`
-- Edge case: no probe matches, no `--type` → `3000` (unknown default)
-- Error path: malformed `docker-compose.yml` — probe misses, falls through (no crash)
-- Error path: `next.config.js` with computed port (`port: getPort()`) — regex misses, falls through
-- Error path: `next.config.js` with `port: process.env.PORT || 3000` — probe rejects the variable reference and falls through to `.env` / default (does not emit `3000` as if it were a framework-config hit)
-- Error path: positional path does not exist → stderr `ERROR:` + exit 1 (operational failure, not a fall-through)
-- Regression: `AGENTS.md` mentioning port `8443` in prose — ignored (grep removed)
-- Regression: `CLAUDE.md` mentioning `localhost:3000` in examples — ignored
+**测试场景:**
+- Happy path：显式 `--port 8080` -> `8080`
+- Happy path：带 `port: 4000` 的 `next.config.js` -> `4000`
+- Happy path：带 `server: { port: 4000 }` 的 `next.config.ts` -> `4000`
+- Happy path：带 `port 3001` 的 `config/puma.rb` -> `3001`（rails type）
+- Happy path（正常路径）：`Procfile.dev` `web: bundle exec puma -p 4567` -> `4567`
+- Happy path：`docker-compose.yml` 包含 `web:\n  ports:\n    - "9000:9000"` -> `9000`
+- Happy path（正常路径）：`package.json` `"dev": "next dev --port 4000"` -> `4000`
+- 边界情况：`.env` `PORT=3001` -> `3001`
+- 边界情况：`.env` `PORT="3001"` -> `3001`（quotes stripped）
+- 边界情况：`.env` `PORT='3001'` -> `3001`（single quotes stripped）
+- 边界情况：`.env` `PORT=3001 # dev only` -> `3001`（comment stripped）
+- 边界情况：`.env` `PORT="3001" # quoted+commented` -> `3001`
+- 边界情况：`.env` `  PORT = 3001  ` -> `3001`（whitespace tolerated）
+- 边界情况：`.env.local` `PORT=4000` + `.env` `PORT=3000` both present -> `4000`（`.env.local` precedence）
+- 边界情况：`.env.development` `PORT=4000` + `.env` `PORT=3000` both present -> `4000`（`.env.development` precedence）
+- 边界情况：`.env.local` `PORT=4000` + `.env.development` `PORT=5000` both present -> `4000`（`.env.local` beats `.env.development`）
+- 边界情况：multiple probes hit - framework config wins over `.env`（priority order）
+- 边界情况：no probe matches, `--type next` -> `3000`（default）
+- 边界情况：no probe matches, `--type vite` -> `5173`
+- 边界情况：no probe matches, `--type astro` -> `4321`
+- 边界情况：no probe matches, no `--type` -> `3000`（unknown default）
+- Error path（错误路径）：malformed `docker-compose.yml` - probe misses, falls through（no crash）
+- Error path（错误路径）：computed port（`port: getPort()`）的 `next.config.js` - regex misses, falls through
+- Error path（错误路径）：`next.config.js` with `port: process.env.PORT || 3000` - probe rejects variable reference and falls through to `.env` / default（不把 `3000` 当 framework-config hit emit）
+- Error path（错误路径）：positional path does not exist -> stderr `ERROR:` + exit 1（operational failure, not a fall-through）
+- 回归测试：`AGENTS.md` mentioning port `8443` in prose - ignored（grep removed）
+- 回归测试：`CLAUDE.md` mentioning `localhost:3000` in examples - ignored
 
-**Verification:**
-- All 20+ test scenarios pass
-- Running in the plugin's own repo root returns `3000` (default, since no framework config)
-- Running against a synthetic Rails repo with `config/puma.rb port 3001` returns `3001`
-- `dev-server-detection.md` no longer contains inline shell; it describes the probe order and framework-default table
+**验证:**
+- 全部 20+ test scenarios pass
+- 在 plugin 自身 repo root 运行返回 `3000`（default，因为无 framework config）
+- 针对 synthetic Rails repo（`config/puma.rb port 3001`）运行返回 `3001`
+- `dev-server-detection.md` 不再包含 inline shell；它描述 probe order 和 framework-default table
 
-- [x] **Unit 5: Wire new scripts and signatures into SKILL.md Phase 3**
+- [x] **Unit 5: 将 new scripts 和 signatures 接入 SKILL.md Phase 3**
 
-**Goal:** SKILL.md Phase 3.2 routes the four new types and handles the `<type>@<cwd>` format; Phase 3.3 substitutes package-manager + cwd into stubs; port resolution calls `resolve-port.sh` instead of the inline cascade.
+**目标:** SKILL.md Phase 3.2 路由四个 new types 并处理 `<type>@<cwd>` format；Phase 3.3 将 package-manager + cwd substitute 到 stubs；port resolution 调用 `resolve-port.sh`，而不是 inline cascade。
 
-**Requirements:** R1, R2, R3, R4, R5
+**需求:** R1, R2, R3, R4, R5
 
-**Dependencies:** Units 1–4 (recipes, signatures, resolvers all exist)
+**依赖:** Units 1-4（recipes、signatures、resolvers 都已存在）
 
-**Files:**
-- Modify: `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (Phase 3.2 routing table, Phase 3.3 stub-writer logic, references list at bottom)
+**文件:**
+- 修改: `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md`（Phase 3.2 routing table、Phase 3.3 stub-writer logic、bottom references list）
 
-**Approach:**
-- Phase 3.2 routing table gains four new rows (nuxt, astro, remix, sveltekit)
-- Phase 3.2 adds a paragraph under the table: "When the detector returns `<type>@<cwd>`, route by `<type>` as usual, and carry `<cwd>` into the stub-writer for Phase 3.3. When the detector returns `multiple:<type1>@<cwd1>,<type2>@<cwd2>,...`, the interactive prompt lists the `<type>@<cwd>` pairs and asks the user to pick one; headless mode emits the standard `multiple` failure with the pair list appended."
-- Phase 3.3 stub-writer logic updated: "For Next/Vite/Nuxt/Astro/Remix/SvelteKit stubs, call `resolve-package-manager.sh` (passing `<cwd>` as the positional arg when present) and substitute the emitted binary and args into `runtimeExecutable` / `runtimeArgs`. When the detector emitted `<type>@<cwd>`, populate the stub's `cwd` field with that value. For port, call `resolve-port.sh [<cwd>] --type <type>` and substitute the emitted port."
-- References list at the bottom of SKILL.md gains the three new reference files (Unit 1) and two new scripts (Units 3 and 4)
-- `dev-server-detection.md` reference in the "Cascade" section is kept but its description changes to "Port-resolution documentation — the runtime path is `scripts/resolve-port.sh`"
+**做法:**
+- Phase 3.2 routing table 增加四行 new rows（nuxt、astro、remix、sveltekit）
+- Phase 3.2 在 table 下添加 paragraph："When the detector returns `<type>@<cwd>`, route by `<type>` as usual, and carry `<cwd>` into the stub-writer for Phase 3.3. When the detector returns `multiple:<type1>@<cwd1>,<type2>@<cwd2>,...`, the interactive prompt lists the `<type>@<cwd>` pairs and asks the user to pick one; headless mode emits the standard `multiple` failure with the pair list appended."
+- Phase 3.3 stub-writer logic 更新："For Next/Vite/Nuxt/Astro/Remix/SvelteKit stubs, call `resolve-package-manager.sh` (passing `<cwd>` as the positional arg when present) and substitute the emitted binary and args into `runtimeExecutable` / `runtimeArgs`. When the detector emitted `<type>@<cwd>`, populate the stub's `cwd` field with that value. For port, call `resolve-port.sh [<cwd>] --type <type>` and substitute the emitted port."
+- SKILL.md 底部 references list 增加三个 new reference files（Unit 1）和两个 new scripts（Units 3 and 4）
+- "Cascade" section 中保留 `dev-server-detection.md` reference，但 description 改为 "Port-resolution documentation — the runtime path is `scripts/resolve-port.sh`"
 
-**Patterns to follow:**
-- Existing Phase 3.2 table structure and prose (keep the table format, add rows)
-- Existing Phase 3.3 stub-writer prose (keep imperative style, add substitution bullets)
-- Existing reference list at SKILL.md bottom (alphabetical within scripts/references groups)
+**遵循的模式:**
+- Existing Phase 3.2 table structure and prose（保持 table format，添加 rows）
+- Existing Phase 3.3 stub-writer prose（保持 imperative style，添加 substitution bullets）
+- Existing reference list at SKILL.md bottom（scripts/references groups 内 alphabetic）
 
-**Test scenarios:**
-- Test expectation: none — SKILL.md content is model-consumed. The behavior it documents is asserted by Units 2, 3, and 4 unit tests.
+**测试场景:**
+- Test expectation: none - SKILL.md content 由模型 consume。其 documented behavior 由 Units 2、3 和 4 unit tests assert。
 
-**Verification:**
-- `bun test tests/skills/ce-polish-beta-*` passes (all old + new tests green)
-- `bun run release:validate` passes (SKILL.md structure intact, no broken references)
-- Reading SKILL.md Phase 3 start-to-finish, a reader can trace: "detector says `next@apps/web`" → "Phase 3.3 substitutes pm+port+cwd from resolvers into Next stub" → "final stub has `cwd: apps/web`, `runtimeExecutable: pnpm`, `port: 3001`"
-- Four new reference files and two new scripts appear in the SKILL.md references list
+**验证:**
+- `bun test tests/skills/ce-polish-beta-*` passes（all old + new tests green）
+- `bun run release:validate` passes（SKILL.md structure intact，无 broken references）
+- 读取 SKILL.md Phase 3 start-to-finish，reader 可 trace："detector says `next@apps/web`" -> "Phase 3.3 substitutes pm+port+cwd from resolvers into Next stub" -> "final stub has `cwd: apps/web`, `runtimeExecutable: pnpm`, `port: 3001`"
+- 四个 new reference files 和两个 new scripts 出现在 SKILL.md references list
 
-## High-Level Technical Design
+## 高层技术设计
 
-> *This illustrates the intended approach and is directional guidance for review, not implementation specification. The implementing agent should treat it as context, not code to reproduce.*
+> *这说明预期做法，并作为 review 的方向性指导，而不是实现规范。实现 agent 应把它当作上下文，而不是要逐字复刻的代码。*
 
-**Data flow through Phase 3 after the fix:**
+**修复后 Phase 3 的数据流:**
 
 ```
     .claude/launch.json exists? ──yes──▶ use it verbatim ──▶ Phase 3.5
@@ -397,60 +397,60 @@ None directly applicable; this work extends patterns already proven in the same 
            )
 ```
 
-**Probe-order for `resolve-port.sh` (first hit wins):**
+**`resolve-port.sh` 的 probe order（first hit wins）:**
 
-| Rank | Source | Why this order |
+| Rank | Source | 排序原因 |
 |------|--------|----------------|
-| 1 | Explicit CLI `--port` | User intent is authoritative |
-| 2 | Framework config (`next.config.*` / `vite.config.*` / `nuxt.config.*` / `astro.config.*`) | The framework itself reads this |
-| 3 | `config/puma.rb` (rails only) | Rails server actually binds here |
-| 4 | `Procfile.dev` web line | What `bin/dev` / foreman actually runs |
-| 5 | `docker-compose.yml` web service ports | Container port binding, often authoritative in Docker-first dev |
-| 6 | `package.json` `dev`/`start` scripts | Falls back to npm-style CLI flags |
-| 7 | `.env*` (quote- and comment-stripped) | Env override, commonly used |
-| 8 | Framework default | Last resort, documented table |
+| 1 | Explicit CLI `--port` | 用户意图最权威 |
+| 2 | Framework config (`next.config.*` / `vite.config.*` / `nuxt.config.*` / `astro.config.*`) | Framework 自身读取这里 |
+| 3 | `config/puma.rb` (rails only) | Rails server 实际绑定这里 |
+| 4 | `Procfile.dev` web line | `bin/dev` / foreman 实际运行的内容 |
+| 5 | `docker-compose.yml` web service ports | Container port binding，在 Docker-first dev 中通常权威 |
+| 6 | `package.json` `dev`/`start` scripts | fallback 到 npm-style CLI flags |
+| 7 | `.env*` (quote- and comment-stripped) | 常用 Env override |
+| 8 | Framework default | 最后 fallback，使用 documented table |
 
-## System-Wide Impact
+## 系统级影响
 
-- **Interaction graph:** Phase 3.2 routing consumes detector output; Phase 3.3 stub-writer consumes resolver output. No other phases touch these scripts. Headless mode's "never mutate state" invariant is preserved because all new scripts are read-only probes.
-- **Error propagation:** New scripts follow the sentinel-on-stdout + exit-code convention. Phase 3 already handles sentinel outputs from `read-launch-json.sh`; new sentinels (`__NO_PACKAGE_JSON__`) integrate into the same handler shape. Unknown probes fall through to framework defaults (same as today) rather than erroring.
-- **State lifecycle risks:** None. No persisted state changes; the stub-writer writes `.claude/launch.json` only in interactive mode with user consent (Phase 3.3 existing behavior, preserved).
-- **API surface parity:** Not applicable — this is a skill-internal detection subsystem. The skill's public contract (argument tokens, `checklist.md` format, headless envelope shape) is unchanged.
-- **Integration coverage:** Unit 5's verification explicitly traces a full monorepo + pnpm + custom-port scenario end-to-end to catch integration bugs the per-unit tests miss.
-- **Unchanged invariants:**
-  - `.claude/launch.json` always wins over auto-detect (Phase 3.1 unchanged)
-  - `rails` still beats `procfile` at root (existing precedence preserved)
-  - Headless mode still never writes `.claude/launch.json`
-  - The cross-skill `dev-server-detection.md` duplication note (vs `test-browser`) remains manual-sync; this plan does not modify `test-browser`
+- **Interaction graph:** Phase 3.2 routing consume detector output；Phase 3.3 stub-writer consume resolver output。无其他 phases touch 这些 scripts。Headless mode 的 "never mutate state" invariant 保持不变，因为所有 new scripts 都是 read-only probes。
+- **Error propagation:** New scripts 遵循 sentinel-on-stdout + exit-code convention。Phase 3 已处理来自 `read-launch-json.sh` 的 sentinel outputs；new sentinels（`__NO_PACKAGE_JSON__`）集成到相同 handler shape。Unknown probes fall through to framework defaults（与今日相同），而不是 erroring。
+- **State lifecycle risks:** 无。没有 persisted state changes；stub-writer 只在 interactive mode 且用户 consent 时写 `.claude/launch.json`（Phase 3.3 existing behavior, preserved）。
+- **API surface parity:** 不适用 - 这是 skill-internal detection subsystem。Skill 的 public contract（argument tokens、`checklist.md` format、headless envelope shape）不变。
+- **Integration coverage:** Unit 5 verification 明确 trace 一个 full monorepo + pnpm + custom-port scenario end-to-end，以捕获 per-unit tests 可能漏掉的 integration bugs。
+- **未改变的 invariants:**
+  - `.claude/launch.json` 始终 wins over auto-detect（Phase 3.1 unchanged）
+  - root 处 `rails` 仍 beats `procfile`（existing precedence preserved）
+  - Headless mode 仍 never writes `.claude/launch.json`
+  - 与 `test-browser` 的 cross-skill `dev-server-detection.md` duplication note 仍是 manual-sync；本 plan 不修改 `test-browser`
 
-## Risks & Dependencies
+## 风险与依赖
 
-| Risk | Mitigation |
-|------|------------|
-| Monorepo probe false-positive (e.g., config in a fixture directory) | Exclusion list (`node_modules`, `fixtures`, etc.) in the probe; depth cap at 3; `multiple` output still triggers user disambiguation |
-| Framework config regex misses a valid port (e.g., computed expression) | Falls through to `.env` then framework default — same as today, just with more chances to catch a literal. Documented as best-effort |
-| Package-manager resolver picks wrong PM (e.g., stale `yarn.lock` in a pnpm-migrated repo) | Priority order follows common-case lockfile precedence; user can override via `launch.json`. Documented in the resolver's header comment |
-| New test files slow the suite | Each new test file adds ~10-20 cases using the existing tmp-repo harness (already fast in `ce-polish-beta-dev-server.test.ts`); measurable impact expected < 2 seconds |
-| Changing `dev-server-detection.md` breaks a downstream reader | The file is only referenced from within the skill; no external consumers. Grep confirms no cross-skill references before the change lands |
-| Dropping `AGENTS.md`/`CLAUDE.md` port grep regresses users relying on it | Very low — the grep was added speculatively and the lossy pattern (`localhost:3000` match) makes it more likely to have surfaced wrong values than correct ones in the wild. Explicit `--port` and `.claude/launch.json` both remain as override paths |
-| Polish's `resolve-port.sh` diverges from `test-browser`'s inline cascade and the two drift silently | Unit 4 adds an explicit sync-note block inside `dev-server-detection.md` enumerating the three intentional divergences (quote stripping, comment stripping, no `AGENTS.md`/`CLAUDE.md` grep). A future maintainer who "fixes" `test-browser` by copying polish's cascade, or vice versa, will hit the sync-note first. No automated cross-skill check — acceptable because both skills are internal and the cascade is small |
+| 风险 | 缓解 |
+|------|------|
+| Monorepo probe false-positive（例如 fixture directory 中的 config） | Probe 的 exclusion list（`node_modules`、`fixtures` 等）；depth cap 3；`multiple` output 仍触发 user disambiguation |
+| Framework config regex misses a valid port（例如 computed expression） | Fall through 到 `.env` 再到 framework default - 与今日相同，只是增加了捕获 literal 的机会。记录为 best-effort |
+| Package-manager resolver picks wrong PM（例如 pnpm-migrated repo 中 stale `yarn.lock`） | Priority order 遵循 common-case lockfile precedence；用户可通过 `launch.json` override。记录在 resolver header comment 中 |
+| New test files slow the suite | 每个 new test file 添加约 10-20 cases，使用 existing tmp-repo harness（在 `ce-polish-beta-dev-server.test.ts` 中已很快）；预计 measurable impact < 2 秒 |
+| Changing `dev-server-detection.md` breaks a downstream reader | 该文件只在 skill 内部 referenced；无 external consumers。Grep confirms no cross-skill references before the change lands |
+| Dropping `AGENTS.md`/`CLAUDE.md` port grep regresses users relying on it | 很低 - grep 最初 speculative 加入，且 lossy pattern（`localhost:3000` match）更可能在 wild 中 surface wrong values，而不是 correct ones。Explicit `--port` 和 `.claude/launch.json` 都仍是 override paths |
+| Polish 的 `resolve-port.sh` 与 `test-browser` 的 inline cascade diverge 且 silent drift | Unit 4 在 `dev-server-detection.md` 内添加 explicit sync-note block，列出三项 intentional divergences（quote stripping、comment stripping、no `AGENTS.md`/`CLAUDE.md` grep）。未来 maintainer 若想通过复制 polish cascade 到 `test-browser` 或反过来 "fix" symmetry，会先遇到 sync-note。无 automated cross-skill check - 因两 skills 都内部使用且 cascade 小，可接受 |
 
-## Documentation / Operational Notes
+## 文档 / 运营备注
 
-- Update PR description on #568 (or a follow-up PR) to note that these gaps are fixed and reference this plan
-- No marketplace release entry, version bump, or CHANGELOG edit — release-please handles it
-- No user-facing docs outside the skill's own reference tree
-- Keep `dev-server-detection.md` as a navigable doc explaining probe order + framework defaults, even though the implementation now lives in `resolve-port.sh`. Reviewers will still land there first when debugging port issues
+- 更新 #568（或 follow-up PR）的 PR description，说明这些 gaps 已 fixed 并引用本 plan
+- 无 marketplace release entry、version bump 或 CHANGELOG edit - release-please handles it
+- 无 skill 自身 reference tree 之外的 user-facing docs
+- 保留 `dev-server-detection.md` 作为 navigable doc，解释 probe order + framework defaults，尽管 implementation 现在位于 `resolve-port.sh`。Reviewers debug port issues 时仍会先进入该文件
 
-## Sources & References
+## 来源与参考
 
-- **Origin:** PR feedback from @tmchow on EveryInc/compound-engineering-plugin#568 ([comment](https://github.com/EveryInc/compound-engineering-plugin/pull/568#issuecomment-4254733274))
-- **Previous plan:** `docs/plans/2026-04-15-001-feat-ce-polish-skill-plan.md` (feature this fixes)
-- **Related files:**
+- **来源:** @tmchow 在 EveryInc/compound-engineering-plugin#568 的 PR feedback（[comment](https://github.com/EveryInc/compound-engineering-plugin/pull/568#issuecomment-4254733274)）
+- **上一份 plan:** `docs/plans/2026-04-15-001-feat-ce-polish-skill-plan.md`（此 fix 所修复的 feature）
+- **相关文件:**
   - `plugins/compound-engineering/skills/ce-polish-beta/scripts/detect-project-type.sh`
   - `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-detection.md`
   - `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-next.md`
   - `plugins/compound-engineering/skills/ce-polish-beta/references/dev-server-vite.md`
   - `plugins/compound-engineering/skills/ce-polish-beta/references/launch-json-schema.md`
   - `plugins/compound-engineering/skills/ce-polish-beta/SKILL.md` (Phase 3)
-- **Test harness pattern:** `tests/skills/ce-polish-beta-dev-server.test.ts`
+- **Test harness pattern（test harness 模式）：** `tests/skills/ce-polish-beta-dev-server.test.ts`

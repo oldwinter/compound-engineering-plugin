@@ -1,10 +1,10 @@
-# Sub-agent Prompt Template
+# Sub-agent Prompt Template（Sub-agent Prompt 模板）
 
-This template is used by the orchestrator to spawn each reviewer sub-agent. Variable substitution slots are filled at spawn time.
+此 template 由 orchestrator 用于 spawn 每个 reviewer sub-agent。Variable substitution slots 会在 spawn time 填充。
 
 ---
 
-## Template
+## Template（模板）
 
 ```
 You are a specialist code reviewer.
@@ -68,15 +68,15 @@ Example of a schema-valid finding (all required fields, correct enum values, cor
 
 ```json
 {
-  "title": "User-supplied ID in account lookup without ownership check",
+  "title": "account lookup 使用 user-supplied ID 且缺少 ownership check",
   "severity": "P0",
   "file": "app/controllers/orders_controller.rb",
   "line": 42,
-  "why_it_matters": "Any signed-in user can read another user's orders by pasting the target account ID into the URL. The controller looks up the account and returns its orders without verifying the current user owns it. The shipments controller already uses a current_user.owns?(account) guard for the same attack class; matching that pattern fixes this finding.",
+  "why_it_matters": "任何已登录用户都可以把目标 account ID 粘贴到 URL 中，从而读取另一个用户的 orders。controller 会 lookup account 并返回其 orders，却没有验证 current user 是否拥有它。shipments controller 已经针对同类 attack 使用 current_user.owns?(account) guard；匹配该 pattern 即可修复此 finding。",
   "autofix_class": "gated_auto",
   "owner": "downstream-resolver",
   "requires_verification": true,
-  "suggested_fix": "Add current_user.owns?(account) guard before lookup, matching the pattern in shipments_controller.rb",
+  "suggested_fix": "lookup 前添加 current_user.owns?(account) guard，匹配 shipments_controller.rb 中的 pattern",
   "confidence": 100,
   "evidence": [
     "orders_controller.rb:42 -- account = Account.find(params[:account_id])",
@@ -86,11 +86,11 @@ Example of a schema-valid finding (all required fields, correct enum values, cor
 }
 ```
 
-The `confidence: 100` is justified because the issue is verifiable from the code alone — the controller fetches by user-supplied ID and returns data without any guard, and the parallel pattern in shipments_controller.rb confirms the project's own convention is being violated.
+`confidence: 100` 的理由是该 issue 仅凭 code 就可以 verify：controller 通过 user-supplied ID fetch 并在没有任何 guard 的情况下返回 data，而 shipments_controller.rb 中的 parallel pattern 确认这违反了 project 自己的 convention。
 
-Writing `why_it_matters` (required field, every finding):
+编写 `why_it_matters`（required field，每个 finding 都必须有）：
 
-The `why_it_matters` field is how the reader — a developer triaging findings, a ticket-body reader months later, or a caller workflow — understands the problem without re-reading the file. Treat it as the most important prose field in your output; every downstream surface (reports, agent envelopes, ticket bodies) depends on it being good.
+`why_it_matters` field 是 reader 理解问题的入口：可能是 triage findings 的 developer、几个月后阅读 ticket body 的人，或 caller workflow；他们不应为了理解问题而重新阅读整个 file。把它当作 output 中最重要的 prose field；每个 downstream surface（reports、agent envelopes、ticket bodies）都依赖它足够清楚。
 
 - **Lead with observable behavior.** Describe what the bug does from the outside — what a user, attacker, operator, or downstream caller experiences. Do not lead with code structure ("The function X does Y..."). Start with the effect ("Any signed-in user can read another user's orders..."). Function and variable names appear later, only when the reader needs them to locate the issue.
 - **Explain why the fix resolves the problem.** If you include a `suggested_fix`, the `why_it_matters` should make clear why that specific fix addresses the root cause. When a similar pattern exists elsewhere in the codebase (an existing guard, an established convention, a parallel handler), reference it so the recommendation is grounded in the project's own conventions rather than theoretical best practice.
@@ -100,16 +100,14 @@ The `why_it_matters` field is how the reader — a developer triaging findings, 
 Illustrative pair — same finding, weak vs. strong framing:
 
 ```
-WEAK (code-citation first; fails the observable-behavior rule):
-  orders_controller.rb:42 has a missing authorization check.
-  Add current_user.owns?(account) guard before the query.
+WEAK（弱示例，code citation 优先；违反 observable-behavior rule）:
+  orders_controller.rb:42 缺少 authorization check。
+  在 query 前添加 current_user.owns?(account) guard。
 
-STRONG (observable behavior first, grounded fix reasoning):
-  Any signed-in user can read another user's orders by pasting the
-  target account ID into the URL. The controller looks up the account
-  and returns its orders without verifying the current user owns it.
-  Adding a one-line ownership guard before the lookup matches the
-  pattern already used in the shipments controller for the same attack.
+STRONG（强示例，observable behavior 优先，并说明 grounded fix reasoning）:
+  任何已登录用户都可以把目标 account ID 粘贴到 URL 中，从而读取另一个用户的 orders。
+  controller 会 lookup account 并返回其 orders，却没有验证 current user 是否拥有它。
+  在 lookup 前添加一行 ownership guard，匹配 shipments controller 已经用于同类 attack 的 pattern。
 ```
 
 False-positive categories to actively suppress. Do NOT emit a finding when any of these apply — not even at anchor `25` or `50`. These are not edge cases you should route to soft buckets; they are non-findings.
@@ -174,16 +172,16 @@ Diff:
 </review-context>
 ```
 
-## Variable Reference
+## Variable Reference（变量参考）
 
-| Variable | Source | Description |
+| Variable（变量） | Source（来源） | Description（说明） |
 |----------|--------|-------------|
-| `{persona_file}` | Agent markdown file content | The full persona definition (identity, failure modes, calibration, suppress conditions) |
+| `{persona_file}` | Agent markdown file content | 完整 persona definition（identity、failure modes、calibration、suppress conditions） |
 | `{diff_scope_rules}` | `references/diff-scope.md` content | Primary/secondary/pre-existing tier rules |
-| `{schema}` | `references/findings-schema.json` content | The JSON schema reviewers must conform to |
-| `{intent_summary}` | Stage 2 output | 2-3 line description of what the change is trying to accomplish |
-| `{pr_metadata}` | Stage 1 output | PR title, body, and URL when reviewing a PR. Empty string when reviewing a branch or standalone checkout |
-| `{file_list}` | Stage 1 output | Changed-file list — inline, or a staged file path to Read for a large review |
-| `{diff}` | Stage 1 output | The diff to review — inline hunks, or a staged file path to Read for a large review |
-| `{run_id}` | Stage 4 output | Unique review run identifier for the artifact directory |
-| `{reviewer_name}` | Stage 3 output | Persona or agent name used as the artifact filename stem |
+| `{schema}` | `references/findings-schema.json` content | reviewers 必须遵循的 JSON schema |
+| `{intent_summary}` | Stage 2 output | 对 change 试图完成内容的 2-3 行描述 |
+| `{pr_metadata}` | Stage 1 output | review PR 时的 PR title、body 和 URL。review branch 或 standalone checkout 时为空字符串 |
+| `{file_list}` | Stage 1 output | Changed-file list，可以是 inline，也可以是 large review 中待读取的 staged file path |
+| `{diff}` | Stage 1 output | 待 review 的 diff，可以是 inline hunks，也可以是 large review 中待读取的 staged file path |
+| `{run_id}` | Stage 4 output | artifact directory 的 unique review run identifier |
+| `{reviewer_name}` | Stage 3 output | 用作 artifact filename stem 的 persona 或 agent name |

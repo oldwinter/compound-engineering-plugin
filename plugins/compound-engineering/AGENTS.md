@@ -1,57 +1,57 @@
-# Plugin Instructions
+# Plugin Instructions（Plugin 运行约定）
 
-These instructions apply when working under `plugins/compound-engineering/`.
-They supplement the repo-root `AGENTS.md`.
+这些 instructions 适用于 `plugins/compound-engineering/` 下的工作。
+它们补充 repo root 的 `AGENTS.md`。
 
-# Compounding Engineering Plugin Development
+# Compounding Engineering Plugin Development（Compound Engineering Plugin 开发）
 
-## Runtime vs Authoring Context
+## Runtime vs Authoring Context（Runtime 与 Authoring Context）
 
-**This plugin's `AGENTS.md` and `CLAUDE.md` files are authoring context — they do not ship with the installed plugin.** Skills are packaged and installed into end-user environments (their own repos, or folders that may not even be git repos), where they run against *the user's* `AGENTS.md`/`CLAUDE.md`, not this repo's.
+**此 plugin 的 `AGENTS.md` 和 `CLAUDE.md` 文件是 authoring context，不会随已安装 plugin 一起分发。** Skills 会被 package 并安装到 end-user environments（用户自己的 repos，或者甚至不是 git repos 的 folders）中；在那里它们会读取 *用户的* `AGENTS.md`/`CLAUDE.md`，不是本 repo 的文件。
 
-Consequences:
+后果：
 
-- Behavioral rules that govern skill *runtime* behavior must live inside the skill itself — in `SKILL.md` or files under its `references/`. Guidance placed in this file is invisible at runtime.
-- When two or more skills share a behavioral principle, duplicate the guidance into each skill (inline for short rules, `references/` for longer ones). There is no cross-skill shared-file mechanism (see "File References in Skills" below). When a reference file is duplicated across skills (e.g., `concepts-vocabulary.md` in both `ce-compound/references/` and `ce-compound-refresh/references/`), edits must be applied to every copy in the same commit. Drift between copies produces inconsistent agent behavior depending on which skill loaded.
-- Do not propose that runtime guidance for ce-ideate, ce-brainstorm, ce-plan, or any other skill live in this AGENTS.md or in the repo-root AGENTS.md. Those files only shape how contributors edit the plugin.
+- 约束 skill *runtime* behavior 的 behavioral rules 必须放在 skill 自身内部，即 `SKILL.md` 或其 `references/` 下的 files。放在本文件中的 guidance 在 runtime 不可见。
+- 当两个或更多 skills 共享 behavioral principle 时，把 guidance 复制到每个 skill 中（短规则 inline，长规则放 `references/`）。没有 cross-skill shared-file mechanism（见下方 "File References in Skills"）。当 reference file 在多个 skills 中重复存在时（例如 `ce-compound/references/` 和 `ce-compound-refresh/references/` 中都有 `concepts-vocabulary.md`），edits 必须在同一 commit 中应用到每一份 copy。Copies 之间的 drift 会让 agent behavior 根据加载的 skill 不同而不一致。
+- 不要建议把 ce-ideate、ce-brainstorm、ce-plan 或任何其他 skill 的 runtime guidance 放到本 AGENTS.md 或 repo-root AGENTS.md 中。这些文件只影响 contributors 如何编辑 plugin。
 
-This is easy to miss because authoring feels like using: you edit the plugin while running inside this repo, and the repo's AGENTS.md is loaded — but that load does not follow the installed skill into a user's environment.
+这个点很容易漏掉，因为 authoring 感觉像 using：你在本 repo 内运行并编辑 plugin，repo 的 AGENTS.md 会被加载，但这种加载不会跟随已安装 skill 进入用户环境。
 
-## Versioning Requirements
+## Versioning Requirements（版本要求）
 
-**IMPORTANT**: Routine PRs should not cut releases for this plugin.
+**IMPORTANT**：Routine PRs 不应为此 plugin cut releases。
 
-The repo uses an automated release process to prepare plugin releases, including version selection and changelog generation. Because multiple PRs may merge before the next release, contributors cannot know the final released version from within an individual PR.
+Repo 使用 automated release process 准备 plugin releases，包括 version selection 和 changelog generation。因为多个 PRs 可能在下一次 release 前 merge，contributors 无法从单个 PR 内知道最终 released version。
 
-**If `bun run release:validate` reports drift, see `docs/solutions/workflow/release-please-version-drift-recovery.md`** for the file-relationship map, the recovery decision tree (forward-sync vs. backward-revert vs. `release-as` pin), and worked examples. That doc answers questions the rules below don't: *why these files are release-managed, how they sync via `extra-files` and `linked-versions`, and what to do when the rules below were violated.*
+**如果 `bun run release:validate` 报告 drift，请查看 `docs/solutions/workflow/release-please-version-drift-recovery.md`**，其中包含 file-relationship map、recovery decision tree（forward-sync vs. backward-revert vs. `release-as` pin）和 worked examples。该文档回答下面规则没有覆盖的问题：*为什么这些 files 是 release-managed、它们如何通过 `extra-files` 和 `linked-versions` 同步，以及违反下面规则时该怎么办。*
 
-### Contributor Rules
+### Contributor Rules（Contributor 规则）
 
-- Do **not** manually bump `.claude-plugin/plugin.json` version in a normal feature PR.
-- Do **not** manually bump `.cursor-plugin/plugin.json` version in a normal feature PR.
-- Do **not** manually bump `.codex-plugin/plugin.json` version in a normal feature PR — release-please owns this via `extra-files` in `.github/release-please-config.json`, parallel to the Claude and Cursor entries.
-- Do **not** manually bump `.claude-plugin/marketplace.json` plugin version in a normal feature PR.
-- Do **not** hand-edit `.agents/plugins/marketplace.json` except to add or remove a plugin. Plugin-list, name, and description drift between the Claude, Cursor, and Codex marketplaces is caught by `bun run release:validate`.
-- Do **not** cut a release section in the canonical root `CHANGELOG.md` for a normal feature PR.
-- Do update substantive docs that are part of the actual change, such as `README.md`, component tables, usage instructions, or counts when they would otherwise become inaccurate.
+- 不要在 normal feature PR 中手工 bump `.claude-plugin/plugin.json` version。
+- 不要在 normal feature PR 中手工 bump `.cursor-plugin/plugin.json` version。
+- 不要在 normal feature PR 中手工 bump `.codex-plugin/plugin.json` version；release-please 会通过 `.github/release-please-config.json` 中的 `extra-files` 管理它，与 Claude 和 Cursor entries 平行。
+- 不要在 normal feature PR 中手工 bump `.claude-plugin/marketplace.json` plugin version。
+- 除了添加或删除 plugin，不要手工编辑 `.agents/plugins/marketplace.json`。Claude、Cursor 和 Codex marketplaces 之间的 plugin-list、name 和 description drift 会被 `bun run release:validate` 捕捉。
+- 不要为 normal feature PR 在 canonical root `CHANGELOG.md` 中 cut release section。
+- 如果 actual change 需要，更新 substantive docs，例如 `README.md`、component tables、usage instructions 或 counts，避免它们变得不准确。
 
-### Pre-Commit Checklist
+### Pre-Commit Checklist（提交前检查清单）
 
-Before committing ANY changes:
+提交任何 changes 前：
 
-- [ ] No manual release-version bump in `.claude-plugin/plugin.json`
-- [ ] No manual release-version bump in `.cursor-plugin/plugin.json`
-- [ ] No manual release-version bump in `.codex-plugin/plugin.json`
-- [ ] No manual release-version bump in `.claude-plugin/marketplace.json`
-- [ ] No manual release entry added to the root `CHANGELOG.md`
-- [ ] `bun run release:validate` passes (enforces Claude/Cursor/Codex manifest parity)
-- [ ] README.md component counts verified
-- [ ] README.md tables accurate (agents, commands, skills)
-- [ ] plugin.json description matches current counts
+- [ ] `.claude-plugin/plugin.json` 中没有 manual release-version bump
+- [ ] `.cursor-plugin/plugin.json` 中没有 manual release-version bump
+- [ ] `.codex-plugin/plugin.json` 中没有 manual release-version bump
+- [ ] `.claude-plugin/marketplace.json` 中没有 manual release-version bump
+- [ ] 没有向 root `CHANGELOG.md` 添加 manual release entry
+- [ ] `bun run release:validate` 通过（强制 Claude/Cursor/Codex manifest parity）
+- [ ] README.md component counts 已验证
+- [ ] README.md tables 准确（agents、commands、skills）
+- [ ] plugin.json description 与当前 counts 匹配
 
-### Directory Structure
+### Directory Structure（目录结构）
 
-```
+```text
 agents/
 └── ce-*.md  # All agents live flat under agents/, prefixed with ce-
 
@@ -60,188 +60,189 @@ skills/
 └── */             # All other skills
 ```
 
-Agents are grouped topically in `README.md` (Review, Document Review, Research, Design, Workflow, Docs) for reader navigation — those groupings are conceptual, not filesystem subdirectories.
+Agents 在 `README.md` 中按 topic 分组（Review、Document Review、Research、Design、Workflow、Docs）方便阅读；这些分组是概念分组，不是 filesystem subdirectories。
 
-> **Note:** Commands were migrated to skills in v2.39.0. All former
-> `/command-name` slash commands now live under `skills/command-name/SKILL.md`
-> and work identically in Claude Code. Other targets may convert or map these references differently.
+> **Note:** Commands 已在 v2.39.0 迁移为 skills。所有旧的
+> `/command-name` slash commands 现在位于 `skills/command-name/SKILL.md`
+> 下，并在 Claude Code 中以相同方式工作。其他 targets 可能会以不同方式 convert 或 map 这些 references。
 
-## Debugging Plugin Bugs
+## Debugging Plugin Bugs（调试 Plugin Bugs）
 
-Developers of this plugin also use it via their marketplace install (`~/.claude/plugins/`). When a developer reports a bug they experienced while using a skill or agent, the installed version may be older than the repo. Glob for the component name under `~/.claude/plugins/` and diff the installed content against the repo version.
+此 plugin 的 developers 也会通过自己的 marketplace install（`~/.claude/plugins/`）使用它。当 developer 报告他们使用某个 skill 或 agent 时遇到 bug，已安装版本可能比 repo 旧。请在 `~/.claude/plugins/` 下 glob component name，并把 installed content 与 repo version diff。
 
-- **Repo already has the fix**: The developer's install is stale. Tell them to reinstall the plugin or use `--plugin-dir` to load skills from the repo checkout. No code change needed.
-- **Both versions have the bug**: Proceed with the fix normally.
+- **Repo already has the fix**：developer 的 install stale。告诉他们 reinstall plugin，或用 `--plugin-dir` 从 repo checkout 加载 skills。不需要 code change。
+- **Both versions have the bug**：正常进行 fix。
 
-Important: Just because the developer's installed plugin may be out of date, it's possible both old and current repo versions have the bug. The proper fix is to still fix the repo version.
+Important：不能因为 developer 的 installed plugin 可能过期，就排除 old 和 current repo versions 都有 bug 的可能。正确做法仍然是修复 repo version。
 
-## Naming Convention
+## Naming Convention（命名约定）
 
-**All skills and agents** use the `ce-` prefix to unambiguously identify them as compound-engineering components:
-- `/ce-brainstorm` - Explore requirements and approaches before planning
-- `/ce-plan` - Create implementation plans
-- `/ce-code-review` - Run comprehensive code reviews
-- `/ce-work` - Execute work items systematically
-- `/ce-compound` - Document solved problems
+**所有 skills 和 agents** 都使用 `ce-` prefix，以明确标识它们是 compound-engineering components：
 
-**Why `ce-`?** Claude Code has built-in `/plan` and `/review` commands. The `ce-` prefix (short for compound-engineering) makes it immediately clear these components belong to this plugin. The hyphen is used instead of a colon to avoid filesystem issues on Windows and to align directory names with frontmatter names.
+- `/ce-brainstorm` - planning 前探索 requirements 和 approaches
+- `/ce-plan` - 创建 implementation plans
+- `/ce-code-review` - 运行 comprehensive code reviews
+- `/ce-work` - 系统执行 work items
+- `/ce-compound` - 记录 solved problems
 
-**Agents** follow the same convention: `ce-adversarial-reviewer`, `ce-learnings-researcher`, etc. When referencing agents from skills, use the bare `ce-<agent-name>` form (e.g., `ce-adversarial-reviewer`) — the `ce-` prefix is sufficient for uniqueness across plugins.
+**为什么用 `ce-`？** Claude Code 内置 `/plan` 和 `/review` commands。`ce-` prefix（compound-engineering 的缩写）让这些 components 属于此 plugin 一目了然。使用 hyphen 而不是 colon，是为了避免 Windows filesystem issues，并让 directory names 与 frontmatter names 对齐。
 
-**The `ce-` prefix is required for every new skill and agent — no exceptions.** Three legacy skills (`every-style-editor`, `file-todos`, `lfg`) predate the rule and remain unprefixed; they are pinned in `tests/frontmatter.test.ts` as the only allowed exceptions. Do not add to that allowlist. When adding a new skill, the directory name, the SKILL.md `name:` frontmatter, and any README references must all start with `ce-`. The frontmatter test enforces this and will fail on a missing prefix.
+**Agents** 遵循同一 convention：`ce-adversarial-reviewer`、`ce-learnings-researcher` 等。从 skills 中引用 agents 时，使用裸 `ce-<agent-name>` 形式（例如 `ce-adversarial-reviewer`）；`ce-` prefix 足以跨 plugins 保持唯一。
 
-## Known External Limitations
+**每个新 skill 和 agent 都必须使用 `ce-` prefix，没有例外。** 三个 legacy skills（`every-style-editor`、`file-todos`、`lfg`）早于该规则，仍保持无 prefix；它们在 `tests/frontmatter.test.ts` 中被 pin 为唯一允许的例外。不要向该 allowlist 添加条目。添加新 skill 时，directory name、SKILL.md `name:` frontmatter 和任何 README references 都必须以 `ce-` 开头。Frontmatter test 会强制这一点，缺 prefix 会失败。
 
-**Proof HITL surfaces a ghost "AI collaborator" agent** (noted 2026-04-16, may change): The Proof API auto-joins any header-less `/state` read under a synthetic `ai:auto-<hash>` identity, so docs created by the `skills/proof/` HITL workflow show a phantom participant alongside `Compound Engineering`. The only way to suppress it is to set `ownerId: "agent:ai:compound-engineering"` on create — but that transfers document ownership to the agent and prevents the user from claiming it into their Proof library, so we don't use it. Treat as cosmetic noise; don't reintroduce the `ownerId` workaround. Tracked upstream: https://github.com/EveryInc/proof/issues/951.
+## Known External Limitations（已知外部限制）
 
-## Skill Design Principles
+**Proof HITL 会显示一个 ghost "AI collaborator" agent**（记录于 2026-04-16，未来可能变化）：Proof API 会在任何无 header 的 `/state` read 下，用 synthetic `ai:auto-<hash>` identity 自动加入，因此由 `skills/proof/` HITL workflow 创建的 docs 会在 `Compound Engineering` 旁显示一个 phantom participant。唯一的抑制方式是在 create 时设置 `ownerId: "agent:ai:compound-engineering"`，但这会把 document ownership 转给 agent，阻止用户把它 claim 到自己的 Proof library，所以我们不使用它。把它视为 cosmetic noise；不要重新引入 `ownerId` workaround。Upstream tracking: https://github.com/EveryInc/proof/issues/951。
 
-Skills are guardrails for an intelligent agent, not a step-by-step controller for a non-intelligent one. The principles below were learned from real-world testing and should guide future skill edits.
+## Skill Design Principles（Skill 设计原则）
 
-**Calibrate prescription level to the failure mode.** Three rough levels:
+Skills 是给 intelligent agent 的 guardrails，不是给非智能执行器的 step-by-step controller。下面原则来自真实世界测试，应指导未来 skill edits。
 
-- **Hard rules** for deterministic safety (e.g., "don't silently `cd` to another repo and write outputs there"). The agent's judgment must not vary — the failure mode is bad enough that mechanical adherence is right.
-- **Strong guidance with examples** for judgment calls where there's a clear bias to teach (e.g., "name the decision; don't expand it" with bad-vs-good pairs). Concrete examples teach better than abstract principles, but anchor them at the principle level so the agent can generalize.
-- **Trust** for cases where prescription would harm: codebase exploration tactics, how many clarifying questions to ask, when to lean on memory, prose phrasing. Over-prescription robs the agent of intelligence and memory.
+**按 failure mode 校准 prescription level。** 大致三层：
 
-Match the level to the failure mode in both directions. Over-prescribing produces rote output; under-prescribing produces inconsistent behavior and drifted artifacts. The right test: can you name a specific bad outcome the prescription prevents? If yes, prescription is justified. If the rule exists "to be safe" without a concrete failure mode, lean toward trust.
+- **Hard rules** 用于 deterministic safety（例如 "don't silently `cd` to another repo and write outputs there"）。Agent judgment 不应变化；failure mode 足够糟糕，机械遵守是正确的。
+- **Strong guidance with examples** 用于有明确 bias 需要教的 judgment calls（例如用 bad-vs-good pairs 说明 "name the decision; don't expand it"）。具体 examples 比抽象原则更能教学，但要 anchoring 在 principle level，以便 agent generalize。
+- **Trust** 用于 prescription 会造成伤害的场景：codebase exploration tactics、问多少 clarifying questions、何时依赖 memory、prose phrasing。Over-prescription 会剥夺 agent 的 intelligence 和 memory。
 
-**SKILL.md content caches at session start; references load on demand.** Implications:
+双向匹配 level 和 failure mode。Over-prescribing 会产生 rote output；under-prescribing 会产生 inconsistent behavior 和 drifted artifacts。正确测试是：能否说出该 prescription 防止的具体 bad outcome？如果可以，prescription justified。如果 rule 只是为了 "to be safe" 而没有具体 failure mode，倾向 trust。
 
-- For load-bearing rules (those that MUST fire reliably), put strong language at the top of the relevant phase in SKILL.md, not just in the reference. References can be skipped; SKILL.md is always loaded.
-- When the same rule is duplicated across SKILL.md and a reference, both must be updated together. Drift produces confusing agent behavior — the agent follows whichever copy is loaded.
-- Inline content in SKILL.md that describes what's also in a reference makes the reference feel optional ("I have enough from inline"). For references that should always load, minimize the inline alternative or keep it strictly load-instruction-only.
+**SKILL.md content 在 session start 缓存；references 按需加载。** 含义：
 
-**Split orthogonal decisions into sequential questions.** When a blocking question's options span multiple decision axes (e.g., "where to operate" plus "which skill to use"), users have to reason about both axes simultaneously and individual options end up underspecified. Sequential menus addressing one decision at a time produce clearer interaction shapes — the user resolves one axis, then sees a follow-up for the next. Location vs. skill routing, scope-tier vs. depth, and other multi-axis questions all benefit from this separation.
+- 对 load-bearing rules（必须可靠触发的 rules），把 strong language 放在 SKILL.md 中相关 phase 顶部，而不只是 reference 中。References 可能被跳过；SKILL.md 总会加载。
+- 同一 rule 在 SKILL.md 和 reference 中重复时，两者必须一起更新。Drift 会产生 confusing agent behavior：agent 会遵循它加载到的那份 copy。
+- 如果 SKILL.md inline content 描述了 reference 中也有的内容，会让 reference 显得 optional（"I have enough from inline"）。对于应 always load 的 references，减少 inline alternative，或让 inline 内容严格只是 load instruction。
 
-**Process exhaust stays out of artifacts.** Engineering process metadata — "captured at Phase X.Y" notes, `## Next Steps` pointing to the next skill, italic provenance lines — does not belong in user-facing docs. Doc readers want the doc; they do not need to trace which engineering phase produced which section. Keep skill state in chat (where it is interactive and can be acted on) and durable content in the artifact.
+**把 orthogonal decisions 拆成 sequential questions。** 当 blocking question 的 options 横跨多个 decision axes（例如 "where to operate" 加 "which skill to use"）时，用户必须同时思考两个 axes，单个 options 也会变得 underspecified。一次处理一个 decision 的 sequential menus 会产生更清晰的 interaction shapes：用户先解决一个 axis，再看到下一个 follow-up。Location vs. skill routing、scope-tier vs. depth，以及其他 multi-axis questions 都受益于这种拆分。
 
-**Distinguish process exhaust from audit content.** Sections that exist for the agent's own bookkeeping are exhaust; sections that exist because downstream readers need to know something about the artifact's authorship are audit content and belong in the doc. The test is whether removing the section would degrade a downstream reader's ability to evaluate the artifact correctly.
+**Process exhaust 不进入 artifacts。** Engineering process metadata，例如 "captured at Phase X.Y" notes、指向下一个 skill 的 `## Next Steps`、italic provenance lines，不属于 user-facing docs。Doc readers 想要的是 doc，不需要追踪哪个 engineering phase 生成了哪个 section。Skill state 保持在 chat 中（可交互、可行动），durable content 保持在 artifact 中。
 
-Non-interactive modes can create audit gaps, but only when the *corresponding interactive mode* would have validated content the headless run skips. Compare per skill, not per mode. If interactive ce-plan walks the user through every requirement and headless ce-plan skips that walkthrough, the headless artifact contains decisions a reader cannot tell weren't user-confirmed — a `## Assumptions` section is audit content. If interactive ce-compound asks only meta-questions (Full vs Lightweight, session-history, "What's next?") while the substantive inferences (track, category, filename, overlap) are agent decisions in both modes, then labeling them only in headless is misleading — it implies interactive runs validated content they didn't. The reader needs to know what *would have been* user-validated; if neither mode validates the inferences, the section is process exhaust dressed up as audit.
+**区分 process exhaust 和 audit content。** 为 agent 自己 bookkeeping 而存在的 sections 是 exhaust；因为 downstream readers 需要了解 artifact authorship 才存在的 sections 是 audit content，属于 doc。测试标准是：移除该 section 是否会降低 downstream reader 正确评估 artifact 的能力。
 
-**Test the spec by running it, not just by reading it.** Real-world test runs surface failure modes that desk review misses: load reliability, plugin caching across sessions, agent interpretation drift, conflation in menu shapes, edge-case interactions with the user's repo layout. When a test reveals unexpected behavior, ask three questions before tightening the spec:
+Non-interactive modes 可能产生 audit gaps，但只有当 *对应 interactive mode* 会验证 headless run 跳过的内容时才成立。按 skill 比较，而不是按 mode 比较。如果 interactive ce-plan 会带用户逐条走过每个 requirement，而 headless ce-plan 跳过 walkthrough，那么 headless artifact 包含读者无法判断是否经过 user-confirmed 的 decisions；`## Assumptions` section 就是 audit content。如果 interactive ce-compound 只问 meta-questions（Full vs Lightweight、session-history、"What's next?"），而 substantive inferences（track、category、filename、overlap）在两种 modes 中都是 agent decisions，那么只在 headless 中标注它们会误导读者，暗示 interactive runs 验证了实际没有验证的内容。Reader 需要知道 *本来会* 被 user-validated 的是什么；如果两种 modes 都不验证这些 inferences，该 section 就是伪装成 audit 的 process exhaust。
 
-- Is the agent's behavior actually wrong, or is it expressing better judgment than the rule encoded?
-- Did the spec drift between SKILL.md and references such that the agent saw inconsistent rules?
-- Is this load-reliability (rule never reached) or rule-content (rule reached but produces wrong output)?
+**通过运行 spec 来测试它，而不只是阅读。** 真实测试会暴露 desk review 漏掉的 failure modes：load reliability、plugin caching across sessions、agent interpretation drift、menu shapes conflation、与用户 repo layout 的 edge-case interactions。测试揭示 unexpected behavior 时，先问三个问题再 tightening spec：
 
-The fix differs by answer. Sometimes "fix the spec" means loosening over-prescription, not adding more rules. Sometimes the right answer is "accept the variance — the agent's adaptation was correct for the case."
+- Agent behavior 真的错了吗，还是它表达了比 rule 编码更好的 judgment？
+- SKILL.md 和 references 之间是否 spec drift，导致 agent 看到 inconsistent rules？
+- 这是 load-reliability（rule 没被看到）还是 rule-content（rule 被看到但产生错误 output）？
 
-## Skill Compliance Checklist
+答案不同，fix 也不同。有时 "fix the spec" 意味着放松 over-prescription，而不是添加更多 rules。有时正确答案是 "accept the variance"，因为 agent 对该 case 的 adaptation 是正确的。
 
-When adding or modifying skills, verify compliance with the skill spec:
+## Skill Compliance Checklist（Skill 合规检查清单）
 
-### YAML Frontmatter (Required)
+添加或修改 skills 时，验证它符合 skill spec：
 
-- [ ] `name:` present and matches directory name (lowercase-with-hyphens)
-- [ ] `description:` present and describes **what it does and when to use it** (per official spec: "Explains code with diagrams. Use when exploring how code works.")
-- [ ] `description:` is no longer than 1024 characters -- some coding harnesses reject longer skill descriptions. Enforced by `tests/frontmatter.test.ts`.
-- [ ] `description:` value is quoted (single or double) if it contains colons -- unquoted colons break `js-yaml` strict parsing and crash `install --to opencode/codex`. Run `bun test tests/frontmatter.test.ts` to verify.
-- [ ] `description:` value does not contain raw angle-bracket tokens like `<skill-name>`, `<tag>`, or `<placeholder>` -- Cowork's plugin validator parses descriptions as HTML and rejects unknown tags with a generic "Plugin validation failed" banner (see issue #602). Claude Code tolerates them, so the bug only surfaces downstream. Backtick-wrap the token (`` `<skill-name>` ``) or rephrase. Enforced by `tests/frontmatter.test.ts`.
+### YAML Frontmatter (Required，必需)
 
-### Reference File Inclusion (Required if references/ exists)
+- [ ] `name:` 存在并匹配 directory name（lowercase-with-hyphens）
+- [ ] `description:` 存在，并描述 **它做什么、什么时候使用**（按 official spec："Explains code with diagrams. Use when exploring how code works."）
+- [ ] `description:` 不超过 1024 characters；一些 coding harnesses 会拒绝更长的 skill descriptions。由 `tests/frontmatter.test.ts` 强制。
+- [ ] 如果 `description:` value 包含 colons，需要用 single 或 double quotes 包起来；unquoted colons 会破坏 `js-yaml` strict parsing，并让 `install --to opencode/codex` crash。运行 `bun test tests/frontmatter.test.ts` 验证。
+- [ ] `description:` value 不包含 raw angle-bracket tokens，例如 `<skill-name>`、`<tag>` 或 `<placeholder>`；Cowork 的 plugin validator 会把 descriptions 当作 HTML parsing，并因 unknown tags 以 generic "Plugin validation failed" banner 拒绝（见 issue #602）。Claude Code 会容忍它们，所以 bug 只在 downstream 暴露。用 backticks 包住 token（`` `<skill-name>` ``），或改写句子。由 `tests/frontmatter.test.ts` 强制。
 
-- [ ] Do NOT use markdown links like `[filename.md](./references/filename.md)` -- agents interpret these as Read instructions with CWD-relative paths, which fail because the CWD is never the skill directory
-- [ ] **Default: use backtick paths.** Most reference files should be referenced with backtick paths so the agent can load them on demand:
-  ```
+### Reference File Inclusion (Required if references/ exists，存在 references/ 时必需)
+
+- [ ] 不要使用 `[filename.md](./references/filename.md)` 这样的 markdown links；agents 会把它们解释为 CWD-relative path 的 Read instructions，而 CWD 从来不是 skill directory，所以会失败。
+- [ ] **Default: use backtick paths.** 大多数 reference files 应用 backtick paths 引用，让 agent 按需加载：
+  ```text
   `references/architecture-patterns.md`
   ```
-  This keeps the skill lean and avoids inflating the token footprint at load time. Use for: large reference docs, routing-table targets, code scaffolds, executable scripts/templates
-- [ ] **Exception: `@` inline for small structural files** that the skill cannot function without and that are under ~150 lines (schemas, output contracts, subagent dispatch templates). Use `@` file inclusion on its own line:
-  ```
+  这让 skill 保持 lean，避免 load time token footprint 膨胀。适用于：large reference docs、routing-table targets、code scaffolds、executable scripts/templates。
+- [ ] **Exception: `@` inline for small structural files**：skill 没有它无法工作、且在约 150 lines 以下的 structural files（schemas、output contracts、subagent dispatch templates）。在单独一行使用 `@` file inclusion：
+  ```text
   @./references/schema.json
   ```
-  This resolves relative to the SKILL.md and substitutes content before the model sees it. If a file is over ~150 lines, prefer a backtick path even if it is always needed
-- [ ] For files the agent needs to *execute* (scripts, shell templates), always use backtick paths -- `@` would inline the script as text content instead of keeping it as an executable file
+  它会相对 SKILL.md resolve，并在 model 看到前替换成内容。如果 file 超过约 150 lines，即使 always needed，也优先使用 backtick path。
+- [ ] 对 agent 需要 *execute* 的 files（scripts、shell templates），始终使用 backtick paths；`@` 会把 script inline 为 text content，而不是保留 executable file。
 
-### Conditional and Late-Sequence Extraction
+### Conditional and Late-Sequence Extraction（条件内容与后段内容抽取）
 
-Skill content loaded at trigger time is carried in every subsequent message — every tool call, agent dispatch, and response. This carrying cost compounds across the session. For skills that orchestrate many tool or agent calls, extract blocks to `references/` when they are conditional (only execute under specific conditions) or late-sequence (only needed after many prior calls) and represent a meaningful share of the skill (~20%+). The more tool/agent calls a skill makes, the more aggressively to extract. Replace extracted blocks with a 1-3 line stub stating the condition and a backtick path reference (e.g., "Read `references/deepening-workflow.md`"). Never use `@` for extracted blocks — it inlines content at load time, defeating the extraction.
+Skill content 在 trigger time 加载后，会被带入后续每条 message：每次 tool call、agent dispatch 和 response。这种 carrying cost 会在 session 中 compound。对于 orchestrate 多次 tool 或 agent calls 的 skills，如果 blocks 是 conditional（只在特定 conditions 下执行）或 late-sequence（很多 prior calls 后才需要），且占 skill 的 meaningful share（约 20%+），就提取到 `references/`。Skill 做的 tool/agent calls 越多，就越应积极提取。把 extracted blocks 替换为 1-3 行 stub，说明 condition 并给出 backtick path reference（例如 "Read `references/deepening-workflow.md`"）。不要对 extracted blocks 使用 `@`，因为它会在 load time inline content，抵消 extraction。
 
-### Writing Style
+### Writing Style（写作风格）
 
-- [ ] Use imperative/infinitive form (verb-first instructions)
-- [ ] Avoid second person ("you should") - use objective language ("To accomplish X, do Y")
+- [ ] 使用 imperative/infinitive form（verb-first instructions）
+- [ ] 避免 second person（"you should"），使用 objective language（"To accomplish X, do Y"）
 
-### Rationale Discipline
+### Rationale Discipline（Rationale 纪律）
 
-Every line in `SKILL.md` loads on every invocation. Include rationale only when it changes what the agent does at runtime — if behavior wouldn't differ without the sentence, cut it.
+`SKILL.md` 中每一行都会在每次 invocation 时加载。只在 rationale 会改变 agent runtime behavior 时保留它；如果没有这句话 behavior 也不会不同，就删掉。
 
-Keep rationale at the highest-level location that covers it; restate behavioral directives at the point they take effect. A 500-line skill shouldn't hinge on the agent remembering line 9 by line 400. Portability notes, defenses against mistakes the agent wasn't going to make, and meta-commentary about this repo's authoring rules belong in commit messages or `docs/solutions/`, not in the skill body.
+把 rationale 放在覆盖它的 highest-level location；在行为发生处重述 behavioral directives。一个 500-line skill 不应依赖 agent 在第 400 行还记得第 9 行。Portability notes、防止 agent 原本不会犯的 mistakes，以及关于本 repo authoring rules 的 meta-commentary 应放在 commit messages 或 `docs/solutions/`，不要放在 skill body。
 
-### Cross-Platform User Interaction
+### Cross-Platform User Interaction（跨平台用户交互）
 
-- [ ] When a skill needs to ask the user a question, instruct use of the platform's blocking question tool and name the known equivalents (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi via the `pi-ask-user` extension)
-- [ ] For Claude Code, also instruct to load `AskUserQuestion` via `ToolSearch` with `select:AskUserQuestion` first if its schema isn't already loaded — `AskUserQuestion` is a deferred tool and won't be available at session start. A pending schema load is not a valid reason to fall back to text.
-- [ ] Include a fallback: when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes where `request_user_input` is unavailable, or `ToolSearch` returns no match), present numbered options in chat and wait for the user's reply — never silently skip the question.
-- [ ] **Narrow exception for legitimate option overflow:** when a menu has 5 or more genuinely relevant options — each a distinct destination or workflow, none removable without losing real user choice — render as a numbered list in chat rather than trimming to fit the 4-option cap. This is used with restraint, not as a convenience escape from the blocking tool. Default remains the blocking tool. Before invoking the exception, verify that (a) no option can be cut, (b) no two options can be merged, and (c) no option is better surfaced as contextual prose (e.g., a nudge adjacent to the menu). If any of those reductions work, prefer them over the fallback. When the exception applies, include a hint that free-form input is accepted (e.g., "Pick a number or describe what you want.") so the numbered list retains the blocking tool's open-endedness.
+- [ ] 当 skill 需要问用户问题时，指示使用 platform 的 blocking question tool，并列出 known equivalents（Claude Code 中 `AskUserQuestion`，Codex 中 `request_user_input`，Gemini 中 `ask_user`，Pi 中通过 `pi-ask-user` extension 使用 `ask_user`）
+- [ ] 对 Claude Code，还要指示如果 schema 尚未 loaded，先通过 `ToolSearch` 使用 `select:AskUserQuestion` 加载 `AskUserQuestion`；`AskUserQuestion` 是 deferred tool，不会在 session start 时可用。Pending schema load 不是 fallback 到 text 的有效理由。
+- [ ] 包含 fallback：当 harness 中没有 blocking tool 或 call errors（例如 Codex edit modes 中 `request_user_input` 不可用，或 `ToolSearch` 没有 match）时，在 chat 中展示 numbered options 并等待用户回复；绝不要 silently skip question。
+- [ ] **Narrow exception for legitimate option overflow:** 当 menu 有 5 个或更多真正 relevant options，且每个都是 distinct destination 或 workflow，删除任何一个都会损失真实用户选择时，用 chat 中的 numbered list，而不是强行裁到 4-option cap。谨慎使用，不要把它当成逃避 blocking tool 的便利出口。默认仍然是 blocking tool。调用 exception 前，验证 (a) 没有 option 可删，(b) 没有两个 options 可合并，(c) 没有 option 更适合作为 contextual prose 展示（例如 menu 旁的 nudge）。如果任一 reduction 可行，优先 reduction 而不是 fallback。Exception 适用时，加一句 free-form input 也被接受的提示（例如 "Pick a number or describe what you want."），让 numbered list 保留 blocking tool 的 open-endedness。
 
-> **Platform-behavior note (April 2026, may change):** The specifics above reflect current behavior — `AskUserQuestion` is deferred in Claude Code, and `request_user_input` in Codex is exposed only in Plan mode. If Anthropic changes `AskUserQuestion` to a non-deferred tool, or Codex exposes `request_user_input` in edit modes, revisit this guidance rather than carrying the workaround forward indefinitely. Verify before assuming these constraints still hold.
+> **Platform-behavior note (April 2026, may change):** 上述 specifics 反映当前 behavior：`AskUserQuestion` 在 Claude Code 中是 deferred，Codex 的 `request_user_input` 只在 Plan mode 暴露。如果 Anthropic 把 `AskUserQuestion` 改为 non-deferred tool，或 Codex 在 edit modes 暴露 `request_user_input`，请重新审视该 guidance，不要无限期携带 workaround。假设这些 constraints 仍然成立前先 verify。
 
-### Interactive Question Tool Design
+### Interactive Question Tool Design（交互式问题工具设计）
 
-Design rules for blocking question menus (`AskUserQuestion` / `request_user_input` / `ask_user`). Violations silently degrade the UX in harnesses where secondary description text is hidden or labels are truncated.
+Blocking question menus（`AskUserQuestion` / `request_user_input` / `ask_user`）的设计规则。违反这些规则会在 secondary description text 被隐藏或 labels 被截断的 harnesses 中静默降低 UX。
 
-- [ ] Each option label must be self-contained — some harnesses render only the label, not the accompanying description; the label alone must convey what the option does
-- [ ] Keep total options to 4 or fewer (`AskUserQuestion` caps at 4 across platforms we target)
-- [ ] Do not offer "still working" / "I'll come back" options — the blocking tool already waits; such options are no-op wrappers. If the user needs to go do something, they simply leave the prompt open
-- [ ] Refer to the agent in third person ("the agent") in labels and stems — first-person "me" / "I'll" is ambiguous in a tool-mediated exchange where it's unclear whether the speaker is the user, the agent, or the tool
-- [ ] Phrase labels from the user's intent, not the system's internal state — each option should complete "I want to ___" from the user's POV; avoid leaking mode names like "end-sync" or "phase-3" into labels
-- [ ] Use the question stem as a teaching surface for first-time mechanics — teach the mechanic there (e.g., "Highlight text in Proof to leave a comment"), not in option descriptions that may be hidden
-- [ ] When renaming a display label, rename its matching routing block (`**If user selects "X":**`) in the same edit — the model matches selections by verbatim label string, so a missed rename silently breaks routing
-- [ ] Front-load the distinguishing word when options share a prefix — "Proceed to planning" vs "Proceed directly to work" look identical when truncated; put the differentiator in the first 3-4 words
-- [ ] Name the target when an artifact is ambiguous — "save to my local file" beats "save to my file" when multiple artifacts (Proof doc, local markdown, cached copy) coexist
-- [ ] Keep voice consistent across a menu — mixing imperative ("Pause") with user-voice status ("I'm done — save…") within the same set reads as authored by different agents
+- [ ] 每个 option label 必须 self-contained；一些 harnesses 只 render label，不 render description，因此 label 本身必须传达 option 做什么。
+- [ ] Total options 保持 4 个或更少（`AskUserQuestion` 在目标 platforms 上 cap 为 4）。
+- [ ] 不要提供 "still working" / "I'll come back" options；blocking tool 本来就会等待，这类 options 是 no-op wrappers。如果用户需要先去做别的事，直接把 prompt 留着即可。
+- [ ] 在 labels 和 stems 中用 third person 指代 agent（"the agent"）；first-person "me" / "I'll" 在 tool-mediated exchange 中很 ambiguous，因为不清楚说话者是 user、agent 还是 tool。
+- [ ] 从用户 intent 来写 labels，不要暴露 system internal state；每个 option 应能补全用户视角的 "I want to ___"，避免泄露 `end-sync` 或 `phase-3` 这类 mode names。
+- [ ] 用 question stem 作为 first-time mechanics 的 teaching surface；在那里教 mechanic（例如 "Highlight text in Proof to leave a comment"），不要放在可能被隐藏的 option descriptions 中。
+- [ ] 重命名 display label 时，在同一 edit 中重命名匹配的 routing block（`**If user selects "X":**`）；model 会按 verbatim label string 匹配 selections，漏改会静默破坏 routing。
+- [ ] 当 options 有共同前缀时，把区别性词语前置；"Proceed to planning" 和 "Proceed directly to work" 截断后看起来一样，应把 differentiator 放在前 3-4 个词。
+- [ ] 当 artifact ambiguous 时，写清 target；多个 artifacts（Proof doc、local markdown、cached copy）共存时，"save to my local file" 比 "save to my file" 好。
+- [ ] 保持 menu voice 一致；同一组中混用 imperative（"Pause"）和 user-voice status（"I'm done — save…"）会显得由不同 agents 编写。
 
-### Cross-Platform Task Tracking
+### Cross-Platform Task Tracking（跨平台任务跟踪）
 
-- [ ] When a skill needs to create or track tasks, describe the intent (e.g., "create a task list") and name the known equivalents (`TaskCreate`/`TaskUpdate`/`TaskList` in Claude Code, `update_plan` in Codex)
-- [ ] Do not reference `TodoWrite` or `TodoRead` — these are legacy Claude Code tools replaced by `TaskCreate`/`TaskUpdate`/`TaskList`
+- [ ] 当 skill 需要创建或跟踪 tasks，描述 intent（例如 "create a task list"），并列出 known equivalents（Claude Code 中 `TaskCreate`/`TaskUpdate`/`TaskList`，Codex 中 `update_plan`）。
+- [ ] 不要引用 `TodoWrite` 或 `TodoRead`；它们是已被 `TaskCreate`/`TaskUpdate`/`TaskList` 替换的 legacy Claude Code tools。
 
-### Cross-Platform Sub-Agent Dispatch
+### Cross-Platform Sub-Agent Dispatch（跨平台 Sub-Agent Dispatch）
 
-- [ ] When a skill dispatches sub-agents, instruct use of the platform's subagent primitive and name the known equivalents (`Agent`/`Task` in Claude Code, `spawn_agent` in Codex, `subagent` in Pi via the `pi-subagents` extension)
-- [ ] Prefer bounded parallel execution: respect platform active-subagent limits, queue overflow work, and treat limit-related spawn errors as backpressure. Include a sequential fallback for platforms that do not support parallel dispatch
-- [ ] Prefer sub-agents shipped with this plugin (`ce-*`) over platform built-ins. Built-ins have different names on each target (e.g., Claude Code's `Explore` is `explorer` on Codex via `spawn_agent`'s `agent_type`, `scout` on Pi via `pi-subagents`) — using our own avoids the enumeration tax. Exception: when a built-in offers a meaningful benefit worth keeping, enumerate the per-platform equivalents inline at the call site so the model can route correctly on each target.
+- [ ] 当 skill dispatch sub-agents，指示使用 platform 的 subagent primitive，并列出 known equivalents（Claude Code 中 `Agent`/`Task`，Codex 中 `spawn_agent`，Pi 中通过 `pi-subagents` extension 使用 `subagent`）。
+- [ ] 优先 bounded parallel execution：尊重 platform active-subagent limits，queue overflow work，并把 limit-related spawn errors 视作 backpressure。对不支持 parallel dispatch 的 platforms，包含 sequential fallback。
+- [ ] 优先使用本 plugin 随附的 sub-agents（`ce-*`），而不是 platform built-ins。Built-ins 在每个 target 上名字不同（例如 Claude Code 的 `Explore` 在 Codex 中是 `spawn_agent` 的 `agent_type` `explorer`，在 Pi 中通过 `pi-subagents` 是 `scout`）；使用自己的 agents 可以避免 enumeration tax。例外：当 built-in 有值得保留的明确优势时，在 call site inline 枚举各平台 equivalents，让 model 能在每个 target 正确 route。
 
-### Script Path References in Skills
+### Script Path References in Skills（Skills 中的脚本路径引用）
 
-- [ ] In bash code blocks, reference co-located scripts using relative paths (e.g., `bash scripts/my-script ARG`) — not `${CLAUDE_PLUGIN_ROOT}` or other platform-specific variables
-- [ ] All platforms resolve script paths relative to the skill's directory; no env var prefix is needed
-- [ ] Reference the script with a backtick path (e.g., `` `scripts/my-script` ``) so agents can locate it; a markdown link is not needed since the bash code block already provides the invocation
+- [ ] 在 bash code blocks 中，用 relative paths 引用 co-located scripts（例如 `bash scripts/my-script ARG`），不要用 `${CLAUDE_PLUGIN_ROOT}` 或其他 platform-specific variables。
+- [ ] 所有 platforms 都会相对 skill directory resolve script paths；不需要 env var prefix。
+- [ ] 用 backtick path 引用 script（例如 `` `scripts/my-script` ``），让 agents 能 locate 它；bash code block 已经提供 invocation，不需要 markdown link。
 
-### Cross-Platform Reference Rules
+### Cross-Platform Reference Rules（跨平台引用规则）
 
-This plugin is authored once, then converted for other agent platforms. Commands and agents are transformed during that conversion, but `plugin.skills` are usually copied almost exactly as written.
+此 plugin author 一次，然后转换到其他 agent platforms。Commands 和 agents 会在 conversion 期间 transform，但 `plugin.skills` 通常几乎原样复制。
 
-- [ ] Because of that, slash references inside command or agent content are acceptable when they point to real published commands; target-specific conversion can remap them.
-- [ ] Inside a pass-through `SKILL.md`, do not assume slash references will be remapped for another platform. Write references according to what will still make sense after the skill is copied as-is.
-- [ ] When one skill refers to another skill, prefer semantic wording such as "load the `ce-doc-review` skill" rather than slash syntax.
-- [ ] Use slash syntax only when referring to an actual published command or workflow such as `/ce-work` or `/ce-compound`.
+- [ ] 因此，在 command 或 agent content 中使用 slash references 是可接受的，只要它们指向真实 published commands；target-specific conversion 可以 remap。
+- [ ] 在 pass-through `SKILL.md` 内，不要假设 slash references 会为另一个 platform remap。按照 skill 被原样复制后仍有意义的方式写 references。
+- [ ] 当一个 skill 引用另一个 skill，优先使用 semantic wording，例如 "load the `ce-doc-review` skill"，而不是 slash syntax。
+- [ ] 只有在引用真实 published command 或 workflow（例如 `/ce-work` 或 `/ce-compound`）时才使用 slash syntax。
 
-### Tool Selection in Agents and Skills
+### Tool Selection in Agents and Skills（Agents 和 Skills 中的 Tool 选择）
 
-Agents and skills that explore codebases must prefer native tools over shell commands.
+探索 codebases 的 agents 和 skills 必须优先使用 native tools，而不是 shell commands。
 
-Why: shell-heavy exploration causes avoidable permission prompts in sub-agent workflows; native file-search, content-search, and file-read tools avoid that.
+原因：shell-heavy exploration 会在 sub-agent workflows 中造成可避免的 permission prompts；native file-search、content-search 和 file-read tools 可以避免这一点。
 
-- [ ] Never instruct agents to use `find`, `ls`, `cat`, `head`, `tail`, `grep`, `rg`, `wc`, or `tree` through a shell for routine file discovery, content search, or file reading
-- [ ] Describe tools by capability class with platform hints — e.g., "Use the native file-search/glob tool (e.g., Glob in Claude Code)" — not by Claude Code-specific tool names alone
-- [ ] When shell is the only option (e.g., `ast-grep`, `bundle show`, git commands), instruct one simple command at a time — no action chaining (`cmd1 && cmd2`, `cmd1 ; cmd2`) and no error suppression (`2>/dev/null`, `|| true`). Two narrow exceptions: boolean conditions within if/while guards (`[ -n "$X" ] || [ -n "$Y" ]`) are fine — that is normal conditional logic, not action chaining. **Value-producing preparatory commands** (`VAR=$(cmd1) && cmd2 "$VAR"`) are also fine when `cmd2` strictly consumes `cmd1`'s output and splitting would require manually threading the value through model context across bash calls (e.g., `BODY_FILE=$(mktemp -u) && cat > "$BODY_FILE" <<EOF ... EOF`). Simple pipes (e.g., `| jq .field`) and output redirection (e.g., `> file`) are acceptable when they don't obscure failures
-- [ ] **Pre-resolution exception:** `!` backtick pre-resolution commands run at skill load time, not at agent runtime. They may use chaining (`&&`, `||`), error suppression (`2>/dev/null`), and fallback sentinels (e.g., `|| echo '__NO_CONFIG__'`) to produce a clean, parseable value for the model. This is the preferred pattern for environment probes (CLI availability, config file reads) that would otherwise require runtime shell calls with chaining. Three shapes are rejected by Claude Code's safety check and must be avoided in `!` backticks:
-  - **`case ... esac`** is rejected as `Contains case_statement`. Use `&&` chaining or pipe-to-sed, or extract to a script.
-  - **`;` (semicolon command separator)** is rejected as `Unhandled node type: ;`. Use `&&` or `||` chaining when those operators express the same intent; extract to a script when unconditional sequencing is genuinely required (`;` is not equivalent to either — it runs the next command regardless of exit code).
-  - **`[A] && B || C`** (mixing `&&` and `||` at the same lexical depth) is rejected as `ambiguous syntax with command separators` (issue #710). Wrap the `&&` chain in a subshell so only `||` remains at top level — `(A && B) || C` — or emit the raw value and let the agent's prose decide. Example of the safe shape: `` !`cat "$(git rev-parse --show-toplevel 2>/dev/null)/path/to/file" 2>/dev/null || echo '__SENTINEL__'` ``
-  - **`$(...)` containing a double-quoted string** (e.g., `basename "$(dirname "$common")"`) is rejected as `Unhandled node type: string` (issue #709). Extract the logic to a script under `scripts/` — do NOT replace with parameter expansion (see next bullet).
-  - **Bash parameter expansion operators** (`${var%pattern}`, `${var##pattern}`, `${var#pattern}`, `${var%%pattern}`, `${var/pat/repl}`, `${var:-default}`, etc.) are rejected as `Contains expansion`. Simple `${var}` is fine; operators after the variable name are not. This means paths like `${common%/.git}` (strip-suffix) or `${repo##*/}` (strip-prefix) cannot be used in `!` pre-resolution. To derive a directory name or strip a path component, extract to a script.
+- [ ] 不要指示 agents 通过 shell 使用 `find`、`ls`、`cat`、`head`、`tail`、`grep`、`rg`、`wc` 或 `tree` 来做 routine file discovery、content search 或 file reading。
+- [ ] 按 capability class 描述 tools，并附 platform hints，例如 "Use the native file-search/glob tool (e.g., Glob in Claude Code)"；不要只写 Claude Code-specific tool names。
+- [ ] 当 shell 是唯一选择时（例如 `ast-grep`、`bundle show`、git commands），一次只指示一个 simple command；不要 action chaining（`cmd1 && cmd2`、`cmd1 ; cmd2`），也不要 error suppression（`2>/dev/null`、`|| true`）。两个 narrow exceptions：if/while guards 内的 boolean conditions（`[ -n "$X" ] || [ -n "$Y" ]`）可以，这是正常 conditional logic，不是 action chaining。**Value-producing preparatory commands**（`VAR=$(cmd1) && cmd2 "$VAR"`）也可以，前提是 `cmd2` 严格消费 `cmd1` 的 output，并且拆分会迫使模型在多次 bash calls 间手工传递 value（例如 `BODY_FILE=$(mktemp -u) && cat > "$BODY_FILE" <<EOF ... EOF`）。Simple pipes（例如 `| jq .field`）和 output redirection（例如 `> file`）可以接受，只要不会遮蔽 failures。
+- [ ] **Pre-resolution exception:** `!` backtick pre-resolution commands 在 skill load time 运行，而不是 agent runtime。它们可以使用 chaining（`&&`、`||`）、error suppression（`2>/dev/null`）和 fallback sentinels（例如 `|| echo '__NO_CONFIG__'`），以便为 model 产出 clean、parseable value。这是 environment probes（CLI availability、config file reads）的 preferred pattern；否则这些 probes 会需要带 chaining 的 runtime shell calls。Claude Code safety check 会拒绝以下形状，必须在 `!` backticks 中避免：
+  - **`case ... esac`** 会被拒绝为 `Contains case_statement`。使用 `&&` chaining、pipe-to-sed，或提取到 script。
+  - **`;`（semicolon command separator）** 会被拒绝为 `Unhandled node type: ;`。当 `&&` 或 `||` 能表达相同 intent 时使用它们；如果确实需要 unconditional sequencing，则提取到 script（`;` 与二者都不等价，它不管 exit code 都会运行下一个 command）。
+  - **`[A] && B || C`**（同一 lexical depth 混用 `&&` 和 `||`）会被拒绝为 `ambiguous syntax with command separators`（issue #710）。把 `&&` chain 包进 subshell，使 top level 只剩 `||`：`(A && B) || C`；或者 emit raw value，让 agent prose 决定。Safe shape 示例：`` !`cat "$(git rev-parse --show-toplevel 2>/dev/null)/path/to/file" 2>/dev/null || echo '__SENTINEL__'` ``
+  - **`$(...)` containing a double-quoted string**（例如 `basename "$(dirname "$common")"`）会被拒绝为 `Unhandled node type: string`（issue #709）。把 logic 提取到 `scripts/` 下的 script；不要用 parameter expansion 替代（见下一条）。
+  - **Bash parameter expansion operators**（`${var%pattern}`、`${var##pattern}`、`${var#pattern}`、`${var%%pattern}`、`${var/pat/repl}`、`${var:-default}` 等）会被拒绝为 `Contains expansion`。Simple `${var}` 可以；variable name 后的 operators 不行。这意味着 `${common%/.git}`（strip-suffix）或 `${repo##*/}`（strip-prefix）不能在 `!` pre-resolution 中使用。要 derive directory name 或 strip path component，请提取到 script。
 
-  When the logic is non-trivial, prefer extracting to a script under the skill's `scripts/` directory; the safety check then sees only `bash <quoted-path>`, which sidesteps both current and future safety-check tightenings. Tests in `tests/skill-shell-safety.test.ts` enforce all four patterns.
+  当 logic non-trivial 时，优先提取到 skill 的 `scripts/` directory 下；safety check 只会看到 `bash <quoted-path>`，从而避开当前和未来 safety-check tightenings。`tests/skill-shell-safety.test.ts` 会强制所有四类 patterns。
 
-  **Permission gate on extracted scripts — invoke from the skill body, not from `!` pre-resolution.** A pre-resolution `bash "${CLAUDE_SKILL_DIR}/scripts/<name>.sh"` form passes the safety check but trips Claude Code's permission check at skill-load time, which does *not* honor `defaultMode: bypassPermissions`. Allow-listing via `allowed-tools` frontmatter is unreliable at *load time*: empirically, broad `Bash(bash *)` patterns appear to load with bypass on but narrow filename-pinned patterns like `Bash(bash *upstream-version.sh)` fail with bypass off. Move the script invocation into the skill body so it runs via the runtime Bash tool instead. Two pieces are required for it to actually work:
+  **Permission gate on extracted scripts：从 skill body 调用，不要从 `!` pre-resolution 调用。** Pre-resolution `bash "${CLAUDE_SKILL_DIR}/scripts/<name>.sh"` 形状能通过 safety check，但会在 skill-load time 触发 Claude Code permission check，而该阶段不尊重 `defaultMode: bypassPermissions`。通过 `allowed-tools` frontmatter allow-list 在 *load time* 不可靠：经验上，宽泛的 `Bash(bash *)` patterns 看起来会以 bypass on 加载，但窄的 filename-pinned patterns（例如 `Bash(bash *upstream-version.sh)`）会以 bypass off 失败。把 script invocation 移到 skill body，让它通过 runtime Bash tool 运行。真正可用需要两点：
 
-  1. **Use `${CLAUDE_SKILL_DIR}` for the script path**, not bare relative paths. The runtime Bash tool runs from the user's project CWD, not the skill directory — `bash scripts/<name>.sh` fails with "No such file or directory" empirically. The `${CLAUDE_SKILL_DIR}` env var resolves correctly across `claude --plugin-dir` and standard marketplace-cached installs.
-  2. **Declare narrow `allowed-tools` patterns** pinned to each script filename. At runtime, `allowed-tools` granting is documented to apply, so users without `bypassPermissions` skip the approval prompt. Pin per filename rather than using broad `Bash(bash *)`.
+  1. **使用 `${CLAUDE_SKILL_DIR}` 作为 script path**，不要用裸 relative paths。Runtime Bash tool 从用户 project CWD 运行，不是 skill directory；`bash scripts/<name>.sh` 会经验性地失败为 "No such file or directory"。`${CLAUDE_SKILL_DIR}` env var 在 `claude --plugin-dir` 和 standard marketplace-cached installs 中都能正确 resolve。
+  2. **声明 narrow `allowed-tools` patterns**，并 pin 到每个 script filename。Runtime 下文档表明 `allowed-tools` granting 会应用，因此没有 `bypassPermissions` 的用户也能跳过 approval prompt。按 filename pin，而不是使用宽泛 `Bash(bash *)`。
 
   ```yaml
   allowed-tools: Bash(bash *upstream-version.sh), Bash(bash *currently-loaded-version.sh)
@@ -258,35 +259,35 @@ Why: shell-heavy exploration causes avoidable permission prompts in sub-agent wo
   ```
   ````
 
-  Use this whenever a `!` pre-resolution would invoke `bash <path>`. Reserve pre-resolution for commands whose first token already matches common user allow rules (`git status`, `gh api`, `cat <path>`, `command -v <name>`).
-- [ ] Do not encode shell recipes for routine exploration when native tools can do the job; encode intent and preferred tool classes instead
-- [ ] For shell-only workflows (e.g., `gh`, `git`, `bundle show`, project CLIs), explicit command examples are acceptable when they are simple, task-scoped, and not chained together
+  只要 `!` pre-resolution 会调用 `bash <path>`，就使用此方式。把 pre-resolution 保留给 first token 已经匹配 common user allow rules 的 commands（`git status`、`gh api`、`cat <path>`、`command -v <name>`）。
+- [ ] 当 native tools 能完成 routine exploration 时，不要编码 shell recipes；编码 intent 和 preferred tool classes。
+- [ ] 对 shell-only workflows（例如 `gh`、`git`、`bundle show`、project CLIs），explicit command examples 可以接受，只要它们 simple、task-scoped，且没有 chained together。
 
-### Passing Reference Material to Sub-Agents
+### Passing Reference Material to Sub-Agents（向 Sub-Agents 传递 Reference Material）
 
-When a skill orchestrates sub-agents that need codebase reference material, prefer passing file paths over file contents. The sub-agent reads only what it needs. Content-passing is fine for small, static material consumed in full (e.g., a JSON schema under ~50 lines).
+当 skill orchestrates 需要 codebase reference material 的 sub-agents 时，优先传 file paths，而不是 file contents。Sub-agent 只读取它需要的内容。对于小型、静态且会被完整消费的 material（例如 50 行以内的 JSON schema），传 content 可以接受。
 
-### Sub-Agent Permission Mode
+### Sub-Agent Permission Mode（sub-agent 权限模式）
 
-When dispatching sub-agents, **omit the `mode` parameter** on the Agent/Task tool call unless the skill explicitly needs a specific mode (e.g., `mode: "plan"` for plan-approval workflows). Passing `mode: "auto"` or any other value overrides the user's configured permission settings (e.g., `bypassPermissions` in their user-level config), which is never the intended behavior for routine subagent dispatch. Omitting `mode` lets the user's own `defaultMode` setting apply.
+Dispatch sub-agents 时，**省略 Agent/Task tool call 上的 `mode` parameter**，除非 skill 明确需要特定 mode（例如 plan-approval workflows 需要 `mode: "plan"`）。传 `mode: "auto"` 或任何其他 value 会覆盖用户配置的 permission settings（例如 user-level config 中的 `bypassPermissions`），这绝不是 routine subagent dispatch 的预期行为。省略 `mode` 可让用户自己的 `defaultMode` setting 生效。
 
-### Reading Config Files from Skills
+### Reading Config Files from Skills（从 Skills 读取 Config Files）
 
-Plugin config lives at `.compound-engineering/config.local.yaml` in the repo root. This file is gitignored (machine-local settings), which creates two gotchas:
+Plugin config 位于 repo root 的 `.compound-engineering/config.local.yaml`。该文件被 gitignore（machine-local settings），会产生两个 gotchas：
 
-1. **Path resolution:** Never read the config relative to CWD — the user may invoke a skill from a subdirectory. Always resolve from the repo root. In pre-resolution commands, use `git rev-parse --show-toplevel` to find the root.
+1. **Path resolution:** 永远不要相对 CWD 读取 config；用户可能从 subdirectory 调用 skill。始终从 repo root resolve。在 pre-resolution commands 中，用 `git rev-parse --show-toplevel` 查找 root。
 
-2. **Worktrees:** Gitignored files are per-worktree. A config file created in the main checkout does not exist in worktrees. Use `--show-toplevel` to find the root:
-   ```
+2. **Worktrees:** Gitignored files 是 per-worktree 的。在 main checkout 中创建的 config file 不会存在于 worktrees。用 `--show-toplevel` 找 root：
+   ```text
    !`cat "$(git rev-parse --show-toplevel 2>/dev/null)/.compound-engineering/config.local.yaml" 2>/dev/null || echo '__NO_CONFIG__'`
    ```
-   Outside a git repo, `git rev-parse` emits empty and `cat "/.compound-engineering/config.local.yaml"` fails (permission denied or not found, suppressed by `2>/dev/null`), so the `__NO_CONFIG__` sentinel fires. Note: the previous pattern used `(top=$(...); [ -n "$top" ] && cat "$top/...")` with a semicolon to guard the empty-root case, but `;` is rejected by Claude Code's safety checker as `Unhandled node type: ;` (see Pre-resolution exception above) and must not be used in `!` pre-resolution.
+   在 git repo 外，`git rev-parse` 会 emit empty，`cat "/.compound-engineering/config.local.yaml"` 会失败（permission denied 或 not found，被 `2>/dev/null` suppress），因此 `__NO_CONFIG__` sentinel 会触发。Note：此前 pattern 用 `(top=$(...); [ -n "$top" ] && cat "$top/...")` 和 semicolon 来 guard empty-root case，但 `;` 会被 Claude Code safety checker 拒绝为 `Unhandled node type: ;`（见上方 Pre-resolution exception），因此不得在 `!` pre-resolution 中使用。
 
-   Note: in a worktree, `--show-toplevel` returns the worktree path, so config from the main checkout will not be found. This is acceptable — config is optional and users who work from worktrees can add a config file there. A previous pattern used `git-common-dir` with `${common%/.git}` to derive the main repo root as a fallback, but bash parameter expansion operators are rejected as "Contains expansion" (see Pre-resolution exception above), so that approach is no longer viable without a script.
+   Note：在 worktree 中，`--show-toplevel` 返回 worktree path，所以找不到 main checkout 中的 config。这可以接受；config 是 optional，使用 worktrees 的用户可以在那里添加 config file。此前 pattern 使用 `git-common-dir` 和 `${common%/.git}` derive main repo root 作为 fallback，但 bash parameter expansion operators 会被拒绝为 "Contains expansion"（见上方 Pre-resolution exception），因此没有 script 时该方法不可行。
 
-If neither path has the file, fall through to defaults — never fail or block on missing config.
+如果两个 paths 都没有文件，fall through 到 defaults；绝不要因为 missing config fail 或 block。
 
-### Quick Validation Command
+### Quick Validation Command（快速验证命令）
 
 ```bash
 # Check for broken markdown link references (should return nothing)
@@ -296,57 +297,57 @@ grep -E '\[.*\]\(\./references/|\[.*\]\(\./assets/|\[.*\]\(references/|\[.*\]\(a
 grep -E '^description:' skills/*/SKILL.md
 ```
 
-## Adding Components
+## Adding Components（添加组件）
 
-- **New skill:** Create `skills/<name>/SKILL.md` with required YAML frontmatter (`name`, `description`). Reference files go in `skills/<name>/references/`. Add the skill to the appropriate category table in `README.md` and update the skill count.
-- **New agent:** Create `agents/ce-<name>.md` with frontmatter (the `ce-` prefix is required). Add the agent to the appropriate topical section of `README.md` (Review, Document Review, Research, Design, Workflow, Docs) and update the agent count.
+- **New skill:** 创建 `skills/<name>/SKILL.md`，包含 required YAML frontmatter（`name`、`description`）。Reference files 放在 `skills/<name>/references/`。把 skill 添加到 `README.md` 的适当 category table，并更新 skill count。
+- **New agent:** 创建 `agents/ce-<name>.md`，包含 frontmatter（`ce-` prefix required）。把 agent 添加到 `README.md` 的适当 topical section（Review、Document Review、Research、Design、Workflow、Docs），并更新 agent count。
 
-### Adding a New Plugin to This Repo
+### Adding a New Plugin to This Repo（向本 Repo 添加新 Plugin）
 
-When adding a new plugin alongside `compound-engineering` and `coding-tutor`, the repo ships to three marketplace formats (Claude, Cursor, Codex). All three must stay in parity or `bun run release:validate` will fail on next run. Checklist:
+当在 `compound-engineering` 和 `coding-tutor` 旁添加新 plugin 时，repo 会 ship 到三种 marketplace formats（Claude、Cursor、Codex）。三者必须保持 parity，否则下次运行 `bun run release:validate` 会失败。Checklist：
 
-- [ ] `.claude-plugin/marketplace.json` — add the plugin to `plugins[]`
-- [ ] `.cursor-plugin/marketplace.json` — add the plugin to `plugins[]`
-- [ ] `.agents/plugins/marketplace.json` — add the plugin to `plugins[]` (Codex schema: nested `source: { source: "local", path: "./plugins/<name>" }`, `policy`, `category`)
-- [ ] `plugins/<name>/.claude-plugin/plugin.json` — create with `name`, `version`, `description`
-- [ ] `plugins/<name>/.cursor-plugin/plugin.json` — create with matching `name`, `version`, `description`
-- [ ] `plugins/<name>/.codex-plugin/plugin.json` — create with matching `name`, `version`, `description`, plus Codex-specific fields (`skills: "./skills/"` if skills exist, plus `interface{}` block)
-- [ ] `.github/release-please-config.json` — add a `plugins/<name>` package entry with `extra-files` for all three plugin.json paths
-- [ ] `.github/.release-please-manifest.json` — add the initial version entry for the new package
-- [ ] `src/release/metadata.ts` — extend `syncReleaseMetadata` with a cross-check target for the new plugin (follow the `codexPluginTargets` pattern)
-- [ ] Run `bun run release:validate` and confirm it reports the new manifests without drift
+- [ ] `.claude-plugin/marketplace.json`：把 plugin 添加到 `plugins[]`
+- [ ] `.cursor-plugin/marketplace.json`：把 plugin 添加到 `plugins[]`
+- [ ] `.agents/plugins/marketplace.json`：把 plugin 添加到 `plugins[]`（Codex schema: nested `source: { source: "local", path: "./plugins/<name>" }`, `policy`, `category`）
+- [ ] `plugins/<name>/.claude-plugin/plugin.json`：创建并包含 `name`、`version`、`description`
+- [ ] `plugins/<name>/.cursor-plugin/plugin.json`：创建并包含 matching `name`、`version`、`description`
+- [ ] `plugins/<name>/.codex-plugin/plugin.json`：创建并包含 matching `name`、`version`、`description`，以及 Codex-specific fields（如果存在 skills，则 `skills: "./skills/"`，再加 `interface{}` block）
+- [ ] `.github/release-please-config.json`：添加 `plugins/<name>` package entry，并为三条 plugin.json paths 添加 `extra-files`
+- [ ] `.github/.release-please-manifest.json`：为新 package 添加 initial version entry
+- [ ] `src/release/metadata.ts`：扩展 `syncReleaseMetadata`，为新 plugin 添加 cross-check target（遵循 `codexPluginTargets` pattern）
+- [ ] 运行 `bun run release:validate`，确认它报告新 manifests 且无 drift
 
-The validator enforces: plugin-list parity across all three marketplaces, name/version/description parity across each plugin's three plugin.json files, and existence of any `skills:` directory declared in the Codex manifest. Note that only `description` drift is auto-corrected on `write: true` — version drift is detect-only because release-please owns the write.
+Validator 会强制：所有三种 marketplaces 的 plugin-list parity、每个 plugin 三个 plugin.json files 的 name/version/description parity，以及 Codex manifest 声明的任何 `skills:` directory 是否存在。注意只有 `description` drift 会在 `write: true` 时 auto-correct；version drift 是 detect-only，因为 release-please owns the write。
 
-## Beta Skills
+## Beta Skills（beta skills，beta skills）
 
-Beta skills use a `-beta` suffix and `disable-model-invocation: true` to prevent accidental auto-triggering. See `docs/solutions/skill-design/beta-skills-framework.md` for naming, validation, and promotion rules.
+Beta skills 使用 `-beta` suffix，并设置 `disable-model-invocation: true`，防止 accidental auto-triggering。命名、validation 和 promotion rules 见 `docs/solutions/skill-design/beta-skills-framework.md`。
 
-**Caveat on non-beta use of `disable-model-invocation`:** The flag blocks all model-initiated invocations via the Skill tool, which includes scheduled re-entry from `/loop`. Only a user typing a slash command directly bypasses it. If a skill is intended to be schedulable (e.g., `resolve-pr-feedback`), do not set this flag — rely on description specificity and argument requirements to prevent accidental auto-fire instead.
+**Caveat on non-beta use of `disable-model-invocation`:** 该 flag 会阻止所有通过 Skill tool 的 model-initiated invocations，包括从 `/loop` scheduled re-entry。只有用户直接输入 slash command 才能 bypass。若 skill 需要可 scheduled（例如 `resolve-pr-feedback`），不要设置此 flag；依赖 description specificity 和 argument requirements 来防止 accidental auto-fire。
 
-### Stable/Beta Sync
+### Stable/Beta Sync（Stable/Beta 同步）
 
-When modifying a skill that has a `-beta` counterpart (or vice versa), always check the other version and **state your sync decision explicitly** before committing — e.g., "Propagated to beta — shared test guidance" or "Not propagating — this is the experimental delegate mode beta exists to test." Syncing to both, stable-only, and beta-only are all valid outcomes. The goal is deliberate reasoning, not a default rule.
+修改有 `-beta` counterpart 的 skill（或反过来）时，务必检查另一个版本，并在 commit 前**明确说明 sync decision**，例如 "Propagated to beta — shared test guidance" 或 "Not propagating — this is the experimental delegate mode beta exists to test." 同步到两者、只同步 stable、只同步 beta 都可以。目标是 deliberate reasoning，而不是默认规则。
 
-## Skill Documentation
+## Skill Documentation（Skill 文档）
 
-Many skills have a user-facing doc at `docs/skills/<skill>.md` (repo-root `docs/`, not under `plugins/`) that explains the skill's high-level purpose, novel mechanics, and chain position — separate from the runtime SKILL.md. The `docs/skills/README.md` index lists all documented skills grouped by category.
+许多 skills 有 user-facing doc 位于 `docs/skills/<skill>.md`（repo-root `docs/`，不是 `plugins/` 下），用于解释 skill 的 high-level purpose、novel mechanics 和 chain position；它与 runtime SKILL.md 分离。`docs/skills/README.md` index 会按 category 列出所有 documented skills。
 
-When modifying such a skill, **state your skill-doc sync decision explicitly** before committing — e.g., "doc updated — added new framing for surprise-me mode" or "doc not updated — change is internal to Phase 2, doesn't surface at doc level." **Most changes don't warrant an update**: internal phase refactors, prompt-tuning, and mechanic-level bug fixes typically don't surface at the doc's level of abstraction.
+修改这类 skill 时，commit 前**明确说明 skill-doc sync decision**，例如 "doc updated — added new framing for surprise-me mode" 或 "doc not updated — change is internal to Phase 2, doesn't surface at doc level." **大多数 changes 不需要 update**：internal phase refactors、prompt-tuning 和 mechanic-level bug fixes 通常不会暴露到 doc 抽象层级。
 
-Update the skill doc when:
+以下情况更新 skill doc：
 
-- The skill's high-level purpose or framing has shifted
-- A highlighted novel mechanic changed materially or was removed
-- A new mechanic emerged that belongs in "What Makes It Novel"
-- The doc's quick example, FAQ, or use cases would mislead a reader
+- Skill 的 high-level purpose 或 framing 发生变化
+- Highlighted novel mechanic 发生实质变化或被移除
+- 出现应属于 "What Makes It Novel" 的新 mechanic
+- Doc 的 quick example、FAQ 或 use cases 会误导读者
 
-Edit just the parts that became inaccurate; don't rewrite to match SKILL.md. Skills without a doc need no check — creating one is a deliberate decision, not a reflexive one. When adding a doc for a skill that didn't have one, also link it from the skill's row in `plugins/compound-engineering/README.md` and add it to the appropriate category in `docs/skills/README.md`.
+只编辑变得不准确的部分；不要为了匹配 SKILL.md 而整篇重写。没有 doc 的 skills 不需要 check；为其创建 doc 是 deliberate decision，不是 reflexive decision。为此前没有 doc 的 skill 添加 doc 时，也要从 `plugins/compound-engineering/README.md` 中该 skill row 链接过去，并把它加入 `docs/skills/README.md` 中适当 category。
 
-## Documented Solutions
+## Documented Solutions（已记录的 Solutions）
 
-`docs/solutions/` holds documented solutions to past problems — bugs, architecture patterns, design patterns, tooling decisions, conventions, workflow practices, and other institutional knowledge. Entries use YAML frontmatter with fields including `module`, `tags`, and `problem_type`. Knowledge-track `problem_type` values are `architecture_pattern`, `design_pattern`, `tooling_decision`, `convention`, `workflow_issue`, `developer_experience`, `documentation_gap`, and `best_practice` (fallback). Bug-track values cover `build_error`, `test_failure`, `runtime_error`, `performance_issue`, `database_issue`, `security_issue`, `ui_bug`, `integration_issue`, and `logic_error`. Search this directory before designing new solutions so institutional memory compounds across changes.
+`docs/solutions/` 保存过去问题的 documented solutions：bugs、architecture patterns、design patterns、tooling decisions、conventions、workflow practices 和其他 institutional knowledge。Entries 使用 YAML frontmatter，字段包括 `module`、`tags` 和 `problem_type`。Knowledge-track `problem_type` values 包括 `architecture_pattern`、`design_pattern`、`tooling_decision`、`convention`、`workflow_issue`、`developer_experience`、`documentation_gap` 和 `best_practice`（fallback）。Bug-track values 覆盖 `build_error`、`test_failure`、`runtime_error`、`performance_issue`、`database_issue`、`security_issue`、`ui_bug`、`integration_issue` 和 `logic_error`。设计新 solutions 前先搜索该目录，让 institutional memory across changes compound。
 
-## Documentation
+## Documentation（文档）
 
-See `docs/solutions/plugin-versioning-requirements.md` for detailed versioning workflow.
+详细 versioning workflow 见 `docs/solutions/plugin-versioning-requirements.md`。

@@ -1,62 +1,62 @@
-# Building Agent-Friendly CLIs: Practical Principles
+# 构建 Agent-Friendly CLIs：实践原则
 
-CLIs are a natural fit for agents — text in, text out, composable by design. They're also more practical than MCP for most developer-facing agent work: LLMs already know common CLI tools from training data, so there's no schema overhead. An MCP server can burn tens of thousands of tokens just loading its tool definitions before a single question is asked, while a CLI call costs only the command and its output. MCP earns its complexity when agents need per-user auth and structured governance, but for the tools developers build and use day-to-day, a well-designed CLI is faster, cheaper, and more reliable.
+CLI 天然适合 agents：text in、text out，且设计上可组合。对大多数面向开发者的 agent 工作来说，它们也比 MCP 更实际：LLMs 已经从训练数据中知道常见 CLI tools，因此没有 schema overhead。一个 MCP server 在回答单个问题前，仅加载 tool definitions 就可能消耗数万 tokens；而一次 CLI call 只消耗 command 和 output。MCP 在 agents 需要 per-user auth 和 structured governance 时值得承担复杂度；但对开发者日常构建和使用的 tools，一个设计良好的 CLI 更快、更便宜，也更可靠。
 
-The details still trip agents up, though: interactive prompts they can't answer, help pages with no examples, error messages that say "invalid input" and nothing else, output that buries useful data in formatting. As agents become real consumers of developer tooling, CLI design needs to account for them explicitly.
+不过细节仍会绊住 agents：它们无法回答的 interactive prompts、没有 examples 的 help pages、只说 "invalid input" 却不解释的 error messages、把有用 data 埋在 formatting 里的 output。随着 agents 成为 developer tooling 的真实消费者，CLI design 需要显式考虑它们。
 
-This guide synthesizes ideas from Anthropic's tool-design guidance, the Command Line Interface Guidelines project, CLI-Anything, and practitioner experience into **7 practical principles** for evaluating whether a CLI is merely usable by agents or genuinely well-optimized for them.
+本 guide 综合 Anthropic 的 tool-design guidance、Command Line Interface Guidelines project、CLI-Anything，以及 practitioner experience，形成 **7 条实践原则**，用于评估一个 CLI 只是能被 agents 勉强使用，还是已经为它们很好地 optimized。
 
-This is not a generic CLI style guide. It is a rubric for CLIs that are intended to work well with AI agents.
+这不是 generic CLI style guide。它是一个 rubric，用于评估那些意图与 AI agents 良好协作的 CLIs。
 
 ---
 
-## How to Use This Rubric
+## 如何使用此 Rubric
 
-This guide is intentionally opinionated, but it is **not pass/fail**.
+本 guide 有意带有明确立场，但它 **不是 pass/fail**。
 
-Use each finding to classify the CLI along three levels:
+使用每条 finding 将 CLI 分为三个 levels：
 
-| Level | Meaning | Typical impact on agents |
+| Level | 含义 | 对 agents 的典型影响 |
 |---|---|---|
-| Blocker | Prevents reliable agent use | Hangs, requires human intervention, or makes output hard to recover from |
-| Friction | Agents can use it, but inefficiently or unreliably | More retries, wasted tokens, brittle parsing, extra tool calls |
-| Optimization | Improves speed, cost, and robustness | Better agent throughput, lower token cost, fewer corrective loops |
+| Blocker | 阻止可靠 agent use | Hangs、需要 human intervention，或让 output 难以 recover |
+| Friction | Agents 可以使用，但低效或不可靠 | 更多 retries、浪费 tokens、brittle parsing、额外 tool calls |
+| Optimization | 提升 speed、cost 和 robustness | 更好的 agent throughput、更低 token cost、更少 corrective loops |
 
-In practice, you should evaluate commands by **command type**, not only at the CLI level:
+实践中，应按 **command type** 评估 commands，而不只在 CLI level 评估：
 
-| Command type | Most important principles |
+| Command type | 最重要的原则 |
 |---|---|
-| Read/query commands | Structured output, bounded output, composability |
-| Mutating commands | Non-interactive execution, actionable errors, safety, idempotence where feasible |
-| Streaming/logging commands | Filtering, truncation controls, clean stderr/stdout behavior |
-| Interactive/bootstrap commands | Automation escape hatch, `--no-input`, scriptable alternatives |
-| Bulk/export commands | Pagination, range selection, machine-readable output |
+| Read/query commands | Structured output、bounded output、composability |
+| Mutating commands | Non-interactive execution、actionable errors、safety、可行时 idempotence |
+| Streaming/logging commands | Filtering、truncation controls、clean stderr/stdout behavior |
+| Interactive/bootstrap commands | Automation escape hatch、`--no-input`、scriptable alternatives |
+| Bulk/export commands | Pagination、range selection、machine-readable output |
 
-This keeps the rubric practical. For example, idempotence is critical for many mutating commands, but not every `tail -f`-style command needs to satisfy it.
+这能让 rubric 更实际。例如 idempotence 对许多 mutating commands 很关键，但不是每个 `tail -f` 风格 command 都需要满足它。
 
 ---
 
-## The 7 Principles
+## 7 条原则
 
-| # | Principle | Why it matters |
+| # | 原则 | 为什么重要 |
 |---|-----------|---------------|
-| 1 | Non-interactive by default for automation paths | Agents cannot reliably answer prompts or navigate TUI flows |
-| 2 | Structured, parseable output | Agents need stable data contracts, not presentation formatting |
-| 3 | Progressive help discovery | Agents explore tools incrementally and benefit from concrete examples |
-| 4 | Fail fast with actionable errors | Agents recover well when errors tell them exactly how to correct course |
-| 5 | Safe retries and explicit mutation boundaries | Agents retry, resume, and recover; commands must not make that dangerous |
-| 6 | Composable and predictable command structure | Agents chain commands and depend on consistent affordances |
-| 7 | Bounded, high-signal responses | Extra output consumes context, time, and tool budget |
+| 1 | Automation paths 默认 non-interactive | Agents 无法可靠回答 prompts 或 navigate TUI flows |
+| 2 | Structured、parseable output | Agents 需要 stable data contracts，而不是 presentation formatting |
+| 3 | Progressive help discovery | Agents 会逐步探索 tools，并受益于 concrete examples |
+| 4 | Fail fast with actionable errors | 当 errors 明确告诉下一步如何修正时，agents recover 得更好 |
+| 5 | Safe retries and explicit mutation boundaries | Agents 会 retry、resume 和 recover；commands 不能让这变危险 |
+| 6 | Composable and predictable command structure | Agents 会 chain commands，并依赖 consistent affordances |
+| 7 | Bounded, high-signal responses | 额外 output 会消耗 context、time 和 tool budget |
 
 ---
 
-## 1. Non-Interactive by Default for Automation Paths
+## 1. Automation Paths 默认 Non-Interactive
 
-**The principle:** Any command an agent might reasonably automate should be invocable without prompts. Interactive mode can still exist, but it should be a convenience layer, not the only path.
+**原则：** 任何 agent 可能合理 automate 的 command，都应该能在无 prompts 的情况下 invoke。Interactive mode 仍可存在，但它应是 convenience layer，而不是唯一路径。
 
-This principle is strongly supported by the CLI Guidelines project: if stdin is not a TTY, the command should not prompt, and `--no-input` should disable prompting entirely. The broader inference from agent-tooling guidance is straightforward: tools that pause for human intervention are poor fits for autonomous execution.
+CLI Guidelines project 强烈支持此原则：如果 stdin 不是 TTY，command 就不应 prompt，且 `--no-input` 应完全禁用 prompting。从 agent-tooling guidance 推出的更广义结论很直接：会停下来等待 human intervention 的 tools 不适合 autonomous execution。
 
-**What good looks like:**
+**好的形态：**
 
 ```bash
 # Human at a terminal (TTY detected) — prompts fill in missing inputs
@@ -74,20 +74,20 @@ $ blog-cli publish --content my-post.md --yes
 Published "My Post" to personal (post_id: post_8k3m)
 ```
 
-- `Blocker`: a common automation command cannot run without a prompt
-- `Friction`: some prompts can be bypassed, but behavior is inconsistent across subcommands
-- `Optimization`: every automation path supports explicit flags and a global non-interactive mode
+- `Blocker`: 常见 automation command 无法无 prompt 运行
+- `Friction`: 部分 prompts 可绕过，但 subcommands 间 behavior 不一致
+- `Optimization`: 每条 automation path 都支持 explicit flags 和 global non-interactive mode
 
-Recommended traits:
+推荐特征：
 
-- Support `--no-input` or `--non-interactive`
-- Detect TTY vs non-TTY and never prompt when stdin is not interactive
-- Support `--yes` / `--force` for confirmation bypass where appropriate
-- Accept structured input via flags, files, or stdin
+- 支持 `--no-input` 或 `--non-interactive`
+- 检测 TTY vs non-TTY，且 stdin 非 interactive 时绝不 prompt
+- 在合适场景支持 `--yes` / `--force` 绕过 confirmation
+- 通过 flags、files 或 stdin 接受 structured input
 
-**Evaluation goal:** verify that commands never hang waiting for input in non-interactive execution.
+**评估目标：** 验证 commands 在 non-interactive execution 中不会 hang 等待 input。
 
-**One practical check (POSIX shell + Python 3 example):**
+**一个实用检查（POSIX shell + Python 3 example）：**
 
 ```bash
 python3 - <<'PY'
@@ -111,17 +111,17 @@ except subprocess.TimeoutExpired:
 PY
 ```
 
-Adapt the mechanism to your environment. The important part is the test purpose: **detach stdin and enforce a timeout**.
+根据环境调整机制。关键是 test purpose：**detach stdin and enforce a timeout**。
 
 ---
 
-## 2. Structured, Parseable Output
+## 2. Structured、Parseable Output（结构化、可解析输出）
 
-**The principle:** Commands that return data should expose a stable machine-readable representation and predictable process semantics.
+**原则：** 返回 data 的 commands 应暴露 stable machine-readable representation 和 predictable process semantics。
 
-Anthropic explicitly recommends returning meaningful context from tools and optimizing tool responses for token efficiency. CLIG explicitly recommends `--json`, clean stdout/stderr separation, and suppressing presentation formatting in non-TTY contexts. This document extends that guidance into a CLI-evaluation rule for agent use.
+Anthropic 明确建议 tools 返回 meaningful context，并针对 token efficiency optimize tool responses。CLIG 明确建议 `--json`、clean stdout/stderr separation，以及在 non-TTY contexts 中 suppress presentation formatting。本 document 将这些 guidance 扩展为 agent use 的 CLI-evaluation rule。
 
-**What good looks like:**
+**好的形态：**
 
 ```bash
 # Human-readable
@@ -135,21 +135,21 @@ $ blog-cli publish --content my-post.md --json
 {"title":"My Post","url":"https://personal.blog.dev/my-post","post_id":"post_8k3m","status":"published"}
 ```
 
-- `Blocker`: output is only prose, tables, or ANSI-heavy formatting with no stable parse path
-- `Friction`: some commands support structured output, but coverage is inconsistent or stderr/stdout are mixed
-- `Optimization`: all data-bearing commands expose a stable machine-readable mode with useful identifiers
+- `Blocker`: output 只有 prose、tables 或 ANSI-heavy formatting，没有 stable parse path
+- `Friction`: 部分 commands 支持 structured output，但 coverage 不一致，或 stderr/stdout 混杂
+- `Optimization`: 所有 data-bearing commands 都提供 stable machine-readable mode，并包含 useful identifiers
 
-Recommended traits:
+推荐特征：
 
-- Support `--json` or another clearly documented machine-readable format on data-bearing commands
-- Use exit code `0` for success and non-zero for failure
-- Write result data to stdout and diagnostics/logs/errors to stderr
-- Return meaningful fields such as names, URLs, status, and IDs
-- Suppress color, spinners, and decorative output when not attached to a TTY
+- 在 data-bearing commands 上支持 `--json` 或其他清晰 documented machine-readable format
+- Success 使用 exit code `0`，failure 使用 non-zero
+- 将 result data 写入 stdout，将 diagnostics/logs/errors 写入 stderr
+- 返回 meaningful fields，例如 names、URLs、status 和 IDs
+- 非 TTY 时 suppress color、spinners 和 decorative output
 
-**Evaluation goal:** verify that structured output is valid, stable enough to parse, and cleanly separated from diagnostics.
+**评估目标：** 验证 structured output valid、稳定到足以 parse，且与 diagnostics cleanly separated。
 
-**One practical check (POSIX shell + Python 3 example):**
+**一个实用检查（POSIX shell + Python 3 example）：**
 
 ```bash
 blog-cli publish --content my-post.md --json 2>stderr.txt | python3 -c '
@@ -167,13 +167,13 @@ rm -f stderr.txt
 
 ---
 
-## 3. Progressive Help Discovery
+## 3. Progressive Help Discovery（渐进式帮助发现）
 
-**The principle:** Agents rarely learn a CLI from one giant document. They probe top-level help, then subcommand help, then examples. Help should support that workflow.
+**原则：** Agents 很少能从一份 giant document 学会 CLI。它们会 probe top-level help，再 probe subcommand help，再看 examples。Help 应支持这种 workflow。
 
-CLIG directly recommends concise help, examples, subcommand help, and linking to deeper docs. Anthropic separately shows that precise tool descriptions and examples materially improve tool-use behavior. The inference here is that CLI help should be designed as layered runtime documentation.
+CLIG 直接建议 concise help、examples、subcommand help 和 deeper docs links。Anthropic 也展示了 precise tool descriptions 和 examples 会显著改善 tool-use behavior。这里的推论是：CLI help 应被设计成 layered runtime documentation。
 
-**What good looks like:**
+**好的形态：**
 
 ```bash
 $ blog-cli --help
@@ -199,39 +199,39 @@ Examples:
   blog-cli publish --content my-post.md --dry-run
 ```
 
-- `Blocker`: subcommands are hard to discover or `--help` is missing/incomplete
-- `Friction`: help exists but omits concrete invocation patterns or required argument guidance
-- `Optimization`: help is layered, concise, example-driven, and points to deeper docs when needed
+- `Blocker`: subcommands 难以 discover，或 `--help` 缺失/不完整
+- `Friction`: help 存在，但缺少 concrete invocation patterns 或 required argument guidance
+- `Optimization`: help layered、concise、example-driven，并在需要时指向 deeper docs
 
-Recommended traits:
+推荐特征：
 
-- Top-level help lists commands clearly
-- Subcommand help includes synopsis, required inputs, key flags, and at least one concrete example for non-trivial commands
-- Common flags appear near the top
-- Deeper docs are linked from help where helpful
+- Top-level help 清晰列出 commands
+- Subcommand help 包含 synopsis、required inputs、key flags，并为 non-trivial commands 至少提供一个 concrete example
+- Common flags 靠前出现
+- 需要时从 help 链接 deeper docs
 
-**Evaluation goal:** verify that an agent can discover how to invoke a command without leaving the CLI or reading the source code.
+**评估目标：** 验证 agent 无需离开 CLI 或阅读 source code，即可 discover 如何 invoke command。
 
-**A better check than `grep example`:**
+**比 `grep example` 更好的检查：**
 
-For each important subcommand, inspect whether help includes all four of:
+对每个重要 subcommand，检查 help 是否包含以下四项：
 
-1. A one-line purpose
-2. A concrete invocation pattern
-3. Required arguments or required flags
-4. The most important modifiers or safety flags
+1. 一行 purpose
+2. Concrete invocation pattern（具体调用模式）
+3. Required arguments 或 required flags
+4. 最重要 modifiers 或 safety flags
 
-If one of those is missing, treat it as `Friction`. If several are missing, treat it as a `Blocker` for discoverability.
+如果缺少其中一项，通常视为 `Friction`。若缺少多项，则对 discoverability 来说是 `Blocker`。
 
 ---
 
-## 4. Fail Fast with Actionable Errors
+## 4. Fail Fast，并提供 Actionable Errors
 
-**The principle:** When a command fails, the error should help the agent fix the next attempt.
+**原则：** command 失败时，error 应帮助 agent 修正下一次尝试。
 
-This is directly supported by Anthropic's guidance: error responses should communicate specific, actionable improvements rather than opaque codes or tracebacks. CLIG also recommends clear error handling and concise output.
+这直接受到 Anthropic guidance 支持：error responses 应传达具体、actionable improvements，而不是 opaque codes 或 tracebacks。CLIG 也建议 clear error handling 和 concise output。
 
-**What good looks like:**
+**好的形态：**
 
 ```bash
 # Bad
@@ -246,20 +246,20 @@ Available statuses: draft, published, scheduled
 Example: blog-cli publish --content my-post.md
 ```
 
-- `Blocker`: failures are vague, silent, or buried in stack traces
-- `Friction`: errors mention what failed but not how to correct it
-- `Optimization`: errors include the correction path, valid values, and nearby examples
+- `Blocker`: failures 含糊、silent，或埋在 stack traces 中
+- `Friction`: errors 说明哪里失败，但没说明如何 correct
+- `Optimization`: errors 包含 correction path、valid values 和附近 examples
 
-Recommended traits:
+推荐特征：
 
-- Include the correct syntax or usage pattern
-- Suggest valid values when validation fails
-- Validate early, before side effects
-- Prefer actionable text over raw tracebacks by default
+- 包含 correct syntax 或 usage pattern
+- Validation 失败时建议 valid values
+- 在 side effects 前 early validate
+- 默认优先 actionable text，而不是 raw tracebacks
 
-**Evaluation goal:** verify that a failed invocation tells the next caller how to succeed.
+**评估目标：** 验证 failed invocation 会告诉下一位 caller 如何成功。
 
-**One practical check:**
+**一个实用检查：**
 
 ```bash
 error_output=$(blog-cli publish 2>&1 >/dev/null)
@@ -268,23 +268,23 @@ printf '%s\n' "$error_output"
 echo "exit=$exit_code"
 ```
 
-Assess the error against these questions:
+按以下问题评估 error：
 
-- Does it say what was wrong?
-- Does it show the correct invocation shape?
-- Does it suggest valid values or next steps?
+- 是否说明哪里错了？
+- 是否展示 correct invocation shape？
+- 是否建议 valid values 或 next steps？
 
-If the answer is only yes to the first question, that is usually `Friction`, not `Optimization`.
+如果只有第一个问题为 yes，通常是 `Friction`，不是 `Optimization`。
 
 ---
 
-## 5. Safe Retries and Explicit Mutation Boundaries
+## 5. Safe Retries 与 Explicit Mutation Boundaries
 
-**The principle:** Agents retry, resume, and sometimes replay commands. Mutating commands should make that safe when possible, and dangerous mutations should be explicit.
+**原则：** Agents 会 retry、resume，有时会 replay commands。Mutating commands 应在可行时让这件事安全，而 dangerous mutations 应显式。
 
-This section intentionally goes beyond the sources a bit. Anthropic emphasizes clear boundaries, careful tool selection, and annotations for destructive tools; CLIG emphasizes confirmations, `--force`, and `--dry-run`. From an agent-readiness perspective, the practical synthesis is: retries must be safe enough that automation is not reckless.
+本 section 有意比 sources 稍进一步。Anthropic 强调 clear boundaries、careful tool selection，以及 destructive tools 的 annotations；CLIG 强调 confirmations、`--force` 和 `--dry-run`。从 agent-readiness 角度，实际综合结论是：retries 必须足够安全，automation 才不会 reckless。
 
-**What good looks like:**
+**好的形态：**
 
 ```bash
 # Repeating the same command does not create duplicate work
@@ -298,39 +298,39 @@ Already published "My Post" to personal, no changes (post_id: post_8k3m)
 $ blog-cli posts delete --slug my-post --confirm
 ```
 
-- `Blocker`: retrying a mutating command can easily duplicate or corrupt state with no warning
-- `Friction`: destructive commands are scriptable but offer little preview or state feedback
-- `Optimization`: retries are safe where feasible, and destructive intent is explicit and inspectable
+- `Blocker`: retry mutating command 很容易 duplicate 或 corrupt state，且无 warning
+- `Friction`: destructive commands 可 script，但 preview 或 state feedback 很少
+- `Optimization`: 可行时 retries safe，destructive intent explicit 且 inspectable
 
-Recommended traits:
+推荐特征：
 
-- Provide `--dry-run` for consequential mutations where feasible
-- Use explicit destructive flags for dangerous operations
-- Return enough state in success output to verify what happened
-- Make duplicate application a no-op or clearly detectable when the domain allows it
+- 对 consequential mutations，在可行时提供 `--dry-run`
+- 对 dangerous operations 使用 explicit destructive flags
+- Success output 返回足够 state，便于 verify 发生了什么
+- Domain 允许时，让 duplicate application 成为 no-op 或可明确检测
 
-Important scoping note:
+重要范围说明：
 
-- For **create/update/deploy/apply** commands, idempotence or duplicate detection is usually high-value
-- For **append/send/trigger/run-now** commands, exact idempotence may be impossible; in those cases, the CLI should at least make mutation boundaries explicit and return audit-friendly identifiers
+- 对 **create/update/deploy/apply** commands，idempotence 或 duplicate detection 通常很有价值
+- 对 **append/send/trigger/run-now** commands，精确 idempotence 可能不可行；此时 CLI 至少应让 mutation boundaries explicit，并返回 audit-friendly identifiers
 
-**Evaluation goal:** verify that retrying or re-running a command is not surprisingly dangerous.
+**评估目标：** 验证 retrying 或 re-running command 不会出人意料地危险。
 
-**Practical checks:**
+**实用检查：**
 
-- Run the same low-risk mutating command twice and compare outcomes
-- Check whether destructive commands expose preview, confirmation-bypass, or explicit-danger affordances
-- Check whether success output includes identifiers that let an agent determine whether it repeated work
+- 将同一个 low-risk mutating command 运行两次并比较 outcomes
+- 检查 destructive commands 是否暴露 preview、confirmation-bypass 或 explicit-danger affordances
+- 检查 success output 是否包含 identifiers，使 agent 能判断自己是否重复了工作
 
 ---
 
-## 6. Composable and Predictable Command Structure
+## 6. Composable 且 Predictable 的 Command Structure
 
-**The principle:** Agents solve tasks by chaining commands. They benefit from CLIs that accept stdin, produce clean stdout, and use predictable naming and subcommand structure.
+**原则：** Agents 通过 chaining commands 解决任务。它们受益于能接受 stdin、产生 clean stdout、且 naming 与 subcommand structure 可预测的 CLIs。
 
-CLIG strongly supports composition: support stdin/stdout, `-` for pipes, clean stderr separation, and order-independent argument handling where possible. Anthropic separately recommends choosing thoughtful, composable tools instead of forcing agents through many low-level steps. The practical synthesis for CLI evaluation is consistency plus pipeability.
+CLIG 强烈支持 composition：支持 stdin/stdout、`-` 作为 pipes、clean stderr separation，并尽可能 order-independent argument handling。Anthropic 另建议选择 thoughtful、composable tools，而不是迫使 agents 经历许多 low-level steps。CLI evaluation 的实际综合点是：consistency plus pipeability。
 
-**What good looks like:**
+**好的形态：**
 
 ```bash
 cat posts.json | blog-cli posts import --stdin
@@ -338,37 +338,37 @@ blog-cli posts list --json | blog-cli posts validate --stdin
 blog-cli posts list --status draft --limit 5 --json | jq -r '.[].title'
 ```
 
-- `Blocker`: commands cannot participate in pipelines or have inconsistent invocation structure
-- `Friction`: some commands are pipeable, but naming and structure vary unpredictably
-- `Optimization`: the CLI is easy to chain because inputs, outputs, and subcommand patterns are regular
+- `Blocker`: commands 无法参与 pipelines，或 invocation structure 不一致
+- `Friction`: 部分 commands pipeable，但 naming 和 structure unpredictable
+- `Optimization`: CLI 易于 chain，因为 inputs、outputs 和 subcommand patterns regular
 
-Recommended traits:
+推荐特征：
 
-- Accept input via flags, files, or stdin where that materially helps automation
-- Support `-` as a stdin/stdout alias when file paths are involved
-- Keep command structures consistent across related resources
-- Prefer flags for ambiguous multi-field operations; reserve positional arguments for familiar, conventional cases
-- Avoid requiring users to remember arbitrary ordering rules for flags and subcommands
+- 当 input 合理来自另一条 command 时，接受 flags、files 或 stdin
+- 在涉及 file paths 时支持 `-` 作为 stdin/stdout alias
+- 相关 resources 的 command structures 保持一致
+- 对 ambiguous multi-field operations 优先使用 flags；将 positional arguments 保留给 familiar、conventional cases
+- 避免要求 users 记住 arbitrary ordering rules for flags and subcommands
 
-**Evaluation goal:** verify that commands can be chained without brittle adapters or special-case knowledge.
+**评估目标：** 验证 commands 可 chain，而无需 brittle adapters 或 special-case knowledge。
 
-**Practical checks:**
+**实用检查：**
 
-- Can a command consume stdin or `-` when input logically comes from another command?
-- Can output from a data command be piped into another tool without stripping logs or ANSI codes?
-- Do related commands use similar verb/resource patterns?
+- 当 input 逻辑上来自另一条 command 时，command 能否 consume stdin 或 `-`？
+- data command 的 output 能否 pipe 到另一 tool，而不需要 strip logs 或 ANSI codes？
+- Related commands 是否使用类似 verb/resource patterns？
 
-This is a better evaluation axis than requiring a specific grammar such as `resource verb` for every CLI.
+这比要求每个 CLI 都采用特定 grammar（例如 `resource verb`）更好的 evaluation axis。
 
 ---
 
-## 7. Bounded, High-Signal Responses
+## 7. Bounded、High-Signal Responses（有边界、高信号响应）
 
-**The principle:** Agents pay a real cost for every extra line of output. Large outputs are sometimes justified, but the CLI should make narrow, relevant responses the default path.
+**原则：** Agents 为每一行额外 output 付出真实成本。Large outputs 有时合理，但 CLI 应让 narrow、relevant responses 成为 default path。
 
-This is directly aligned with Anthropic's token-efficiency guidance: use pagination, filtering, truncation, and sensible defaults for large responses, and steer agents toward narrowing strategies. This document adds a practical optimization stance for CLIs: a command may be usable while still being wasteful.
+这与 Anthropic 的 token-efficiency guidance 直接一致：对 large responses 使用 pagination、filtering、truncation 和 sensible defaults，并引导 agents 使用 narrowing strategies。本 document 为 CLIs 增加一个 practical optimization stance：command 可能 usable，但仍然 wasteful。
 
-**What good looks like:**
+**好的形态：**
 
 ```bash
 # Broad but bounded
@@ -380,73 +380,73 @@ To narrow results: blog-cli posts list --status published --since 7d --limit 10
 $ blog-cli posts list --tag javascript --status published --since 30d --limit 10 --json
 ```
 
-- `Blocker`: a routine query command dumps huge output by default with no narrowing controls
-- `Friction`: narrowing exists, but defaults are too broad or truncation provides no guidance
-- `Optimization`: defaults are bounded, filters are obvious, and truncation teaches the next better query
+- `Blocker`: routine query command 默认 dump 巨大 output，且无 narrowing controls
+- `Friction`: narrowing 存在，但 defaults 过宽，或 truncation 不给 guidance
+- `Optimization`: defaults bounded、filters obvious，truncation 教下一条更好的 query
 
-Recommended traits:
+推荐特征：
 
-- Support filtering, pagination, range selection, and limits on potentially large result sets
-- Provide concise vs detailed response modes where helpful
-- When truncating, explain how to narrow or page the query
-- Return semantic identifiers and summaries before raw detail
+- 对可能 large 的 result sets，支持 filtering、pagination、range selection 和 limits
+- 有帮助时提供 concise vs detailed response modes
+- Truncating 时解释如何 narrow 或 page query
+- 先返回 semantic identifiers 和 summaries，再返回 raw detail
 
-On thresholds:
+关于阈值：
 
-- A default response comfortably under a few hundred lines is often a strong optimization for agents
-- A larger default is not automatically wrong if the command is inherently export-oriented or the data volume is intrinsic
-- For evaluation, prefer asking whether the default is **proportionate to the common task** rather than treating any fixed line count as a hard fail
+- 默认 response 舒适地低于几百行，对 agents 通常是强 optimization
+- 如果 command 天生 export-oriented 或 data volume 是 intrinsic，更大的 default 不必然错误
+- 评估时，优先问 default 是否 **proportionate to the common task**，而不是把固定行数当 hard fail
 
-**Evaluation goal:** verify that agents can get relevant answers without first paying for an unnecessary data dump.
+**评估目标：** 验证 agents 能得到 relevant answers，而无需先为 unnecessary data dump 付费。
 
-**Practical checks:**
+**实用检查：**
 
-- Compare default output to filtered output and check whether narrowing materially reduces volume
-- Check whether the command exposes `--limit`, filters, time bounds, selectors, or pagination
-- If default output is large, check whether the command is explicitly an export/bulk command rather than a routine query surface
+- 比较 default output 与 filtered output，检查 narrowing 是否显著降低 volume
+- 检查 command 是否暴露 `--limit`、filters、time bounds、selectors 或 pagination
+- 如果 default output 很大，检查该 command 是否明确是 export/bulk command，而不是 routine query surface
 
-As a heuristic, treat a default output above roughly 500 lines as a likely `Friction` signal unless the command is explicitly bulk-oriented and documented as such.
+作为 heuristic，除非 command 明确 bulk-oriented 且有相应 documentation，否则默认 output 超过约 500 行可视为 likely `Friction` signal。
 
 ---
 
-## Quick Assessment Checklist
+## 快速评估 Checklist
 
-Use this to evaluate a CLI quickly without pretending every issue is binary:
+使用此表快速评估 CLI，同时避免把每个问题都假装成 binary：
 
-| # | Check | What you are testing | Typical severity if missing |
+| # | Check | 你在测试什么 | 缺失时的典型 severity |
 |---|-------|----------------------|-----------------------------|
-| 1 | Non-interactive path | Can the command run with stdin detached and no prompt? | `Blocker` |
-| 2 | Structured output | Can agents get machine-readable output without scraping prose? | `Blocker` or `Friction` |
-| 3 | Discoverable help | Can an agent find the invocation shape from `--help` alone? | `Friction` |
-| 4 | Actionable errors | Does failure teach the next correct invocation? | `Friction` |
-| 5 | Safe mutation boundaries | Are retries, destructive actions, and previews handled explicitly? | `Blocker` or `Friction` |
-| 6 | Composition | Can the command participate in pipelines cleanly? | `Friction` |
-| 7 | Bounded output | Are defaults reasonably scoped for common agent tasks? | `Friction` or `Optimization` |
+| 1 | Non-interactive path | command 能否在 stdin detached 且无 prompt 下运行？ | `Blocker` |
+| 2 | Structured output | Agents 能否无需 scrape prose 得到 machine-readable output？ | `Blocker` or `Friction` |
+| 3 | Discoverable help | Agent 能否仅通过 `--help` 找到 invocation shape？ | `Friction` |
+| 4 | Actionable errors | Failure 是否教下一次正确 invocation？ | `Friction` |
+| 5 | Safe mutation boundaries | Retries、destructive actions 和 previews 是否被显式处理？ | `Blocker` or `Friction` |
+| 6 | Composition | command 能否干净参与 pipelines？ | `Friction` |
+| 7 | Bounded output | defaults 对常见 agent tasks 是否合理 scoped？ | `Friction` or `Optimization` |
 
 ---
 
-## Recommended Evaluation Flow
+## 推荐评估流程
 
-When assessing a real CLI, review it in this order:
+评估真实 CLI 时，按以下顺序 review：
 
-1. Pick representative commands by type: one read command, one mutating command, one bulk/logging command, and any intentionally interactive workflow.
-2. Check for automation blockers first: prompts, unusable help, prose-only output, mixed stdout/stderr.
-3. Check recovery quality next: error messages, validation, stable identifiers, repeatability.
-4. Check optimization last: narrowing defaults, concise modes, consistent structure, pipeability.
+1. 按 type 选择 representative commands：一个 read command、一个 mutating command、一个 bulk/logging command，以及任何 intentional interactive workflow。
+2. 先检查 automation blockers：prompts、unusable help、prose-only output、mixed stdout/stderr。
+3. 接着检查 recovery quality：error messages、validation、stable identifiers、repeatability。
+4. 最后检查 optimization：narrowing defaults、concise modes、consistent structure、pipeability。
 
-This avoids over-penalizing a CLI for missing optimizations before confirming whether agents can use it at all.
+这样可以避免在确认 agents 是否根本可用之前，就因缺少 optimizations 对 CLI 过度扣分。
 
 ---
 
-## Sources
+## 来源
 
-### Primary sources
+### 主要来源
 
-- [Writing effective tools for agents — Anthropic Engineering](https://www.anthropic.com/engineering/writing-tools-for-agents) — Primary source for tool design guidance around meaningful context, token efficiency, actionable errors, and evaluation-driven optimization.
-- [Command Line Interface Guidelines](https://clig.dev/) — Primary source for CLI behavior around help, stdout/stderr separation, interactivity, arguments/flags, and composability.
-- [CLI-Anything](https://clianything.org/) — Useful agent-CLI reference point emphasizing self-description, composability, JSON output, and deterministic behavior. Best treated as a practitioner framework, not a standards source.
+- [Writing effective tools for agents — Anthropic Engineering](https://www.anthropic.com/engineering/writing-tools-for-agents) — 关于 meaningful context、token efficiency、actionable errors 和 evaluation-driven optimization 的 tool design guidance primary source。
+- [Command Line Interface Guidelines](https://clig.dev/) — 关于 help、stdout/stderr separation、interactivity、arguments/flags 和 composability 的 CLI behavior primary source。
+- [CLI-Anything](https://clianything.org/) — 有用的 agent-CLI reference point，强调 self-description、composability、JSON output 和 deterministic behavior。最好视作 practitioner framework，而不是 standards source。
 
-### Additional references
+### 其他参考
 
-- [Why CLI is the New MCP — OneUptime](https://oneuptime.com/blog/post/2026-02-03-cli-is-the-new-mcp/view) — Opinionated ecosystem commentary on why CLI remains a strong agent integration surface.
-- [How to Write a Good Spec for AI Agents — Addy Osmani](https://addyosmani.com/blog/good-spec/) — Relevant to layered documentation and context budgeting, but not a primary source for CLI-specific guidance.
+- [Why CLI is the New MCP — OneUptime](https://oneuptime.com/blog/post/2026-02-03-cli-is-the-new-mcp/view) — 关于 CLI 为什么仍是强 agent integration surface 的 opinionated ecosystem commentary。
+- [How to Write a Good Spec for AI Agents — Addy Osmani](https://addyosmani.com/blog/good-spec/) — 与 layered documentation 和 context budgeting 相关，但不是 CLI-specific guidance 的 primary source。

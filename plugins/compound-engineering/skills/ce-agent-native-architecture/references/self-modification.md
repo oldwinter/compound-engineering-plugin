@@ -1,54 +1,54 @@
 <overview>
-Self-modification is the advanced tier of agent native engineering: agents that can evolve their own code, prompts, and behavior. Not required for every app, but a big part of the future.
+Self-modification 是 agent native engineering 的 advanced tier：agent 可以演化自己的 code、prompts 和 behavior。不是每个 app 都需要，但它是未来的重要组成部分。
 
-This is the logical extension of "whatever the developer can do, the agent can do."
+这是 "whatever the developer can do, the agent can do" 的逻辑延伸。
 </overview>
 
 <why_self_modification>
-## Why Self-Modification?
+## 为什么需要 Self-Modification？
 
-Traditional software is static—it does what you wrote, nothing more. Self-modifying agents can:
+传统 software 是 static 的：它只做你写下的事，不多不少。Self-modifying agents 可以：
 
-- **Fix their own bugs** - See an error, patch the code, restart
-- **Add new capabilities** - User asks for something new, agent implements it
-- **Evolve behavior** - Learn from feedback and adjust prompts
-- **Deploy themselves** - Push code, trigger builds, restart
+- **修复自己的 bugs** - 看到 error，patch code，restart
+- **添加 new capabilities** - 用户提出新需求，agent 自己实现
+- **演化 behavior** - 从 feedback 中学习并调整 prompts
+- **部署自己** - Push code，trigger builds，restart
 
-The agent becomes a living system that improves over time, not frozen code.
+agent 会成为随时间改进的 living system，而不是 frozen code。
 </why_self_modification>
 
 <capabilities>
-## What Self-Modification Enables
+## Self-Modification 能带来什么
 
-**Code modification:**
-- Read and understand source files
-- Write fixes and new features
-- Commit and push to version control
-- Trigger builds and verify they pass
+**Code modification（代码修改）：**
+- 阅读并理解 source files
+- 编写 fixes 和 new features
+- Commit 并 push 到 version control
+- Trigger builds 并验证通过
 
-**Prompt evolution:**
-- Edit the system prompt based on feedback
-- Add new features as prompt sections
-- Refine judgment criteria that aren't working
+**Prompt evolution（Prompt 演化）：**
+- 根据 feedback 编辑 system prompt
+- 将 new features 添加为 prompt sections
+- refine 不起作用的 judgment criteria
 
-**Infrastructure control:**
-- Pull latest code from upstream
-- Merge from other branches/instances
-- Restart after changes
-- Roll back if something breaks
+**Infrastructure control（基础设施控制）：**
+- 从 upstream pull latest code
+- 从其他 branches/instances merge
+- changes 后 restart
+- 出问题时 roll back
 
-**Site/output generation:**
-- Generate and maintain websites
-- Create documentation
-- Build dashboards from data
+**Site/output generation（站点 / 输出生成）：**
+- 生成并维护 websites
+- 创建 documentation
+- 基于 data 构建 dashboards
 </capabilities>
 
 <guardrails>
-## Required Guardrails
+## Required Guardrails（必要 Guardrails）
 
-Self-modification is powerful. It needs safety mechanisms.
+Self-modification 很强大，因此需要 safety mechanisms。
 
-**Approval gates for code changes:**
+**面向 code changes 的 approval gates：**
 ```typescript
 tool("write_file", async ({ path, content }) => {
   if (isCodeFile(path)) {
@@ -63,7 +63,7 @@ tool("write_file", async ({ path, content }) => {
 });
 ```
 
-**Auto-commit before changes:**
+**changes 前 auto-commit：**
 ```typescript
 tool("self_deploy", async () => {
   // Save current state first
@@ -81,7 +81,7 @@ tool("self_deploy", async () => {
 });
 ```
 
-**Build verification:**
+**Build verification（构建验证）：**
 ```typescript
 // Don't restart unless build passes
 try {
@@ -93,7 +93,7 @@ try {
 }
 ```
 
-**Health checks after restart:**
+**restart 后的 health checks：**
 ```typescript
 tool("health_check", async () => {
   const uptime = process.uptime();
@@ -113,15 +113,15 @@ tool("health_check", async () => {
 </guardrails>
 
 <git_architecture>
-## Git-Based Self-Modification
+## Git-Based Self-Modification（基于 Git 的自我修改）
 
-Use git as the foundation for self-modification. It provides:
-- Version history (rollback capability)
-- Branching (experiment safely)
-- Merge (sync with other instances)
-- Push/pull (deploy and collaborate)
+使用 git 作为 self-modification 的基础。它提供：
+- Version history（版本历史，rollback capability）
+- Branching（安全 experiment）
+- Merge（与其他 instances sync）
+- Push/pull（deploy 和 collaborate）
 
-**Essential git tools:**
+**Essential git tools（必要 git tools）：**
 ```typescript
 tool("status", "Show git status", {}, ...);
 tool("diff", "Show file changes", { path: z.string().optional() }, ...);
@@ -132,7 +132,7 @@ tool("pull", "Pull from GitHub", { source: z.enum(["main", "instance"]) }, ...);
 tool("rollback", "Revert recent commits", { commits: z.number() }, ...);
 ```
 
-**Multi-instance architecture:**
+**Multi-instance architecture（多实例架构）：**
 ```
 main                      # Shared code
 ├── instance/bot-a       # Instance A's branch
@@ -140,17 +140,17 @@ main                      # Shared code
 └── instance/bot-c       # Instance C's branch
 ```
 
-Each instance can:
-- Pull updates from main
-- Push improvements back to main (via PR)
-- Sync features from other instances
-- Maintain instance-specific config
+每个 instance 可以：
+- 从 main pull updates
+- 将 improvements push 回 main（通过 PR）
+- 从其他 instances sync features
+- 维护 instance-specific config
 </git_architecture>
 
 <prompt_evolution>
-## Self-Modifying Prompts
+## Self-Modifying Prompts（自修改 Prompts）
 
-The system prompt is a file the agent can read and write.
+system prompt 是 agent 可以 read 和 write 的文件。
 
 ```typescript
 // Agent can read its own prompt
@@ -160,7 +160,7 @@ tool("read_file", ...);  // Can read src/prompts/system.md
 tool("write_file", ...);  // Can write to src/prompts/system.md (with approval)
 ```
 
-**System prompt as living document:**
+**System prompt as living document（作为活文档的 system prompt）：**
 ```markdown
 ## Feedback Processing
 
@@ -173,33 +173,33 @@ When someone shares feedback:
      learned this from Dan's feedback on 2024-12-07 -->
 ```
 
-The agent can:
-- Add notes to itself
-- Refine judgment criteria
-- Add new feature sections
-- Document edge cases it learned
+agent 可以：
+- 给自己添加 notes
+- Refine judgment criteria（细化判断标准）
+- 添加 new feature sections
+- 记录它学到的 edge cases
 </prompt_evolution>
 
 <when_to_use>
-## When to Implement Self-Modification
+## 何时实现 Self-Modification
 
-**Good candidates:**
-- Long-running autonomous agents
-- Agents that need to adapt to feedback
-- Systems where behavior evolution is valuable
-- Internal tools where rapid iteration matters
+**Good candidates（适合场景）：**
+- Long-running autonomous agents（长时间运行的 autonomous agents）
+- 需要适应 feedback 的 agents
+- behavior evolution 有价值的 systems
+- rapid iteration 重要的 internal tools
 
-**Not necessary for:**
-- Simple single-task agents
-- Highly regulated environments
-- Systems where behavior must be auditable
-- One-off or short-lived agents
+**Not necessary for（不一定需要的场景）：**
+- 简单 single-task agents
+- Highly regulated environments（高监管环境）
+- behavior 必须 auditable 的 systems
+- One-off 或 short-lived agents
 
-Start with a non-self-modifying prompt-native agent. Add self-modification when you need it.
+从 non-self-modifying prompt-native agent 开始。确实需要时，再添加 self-modification。
 </when_to_use>
 
 <example_tools>
-## Complete Self-Modification Toolset
+## Complete Self-Modification Toolset（完整 Self-Modification Toolset）
 
 ```typescript
 const selfMcpServer = createSdkMcpServer({
@@ -249,21 +249,21 @@ const gitMcpServer = createSdkMcpServer({
 </example_tools>
 
 <checklist>
-## Self-Modification Checklist
+## Self-Modification Checklist（Self-Modification 检查清单）
 
-Before enabling self-modification:
-- [ ] Git-based version control set up
-- [ ] Approval gates for code changes
-- [ ] Build verification before restart
-- [ ] Rollback mechanism available
-- [ ] Health check endpoint
-- [ ] Instance identity configured
+启用 self-modification 前：
+- [ ] 已设置 Git-based version control
+- [ ] code changes 有 approval gates
+- [ ] restart 前有 build verification
+- [ ] rollback mechanism 可用
+- [ ] health check endpoint（健康检查 endpoint）
+- [ ] 已配置 instance identity
 
-When implementing:
-- [ ] Agent can read all project files
-- [ ] Agent can write files (with appropriate approval)
-- [ ] Agent can commit and push
-- [ ] Agent can pull updates
-- [ ] Agent can restart itself
-- [ ] Agent can roll back if needed
+实现时：
+- [ ] Agent 可以读取所有 project files
+- [ ] Agent 可以写 files（带 appropriate approval）
+- [ ] Agent 可以 commit 和 push
+- [ ] Agent 可以 pull updates
+- [ ] Agent 可以 restart itself
+- [ ] Agent 可以在需要时 roll back
 </checklist>

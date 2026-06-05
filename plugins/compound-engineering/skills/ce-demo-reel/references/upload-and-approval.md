@@ -1,80 +1,80 @@
-# Upload and Approval
+# Upload and Approval（上传与审批）
 
-Upload a temporary preview for the user to review, then either promote to permanent hosting or save locally based on user choice.
+上传 temporary preview 供用户 review，然后根据用户选择 promote 到 permanent hosting 或 save locally。
 
-## Headless / Background Mode
+## Headless / Background Mode（无头 / 后台模式）
 
-If no blocking question tool is available (Codex running autonomously, background agent, or any mode where there is no synchronous user), skip Steps 1–2 and go straight to headless upload:
+如果没有可用的 blocking question tool（Codex autonomous running、background agent，或任何没有 synchronous user 的 mode），跳过 Steps 1-2，直接进入 headless upload：
 
-1. **R2 available** (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_ENDPOINT`, `R2_PUBLIC_URL` all set): upload to R2 and use the public URL. Proceed to Step 3-R2.
-2. **R2 not available**: upload directly to catbox permanent hosting without a preview step. Proceed to Step 3.
+1. **R2 available**（`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_ENDPOINT`、`R2_PUBLIC_URL` 全部已设置）：上传到 R2 并使用 public URL。继续 Step 3-R2。
+2. **R2 not available**：不经过 preview step，直接上传到 catbox permanent hosting。继续 Step 3。
 
-## Step 1: Preview Upload (Temporary)
+## Step 1：Preview Upload（Temporary，临时预览上传）
 
-Upload the evidence file (GIF or PNG) to litterbox for a temporary 1-hour preview:
+将 evidence file（GIF 或 PNG）上传到 litterbox，生成 temporary 1-hour preview：
 
 ```bash
 python3 scripts/capture-demo.py preview [ARTIFACT_PATH]
 ```
 
-The last line of output is the preview URL (e.g., `https://litter.catbox.moe/abc123.gif`). This URL expires after 1 hour — no cleanup needed.
+Output 最后一行是 preview URL（例如 `https://litter.catbox.moe/abc123.gif`）。此 URL 1 小时后过期；无需 cleanup。
 
-For multiple files (static screenshots tier), upload each file separately.
+对多个 files（static screenshots tier），分别上传每个文件。
 
-**If upload fails** after retry, fall back to opening the local file with the platform file-opener (`open` on macOS, `xdg-open` on Linux) so the user can still review it. Include the local path in the destination choice question instead of a URL.
+**如果 retry 后 upload 仍失败**，fallback 到使用 platform file-opener 打开 local file（macOS 上 `open`，Linux 上 `xdg-open`），让用户仍可 review。Destination choice question 中包含 local path，而不是 URL。
 
-## Step 2: Destination Choice
+## Step 2：Destination Choice（目标位置选择）
 
-Present the preview URL to the user and ask how to handle the evidence. Use the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
+向用户展示 preview URL，并询问如何处理 evidence。使用 platform 的 blocking question tool：Claude Code 中为 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`），Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或 call errors（例如 Codex edit modes）时，才 fallback 到 chat 中展示 options；不要因为需要 schema load 就 fallback。永远不要 silently skip question。
 
-**Question:** "Evidence preview (1h link): [PREVIEW_URL]. Where should the evidence go?"
+**Question（问题）：** "Evidence preview (1h link): [PREVIEW_URL]. Where should the evidence go?"
 
-**Options:**
-1. **Upload to R2 (public URL)** -- upload to Cloudflare R2 for permanent PR embedding (available when R2 env vars are set)
-2. **Upload to catbox (public URL)** -- promote to catbox permanent hosting for PR embedding
-3. **Save locally** -- save to a stable OS-temp path (/tmp/compound-engineering/ce-demo-reel/)
-4. **Recapture** -- provide instructions on what to change
-5. **Proceed without evidence** -- set evidence to null and proceed
+**Options（选项）：**
+1. **Upload to R2 (public URL)** -- 上传到 Cloudflare R2，用于 permanent PR embedding（R2 env vars 设置后可用）
+2. **Upload to catbox (public URL)** -- promote 到 catbox permanent hosting，用于 PR embedding
+3. **Save locally** -- 保存到 stable OS-temp path（/tmp/compound-engineering/ce-demo-reel/）
+4. **Recapture** -- 提供要修改什么的 instructions
+5. **Proceed without evidence** -- 将 evidence 设为 null 并继续
 
-Omit option 1 if R2 env vars (`R2_ACCESS_KEY_ID`, `R2_BUCKET`, `R2_ENDPOINT`, `R2_PUBLIC_URL`) are not set.
+如果 R2 env vars（`R2_ACCESS_KEY_ID`、`R2_BUCKET`、`R2_ENDPOINT`、`R2_PUBLIC_URL`）未设置，省略 option 1。
 
-### On "Upload to R2 (public URL)"
+### On "Upload to R2 (public URL)"（选择上传到 R2）
 
-Proceed to Step 3-R2: R2 Upload.
+进入 Step 3-R2：R2 Upload。
 
-### On "Upload to catbox (public URL)"
+### On "Upload to catbox (public URL)"（选择上传到 catbox）
 
-Proceed to Step 3: Promote to Permanent Hosting (catbox).
+进入 Step 3：Promote to Permanent Hosting（catbox）。
 
-### On "Save locally"
+### On "Save locally"（选择本地保存）
 
-Proceed to Step 3b: Local Save.
+进入 Step 3b：Local Save。
 
-### On "Recapture"
+### On "Recapture"（选择重新捕获）
 
-Return to the tier execution step. The user's instructions guide what to change in the next capture attempt. After recapture, upload a new preview and repeat the destination choice.
+返回 tier execution step。用户 instructions 指导下一次 capture attempt 要改什么。Recapture 后，上传 new preview，并重复 destination choice。
 
-### On "Proceed without evidence"
+### On "Proceed without evidence"（选择不带 evidence 继续）
 
-Set evidence to null and proceed. The preview link expires on its own.
+将 evidence 设为 null 并继续。Preview link 会自行过期。
 
-## Step 3: Promote to Permanent Hosting (catbox)
+## Step 3：Promote to Permanent Hosting（提升到 permanent hosting，catbox）
 
-After the user selects "Upload to catbox", upload to permanent catbox hosting. The command accepts either the preview URL (preferred) or the local file path (fallback):
+用户选择 "Upload to catbox" 后，上传到 permanent catbox hosting。Command 接受 preview URL（preferred）或 local file path（fallback）：
 
 ```bash
 python3 scripts/capture-demo.py upload [PREVIEW_URL or ARTIFACT_PATH]
 ```
 
-If Step 1 produced a preview URL, pass it here -- catbox copies directly from litterbox without re-uploading. If Step 1 fell back to local review (no preview URL), pass the local artifact path instead.
+如果 Step 1 生成了 preview URL，在这里传入它；catbox 会直接从 litterbox copy，无需 re-upload。如果 Step 1 fallback 到 local review（无 preview URL），改为传入 local artifact path。
 
-The last line of output is the permanent URL (e.g., `https://files.catbox.moe/abc123.gif`). Use this URL in the output, not the preview URL.
+Output 最后一行是 permanent URL（例如 `https://files.catbox.moe/abc123.gif`）。在 output 中使用此 URL，不要使用 preview URL。
 
-For multiple files, promote each separately.
+对多个 files，分别 promote。
 
-## Step 3-R2: R2 Upload
+## Step 3-R2：R2 Upload（R2 上传）
 
-Upload the artifact to Cloudflare R2 using the AWS CLI:
+使用 AWS CLI 将 artifact 上传到 Cloudflare R2：
 
 ```bash
 KEY="ce-demo-reel/$(date +%Y%m%d-%H%M%S)-$(basename [ARTIFACT_PATH])"
@@ -85,34 +85,34 @@ aws s3 cp [ARTIFACT_PATH] "s3://$R2_BUCKET/$KEY" \
   --content-type "image/gif"
 ```
 
-Adjust `--content-type` to `image/png` for static screenshots.
+对 static screenshots，将 `--content-type` 调整为 `image/png`。
 
-The permanent public URL is: `$R2_PUBLIC_URL/$KEY`
+Permanent public URL 是：`$R2_PUBLIC_URL/$KEY`
 
-**If upload fails** (aws CLI not available, credentials invalid), fall back to catbox (Step 3) and note the fallback reason.
+**如果 upload 失败**（aws CLI 不可用、credentials invalid），fallback 到 catbox（Step 3），并注明 fallback reason。
 
-For multiple files, upload each separately with a unique key.
+对多个 files，用 unique key 分别上传。
 
-## Step 3b: Local Save
+## Step 3b：Local Save（本地保存）
 
-After the user selects "Save locally", save the artifact to the default OS-temp path using the pipeline script:
+用户选择 "Save locally" 后，使用 pipeline script 将 artifact 保存到 default OS-temp path：
 
 ```bash
 python3 scripts/capture-demo.py save-local --file [ARTIFACT_PATH] --branch [BRANCH_NAME]
 ```
 
-Determine `[BRANCH_NAME]` from `git branch --show-current` or the PR context discovered in Step 0 of the SKILL.md.
+从 `git branch --show-current` 或 SKILL.md Step 0 发现的 PR context 确定 `[BRANCH_NAME]`。
 
-The last line of output is the absolute path of the saved file. Use this path in the output.
+Output 最后一行是 saved file 的 absolute path。在 output 中使用此 path。
 
-For multiple files (static screenshots tier), save each file separately.
+对多个 files（static screenshots tier），分别保存每个文件。
 
-**If save fails** (permission denied, disk full), report the error and offer to retry or fall back to catbox upload (Step 3).
+**如果 save 失败**（permission denied、disk full），报告 error，并提供 retry 或 fallback 到 catbox upload（Step 3）。
 
-## Step 4: Return Output
+## Step 4：Return Output（返回输出）
 
-Return the structured output defined in the SKILL.md Output section: `Tier`, `Description`, and either `URL` (permanent public URL) or `Path` (local file path). The caller formats the evidence into the PR description. ce-demo-reel does not generate markdown.
+返回 SKILL.md Output section 中定义的 structured output：`Tier`、`Description`，以及 `URL`（permanent public URL）或 `Path`（local file path）。Caller 会将 evidence 格式化进 PR description。ce-demo-reel 不生成 markdown。
 
-## Step 5: Cleanup
+## Step 5：Cleanup（清理）
 
-Remove the `[RUN_DIR]` scratch directory and all temporary files. Preserve nothing -- the evidence lives at the permanent URL or has been copied to the local save path.
+移除 `[RUN_DIR]` scratch directory 和所有 temporary files。不保留任何内容；evidence 位于 permanent URL，或已 copy 到 local save path。

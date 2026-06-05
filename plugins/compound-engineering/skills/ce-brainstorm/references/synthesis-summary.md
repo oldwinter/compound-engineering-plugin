@@ -1,87 +1,87 @@
-# Synthesis Summary
+# Synthesis Summary（综合摘要）
 
-**Synthesis ≠ requirements doc.** The synthesis is NOT a preview, draft, or substitute for the requirements doc — it's the scope checkpoint that doc-write consumes as input. The requirements doc itself is written in Phase 3 from the confirmed synthesis. Both the synthesis and the requirements doc stay scope-only — implementation detail (file paths, code shapes, exact error wording) is downstream (ce-plan's job), not the requirements doc.
+**Synthesis ≠ requirements doc.** synthesis 不是 requirements doc 的 preview、draft 或 substitute；它是 doc-write 作为 input 消费的 scope checkpoint。requirements doc 本身在 Phase 3 中从 confirmed synthesis 写出。synthesis 和 requirements doc 都保持 scope-only；implementation detail（file paths、code shapes、exact error wording）属于 downstream（ce-plan 的职责），不是 requirements doc 的内容。
 
-**Two-stage shape: internal draft, then chat-time scoping synthesis.** The synthesis is composed in two stages. Stage 1 is an internal three-bucket draft (Stated / Inferred / Out of scope) the agent uses to think comprehensively about scope. Stage 2 is the scoping synthesis presented to the user — shaped like what two product collaborators would confirm before writing a PRD, not like a comprehensive audit and not like a one-line preview. The user only sees stage 2. The internal draft still informs the doc body via the doc-shape routing below; it just doesn't reach the user verbatim. This split exists because the comprehensive audit shape produced too much detail for the user to actually weigh in on, even when the granularity rules were followed.
+**Two-stage shape: internal draft, then chat-time scoping synthesis.** synthesis 分两阶段组成。Stage 1 是 internal three-bucket draft（Stated / Inferred / Out of scope），agent 用它 comprehensively 思考 scope。Stage 2 是呈现给用户的 scoping synthesis；它的形状像两个 product collaborators 在写 PRD 前会确认的内容，不像 comprehensive audit，也不是 one-line preview。用户只看到 stage 2。internal draft 仍通过下方 doc-shape routing 影响 doc body；它只是不会逐字到达用户。这个 split 存在的原因是 comprehensive audit shape 产生了太多 detail，即使遵循 granularity rules，用户也很难实际权衡。
 
-**Three-bucket structure is the internal draft, not the user-facing artifact.** It does its scope-thinking job during stage 1 and dissolves when Phase 3 writes the doc: Stated content informs Requirements, Inferred content informs Key Decisions, Out-of-scope content informs Scope Boundaries. The doc has no parallel `## Synthesis` section — only the scoping synthesis prose embeds, as `## Summary`. See "Doc shape after confirmation" below for the routing.
+**Three-bucket structure 是 internal draft，不是 user-facing artifact。** 它在 stage 1 做 scope-thinking 工作，并在 Phase 3 写 doc 时 dissolve：Stated content 影响 Requirements，Inferred content 影响 Key Decisions，Out-of-scope content 影响 Scope Boundaries。doc 没有并行的 `## Synthesis` section；只有 scoping synthesis prose 作为 `## Summary` 嵌入。routing 见下方 "Doc shape after confirmation"。
 
-This content is loaded when Phase 2.5 fires — after Phase 2 (approaches chosen) and before Phase 3 (write requirements doc). The synthesis is the user's last opportunity to correct the agent's interpretation before the doc lands. It serves two purposes: synthesis confirmation (the user agreed to many individual things in dialogue but never saw the whole) and a transition checkpoint ("about to write a doc").
+本内容在 Phase 2.5 触发时加载：Phase 2（approaches chosen）之后，Phase 3（write requirements doc）之前。synthesis 是 doc 落地前用户纠正 agent interpretation 的最后机会。它服务两个目的：synthesis confirmation（用户在 dialogue 中同意了许多个别事项，但从未看到整体）和 transition checkpoint（"about to write a doc"）。
 
-Fires for **all tiers** including Lightweight. Skip Phase 2.5 entirely on the Phase 0.1b non-software (universal-brainstorming) route. The skill is interactive by design — brainstorming requires dialogue with a synchronous user. There is no non-interactive mode; if an automated workflow needs a requirements doc without dialogue, the right move is to write the doc from context directly, not to invoke `ce-brainstorm`.
-
----
-
-## Stage 1: internal three-bucket draft
-
-The internal draft is structured in three labeled buckets. Items may appear in two buckets when meaningfully both — flag the inclusion-then-exclusion as Inferred so the reasoning is captured.
-
-- **Stated** — what the user said directly (in the original prompt, prior conversation, dialogue answers, approach selection in Phase 2). Items here have explicit user-language anchors.
-- **Inferred** — what the agent assumed to fill gaps. Scope boundaries the user never explicitly named, success criteria extrapolated from intent, technical assumptions made because the brief interview didn't probe them. The Inferred bucket is the most actionable surface for correction — items here are the agent's bets.
-- **Out of scope** — deliberately excluded items. Adjacent work the agent considered but decided not to include, refactors, nice-to-haves, future-work items. Making exclusions explicit lets the agent spot anything that should actually be included.
-
-This draft is internal. Do not paste it verbatim into chat. Compose it as a thinking step, then derive stage 2 from it.
+对包括 Lightweight 在内的**所有 tiers**触发。在 Phase 0.1b non-software（universal-brainstorming）route 上完全跳过 Phase 2.5。该 skill 设计上就是 interactive；brainstorming 需要与同步用户对话。不存在 non-interactive mode；如果 automated workflow 需要无 dialogue 的 requirements doc，正确做法是直接从 context 写 doc，而不是调用 `ce-brainstorm`。
 
 ---
 
-## Stage 2: the chat-time scoping synthesis
+## Stage 1: internal three-bucket draft（内部三桶草稿）
 
-The scoping synthesis is what the user actually sees. It reflects the dialogue's substance back so the user can pattern-match — long enough to serve a multi-turn conversation, short enough to be high-impact only. The reference shape is what two product collaborators would say to each other after a real discussion: "OK, so we're doing X, with Y trade-off, deferring Z, and one thing I want to double-check is W. Sound right?"
+internal draft 结构为三个 labeled buckets。当 item 有意义地同时属于两个 buckets 时，可同时出现；将 inclusion-then-exclusion 标记为 Inferred，以捕获 reasoning。
 
-The scoping synthesis has up to four named sections, each **render-conditional** on having something to say. Empty sections are omitted, not padded.
+- **Stated** — 用户直接说过的内容（original prompt、prior conversation、dialogue answers、Phase 2 中的 approach selection）。这里的 items 有明确 user-language anchors。
+- **Inferred** — agent 为填补 gaps 所做的 assumptions。用户从未明确命名的 scope boundaries、从 intent extrapolated 的 success criteria、因 brief interview 未 probe 而做出的 technical assumptions。Inferred bucket 是最 actionable 的 correction surface；这里的 items 是 agent 的 bets。
+- **Out of scope** — deliberately excluded items。agent 考虑过但决定不包含的 adjacent work、refactors、nice-to-haves、future-work items。明确 exclusions 让 agent 能发现任何实际上应包含的内容。
 
-1. **What we're building** (always present) — 1–3 sentences. The shape that emerged from dialogue, forward-looking, plain words. Not a transcript of "you said X."
-2. **Key trade-offs** (conditional) — 1–3 bullets, each with a brief why. Render only when real trade-offs were made in dialogue.
-3. **What's not in scope** (conditional) — 1–3 bullets, or fold into a single sentence. Render only when deferred items would surprise a downstream reader if absent.
-4. **Call outs** (conditional) — 0–3 bullets. Residual forks the dialogue didn't resolve: post-dialogue consequences (combining user answers surfaced something they couldn't see during Q&A), silent agent inferences, or — in pre-loaded contexts with no dialogue — scope bets the user is seeing for the first time. **Not "questions the agent could have asked during Phase 1.3 but didn't"** — if a call-out reads like a missed dialogue question, Phase 1.3's integration check failed; flag the gap rather than padding the section.
+该 draft 是 internal。不要逐字粘贴到聊天中。将其作为 thinking step 组成，然后从中 derive stage 2。
 
-Each section answers a different question:
+---
 
-- **What's being built?** → shape
-- **What did we trade off?** → explicit choices made in conversation
-- **What did we cut?** → deferred items a reader would expect to see acknowledged
-- **Where might you redirect?** → residual forks: post-dialogue consequences, silent inferences, late-cycle bets
+## Stage 2: the chat-time scoping synthesis（聊天时的范围综合）
 
-Then the confirmation: *"Confirm and I'll write the requirements doc next, drawing on our dialogue and this synthesis. Or tell me what to change."* The phrasing sets the expectation that confirm → doc-write, so the user knows what's about to happen and can interrupt without ambiguity.
+scoping synthesis 是用户实际看到的内容。它将 dialogue 的 substance 反映回来，让用户可 pattern-match；足够长，能服务 multi-turn conversation，又足够短，只保留 high-impact 内容。reference shape 是两个 product collaborators 在真实讨论后会彼此确认的话："OK, so we're doing X, with Y trade-off, deferring Z, and one thing I want to double-check is W. Sound right?"
 
-### Path A vs Path B: the gate that fires the confirmation question
+scoping synthesis 最多有四个 named sections，每个都基于是否有内容可说而 **render-conditional**。空 sections 省略，不 padding。
 
-Phase 2.5 has two presentation modes, gated by **two signals**: (1) did any blocking question fire before Phase 2.5? AND (2) what tier did Phase 0.3 classify the scope as? Blocking questions include Phase 0.3 scope disambiguation, Phase 1.3 collaborative dialogue probes, and Phase 2 approach selection (when a menu fires). Internal classification, Phase 1.1 scan, and Phase 1.2 pressure test are not blocking questions — they don't count.
+1. **What we're building**（始终存在）— 1–3 句。dialogue 中浮现的 shape，forward-looking，plain words。不是 "you said X" 的 transcript。
+2. **Key trade-offs**（conditional）— 1–3 bullets，每个带 brief why。仅当 dialogue 中做出了真实 trade-offs 时渲染。
+3. **What's not in scope**（conditional）— 1–3 bullets，或折叠为一句话。仅当 deferred items 缺失会让 downstream reader 惊讶时渲染。
+4. **Call outs**（conditional）— 0–3 bullets。dialogue 未 resolve 的 residual forks：post-dialogue consequences（组合用户答案后 surface 出他们在 Q&A 中看不到的东西）、silent agent inferences，或在无 dialogue 的 pre-loaded contexts 中，用户第一次看到的 scope bets。**不是 "questions the agent could have asked during Phase 1.3 but didn't"**；如果 call-out 读起来像 missed dialogue question，Phase 1.3 的 integration check 失败；flag gap，而不是 padding section。
 
-- **Path A — no blocking questions fired AND tier is Lightweight**: announce-mode. Emit "What we're building" prose only (no other sections, no confirmation question), then proceed to Phase 3 doc-write in the same turn. Do NOT end the turn waiting for acknowledgment. The user can revise after the doc lands if the shape is wrong — Lightweight Path A docs are short, post-hoc revision is cheap.
-- **Path B — at least one blocking question fired, OR tier is Standard / Deep-feature / Deep-product**: full tier-aware scoping synthesis with confirmation gate. Two scenarios fire Path B: (a) the user invested answer-time during dialogue, or (b) the user pre-loaded substantive scope content (Phase 0.2 fast-path with a richly-specified opening prompt). Either way, the substance earns a real checkpoint. The confirmation question is unconditional even when zero call-outs survive the keep test.
+每个 section 回答不同问题：
 
-**Why the tier guard exists.** Phase 0.2's fast path is designed for two very different cases — a tight one-line prompt that needs no dialogue ("fix the typo on line 47"), and a richly pre-loaded brainstorm context that ALSO needs no dialogue because the user pre-stated everything (e.g., handing off accumulated decisions from a prior session for a brainstorm doc backfill). Without a tier guard, both route to Path A, and the richly-loaded case gets a 1-sentence checkpoint for what may be 20+ items worth of scope. Tier-classifying Phase 0.3 distinguishes these cases — pre-loaded substance makes the tier Standard or Deep, which then routes to Path B and produces the full scoping synthesis the substance deserves. Do not simplify the gate back to a single "no questions fired" signal — that was a real defect that produced one-sentence syntheses on Deep-tier pre-loads.
+- **What's being built?（要构建什么？）** → shape
+- **What did we trade off?（做了什么权衡？）** → explicit choices made in conversation
+- **What did we cut?（删掉/延后了什么？）** → deferred items a reader would expect to see acknowledged
+- **Where might you redirect?（可能需要在哪里改向？）** → residual forks: post-dialogue consequences, silent inferences, late-cycle bets
 
-Path A maps to the existing "announce-mode" concept on the Phase 0.2 fast path, but only when the substance genuinely warrants 1–3 sentences. Path B is the default for every other interactive invocation.
+然后确认：*"Confirm and I'll write the requirements doc next, drawing on our dialogue and this synthesis. Or tell me what to change."* 该 phrasing 设置了 confirm → doc-write 的预期，让用户知道即将发生什么，并能无歧义地 interrupt。
 
-### Keep tests per section
+### Path A vs Path B: the gate that fires the confirmation question（触发确认问题的 gate）
 
-Each conditional section has its own keep test. Sections are render-conditional — an empty section is omitted, not padded with weak items.
+Phase 2.5 有两种 presentation modes，由**两个 signals** gate：（1）Phase 2.5 前是否触发过 blocking question？以及（2）Phase 0.3 将 scope 分类为何种 tier？Blocking questions 包括 Phase 0.3 scope disambiguation、Phase 1.3 collaborative dialogue probes、Phase 2 approach selection（当 menu 触发时）。Internal classification、Phase 1.1 scan 和 Phase 1.2 pressure test 不是 blocking questions，不计入。
 
-**Trade-offs keep test:** would the user be surprised if I didn't surface this acknowledgment? Real trade-offs are choices the user explicitly weighed alternatives on in dialogue, or structural choices the agent made that the user would expect to see named. Mechanical or inevitable choices (e.g., "uses the existing rule entity") fail the test and dissolve into the doc body without surfacing.
+- **Path A — no blocking questions fired AND tier is Lightweight**：announce-mode。只输出 "What we're building" prose（没有其他 sections，没有 confirmation question），然后在同一 turn 继续 Phase 3 doc-write。不要结束 turn 等待 acknowledgment。如果 shape 错了，用户可在 doc 落地后 revise；Lightweight Path A docs 很短，post-hoc revision 成本低。
+- **Path B — at least one blocking question fired, OR tier is Standard / Deep-feature / Deep-product**：带 confirmation gate 的 full tier-aware scoping synthesis。两个 scenarios 会触发 Path B：(a) 用户在 dialogue 中投入了 answer-time，或 (b) 用户预加载了 substantive scope content（Phase 0.2 fast-path 中 opening prompt 已 richly-specified）。无论哪种，substance 都值得真实 checkpoint。即使 zero call-outs 通过 keep test，confirmation question 也 unconditional。
 
-**Deferred keep test:** is a reasonable downstream reader likely to ask "why isn't X here?" Items the user explicitly deferred, or items adjacent enough that a reader will look for them. Mechanical excludes (e.g., "no rate limiting because it's not in scope") fail and stay in the internal draft only.
+**为什么存在 tier guard。** Phase 0.2 的 fast path 面向两种很不同的情况：不需要 dialogue 的紧凑 one-line prompt（"fix the typo on line 47"），以及同样不需要 dialogue 的 richly pre-loaded brainstorm context，因为用户已预先陈述一切（例如从 prior session handoff accumulated decisions，用于 brainstorm doc backfill）。没有 tier guard 时，两者都 route 到 Path A，而 richly-loaded case 可能有 20+ items 的 scope，却只得到 1-sentence checkpoint。Phase 0.3 的 tier-classifying 区分这些情况：pre-loaded substance 会让 tier 成为 Standard 或 Deep，随后 route 到 Path B，产出该 substance 应得的 full scoping synthesis。不要将 gate 简化回单一 "no questions fired" signal；那曾是真实 defect，会在 Deep-tier pre-loads 上产出 one-sentence syntheses。
 
-**Call-outs keep test (the affirmability test):** would the user need to read code to evaluate this? If yes, it is doc-body content — cut. If no, apply the keep test — one of the following must be true:
+Path A 映射到 Phase 0.2 fast path 上既有的 "announce-mode" concept，但仅当 substance 真正只值得 1–3 sentences 时。Path B 是所有其他 interactive invocation 的默认路径。
 
-- **Real scope fork** — another reasonable agent might choose a different scope on this dimension (who the primary actor is, whether case X is in/out, in scope vs deferred)
-- **Non-obvious scope inclusion** — a behavior the agent assumed is in scope that the user might want excluded
-- **Non-obvious scope exclusion** — an item the agent moved to deferred that the user might want in scope
-- **Cheap-now-expensive-later correction** — a scope bet that's cheap to fix now but expensive after the requirements doc lands and ce-plan consumes it
-- **Non-obvious consequence of multi-turn answers** — a downstream effect of combining user-stated answers that the user is unlikely to have tracked through dialogue. Surfaced forward-looking ("X means Y for the doc"), not retrospectively ("you said X"). This category is the multi-turn-dialogue reason call-outs exist at all in ce-brainstorm; do not filter these as "already implied by Stated"
+### Keep tests per section（各 section 的保留测试）
 
-Cut anything that doesn't match a keep-test category, including:
+每个 conditional section 都有自己的 keep test。Sections 是 render-conditional 的：空 section 省略，不用弱 items 填充。
 
-- Mechanical items where there is no real alternative
-- Implementation choices that will be settled during planning
-- Items already implied by the scoping synthesis prose
-- Re-statements of Q&A turns ("you said you wanted X") — that's transcript, not a call-out
-- Re-statements of the Phase 2 approach the user already picked
+**Trade-offs keep test：** 如果我不显式呈现这个 acknowledgment，用户会惊讶吗？真实 trade-offs 是用户在 dialogue 中明确权衡过替代方案的选择，或 agent 做出的、用户会期待被命名的结构性选择。机械或必然的选择（例如 "uses the existing rule entity"）不通过测试，只 dissolve 到 doc body 中，不在 synthesis 中浮现。
 
-### Total bullet budget across sections 2–4
+**Deferred keep test：** 一个合理的 downstream reader 是否可能问："why isn't X here?" 用户明确 deferred 的 items，或足够相邻、reader 会寻找的 items，可以保留。机械性 excludes（例如 "no rate limiting because it's not in scope"）不通过测试，只留在 internal draft 中。
 
-The cap is heuristic, not law. The real discipline is each section's keep test on each candidate. Typical bounds by tier, counting bullets across Trade-offs + Deferred + Call outs combined:
+**Call-outs keep test（affirmability test）：** 用户是否需要读代码才能评估这点？如果是，它就是 doc-body content，cut。如果不是，应用 keep test；以下至少一项必须为真：
+
+- **Real scope fork** — 另一个合理的 agent 可能在这个维度选择不同 scope（primary actor 是谁、case X 是否 in/out、in scope vs deferred）
+- **Non-obvious scope inclusion** — agent 假定 in scope、但用户可能想 exclude 的行为
+- **Non-obvious scope exclusion** — agent 移到 deferred、但用户可能想纳入 scope 的 item
+- **Cheap-now-expensive-later correction** — 现在修正很便宜，但 requirements doc 落地且 ce-plan 消费后会很昂贵的 scope bet
+- **Non-obvious consequence of multi-turn answers** — 组合用户已陈述答案后产生的 downstream effect，用户不太可能在 dialogue 中一路追踪到。以 forward-looking 方式呈现（"X means Y for the doc"），不要 retrospective（"you said X"）。这一类是 ce-brainstorm 中 call-outs 存在的 multi-turn-dialogue 理由；不要把它们过滤为 "already implied by Stated"
+
+Cut 任何不匹配 keep-test category 的内容，包括：
+
+- 没有真实替代方案的机械性 items
+- 会在 planning 阶段决定的 implementation choices
+- 已经被 scoping synthesis prose 暗含的 items
+- 对 Q&A turns 的重述（"you said you wanted X"）——那是 transcript，不是 call-out
+- 对用户已选择的 Phase 2 approach 的重述
+
+### Total bullet budget across sections 2–4（第 2-4 节的总 bullet 预算）
+
+cap 是 heuristic，不是法律。真正的 discipline 是对每个 candidate 应用其 section 的 keep test。按 tier 的 typical bounds 如下，计数覆盖 Trade-offs + Deferred + Call outs 的 bullets 总和：
 
 | Tier | Typical total | Hard ceiling |
 |---|---|---|
@@ -90,50 +90,50 @@ The cap is heuristic, not law. The real discipline is each section's keep test o
 | Deep — feature | 3–5 | 7 |
 | Deep — product | 4–7 | 9 |
 
-**Above the hard ceiling, the synthesis is misshapen — do not raise the cap, re-cut at a higher level of abstraction.** Almost always, multiple bullets within a section are sub-decisions of one larger named decision. Collapse related bullets into a single one named at the level the user actually weighs in on.
+**超过 hard ceiling 时，synthesis 形状已经错了；不要提高 cap，要在更高抽象层级重新 cut。** 几乎总是因为 section 内多个 bullets 其实是某个更大 named decision 的 sub-decisions。将相关 bullets collapse 成一个 bullet，并命名在用户真正权衡的层级上。
 
-A useful test: read the bullets aloud. If two or more sound like "and also" extensions of the same idea, they belong as one.
+一个有用测试：把 bullets 读出来。如果两个或更多听起来像同一想法的 "and also" 延伸，它们就应该合并为一个。
 
-**Path A fires only for Lightweight tier with no blocking questions. Path B is the default for Standard, Deep-feature, and Deep-product regardless of question signal — substance earns the checkpoint, not interaction history.** Zero call-outs on Path B is normal for Lightweight, sometimes for Standard, almost never for Deep. If a Deep scoping synthesis produces zero call-outs after rich content (whether from dialogue or pre-loaded context), double-check the agent hasn't filtered consequence-class call-outs as "already implied."
+**Path A 仅在 Lightweight tier 且没有 blocking questions 时触发。无论 question signal 如何，Path B 都是 Standard、Deep-feature 和 Deep-product 的默认路径；赢得 checkpoint 的是 substance，不是 interaction history。** Path B 上 zero call-outs 对 Lightweight 是正常的，对 Standard 有时正常，对 Deep 几乎从不正常。如果一个 Deep scoping synthesis 在 rich content（来自 dialogue 或 pre-loaded context）后产生 zero call-outs，要 double-check agent 是否把 consequence-class call-outs 过滤成了 "already implied"。
 
-### Detail level: conversational, not documentary
+### Detail level: conversational, not documentary（细节层级：像对话，不像文档）
 
-Each bullet is **1 line ideally, 2 lines maximum**. The reference shape is what two collaborators would say to each other in conversation, not what a requirements doc would say in its body. The synthesis is a forcing function for shape confirmation; the requirements doc is where the substance lives. If a bullet reads like a doc paragraph, it's wrong-shaped — the agent has compressed horizontally (fewer bullets) without compressing vertically (less per bullet), and the cap is meaningless if individual bullets bloat to fill it.
+每个 bullet **理想为 1 行，最多 2 行**。reference shape 是两个 collaborators 会在 conversation 中彼此说的话，不是 requirements doc body 会写的话。synthesis 是 shape confirmation 的 forcing function；substance 属于 requirements doc。如果某个 bullet 读起来像 doc paragraph，shape 就错了：agent 只做了横向压缩（更少 bullets），却没有纵向压缩（每个 bullet 更少内容）；如果每个 bullet 都膨胀到填满空间，cap 就没有意义。
 
-Two tests:
+两个 tests：
 
-- **Read-aloud test**: would two product collaborators *say* this bullet, or would they *write* it in a spec? Say = right. Write = re-cut to a sentence or cut.
-- **Single-sentence test**: can the bullet land in one sentence? If it needs semicolons stringing clauses or a list within the bullet, it's probably two decisions sharing a bullet — split (and re-cut for count) or cut to the higher-level one.
+- **Read-aloud test**：两个 product collaborators 会*说出*这个 bullet，还是会把它*写进* spec？会说 = 正确。会写 = 重新 cut 成一句，或 cut 掉。
+- **Single-sentence test**：这个 bullet 能否落成一句话？如果它需要用分号串联 clauses，或在 bullet 内再嵌 list，它很可能是两个 decisions 挤在一个 bullet 中；拆分（并按 count 重新 cut），或 cut 到更高层级。
 
-Bad vs good — detail level:
+Bad vs good — detail level（坏例子 vs 好例子：细节层级）：
 
 | Too detailed (wrong) | Conversational (right) |
 |---|---|
 | Per-channel mute scoped to notification rules; mute applies to all events through that rule including @mentions, DMs forwarded as notifications, and bot messages; persists 24h with extension | Per-channel over per-user — support team isn't a single user |
 | Rule-delete loss path is silent and could surprise users who configured extended mutes; consider a confirmation dialog, soft-delete with state preservation, or a 7-day undo window | Rule-delete silently loses pause state — confirm no warning needed |
 
-The "What we're building" prose obeys the same discipline: 1–3 sentences describing the shape, not an enumeration of requirements. If the prose lists what's in / what's out / what's how, it has become a doc preview — cut to shape only.
+"What we're building" prose 遵守同样 discipline：用 1–3 句描述 shape，而不是枚举 requirements。如果 prose 在列 what's in / what's out / what's how，它就已经变成 doc preview；cut 到只剩 shape。
 
-### Anti-patterns
+### Anti-patterns（反模式）
 
-Each anti-pattern below produces a bullet that fails its section's keep test, or a scoping synthesis that drifts back toward the comprehensive-audit failure mode.
+下面每个 anti-pattern 都会产生不通过其 section keep test 的 bullet，或让 scoping synthesis 漂回 comprehensive-audit failure mode。
 
-- **Naming implementation detail in any bullet**: file paths, module names, exact JSON keys, HTTP status codes, error message wording, SQL syntax. The synthesis is scope-only; implementation is ce-plan's job. These granularity rules apply to every bullet in every section.
-- **Re-stating a Q&A turn verbatim** ("you said you wanted X"): transcript, not scoping synthesis. Reframe forward-looking ("X means Y for the doc") or cut.
-- **Re-stating the Phase 2 approach the user already picked**: the approach was chosen before Phase 2.5 — its mention belongs in one sentence of "What we're building," not as a call-out.
-- **Padding a section to meet a bullet count**: render-conditional means empty is allowed. Omit the section entirely rather than fill it with weak items.
-- **Pasting the three-bucket internal draft verbatim into chat**: that was the old shape and the volume problem it produced is why stage 2 exists. Compose internally, derive scoping synthesis sections, present compressed.
-- **Floating questions adjacent to stage 2**: if a question genuinely cannot be defaulted, pause synthesis and resolve it before presenting. Pick the question shape that matches: a blocking multiple-choice tool when options are bounded and meaningfully distinct, open-ended when option sets would unintentionally influence the user's answer per Interaction Rule 5(a). Integrate the answer, then present the scoping synthesis. Never present the scoping synthesis with adjacent floating questions — that gives the user no clear resolution path.
+- **在任何 bullet 中命名 implementation detail**：file paths、module names、exact JSON keys、HTTP status codes、error message wording、SQL syntax。synthesis 是 scope-only；implementation 是 ce-plan 的职责。这些 granularity rules 适用于每个 section 的每个 bullet。
+- **逐字重述 Q&A turn**（"you said you wanted X"）：这是 transcript，不是 scoping synthesis。改成 forward-looking（"X means Y for the doc"）或 cut。
+- **重述用户已经选择的 Phase 2 approach**：approach 已在 Phase 2.5 前选定；它应该在 "What we're building" 的一句话中出现，而不是作为 call-out。
+- **为了凑 bullet count 而 padding section**：render-conditional 意味着 empty 是允许的。省略整个 section，不要用 weak items 填充。
+- **把 three-bucket internal draft 逐字粘贴到 chat**：那是旧 shape，它产生的 volume problem 正是 stage 2 存在的原因。内部 compose，derive scoping synthesis sections，然后 compressed presentation。
+- **在 stage 2 旁边漂浮问题**：如果某个问题确实不能 default，先暂停 synthesis 并解决它，再 presentation。选择匹配的问题形状：当 options bounded 且 meaningfully distinct 时使用 blocking multiple-choice tool；当 option set 会按 Interaction Rule 5(a) 无意影响用户答案时，使用 open-ended。整合答案后，再呈现 scoping synthesis。永远不要在 scoping synthesis 旁边放 floating questions；那会让用户没有清晰的 resolution path。
 
 ---
 
-## Prompt templates
+## Prompt templates（Prompt 模板）
 
-This is directional guidance — adjust phrasing to fit dialogue context. Open-ended feedback per Interaction Rule 5(a) (an option menu would unintentionally influence the user toward the parts the menu lists, away from anything else they might want to change).
+这是 directional guidance；根据 dialogue context 调整 phrasing。按 Interaction Rule 5(a) 使用 open-ended feedback（option menu 会无意中把用户引向 menu 列出的部分，而远离他们可能想改的其他内容）。
 
-**Prose discipline for "What we're building" (required):** forward-looking (what *will* be in the doc), not retrospective (what's been discussed). Lead with the actual thing being built in plain words. No qualifiers ("comprehensive," "thoughtful," "substantive"). No re-stating dialogue context the user just lived through. If the work can't be said in 1–3 sentences without filler, the synthesis isn't ready yet.
+**"What we're building" 的 prose discipline（required）：** forward-looking（doc 中*将会*包含什么），不是 retrospective（已经讨论过什么）。用 plain words 先说实际要构建的东西。不要加 qualifiers（"comprehensive"、"thoughtful"、"substantive"）。不要重述用户刚刚经历过的 dialogue context。如果这个 work 不能在 1–3 句内无 filler 地说清，synthesis 还没准备好。
 
-### Path B template (questions were asked)
+### Path B template（Path B 模板，questions were asked）
 
 ```
 Based on our dialogue, here's the scope I'm proposing for the requirements doc:
@@ -155,7 +155,7 @@ Based on our dialogue, here's the scope I'm proposing for the requirements doc:
 Confirm and I'll write the requirements doc next, drawing on our dialogue and this synthesis. Or tell me what to change — even something I captured correctly earlier is fair game to revise (you may have changed your mind or want to correct an unstated assumption).
 ```
 
-### Path A template (no questions were asked — typically Phase 0.2 short-circuit)
+### Path A template（Path A 模板，no questions were asked，通常是 Phase 0.2 short-circuit）
 
 ```
 Proposing: [1–3 line shape — what the doc will say in plain words].
@@ -163,13 +163,13 @@ Proposing: [1–3 line shape — what the doc will say in plain words].
 No open decisions — writing the requirements doc now. Interrupt if the shape is wrong.
 ```
 
-Proceed to Phase 3 doc-write in the same turn — do NOT end the turn waiting for an acknowledgment. The "interrupt if wrong" affordance means the user can revise after the doc lands, not before. Lightweight Path A docs are short, so post-hoc revision is cheap.
+在同一 turn 继续 Phase 3 doc-write；不要结束 turn 等待 acknowledgment。"interrupt if wrong" affordance 意味着用户可以在 doc 落地后 revise，而不是之前。Lightweight Path A docs 很短，因此 post-hoc revision 成本低。
 
-Ask the user open-ended on Path B (no `AskUserQuestion` menu). The justification is Interaction Rule 5(a) in SKILL.md — an option menu would unintentionally influence the user's feedback toward the parts the menu lists.
+在 Path B 上用 open-ended 方式询问用户（不要用 `AskUserQuestion` menu）。理由是 SKILL.md 中的 Interaction Rule 5(a)：option menu 会无意中把用户 feedback 引向 menu 所列部分。
 
-### Worked example: compression from internal draft to scoping synthesis (Standard tier)
+### Worked example：从 internal draft 压缩到 scoping synthesis（Standard tier）
 
-For a notification-mute feature where the internal draft had 5 Stated items, 4 Inferred items, and 3 Out-of-scope items, the compressed Stage 2 looks like:
+对于一个 notification-mute feature，假设 internal draft 有 5 个 Stated items、4 个 Inferred items 和 3 个 Out-of-scope items，压缩后的 Stage 2 如下：
 
 ```
 Based on our dialogue, here's the scope I'm proposing for the requirements doc:
@@ -190,82 +190,82 @@ Based on our dialogue, here's the scope I'm proposing for the requirements doc:
 Confirm and I'll write the requirements doc next, drawing on our dialogue and this synthesis. Or tell me what to change.
 ```
 
-What got cut from the 12-item internal draft and why:
+从 12-item internal draft 中 cut 掉的内容及原因：
 
-- Stated items already covered by the "What we're building" prose dissolved silently
-- "Use existing rule entity" — mechanical, no real trade-off
-- "Use Postgres for persistence" — implementation detail (ce-plan's job), failed granularity rules
-- One Out-of-scope item ("no rate limiting") — mechanical exclude, no reader would ask about it
-- Three Inferred items rolled into the Trade-offs section as the explicit choices behind them
+- 已由 "What we're building" prose 覆盖的 Stated items silently dissolved
+- "Use existing rule entity" —— mechanical，没有真实 trade-off
+- "Use Postgres for persistence" —— implementation detail（ce-plan 的职责），不通过 granularity rules
+- 一个 Out-of-scope item（"no rate limiting"）—— mechanical exclude，没有 reader 会问它
+- 三个 Inferred items rolled into Trade-offs section，作为其背后的 explicit choices
 
-What survived: a scoping synthesis with substance proportional to the dialogue, bounded at the Standard ceiling of 5 bullets across the three conditional sections — any more would have triggered a re-cut at higher abstraction.
-
----
-
-## Pre-flight re-review
-
-Before emitting the scoping synthesis, re-read the draft as a user would read it. Two failure modes to catch:
-
-- **The scoping synthesis reads like a requirements-doc preview.** Prose enumerates what's in/out, bullets are documentary instead of conversational. The synthesis is a shape-confirmation checkpoint, not a doc preview — if it reads as preview, Phase 2.5 and Phase 3 have collapsed into one step. Revise to conversational shape, or accept that the requirements doc itself will contain the detail and the synthesis should be lighter.
-- **The bullet count fits the cap but each bullet is over-detailed.** Hitting 5 bullets in Standard while each bullet is a paragraph means the agent met the count cap by compressing horizontally (fewer bullets) without compressing vertically (less per bullet). The cap is meaningless if individual bullets bloat to fill it. Re-cut to sentence-level bullets.
-
-This is one mental act — re-read as the user — not a checklist to mechanically run. The forcing function is putting yourself in the user's reading shoes briefly, with explicit attention to detail level alongside the keep tests. Revise before emitting if either failure mode fires.
+保留下来的结果：一个 substance 与 dialogue 成比例的 scoping synthesis，在三个 conditional sections 中受 Standard ceiling 5 bullets 约束；更多 bullet 会触发更高抽象层级的 re-cut。
 
 ---
 
-## Re-present after revision; write only on confirm
+## Pre-flight re-review（输出前重新 review）
 
-A revision is not a confirmation. After any user revision (even a trivially-understood swap like "move deferred item X back into scope"), integrate the change, re-present the revised scoping synthesis with the change reflected, and wait for explicit confirmation before writing the doc. The loop is:
+在 emitting scoping synthesis 前，像用户会阅读它那样 re-read draft。要捕获两个 failure modes：
 
-1. Present scoping synthesis → user responds
-2. User confirms → write the doc
-3. User revises → integrate, re-present revised scoping synthesis, return to step 1
+- **scoping synthesis 读起来像 requirements-doc preview。** Prose 枚举 what's in/out，bullets 是 documentary 而不是 conversational。synthesis 是 shape-confirmation checkpoint，不是 doc preview；如果它读起来像 preview，Phase 2.5 和 Phase 3 就已经坍缩成一步。revise 成 conversational shape，或接受 requirements doc 本身会承载 detail，因此 synthesis 应更轻。
+- **bullet count 符合 cap，但每个 bullet 过度详细。** Standard 中命中 5 bullets，但每个 bullet 都是一段话，说明 agent 通过横向压缩（更少 bullets）满足 count cap，却没有纵向压缩（每个 bullet 更少内容）。如果每个 bullet 都膨胀到填满空间，cap 就没有意义。re-cut 成 sentence-level bullets。
 
-Doc-write fires only on explicit confirm or after the soft-cut blocking question's "proceed" option (see below). The confirmation step is what makes the scoping synthesis **confirmed** rather than "agent's last proposal" — never write immediately after a revision, even when the revision is small enough that the agent feels it understood.
+这是一个 mental act：以用户视角 re-read，而不是机械运行 checklist。forcing function 是短暂站到用户的阅读位置，并在 keep tests 之外显式关注 detail level。如果任一 failure mode 触发，emitting 前先 revise。
 
 ---
 
-## Soft-cut on circularity (not iteration count)
+## Re-present after revision; write only on confirm（revision 后重新呈现；只在确认后写入）
 
-Track which scoping synthesis items the user touched per round. The soft-cut blocking question fires **only when the same item is revised twice** (or a third-round revision targets an item already revised in round two). New-item revisions across rounds proceed without limit — revising different aspects of a wrong scoping synthesis is exactly what the mechanism should support.
+revision 不是 confirmation。任何 user revision 后（即使是很容易理解的替换，比如 "move deferred item X back into scope"），integrate change，re-present 反映该 change 的 revised scoping synthesis，然后等 explicit confirmation 再写 doc。loop 如下：
 
-**Identity across rounds is by decision dimension, not surface wording or section.** A revision may cause stage 2 to re-derive — the same underlying decision can come back rephrased, merged with another bullet, or moved to a different section (e.g., what was a Trade-off in round one becomes a Call-out in round two after the user pushed back). "Same item" means the same underlying decision regardless of which section currently holds it. When a re-cut collapses multiple prior bullets into one, the new combined bullet inherits the "touched" status of any of its constituents — soft-cut fires if any underlying decision was already revised once before.
+1. Present scoping synthesis（呈现 scoping synthesis）→ user responds
+2. User confirms（用户确认）→ write the doc
+3. User revises → integrate，re-present revised scoping synthesis，回到 step 1
 
-When the soft-cut fires, use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini, `ask_user` in Pi) with two options:
+Doc-write 只在 explicit confirm 后，或 soft-cut blocking question 的 "proceed" option 后触发（见下）。confirmation step 让 scoping synthesis 成为 **confirmed**，而不是 "agent's last proposal"；永远不要在 revision 后立刻写 doc，即使 revision 小到 agent 觉得自己理解了。
+
+---
+
+## Soft-cut on circularity（按循环性 soft-cut，而不是按迭代次数）
+
+按 round 跟踪用户 touched 的 scoping synthesis items。soft-cut blocking question **只在同一 item 被 revised 两次**时触发（或第三轮 revision 触及第二轮已 revised 的 item）。跨 rounds 的 new-item revisions 不设限制；修正错误 scoping synthesis 的不同方面，正是该机制应支持的行为。
+
+**跨 rounds 的 identity 按 decision dimension 判断，不按 surface wording 或 section。** revision 可能导致 stage 2 re-derive；同一个 underlying decision 可能以改写、与另一个 bullet 合并、或移到不同 section 的形式回来（例如 round one 中的 Trade-off 在用户 push back 后，round two 变成 Call-out）。"Same item" 指同一个 underlying decision，不管当前位于哪个 section。当 re-cut 将多个 prior bullets collapse 成一个时，新的 combined bullet 会继承其中任一 constituent 的 "touched" 状态；如果任何 underlying decision 已经 revised 过一次，soft-cut 就会触发。
+
+soft-cut 触发时，使用平台的 blocking question tool（Claude Code 中是 `AskUserQuestion`，Codex 中是 `request_user_input`，Gemini 中是 `ask_user`，Pi 中是 `ask_user`），并提供两个 options：
 
 - `Proceed and write the requirements doc`
 - `Hold off — keep discussing before the doc`
 
-Fall back to a numbered list in chat only when no blocking tool exists or the call errors. Never silently skip.
+只有当 blocking tool 不存在或调用出错时，才 fallback 到 chat 中的 numbered list。永远不要 silently skip。
 
 ---
 
-## Self-redirect
+## Self-redirect（自我重定向）
 
-If the user response indicates they're in the wrong skill or want a different workflow (e.g., "this is too small, just /ce-work it" or "this needs more thought, let me brainstorm differently"):
+如果用户 response 表明他们处在错误 skill 中，或想要不同 workflow（例如 "this is too small, just /ce-work it" 或 "this needs more thought, let me brainstorm differently"）：
 
-- Stop ce-brainstorm
-- Suggest the alternative skill the user appears to want (e.g., `/ce-work`, `/ce-debug`)
-- Offer to load it in-session
-- Do not push back or argue — the user's redirect signal is the deliberate choice
+- Stop ce-brainstorm（停止 ce-brainstorm）
+- Suggest 用户似乎想要的 alternative skill（例如 `/ce-work`、`/ce-debug`）
+- Offer 在 session 中加载它
+- 不要 push back 或 argue；用户的 redirect signal 是 deliberate choice
 
-This support exists because the scoping synthesis is an honest checkpoint. If the user discovers the skill choice was wrong by reading the scoping synthesis, redirecting is the right move.
+这个 support 存在，是因为 scoping synthesis 是 honest checkpoint。如果用户通过阅读 scoping synthesis 发现 skill choice 错了，redirect 就是正确动作。
 
 ---
 
-## Doc shape after confirmation
+## Doc shape after confirmation（确认后的 doc 形状）
 
-After user confirmation (or after the soft-cut decision proceeds), Phase 3 writes the requirements doc. The internal draft does NOT carry into the doc as a `## Synthesis` section. Only the "What we're building" prose embeds, as `## Summary` at the top. Internal-draft content dissolves into the doc's body sections:
+用户 confirmation 后（或 soft-cut decision 选择 proceed 后），Phase 3 写 requirements doc。internal draft 不会作为 `## Synthesis` section 进入 doc。只有 "What we're building" prose 会作为顶部的 `## Summary` 嵌入。internal-draft content dissolve 到 doc body sections：
 
-| Internal-draft element | Where it goes in the doc |
+| Internal-draft element | 在 doc 中的位置 |
 |---|---|
-| "What we're building" prose | `## Summary` (1–3 lines, forward-looking, what's proposed) |
-| Stated bullets | `## Requirements` (numbered R-IDs, full detail) and where relevant `## Problem Frame` for narrative context |
-| Inferred bullets | `## Key Decisions` (with rationale) — bets the user accepted in dialogue become decisions in the doc. |
+| "What we're building" prose | `## Summary`（1–3 lines，forward-looking，what's proposed） |
+| Stated bullets | `## Requirements`（numbered R-IDs，full detail），以及相关时用于 narrative context 的 `## Problem Frame` |
+| Inferred bullets | `## Key Decisions`（with rationale）——用户在 dialogue 中接受的 bets 变成 doc 中的 decisions。 |
 | Out-of-scope bullets | `## Scope Boundaries` |
 
-The chat-time Trade-offs section dissolves into `## Key Decisions` (the explicit choices acknowledged in chat become documented decisions). The chat-time What's-not-in-scope section dissolves into `## Scope Boundaries`.
+chat-time Trade-offs section dissolve 到 `## Key Decisions`（chat 中 acknowledged 的 explicit choices 变成 documented decisions）。chat-time What's-not-in-scope section dissolve 到 `## Scope Boundaries`。
 
-No italic capture-context note (e.g., "Captured at Phase 2.5..."). It would leak engineering process into an artifact whose readers do not need that signal.
+不要添加 italic capture-context note（例如 "Captured at Phase 2.5..."）。这会把 engineering process 泄漏到不需要该信号的 artifact 中。
 
-The doc's `## Summary` and `## Problem Frame` must serve distinct purposes — see `references/brainstorm-sections.md` "Discipline: Summary vs Problem Frame" for the rules.
+doc 的 `## Summary` 和 `## Problem Frame` 必须服务不同 purposes；规则见 `references/brainstorm-sections.md` 中的 "Discipline: Summary vs Problem Frame"。

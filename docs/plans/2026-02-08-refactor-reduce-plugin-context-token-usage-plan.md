@@ -1,78 +1,79 @@
 ---
-title: Reduce compound-engineering plugin context token usage
+title: 减少 compound-engineering plugin context token usage
 type: refactor
 date: 2026-02-08
 ---
 
-# Reduce compound-engineering Plugin Context Token Usage
+# 降低 compound-engineering Plugin Context Token Usage
 
-## Overview
+## 概览
 
-The compound-engineering plugin is **overflowing the default context budget by ~3x**, causing Claude Code to silently drop components. The plugin consumes ~50,500 characters in always-loaded descriptions against a default budget of 16,000 characters (2% of context window). This means Claude literally doesn't know some agents/skills exist during sessions.
+compound-engineering plugin **超出默认 context budget 约 3x**，导致 Claude Code 静默 drop components。plugin 在 always-loaded descriptions 中消耗约 50,500 characters，而默认 budget 是 16,000 characters（context window 的 2%）。这意味着 Claude 在 session 中实际上不知道某些 agents/skills 存在。
 
-## Problem Statement
+## 问题陈述
 
-### How Context Loading Works
+### Context Loading 的工作方式
 
-Claude Code uses progressive disclosure for plugin content:
+Claude Code 对 plugin content 使用 progressive disclosure：
 
-| Level | What Loads | When |
+| Level | 加载内容 | 何时加载 |
 |-------|-----------|------|
-| **Always in context** | `description` frontmatter from skills, commands, and agents | Session startup (unless `disable-model-invocation: true`) |
-| **On invocation** | Full SKILL.md / command body / agent body | When triggered |
-| **On demand** | Reference files in skill directories | When Claude reads them |
+| **Always in context** | skills、commands 和 agents 的 `description` frontmatter | Session startup（除非 `disable-model-invocation: true`） |
+| **On invocation** | 完整 SKILL.md / command body / agent body | Triggered 时 |
+| **On demand** | skill directories 中的 reference files | Claude 读取时 |
 
-The total budget for ALL descriptions combined is **2% of context window** (~16,000 chars fallback). When exceeded, components are **silently excluded**.
+所有 descriptions 加总的 budget 是 **context window 的 2%**（fallback 约 16,000 chars）。超过时，components 会被 **silently excluded**。
 
-### Current State: 316% of Budget
+### 当前状态：Budget 的 316%
 
-| Component | Count | Always-Loaded Chars | % of 16K Budget |
+| Component | Count | Always-Loaded Chars | 16K Budget 占比 |
 |-----------|------:|--------------------:|----------------:|
 | Agent descriptions | 29 | ~41,400 | 259% |
 | Skill descriptions | 16 | ~5,450 | 34% |
 | Command descriptions | 24 | ~3,700 | 23% |
 | **Total** | **69** | **~50,500** | **316%** |
 
-### Root Cause: Bloated Agent Descriptions
+### 根因：Agent Descriptions 过大
 
-Agent `description` fields contain full `<example>` blocks with user/assistant dialog. These examples belong in the agent body (system prompt), not the description. The description's only job is **discovery** — helping Claude decide whether to delegate.
+Agent `description` fields 包含完整 `<example>` blocks 与 user/assistant dialog。这些 examples 属于 agent body（system prompt），而不是 description。description 的唯一工作是 **discovery** -- 帮助 Claude 决定是否 delegate。
 
-Examples of the problem:
+问题示例：
 
-- `design-iterator.md`: 2,488 chars in description (should be ~200)
-- `spec-flow-analyzer.md`: 2,289 chars in description
-- `security-sentinel.md`: 1,986 chars in description
-- `kieran-rails-reviewer.md`: 1,822 chars in description
-- Average agent description: ~1,400 chars (should be 100-250)
+- `design-iterator.md`: description 中 2,488 chars（应约 200）
+- `spec-flow-analyzer.md`: description 中 2,289 chars
+- `security-sentinel.md`: description 中 1,986 chars
+- `kieran-rails-reviewer.md`: description 中 1,822 chars
+- 平均 agent description：约 1,400 chars（应为 100-250）
 
-Compare to Anthropic's official examples at 100-200 chars:
+与 Anthropic official examples 的 100-200 chars 对比：
 
 ```yaml
 # Official (140 chars)
-description: Expert code review specialist. Proactively reviews code for quality, security, and maintainability. Use immediately after writing or modifying code.
+description: 专家级 code review specialist。主动 review code 的 quality、security 和 maintainability。写入或修改 code 后立即使用。
 
 # Current plugin (1,822 chars)
 description: "Use this agent when you need to review Rails code changes with an extremely high quality bar...\n\nExamples:\n- <example>\n  Context: The user has just implemented..."
 ```
 
-### Secondary Cause: No `disable-model-invocation` on Manual Commands
+### 次要原因：Manual Commands 没有 `disable-model-invocation`
 
-Zero commands set `disable-model-invocation: true`. Commands like `/deploy-docs`, `/lfg`, `/slfg`, `/triage`, `/feature-video`, `/test-browser`, `/xcode-test` are manual workflows with side effects. Their descriptions consume budget unnecessarily.
+没有任何 command 设置 `disable-model-invocation: true`。`/deploy-docs`、`/lfg`、`/slfg`、`/triage`、`/feature-video`、`/test-browser`、`/xcode-test` 等 commands 是带 side effects 的 manual workflows。它们的 descriptions 不必要地消耗 budget。
 
-The official docs explicitly state:
+official docs 明确说明：
 > Use `disable-model-invocation: true` for workflows with side effects: `/deploy`, `/commit`, `/triage-prs`. You don't want Claude deciding to deploy because your code looks ready.
+> 中文含义：对带 side effects 的 workflows（如 `/deploy`、`/commit`、`/triage-prs`）使用 `disable-model-invocation: true`；不要让 Claude 仅因为代码看起来 ready 就决定 deploy。
 
 ---
 
-## Proposed Solution
+## 建议方案
 
-Three changes, ordered by impact:
+三个 changes，按 impact 排序：
 
-### Phase 1: Trim Agent Descriptions (saves ~35,600 chars)
+### Phase 1：精简 Agent Descriptions（节省约 35,600 chars）
 
-For all 29 agents: move `<example>` blocks from the `description` field into the agent body markdown. Keep descriptions to 1-2 sentences (100-250 chars).
+对全部 29 agents：将 `<example>` blocks 从 `description` field 移入 agent body markdown。Descriptions 保持 1-2 句（100-250 chars）。
 
-**Before** (agent frontmatter):
+**Before（之前）**（agent frontmatter）：
 ```yaml
 ---
 name: kieran-rails-reviewer
@@ -82,11 +83,11 @@ description: "Use this agent when you need to review Rails code changes with an 
 Detailed system prompt...
 ```
 
-**After** (agent frontmatter):
+**After（之后）**（agent frontmatter）：
 ```yaml
 ---
 name: kieran-rails-reviewer
-description: Review Rails code with Kieran's strict conventions. Use after implementing features, modifying code, or creating new Rails components.
+description: 使用 Kieran 的严格 conventions review Rails code。在实现 features、修改 code 或创建 new Rails components 后使用。
 ---
 
 <examples>
@@ -100,15 +101,15 @@ user: "I've added a new update action to the posts controller"
 Detailed system prompt...
 ```
 
-The examples move into the body (which only loads when the agent is actually invoked).
+examples 移入 body（只有 agent 实际 invoked 时才加载）。
 
-**Impact:** ~41,400 chars → ~5,800 chars (86% reduction)
+**Impact（影响）:** ~41,400 chars → ~5,800 chars（86% reduction）
 
-### Phase 2: Add `disable-model-invocation: true` to Manual Commands (saves ~3,100 chars)
+### Phase 2：给 Manual Commands 添加 `disable-model-invocation: true`（节省约 3,100 chars）
 
-Commands that should only run when explicitly invoked by the user:
+只应由用户显式调用的 commands：
 
-| Command | Reason |
+| Command | Reason（原因） |
 |---------|--------|
 | `/deploy-docs` | Side effect: deploys |
 | `/release-docs` | Side effect: regenerates docs |
@@ -129,21 +130,21 @@ Commands that should only run when explicitly invoked by the user:
 | `/generate_command` | Side effect: creates files |
 | `/create-agent-skill` | Side effect: creates files |
 
-Keep these **without** the flag (Claude should know about them):
-- `/workflows:plan` — Claude might suggest planning
-- `/workflows:work` — Claude might suggest starting work
-- `/workflows:review` — Claude might suggest review
-- `/workflows:brainstorm` — Claude might suggest brainstorming
-- `/workflows:compound` — Claude might suggest documenting
-- `/deepen-plan` — Claude might suggest deepening a plan
+这些保持 **without** the flag（Claude 应该知道它们）：
+- `/workflows:plan` -- Claude 可能建议 planning
+- `/workflows:work` -- Claude 可能建议 starting work
+- `/workflows:review` -- Claude 可能建议 review
+- `/workflows:brainstorm` -- Claude 可能建议 brainstorming
+- `/workflows:compound` -- Claude 可能建议 documenting
+- `/deepen-plan` -- Claude 可能建议 deepening a plan
 
-**Impact:** ~3,700 chars → ~600 chars for commands in context
+**Impact（影响）:** context 中 command descriptions 从 ~3,700 chars 降到 ~600 chars
 
-### Phase 3: Add `disable-model-invocation: true` to Manual Skills (saves ~1,000 chars)
+### Phase 3：给 Manual Skills 添加 `disable-model-invocation: true`（节省约 1,000 chars）
 
-Skills that are manual workflows:
+属于 manual workflows 的 skills：
 
-| Skill | Reason |
+| Skill | Reason（原因） |
 |-------|--------|
 | `skill-creator` | Only invoked manually |
 | `orchestrating-swarms` | Only invoked manually |
@@ -152,27 +153,27 @@ Skills that are manual workflows:
 | `compound-docs` | Only invoked manually |
 | `file-todos` | Only invoked manually |
 
-Keep without the flag (Claude should auto-invoke):
-- `dhh-rails-style` — Claude should use when writing Rails code
-- `frontend-design` — Claude should use when building UI
-- `brainstorming` — Claude should suggest before implementation
-- `agent-browser` — Claude should use for browser tasks
-- `gemini-imagegen` — Claude should use for image generation
-- `create-agent-skills` — Claude should use when creating skills
-- `every-style-editor` — Claude should use for editing
-- `dspy-ruby` — Claude should use for DSPy.rb
-- `agent-native-architecture` — Claude should use for agent-native design
-- `andrew-kane-gem-writer` — Claude should use for gem writing
-- `rclone` — Claude should use for cloud uploads
-- `document-review` — Claude should use for doc review
+保持 without the flag（Claude 应 auto-invoke）：
+- `dhh-rails-style` -- Claude 写 Rails code 时应使用
+- `frontend-design` -- Claude 构建 UI 时应使用
+- `brainstorming` -- Claude 应在 implementation 前建议
+- `agent-browser` -- Claude 应用于 browser tasks
+- `gemini-imagegen` -- Claude 应用于 image generation
+- `create-agent-skills` -- Claude 创建 skills 时应使用
+- `every-style-editor` -- Claude 应用于 editing
+- `dspy-ruby` -- Claude 应用于 DSPy.rb
+- `agent-native-architecture` -- Claude 应用于 agent-native design
+- `andrew-kane-gem-writer` -- Claude 应用于 gem writing
+- `rclone` -- Claude 应用于 cloud uploads
+- `document-review` -- Claude 应用于 doc review
 
-**Impact:** ~5,450 chars → ~4,000 chars for skills in context
+**Impact:** context 中 skill descriptions 从 ~5,450 chars 降到 ~4,000 chars
 
 ---
 
-## Projected Result
+## 预期结果
 
-| Component | Before (chars) | After (chars) | Reduction |
+| Component | Before（chars） | After（chars） | Reduction |
 |-----------|---------------:|-------------:|-----------:|
 | Agent descriptions | ~41,400 | ~5,800 | -86% |
 | Command descriptions | ~3,700 | ~600 | -84% |
@@ -180,33 +181,33 @@ Keep without the flag (Claude should auto-invoke):
 | **Total** | **~50,500** | **~10,400** | **-79%** |
 | **% of 16K budget** | **316%** | **65%** | -- |
 
-From 316% of budget (components silently dropped) to 65% of budget (room for growth).
+从 budget 的 316%（components silently dropped）降到 65%（仍有 growth room）。
 
 ---
 
-## Acceptance Criteria
+## 验收标准
 
-- [x] All 29 agent description fields are under 250 characters
-- [x] All `<example>` blocks moved from description to agent body
-- [x] 18 manual commands have `disable-model-invocation: true`
-- [x] 6 manual skills have `disable-model-invocation: true`
-- [x] Total always-loaded description content is under 16,000 characters
-- [ ] Run `/context` to verify no "excluded skills" warnings
-- [x] All agents still function correctly (examples are in body, not lost)
-- [x] All commands still invocable via `/command-name`
-- [x] Update plugin version in plugin.json and marketplace.json
-- [x] Update CHANGELOG.md
+- [x] 所有 29 个 agent description fields 低于 250 characters
+- [x] 所有 `<example>` blocks 已从 description 移到 agent body
+- [x] 18 个 manual commands 有 `disable-model-invocation: true`
+- [x] 6 个 manual skills 有 `disable-model-invocation: true`
+- [x] Total always-loaded description content 低于 16,000 characters
+- [ ] 运行 `/context` 验证没有 "excluded skills" warnings
+- [x] 所有 agents 仍正常工作（examples 在 body 中，没有丢失）
+- [x] 所有 commands 仍可通过 `/command-name` invoke
+- [x] 更新 plugin.json 和 marketplace.json 中的 plugin version
+- [x] 更新 CHANGELOG.md
 
-## Implementation Notes
+## 实现说明
 
-- Agent examples should use `<examples><example>...</example></examples>` tags in the body — Claude understands these natively
-- Description format: "[What it does]. Use [when/trigger condition]." — two sentences max
-- The `lint` agent at 115 words shows compact agents work great
-- Test with `claude --plugin-dir ./plugins/compound-engineering` after changes
-- The `SLASH_COMMAND_TOOL_CHAR_BUDGET` env var can override the default budget for testing
+- Agent examples 应在 body 中使用 `<examples><example>...</example></examples>` tags -- Claude 原生理解这些
+- Description format："[What it does]. Use [when/trigger condition]." -- 最多两句
+- `lint` agent 的 115 words 说明 compact agents 效果很好
+- 变更后用 `claude --plugin-dir ./plugins/compound-engineering` 测试
+- `SLASH_COMMAND_TOOL_CHAR_BUDGET` env var 可覆盖默认 budget 以便测试
 
-## References
+## 参考资料
 
-- [Skills docs](https://code.claude.com/docs/en/skills) — "Skill descriptions are loaded into context... If you have many skills, they may exceed the character budget"
-- [Subagents docs](https://code.claude.com/docs/en/sub-agents) — description field used for automatic delegation
-- [Skills troubleshooting](https://code.claude.com/docs/en/skills#claude-doesnt-see-all-my-skills) — "The budget scales dynamically at 2% of the context window, with a fallback of 16,000 characters"
+- [Skills docs](https://code.claude.com/docs/en/skills) -- "Skill descriptions are loaded into context... If you have many skills, they may exceed the character budget"（skill descriptions 会进入 context）
+- [Subagents docs](https://code.claude.com/docs/en/sub-agents) -- description field used for automatic delegation（description field 用于 automatic delegation）
+- [Skills troubleshooting](https://code.claude.com/docs/en/skills#claude-doesnt-see-all-my-skills) -- "The budget scales dynamically at 2% of the context window, with a fallback of 16,000 characters"（budget 会随 context window 动态调整）

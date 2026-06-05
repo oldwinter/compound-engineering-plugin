@@ -3,82 +3,82 @@ date: 2026-03-23
 topic: plan-review-personas
 ---
 
-# Persona-Based Plan Review for document-review
+# document-review 的 Persona-Based Plan Review
 
-## Problem Frame
+## 问题框架
 
-The `document-review` skill currently uses a single-voice evaluator with five generic criteria (Clarity, Completeness, Specificity, Appropriate Level, YAGNI). This catches surface-level issues but misses role-specific concerns: a security engineer, product leader, and design reviewer each see different problems in the same plan. The ce:review skill already demonstrates that multi-persona review produces richer, more actionable feedback for code. The same architecture should apply to plan review.
+`document-review` skill 当前使用 single-voice evaluator，带五个 generic criteria（Clarity、Completeness、Specificity、Appropriate Level、YAGNI）。这能捕获 surface-level issues，但会漏掉 role-specific concerns：security engineer、product leader 和 design reviewer 会在同一 plan 中看到不同问题。ce:review skill 已经证明 multi-persona review 会为 code 产出更丰富、更 actionable 的 feedback。同样 architecture 应用于 plan review。
 
-## Requirements
+## 需求
 
-- R1. Replace the current single-voice `document-review` with a persona pipeline that dispatches specialized reviewer agents in parallel against the target document.
+- R1. 用 persona pipeline 替换当前 single-voice `document-review`，对 target document parallel dispatch specialized reviewer agents。
 
-- R2. Implement 2 always-on personas that run on every document review:
-  - **coherence**: Internal consistency, contradictions, terminology drift, structural issues, ambiguity. Checks whether readers would diverge on interpretation.
-  - **feasibility**: Can this actually be built? Architecture decisions, external dependencies, performance requirements, migration strategies. Absorbs the "tech-plan implementability" angle (can an implementer code from this?).
+- R2. 实现 2 个 always-on personas，每次 document review 都运行：
+  - **coherence**：Internal consistency、contradictions、terminology drift、structural issues、ambiguity。检查 readers 是否会对 interpretation 产生分歧。
+  - **feasibility**：Can this actually be built? Architecture decisions、external dependencies、performance requirements、migration strategies。吸收 “tech-plan implementability” 角度（implementer 能否从这里开始 code？）。
 
-- R3. Implement 4 conditional personas that activate based on document content analysis:
-  - **product-lens**: Activates when the document contains user-facing features, market claims, scope decisions, or prioritization. Opens with a "premise challenge" -- 3 diagnostic questions that challenge whether the plan solves the right problem. Asks: "What's the 10-star version? What's the narrowest wedge that proves demand?"
-  - **design-lens**: Activates when the document contains UI/UX work, frontend changes, or user flows. Uses a "rate 0-10 and describe what 10 looks like" dimensional rating method. Rates design dimensions concretely, identifies what "great" looks like for each.
-  - **security-lens**: Activates when the document contains auth, data handling, external APIs, or payments. Evaluates threat model at the plan level, not code level. Surfaces what the plan fails to account for.
-  - **scope-guardian**: Activates when the document contains multiple priority levels, unclear boundaries, or goals that don't align with requirements. Absorbs the "skeptic" angle -- challenges unnecessary complexity, premature abstractions, and frameworks ahead of need. Opens with a "what already exists?" check against the codebase.
+- R3. 实现 4 个 conditional personas，基于 document content analysis 激活：
+  - **product-lens**：当 document 包含 user-facing features、market claims、scope decisions 或 prioritization 时激活。以 “premise challenge” 开场——3 个 diagnostic questions，质疑 plan 是否解决正确问题。询问：“What's the 10-star version? What's the narrowest wedge that proves demand?”
+  - **design-lens**：当 document 包含 UI/UX work、frontend changes 或 user flows 时激活。使用 “rate 0-10 and describe what 10 looks like” dimensional rating method。具体评价 design dimensions，并识别每项的 “great” 是什么样子。
+  - **security-lens**：当 document 包含 auth、data handling、external APIs 或 payments 时激活。在 plan level 评估 threat model，而不是 code level。surface plan 未考虑的内容。
+  - **scope-guardian**：当 document 包含 multiple priority levels、unclear boundaries，或 goals 与 requirements 不一致时激活。吸收 “skeptic” 角度——质疑 unnecessary complexity、premature abstractions 和 ahead-of-need frameworks。以针对 codebase 的 “what already exists?” check 开场。
 
-- R4. The skill auto-detects which conditional personas are relevant by analyzing the document content. No user configuration required for persona selection.
+- R4. skill 通过分析 document content 自动检测哪些 conditional personas 相关。不需要 user configuration 选择 personas。
 
-- R5. Hybrid action model after persona findings are synthesized:
-  - **Auto-fix**: Document quality issues (contradictions, terminology drift, structural problems, missing details that can be inferred). These are unambiguously improvements.
-  - **Present for user decision**: Strategic/product questions (problem framing, scope challenges, priority conflicts, "is this the right thing to build?"). These require human judgment.
+- R5. persona findings synthesis 后使用 hybrid action model：
+  - **Auto-fix**：Document quality issues（contradictions、terminology drift、structural problems、可推断的 missing details）。这些都是 unambiguously improvements。
+  - **Present for user decision**：Strategic/product questions（problem framing、scope challenges、priority conflicts、“is this the right thing to build?”）。这些需要 human judgment。
 
-- R6. Each persona returns structured findings with confidence scores. The orchestrator deduplicates overlapping findings across personas and synthesizes into a single prioritized report.
+- R6. 每个 persona 返回带 confidence scores 的 structured findings。orchestrator 对 personas 之间 overlapping findings deduplicate，并 synthesize 成 single prioritized report。
 
-- R7. Maintain backward compatibility with all existing callers:
+- R7. 保持与所有 existing callers 的 backward compatibility：
   - `ce-brainstorm` Phase 4 "Review and refine" option
   - `ce-plan` / `ce-plan-beta` post-generation "Review and refine" option
   - `deepen-plan-beta` post-deepening "Review and refine" option
   - Standalone invocation
-  - Returns "Review complete" when done, as callers expect
+  - done 时返回 "Review complete"，符合 callers expectation
 
-- R8. Pipeline-compatible: When called from automated pipelines (e.g., future lfg/slfg integration), auto-fixes run silently and only genuinely blocking strategic questions surface to the user.
+- R8. Pipeline-compatible：当 automated pipelines 调用时（例如 future lfg/slfg integration），auto-fixes silently run，只有真正 blocking strategic questions 才 surface 给用户。
 
-## Success Criteria
+## 成功标准
 
-- Running document-review on a plan surfaces role-specific issues that the current single-voice evaluator misses (e.g., security gaps, product framing problems, scope concerns).
-- Conditional personas activate only when relevant -- a backend refactor plan does not spawn design-lens.
-- Auto-fix changes improve the document without requiring user approval for every edit.
-- Strategic findings are presented as clear questions, not vague observations.
-- All existing callers (brainstorm, plan, plan-beta, deepen-plan-beta) work without modification.
+- 在 plan 上运行 document-review，会 surface 当前 single-voice evaluator 漏掉的 role-specific issues（例如 security gaps、product framing problems、scope concerns）。
+- Conditional personas 只在相关时激活——backend refactor plan 不会 spawn design-lens。
+- Auto-fix changes 改善 document，且不要求用户 approve 每个 edit。
+- Strategic findings 以清晰 questions 呈现，而不是 vague observations。
+- 所有 existing callers（brainstorm、plan、plan-beta、deepen-plan-beta）无需修改即可工作。
 
-## Scope Boundaries
+## 范围边界
 
-- Not adding new callers or pipeline integrations beyond maintaining existing ones.
-- Not changing how deepen-plan-beta works (it strengthens with research; document-review reviews for issues).
-- Not adding user configuration for persona selection (auto-detection only for now).
-- Not inventing new review frameworks -- incorporating established review patterns (premise challenge, dimensional rating, existing-code check) into the respective personas.
+- 不添加 new callers 或 pipeline integrations，除了维护 existing ones。
+- 不改变 deepen-plan-beta 的工作方式（它用 research strengthen；document-review 负责 review issues）。
+- 不添加 persona selection 的 user configuration（当前只做 auto-detection）。
+- 不发明 new review frameworks——把 established review patterns（premise challenge、dimensional rating、existing-code check）纳入相应 personas。
 
-## Key Decisions
+## 关键决策
 
-- **Replace, don't layer**: document-review is fully replaced by the persona pipeline, not enhanced with an optional mode. Simpler mental model, one behavior.
-- **2 always-on + 4 conditional**: Coherence and feasibility run on every document. Product-lens, design-lens, security-lens, and scope-guardian activate based on content. Keeps cost proportional to document complexity.
-- **Hybrid action model**: Auto-fix document quality issues, present strategic questions. Matches the natural split between what personas surface.
-- **Absorb skeptic into scope-guardian**: Both challenge whether the plan is right-sized. One persona with both angles avoids redundancy.
-- **Absorb tech-plan implementability into feasibility**: Both ask "can this work?" One persona with both angles.
-- **Review patterns as persona behavior, not separate mechanisms**: Premise challenge goes into product-lens, dimensional rating goes into design-lens, existing-code check goes into scope-guardian.
+- **Replace, don't layer**：document-review 被 persona pipeline 完全替换，而不是增加 optional mode。mental model 更简单，只有一种 behavior。
+- **2 always-on + 4 conditional**：Coherence 和 feasibility 在每个 document 上运行。Product-lens、design-lens、security-lens 和 scope-guardian 根据 content 激活。让 cost 与 document complexity 成比例。
+- **Hybrid action model**：Auto-fix document quality issues，present strategic questions。匹配 personas 自然 surface 的内容分界。
+- **Absorb skeptic into scope-guardian**：二者都质疑 plan 是否 right-sized。一个 persona 吸收两个角度可避免 redundancy。
+- **Absorb tech-plan implementability into feasibility**：二者都问 “can this work?”。一个 persona 吸收两个角度。
+- **Review patterns as persona behavior, not separate mechanisms**：Premise challenge 放入 product-lens，dimensional rating 放入 design-lens，existing-code check 放入 scope-guardian。
 
-## Dependencies / Assumptions
+## 依赖与假设
 
-- Assumes the ce:review agent orchestration pattern (parallel dispatch, synthesis, dedup) can be adapted for plan review without fundamental changes.
-- Assumes plan/requirements documents are text-based and contain enough signal for content-based conditional persona selection.
+- 假设 ce:review agent orchestration pattern（parallel dispatch、synthesis、dedup）可用于 plan review，而无需 fundamental changes。
+- 假设 plan/requirements documents 是 text-based，且包含足够 signal 用于 content-based conditional persona selection。
 
-## Outstanding Questions
+## 未决问题
 
-### Deferred to Planning
+### 延后到 Planning 阶段
 
-- [Affects R6][Technical] What is the exact structured output format for persona findings? Should it mirror ce:review's P1/P2/P3 severity model or use a different classification?
-- [Affects R4][Needs research] What content signals reliably detect each conditional persona's relevance? Need to define the heuristics (keyword-based, section-based, or semantic).
-- [Affects R1][Technical] Should personas be implemented as compound-engineering agents (like code review agents) or as inline prompt sections within the skill? Agents enable parallel dispatch; inline is simpler.
-- [Affects R5][Technical] How should the auto-fix mechanism work -- direct inline edits like current document-review, or a separate "apply fixes" pass after synthesis?
-- [Affects R7][Technical] Do any of the 4 existing callers need minor updates to handle the new output format, or is the "Review complete" contract sufficient?
+- [Affects R6][Technical] persona findings 的 exact structured output format 是什么？应 mirror ce:review 的 P1/P2/P3 severity model，还是使用不同 classification？
+- [Affects R4][Needs research] 哪些 content signals 能可靠检测各 conditional persona 的 relevance？需要定义 heuristics（keyword-based、section-based 或 semantic）。
+- [Affects R1][Technical] personas 应作为 compound-engineering agents 实现（像 code review agents），还是作为 skill 内 inline prompt sections？Agents 支持 parallel dispatch；inline 更简单。
+- [Affects R5][Technical] auto-fix mechanism 应如何工作——像当前 document-review 一样 direct inline edits，还是 synthesis 后单独 “apply fixes” pass？
+- [Affects R7][Technical] 4 个 existing callers 中是否有任何需要小幅更新来处理 new output format，还是 "Review complete" contract 已足够？
 
-## Next Steps
+## 下一步
 
--> /ce:plan for structured implementation planning
+-> /ce:plan 进行结构化 implementation planning

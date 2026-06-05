@@ -1,5 +1,5 @@
 ---
-title: "Pass paths, not content, when dispatching sub-agents"
+title: "Dispatch sub-agents 时传 paths，而不是 content"
 category: skill-design
 problem_type: design_pattern
 component: tooling
@@ -10,44 +10,46 @@ tags: [orchestration, subagent, token-efficiency, skill-design, multi-agent]
 date: 2026-03-26
 ---
 
-## Problem
+## 问题
 
-When orchestrating sub-agents that need codebase reference material (config files, standards docs, etc.), passing full file contents in the sub-agent prompt bloats context and makes the orchestrator do expensive upfront work that may go unused.
+编排需要 codebase reference material（config files、standards docs 等）的 sub-agents 时，在 sub-agent prompt 中传完整文件内容会膨胀 context，并让 orchestrator 预先执行昂贵且可能不会被使用的工作。
 
-## Symptoms
+## 症状
 
-- Orchestrator skill reads multiple files, concatenates their contents into a block (e.g., `<standards>` with full CLAUDE.md/AGENTS.md content), and injects it into the sub-agent prompt
-- Sub-agent receives all content regardless of how much is relevant to its specific task
-- In repos with directory-scoped config files, the orchestrator must discover and read every file before invoking a single sub-agent
-- Sub-agent prompts grow linearly with the number of reference files, even when the agent needs only specific sections
+- Orchestrator skill 读取多个文件，将其内容拼接成一个 block（例如包含完整 CLAUDE.md/AGENTS.md content 的 `<standards>`），并注入 sub-agent prompt
+- Sub-agent 会收到全部 content，不管其中有多少与其具体任务相关
+- 在带有 directory-scoped config files 的 repos 中，orchestrator 必须在调用单个 sub-agent 前发现并读取每个文件
+- 即使 agent 只需要特定 sections，sub-agent prompts 也会随 reference files 数量线性增长
 
-## What Didn't Work
+## 无效做法
 
-Having the orchestrator read all relevant file contents and pass them in a content block. This was the initial approach for the `ce-project-standards-reviewer` agent in ce-code-review: Stage 3b collected all CLAUDE.md/AGENTS.md content into a `<standards>` block passed in the sub-agent prompt.
+让 orchestrator 读取所有相关文件内容，并在 content block 中传入。这是 ce-code-review 中 `ce-project-standards-reviewer` agent 的初始做法：Stage 3b 收集所有 CLAUDE.md/AGENTS.md content，放入 `<standards>` block 并传给 sub-agent prompt。
 
-Problems:
-- Orchestrator did expensive read work that may be partially wasted
-- Sub-agent prompt inflated with content it may not fully use
-- Scales poorly as the number of directory-scoped config files grows
-- Sub-agent loses agency to decide what's relevant
+问题：
+- Orchestrator 执行了昂贵的读取工作，其中一部分可能被浪费
+- Sub-agent prompt 被它可能不会完全使用的 content 膨胀
+- 随 directory-scoped config files 数量增长，扩展性很差
+- Sub-agent 失去决定哪些内容相关的 agency
 
-## Solution
+## 解决方案
 
-Separate discovery (cheap) from reading (expensive). The orchestrator discovers file paths via glob or search, passes a path list, and the sub-agent reads only the files and sections it needs.
+将 discovery（便宜）与 reading（昂贵）分离。orchestrator 通过 glob 或 search 发现 file paths，传递 path list，然后 sub-agent 只读取自己需要的 files 和 sections。
 
-**Pattern from Anthropic's code-review command:**
+**来自 Anthropic code-review command 的 pattern（模式）：**
 
 > "Use another Haiku agent to give you a list of file paths to (but not the contents of) any relevant CLAUDE.md files from the codebase: the root CLAUDE.md file (if one exists), as well as any CLAUDE.md files in the directories whose files the pull request modified"
 
-The reviewing agents then receive those paths and read the files themselves.
+中文含义：使用另一个 Haiku agent 给出相关 `CLAUDE.md` 文件路径列表，而不是文件内容；包括 root `CLAUDE.md`（如果存在），以及 PR 修改文件所在目录中的任何 `CLAUDE.md`。
 
-**How we applied it in ce-code-review:**
+reviewing agents 随后接收这些 paths，并自行读取文件。
 
-1. Stage 3b: orchestrator globs for CLAUDE.md/AGENTS.md paths in changed directories, emits a `<standards-paths>` block
-2. Sub-agent prompt: `ce-project-standards-reviewer` reads the listed files itself, targeting sections relevant to the changed file types
-3. Standalone fallback: if no `<standards-paths>` block is present, the agent discovers paths independently
+**我们在 ce-code-review 中的应用方式：**
 
-**General template:**
+1. Stage 3b：orchestrator 在 changed directories 中 glob CLAUDE.md/AGENTS.md paths，输出 `<standards-paths>` block
+2. Sub-agent prompt：`ce-project-standards-reviewer` 自行读取列出的文件，定位与 changed file types 相关的 sections
+3. Standalone fallback：如果不存在 `<standards-paths>` block，agent 独立发现 paths
+
+**通用模板：**
 
 ```
 Orchestrator:
@@ -60,31 +62,31 @@ Sub-agent:
 3. Read only sections relevant to the specific task
 ```
 
-## Why This Works
+## 为什么有效
 
-Discovery is cheap; reading and processing file contents is expensive. The sub-agent is closer to the task (it knows what it's reviewing) and is better positioned to decide which sections of which files are relevant. This is lazy evaluation applied to agent orchestration: don't pay the cost of reading until you know you need the content.
+Discovery 很便宜；读取和处理文件内容很昂贵。sub-agent 离任务更近（它知道自己在 review 什么），也更适合决定哪些文件的哪些 sections 相关。这是应用到 agent orchestration 的 lazy evaluation：在知道需要 content 之前，不要支付读取成本。
 
-## Prevention
+## 预防
 
-When designing orchestrator skills that invoke sub-agents needing repo reference material:
+设计会调用需要 repo reference material 的 sub-agents 的 orchestrator skills 时：
 
-1. **Default to path-passing.** Orchestrator discovers paths, sub-agent reads content.
-2. **Include a standalone fallback.** If the paths block is absent, the sub-agent discovers paths on its own. This enables both orchestrated and standalone invocation.
-3. **Content-passing is acceptable when:** the reference material is small, static, and guaranteed to be fully consumed by every invocation (e.g., a JSON schema under 50 lines that the sub-agent always needs in full).
-4. **Signal to refactor:** if you catch an orchestrator reading file contents before invoking sub-agents, treat it as a candidate for the path-passing pattern.
+1. **默认 path-passing。** Orchestrator 发现 paths，sub-agent 读取 content。
+2. **包含 standalone fallback。** 如果 paths block 不存在，sub-agent 自行发现 paths。这同时支持 orchestrated 和 standalone invocation。
+3. **Content-passing 可接受的场景：** reference material 小、静态，并保证每次 invocation 都会完整消费（例如 sub-agent 始终完整需要的 50 行以下 JSON schema）。
+4. **重构信号：** 如果发现 orchestrator 在调用 sub-agents 前读取文件内容，将它视为 path-passing pattern 的候选。
 
-## Instruction phrasing matters more than meta-rules
+## Instruction phrasing 比 meta-rules 更重要
 
-Empirical testing showed that how the skill phrases a search instruction has a dramatic effect on tool call count. For the same task (find ancestor CLAUDE.md/AGENTS.md files for changed paths):
+实测表明，skill 如何措辞 search instruction 会显著影响 tool call count。对于同一任务（为 changed paths 查找 ancestor CLAUDE.md/AGENTS.md files）：
 
 | Instruction phrasing | Claude Code tool calls | Codex shell commands |
 |---|---|---|
 | "for each changed file, walk its ancestor directories and check for X at each level" | 14 | 2 |
 | "find all X in the repo, then filter to ancestors of changed files" | 2 | 2 |
 
-The "per-item walk" phrasing caused Claude Code to glob each directory level individually. The "bulk find, then filter" phrasing produced two globs total. Codex was resilient to both phrasings (it wrote a Python script to batch the work either way).
+"per-item walk" 措辞会导致 Claude Code 对每个目录层级分别 glob。"bulk find, then filter" 措辞总共只产生两次 globs。Codex 对两种措辞都更稳健（无论哪种，它都会写 Python script 批量处理）。
 
-When in doubt about whether an instruction phrasing is efficient, test it empirically before committing. Both `claude -p` and `codex exec` support JSON output that reveals tool call counts:
+当不确定 instruction phrasing 是否高效时，提交前做实测。`claude -p` 和 `codex exec` 都支持 JSON output，可揭示 tool call counts：
 
 ```bash
 # Claude Code: stream-json + verbose shows each tool call
@@ -94,10 +96,10 @@ claude -p "instruction here" --output-format stream-json --verbose 2>/dev/null >
 codex exec --json --full-auto "instruction here" > out.jsonl
 ```
 
-This is worth doing for orchestration-heavy skills where instructions drive search or file discovery — a small phrasing change can produce a large difference in tool calls, latency, and token cost. Not every instruction needs benchmarking, but when the skill will run on every review or every plan, the cost compounds.
+对于 instructions 会驱动 search 或 file discovery 的 orchestration-heavy skills，这很值得做：一个很小的措辞变化可能造成 tool calls、latency 和 token cost 的巨大差异。不是每条 instruction 都需要 benchmark，但当 skill 会在每次 review 或每次 plan 中运行时，成本会复合增长。
 
-## Related
+## 相关
 
-- `docs/solutions/skill-design/compound-refresh-skill-improvements.md` — establishes "no shell commands for file operations in subagents"; complementary pattern about letting sub-agents use appropriate tools rather than orchestrating reads on their behalf
-- `docs/solutions/skill-design/script-first-skill-architecture.md` — complementary pattern: scripts pre-process large datasets so orchestrators don't load raw data
-- `docs/solutions/agent-friendly-cli-principles.md` — Principle #7 (Bounded, High-Signal Responses) reinforces that agents pay real cost for extra output; paths are bounded, content is not
+- `docs/solutions/skill-design/compound-refresh-skill-improvements.md` — 建立了 "no shell commands for file operations in subagents"；这是互补 pattern，强调让 sub-agents 使用合适工具，而不是由 orchestrator 代替它们读取
+- `docs/solutions/skill-design/script-first-skill-architecture.md` — 互补 pattern：scripts 预处理大型数据集，让 orchestrators 不加载 raw data
+- `docs/solutions/agent-friendly-cli-principles.md` — Principle #7（Bounded, High-Signal Responses）强调 agents 会为额外输出支付真实成本；paths 是 bounded，content 不是

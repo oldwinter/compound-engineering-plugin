@@ -1,205 +1,205 @@
 ---
-title: "feat(ce-work): reduce token usage by extracting late-sequence references"
+title: "feat(ce-work): 通过提取 late-sequence references 减少 token usage"
 type: feat
 status: completed
 date: 2026-04-09
 ---
 
-# feat(ce-work): reduce token usage by extracting late-sequence references
+# feat(ce-work): 通过提取 late-sequence references 降低 token usage
 
-## Overview
+## 概览
 
-Apply the "conditional and late-sequence extraction" pattern (established in PR #489 for ce:plan) to ce:work and ce:work-beta. Both skills carry Phase 3/4 shipping content through the entire Phase 2 execution loop without using it. Extracting this late-sequence content into on-demand reference files eliminates that compounding context cost.
+将 "conditional and late-sequence extraction" pattern（在 PR #489 中为 ce:plan 建立）应用到 ce:work 和 ce:work-beta。两个 skills 都在整个 Phase 2 execution loop 中携带 Phase 3/4 shipping content，却还没有使用它。把这类 late-sequence content extract 到 on-demand reference files，可以消除这种 compounding context cost。
 
-## Problem Frame
+## 问题框架
 
-ce:work sessions are the longest-running skill in the plugin — a typical execution session involves 20-60+ tool calls across Phase 0-4. Phase 3 (quality check) and Phase 4 (ship it) content, plus the duplicative Quality Checklist and Code Review Tiers summary sections, ride in context for the entire Phase 2 execution loop without being used until the very end. This compounds token costs proportional to message count.
+ce:work sessions 是 plugin 中持续时间最长的 skill -- 典型 execution session 会在 Phase 0-4 中涉及 20-60+ tool calls。Phase 3（quality check）和 Phase 4（ship it）content，加上重复的 Quality Checklist 与 Code Review Tiers summary sections，在整个 Phase 2 execution loop 中都跟随 context，却直到最后才使用。这让 token cost 随 message count 成比例 compound。
 
-ce:work-beta already extracted its Codex delegation workflow into `references/codex-delegation-workflow.md` (315 lines), but its Phase 3/4 content has the same late-sequence problem as stable. Both variants benefit from the same extraction.
+ce:work-beta 已经把 Codex delegation workflow extract 到 `references/codex-delegation-workflow.md`（315 lines），但它的 Phase 3/4 content 与 stable 有相同 late-sequence problem。两个 variants 都能从同样的 extraction 中获益。
 
-## Requirements Trace
+## 需求追踪
 
-- R1. Extract late-sequence blocks (Phase 3 + Phase 4 + Quality Checklist + Code Review Tiers) into an on-demand reference file for ce:work
-- R2. Extract the same late-sequence blocks for ce:work-beta
-- R3. Replace extracted blocks with 1-3 line stubs per the AGENTS.md "Conditional and Late-Sequence Extraction" rule
-- R4. Update contract tests to read from reference files where assertions moved
+- R1. 将 late-sequence blocks（Phase 3 + Phase 4 + Quality Checklist + Code Review Tiers）extract 到 ce:work 的 on-demand reference file
+- R2. 对 ce:work-beta extract 同样的 late-sequence blocks
+- R3. 按 AGENTS.md "Conditional and Late-Sequence Extraction" rule，用每处 1-3 行 stub 替换 extracted blocks
+- R4. 更新 contract tests，使 assertions 在内容移动后从 reference files 读取
 
-## Scope Boundaries
+## 范围边界
 
-- Not changing any behavioral content — purely restructuring for token efficiency
-- Not extracting Phase 0, Phase 1, or Phase 2 content (needed during the core execution loop)
-- Not extracting Key Principles or Common Pitfalls (small, general-purpose guidance used throughout)
-- Not extracting ce:work-beta's Argument Parsing or Codex Delegation Mode sections (already handled or needed early)
-- Beta is on a separate evolutionary track from stable — extraction follows the same pattern but the files are independent, not shared
+- 不改变任何 behavioral content -- 纯粹为 token efficiency 重构
+- 不 extract Phase 0、Phase 1 或 Phase 2 content（core execution loop 中需要）
+- 不 extract Key Principles 或 Common Pitfalls（小型 general-purpose guidance，会贯穿使用）
+- 不 extract ce:work-beta 的 Argument Parsing 或 Codex Delegation Mode sections（已处理或早期需要）
+- Beta 与 stable 处在不同 evolutionary track -- extraction 遵循同一 pattern，但 files 独立，不 shared
 
-## Context & Research
+## 上下文与研究
 
-### Relevant Code and Patterns
+### 相关代码与模式
 
-- `plugins/compound-engineering/skills/ce-plan/SKILL.md` — established extraction pattern with stub syntax
-- `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` — example of late-sequence extraction
-- `plugins/compound-engineering/skills/ce-brainstorm/references/handoff.md` — another late-sequence extraction (ce:brainstorm already did this)
-- `plugins/compound-engineering/skills/ce-work-beta/references/codex-delegation-workflow.md` — beta already uses extraction for its conditional delegation workflow
-- `tests/pipeline-review-contract.test.ts` — existing contract tests for ce:work (lines 9-98) and ce:work-beta (lines 100-219)
-- `plugins/compound-engineering/AGENTS.md` — "Conditional and Late-Sequence Extraction" rule
+- `plugins/compound-engineering/skills/ce-plan/SKILL.md` -- 已建立的 extraction pattern 与 stub syntax
+- `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` -- late-sequence extraction 示例
+- `plugins/compound-engineering/skills/ce-brainstorm/references/handoff.md` -- 另一个 late-sequence extraction（ce:brainstorm 已做）
+- `plugins/compound-engineering/skills/ce-work-beta/references/codex-delegation-workflow.md` -- beta 已经为 conditional delegation workflow 使用 extraction
+- `tests/pipeline-review-contract.test.ts` -- 现有 ce:work（lines 9-98）与 ce:work-beta（lines 100-219）contract tests
+- `plugins/compound-engineering/AGENTS.md` -- "Conditional and Late-Sequence Extraction" rule
 
-### Institutional Learnings
+### 组织内经验
 
-- PR #489 validated that extracting ~36% of ce:plan saved ~130,000-167,000 context tokens per session with zero premature reference file reads
-- ce:brainstorm has already applied the same pattern (Phase 3/4 extracted to `references/requirements-capture.md` and `references/handoff.md`)
+- PR #489 验证：extract 约 36% 的 ce:plan，可在每个 session 中节省约 130,000-167,000 context tokens，并且没有 premature reference file reads
+- ce:brainstorm 已经应用同一 pattern（Phase 3/4 extract 到 `references/requirements-capture.md` 与 `references/handoff.md`）
 
-## Key Technical Decisions
+## 关键技术决策
 
-- **Bundle Phase 3 + Phase 4 + Quality Checklist + Code Review Tiers into one reference file**: These are all used at the same point in the workflow (after all Phase 2 tasks complete). The Quality Checklist is "Before creating PR" and Code Review Tiers duplicates Phase 3 Step 2 — they're the same workflow stage. One file is simpler than four. This matches the bundling strategy ce:brainstorm used for its late-sequence content.
-- **Keep Key Principles, Common Pitfalls in SKILL.md**: They're small (~40 lines combined) and provide behavioral guardrails throughout execution. Extracting them saves little and risks execution quality.
-- **Independent reference files for stable and beta**: Per AGENTS.md skill self-containment rules, each skill's references directory is its own unit. Beta already has a `references/` directory with `codex-delegation-workflow.md`; the shipping workflow file goes alongside it. Stable creates its `references/` directory fresh.
+- **把 Phase 3 + Phase 4 + Quality Checklist + Code Review Tiers bundle 到一个 reference file：** 它们都在 workflow 的同一点使用（所有 Phase 2 tasks 完成后）。Quality Checklist 是 "Before creating PR"，Code Review Tiers 重复 Phase 3 Step 2 -- 属于同一 workflow stage。一个文件比四个更简单。这匹配 ce:brainstorm 对 late-sequence content 使用的 bundling strategy。
+- **Key Principles、Common Pitfalls 保留在 SKILL.md：** 它们较小（合计约 40 行），并在整个 execution 中提供 behavioral guardrails。extract 它们节省很少，且有损 execution quality 风险。
+- **Stable 与 beta 使用独立 reference files：** 根据 AGENTS.md skill self-containment rules，每个 skill 的 references directory 是自己的 unit。Beta 已有包含 `codex-delegation-workflow.md` 的 `references/` directory；shipping workflow file 放在旁边。Stable 新建自己的 `references/` directory。
 
-## Implementation Units
+## 实现单元
 
-- [x] **Unit 1: Create `references/shipping-workflow.md` for ce:work**
+- [x] **Unit 1：为 ce:work 创建 `references/shipping-workflow.md`**
 
-**Goal:** Extract Phase 3 (Quality Check), Phase 4 (Ship It), Quality Checklist, and Code Review Tiers into a single reference file for the stable skill.
+**目标：** 将 Phase 3（Quality Check）、Phase 4（Ship It）、Quality Checklist 和 Code Review Tiers extract 到 stable skill 的单个 reference file。
 
-**Requirements:** R1, R3
+**需求：** R1, R3
 
-**Dependencies:** None
+**依赖：** None
 
-**Files:**
-- Create: `plugins/compound-engineering/skills/ce-work/references/shipping-workflow.md`
-- Modify: `plugins/compound-engineering/skills/ce-work/SKILL.md`
+**文件：**
+- Create（新增）: `plugins/compound-engineering/skills/ce-work/references/shipping-workflow.md`
+- Modify（修改）: `plugins/compound-engineering/skills/ce-work/SKILL.md`
 
-**Approach:**
-- Move Phase 3 (lines 271-315), Phase 4 (lines 317-374), Quality Checklist (lines 408-423), and Code Review Tiers (lines 425-435) into the new reference file
-- Add a header comment: "This file contains the shipping workflow (Phase 3-4). Load it only when all Phase 2 tasks are complete and execution transitions to quality check."
-- Replace Phase 3 + Phase 4 in SKILL.md with a 2-line stub stating the condition and backtick path reference
-- Remove the standalone Quality Checklist and Code Review Tiers sections at the bottom of SKILL.md (they're consolidated into the reference file)
+**做法：**
+- 将 Phase 3（lines 271-315）、Phase 4（lines 317-374）、Quality Checklist（lines 408-423）和 Code Review Tiers（lines 425-435）移入新 reference file
+- 添加 header comment："This file contains the shipping workflow (Phase 3-4). Load it only when all Phase 2 tasks are complete and execution transitions to quality check."
+- 在 SKILL.md 中用 2-line stub 替换 Phase 3 + Phase 4，说明 condition，并引用 backtick path
+- 删除 SKILL.md 底部 standalone Quality Checklist 与 Code Review Tiers sections（它们已 consolidated 到 reference file）
 
-**Patterns to follow:**
-- `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` — late-sequence extraction with header comment and stub pattern
-- `plugins/compound-engineering/skills/ce-brainstorm/references/handoff.md` — same pattern for brainstorm's shipping phase
+**遵循的模式：**
+- `plugins/compound-engineering/skills/ce-plan/references/plan-handoff.md` -- 带 header comment 与 stub pattern 的 late-sequence extraction
+- `plugins/compound-engineering/skills/ce-brainstorm/references/handoff.md` -- brainstorm shipping phase 的同一 pattern
 
-**Test scenarios:**
-- Happy path: SKILL.md stub contains backtick path to `references/shipping-workflow.md` and states the loading condition
-- Happy path: reference file contains Phase 3 (quality checks, code review, final validation, operational validation plan) and Phase 4 (screenshots, commit/PR, plan status update, notify user) and the quality checklist and code review tiers
-- Edge case: SKILL.md does not contain `gh pr create` — the existing contract test at line 35 continues to pass since this string was never in ce:work SKILL.md
+**测试场景：**
+- Happy path：SKILL.md stub 包含指向 `references/shipping-workflow.md` 的 backtick path，并说明 loading condition
+- Happy path：reference file 包含 Phase 3（quality checks、code review、final validation、operational validation plan）与 Phase 4（screenshots、commit/PR、plan status update、notify user），以及 quality checklist 和 code review tiers
+- Edge case：SKILL.md 不包含 `gh pr create` -- line 35 的现有 contract test 继续通过，因为该 string 从未在 ce:work SKILL.md 中
 
-**Verification:**
-- SKILL.md line count decreases by ~130 lines (445 -> ~315)
-- Reference file contains all Phase 3, Phase 4, Quality Checklist, and Code Review Tiers content
-- SKILL.md stub clearly states when to load the reference
-
----
-
-- [x] **Unit 2: Create `references/shipping-workflow.md` for ce:work-beta**
-
-**Goal:** Extract the same late-sequence shipping content from ce:work-beta into its already-existing references directory, alongside the existing `codex-delegation-workflow.md`.
-
-**Requirements:** R2, R3
-
-**Dependencies:** None (can run in parallel with Unit 1)
-
-**Files:**
-- Create: `plugins/compound-engineering/skills/ce-work-beta/references/shipping-workflow.md`
-- Modify: `plugins/compound-engineering/skills/ce-work-beta/SKILL.md`
-
-**Approach:**
-- Move Phase 3 (lines 336-381), Phase 4 (lines 382-438), Quality Checklist (lines 481-496), and Code Review Tiers (lines 498-508) into the new reference file
-- Same header comment pattern as Unit 1
-- Replace with the same 2-line stub pattern
-- Remove standalone Quality Checklist and Code Review Tiers sections
-- Beta has an additional Phase 2 subsection ("Frontend Design Guidance" at lines 322-328) that stays in SKILL.md since it's used during execution
-- The Codex Delegation Mode stub (lines 442-444) stays untouched — it's a separate extraction
-
-**Sync decision:** Propagating extraction to beta — this is a structural optimization that applies equally to both variants. The shipping workflow content is identical between stable and beta.
-
-**Patterns to follow:**
-- Unit 1 output for stable variant
-- Beta's existing `codex-delegation-workflow.md` extraction as precedent
-
-**Test scenarios:**
-- Happy path: beta SKILL.md stub contains backtick path to `references/shipping-workflow.md`
-- Happy path: beta reference file contains the same Phase 3/4 content as stable's reference
-- Edge case: existing `codex-delegation-workflow.md` reference is untouched
-
-**Verification:**
-- Beta SKILL.md line count decreases by ~130 lines (518 -> ~388)
-- Beta `references/` directory now contains both `codex-delegation-workflow.md` and `shipping-workflow.md`
+**验证：**
+- SKILL.md line count 减少约 130 行（445 -> ~315）
+- Reference file 包含所有 Phase 3、Phase 4、Quality Checklist 和 Code Review Tiers content
+- SKILL.md stub 清楚说明何时 load reference
 
 ---
 
-- [x] **Unit 3: Update contract tests**
+- [x] **Unit 2：为 ce:work-beta 创建 `references/shipping-workflow.md`**
 
-**Goal:** Update existing contract tests to read assertions from reference files where content moved, and add stub pointer tests.
+**目标：** 从 ce:work-beta 中 extract 同样的 late-sequence shipping content，放入它已存在的 references directory，与现有 `codex-delegation-workflow.md` 并列。
 
-**Requirements:** R4
+**需求：** R2, R3
 
-**Dependencies:** Unit 1, Unit 2
+**依赖：** None（可与 Unit 1 parallel）
 
-**Files:**
-- Modify: `tests/pipeline-review-contract.test.ts`
+**文件：**
+- Create（新增）: `plugins/compound-engineering/skills/ce-work-beta/references/shipping-workflow.md`
+- Modify（修改）: `plugins/compound-engineering/skills/ce-work-beta/SKILL.md`
 
-**Approach:**
+**做法：**
+- 将 Phase 3（lines 336-381）、Phase 4（lines 382-438）、Quality Checklist（lines 481-496）和 Code Review Tiers（lines 498-508）移入新 reference file
+- 使用与 Unit 1 相同的 header comment pattern
+- 用同样的 2-line stub pattern 替换
+- 删除 standalone Quality Checklist 与 Code Review Tiers sections
+- Beta 额外的 Phase 2 subsection（"Frontend Design Guidance"，lines 322-328）保留在 SKILL.md，因为 execution 期间会使用
+- Codex Delegation Mode stub（lines 442-444）保持不动 -- 它是单独 extraction
 
-Tests that need restructuring (some assertions move to reference file, negative assertions may stay on SKILL.md):
-- "requires code review before shipping" (line 10) — positive assertions (`"2. **Code Review**"`, tier names, `ce:review`, `mode:autofix`, quality checklist review line) read from `references/shipping-workflow.md`; negative assertions (`not.toContain("Consider Code Review")`, `not.toContain("Code Review** (Optional)")`) stay reading SKILL.md to confirm extraction completeness
-- "delegates commit and PR to dedicated skills" (line 28) — positive assertions (`git-commit-push-pr`, `git-commit`) read from `references/shipping-workflow.md`; negative assertions (`not.toContain("gh pr create")`) stay reading SKILL.md
-- "ce:work-beta mirrors review and commit delegation" (line 39) — same dual-read pattern from beta's reference and beta's SKILL.md
-- "quality checklist says Testing addressed" (line 66) — positive assertion (`"Testing addressed"`) reads from `references/shipping-workflow.md`; negative assertions (`not.toContain("Tests pass...")`) stay reading SKILL.md
-- "ce:work-beta mirrors testing deliberation and checklist changes" (line 77) — testing deliberation stays reading beta SKILL.md; checklist assertions read from beta reference
+**Sync decision:** 将 extraction 传播到 beta -- 这是同样适用于两个 variants 的 structural optimization。shipping workflow content 在 stable 与 beta 间相同。
 
-Tests that stay unchanged (content not extracted):
-- "includes per-task testing deliberation in execution loop" (line 52) — Phase 2 content, stays in SKILL.md
-- "ce:work remains the stable non-delegating surface" (line 91) — checks SKILL.md absence of delegation content
-- All ce:work-beta delegation contract tests (lines 100-219) — check SKILL.md stubs and delegation reference
+**遵循的模式：**
+- Unit 1 的 stable variant 输出
+- Beta 现有 `codex-delegation-workflow.md` extraction 作为 precedent
 
-New tests to add:
-- Stub pointer test: SKILL.md contains backtick path `references/shipping-workflow.md` (for both stable and beta)
-- Negative test: SKILL.md does not contain `"2. **Code Review**"` directly (confirms extraction, not duplication)
+**测试场景：**
+- Happy path：beta SKILL.md stub 包含指向 `references/shipping-workflow.md` 的 backtick path
+- Happy path：beta reference file 包含与 stable reference 相同的 Phase 3/4 content
+- Edge case：现有 `codex-delegation-workflow.md` reference 未被触碰
 
-**Patterns to follow:**
-- Lines 283-289 in `tests/pipeline-review-contract.test.ts` — PR #489's stub pointer test pattern (`"SKILL.md stub points to plan-handoff reference"`)
+**验证：**
+- Beta SKILL.md line count 减少约 130 行（518 -> ~388）
+- Beta `references/` directory 现在同时包含 `codex-delegation-workflow.md` 与 `shipping-workflow.md`
 
-**Test scenarios:**
-- Happy path: all existing ce:work and ce:work-beta contract tests pass after updating file paths
-- Happy path: new stub pointer tests verify both SKILL.md files reference `shipping-workflow.md`
-- Edge case: tests checking Phase 2 content (testing deliberation, delegation routing) still read from SKILL.md unchanged
+---
 
-**Verification:**
+- [x] **Unit 3：更新 contract tests**
+
+**目标：** 更新现有 contract tests，使内容移动后的 assertions 从 reference files 读取，并添加 stub pointer tests。
+
+**需求：** R4
+
+**依赖：** Unit 1, Unit 2
+
+**文件：**
+- Modify（修改）: `tests/pipeline-review-contract.test.ts`
+
+**做法：**
+
+需要重构的 tests（部分 assertions 移到 reference file，negative assertions 可留在 SKILL.md）：
+- "requires code review before shipping"（line 10）-- positive assertions（`"2. **Code Review**"`、tier names、`ce:review`、`mode:autofix`、quality checklist review line）从 `references/shipping-workflow.md` 读取；negative assertions（`not.toContain("Consider Code Review")`、`not.toContain("Code Review** (Optional)")`）继续读 SKILL.md，确认 extraction completeness
+- "delegates commit and PR to dedicated skills"（line 28）-- positive assertions（`git-commit-push-pr`、`git-commit`）从 `references/shipping-workflow.md` 读取；negative assertions（`not.toContain("gh pr create")`）继续读 SKILL.md
+- "ce:work-beta mirrors review and commit delegation"（line 39）-- 从 beta reference 与 beta SKILL.md 使用同样 dual-read pattern
+- "quality checklist says Testing addressed"（line 66）-- positive assertion（`"Testing addressed"`）从 `references/shipping-workflow.md` 读取；negative assertions（`not.toContain("Tests pass...")`）继续读 SKILL.md
+- "ce:work-beta mirrors testing deliberation and checklist changes"（line 77）-- testing deliberation 继续读 beta SKILL.md；checklist assertions 读 beta reference
+
+保持不变的 tests（内容未 extract）：
+- "includes per-task testing deliberation in execution loop"（line 52）-- Phase 2 content，保留在 SKILL.md
+- "ce:work remains the stable non-delegating surface"（line 91）-- 检查 SKILL.md 中 absence of delegation content
+- 所有 ce:work-beta delegation contract tests（lines 100-219）-- 检查 SKILL.md stubs 与 delegation reference
+
+新增 tests：
+- Stub pointer test：SKILL.md 包含 backtick path `references/shipping-workflow.md`（stable 与 beta 都测）
+- Negative test：SKILL.md 不直接包含 `"2. **Code Review**"`（确认 extraction，而不是 duplication）
+
+**遵循的模式：**
+- `tests/pipeline-review-contract.test.ts` lines 283-289 -- PR #489 的 stub pointer test pattern（`"SKILL.md stub points to plan-handoff reference"`）
+
+**测试场景：**
+- Happy path：更新 file paths 后，所有现有 ce:work 与 ce:work-beta contract tests 通过
+- Happy path：new stub pointer tests 验证两个 SKILL.md files 都引用 `shipping-workflow.md`
+- Edge case：检查 Phase 2 content（testing deliberation、delegation routing）的 tests 仍读 SKILL.md，不变
+
+**验证：**
 - `bun test tests/pipeline-review-contract.test.ts` passes
-- No contract test reads from SKILL.md for content that moved to a reference file
+- 没有 contract test 从 SKILL.md 读取已移动到 reference file 的 content
 
-## System-Wide Impact
+## 系统级影响
 
-- **Interaction graph:** No behavioral change — content is restructured, not modified. The agent reads the same instructions, just from a reference file instead of inline.
-- **Error propagation:** If reference file read fails at runtime, the agent would lack shipping instructions. Low risk since file reads are reliable and the files are co-located in the skill directory.
-- **API surface parity:** Both stable and beta get the same extraction. Beta's existing Codex delegation reference is untouched.
-- **Integration coverage:** Contract tests in `tests/pipeline-review-contract.test.ts` are the primary integration surface.
-- **Unchanged invariants:** Phase 0-2 execution behavior, subagent dispatch, test discovery, and all other execution-time content remains inline and unchanged.
+- **Interaction graph:** 无 behavioral change -- content 被 restructuring，而非 modified。agent 读取相同 instructions，只是从 reference file 读取而不是 inline。
+- **Error propagation:** 如果 runtime 读取 reference file 失败，agent 会缺少 shipping instructions。风险低，因为 file reads 可靠，且 files 与 skill co-located。
+- **API surface parity:** Stable 和 beta 都获得同样 extraction。Beta 现有 Codex delegation reference 未受影响。
+- **Integration coverage:** `tests/pipeline-review-contract.test.ts` 中的 contract tests 是主要 integration surface。
+- **Unchanged invariants:** Phase 0-2 execution behavior、subagent dispatch、test discovery 和所有其他 execution-time content 保持 inline 且不变。
 
-## Risks & Dependencies
+## 风险与依赖
 
-| Risk | Mitigation |
+| 风险 | 缓解 |
 |------|------------|
-| Contract tests break if file paths change | Unit 3 explicitly updates all affected tests |
-| Agent fails to load reference file at the right time | Stub wording follows the validated pattern from PR #489 and ce:brainstorm |
-| Beta-specific content accidentally dropped | Unit 2 only extracts Phase 3/4 content identical to stable; delegation stubs/references are untouched |
+| 如果 file paths 改变，contract tests 会破 | Unit 3 明确更新所有 affected tests |
+| Agent 没有在正确时间 load reference file | Stub wording 遵循 PR #489 与 ce:brainstorm validated pattern |
+| Beta-specific content 被意外丢失 | Unit 2 只 extract 与 stable 相同的 Phase 3/4 content；delegation stubs/references 不触碰 |
 
-## Token Savings Estimate
+## Token 节省估算
 
-| Skill | Extraction | Lines | Est. tokens | Loaded when |
+| Skill | Extraction | 行数 | 估算 tokens | 加载时机 |
 |---|---|---|---|---|
 | ce:work | `references/shipping-workflow.md` | ~130 | ~2,200 | All Phase 2 tasks complete |
 | ce:work-beta | `references/shipping-workflow.md` | ~130 | ~2,200 | All Phase 2 tasks complete |
 
-**ce:work reduction:** 445 lines (~6,500 tokens) -> ~315 lines (~4,600 tokens) — **~29% reduction**
+**ce:work reduction:** 445 lines（约 6,500 tokens）-> 约 315 lines（约 4,600 tokens）-- **约 29% reduction**
 
-**ce:work-beta reduction:** 518 lines (~7,600 tokens) -> ~388 lines (~5,700 tokens) — **~25% reduction**
+**ce:work-beta reduction:** 518 lines（约 7,600 tokens）-> 约 388 lines（约 5,700 tokens）-- **约 25% reduction**
 
-**Per-session savings (each skill):** For a typical 40-message execution session:
-- Shipping workflow: ~2,200 tokens x ~32 messages before it's needed = **~70,400 context tokens per session**
+**Per-session savings（each skill）:** 对典型 40-message execution session：
+- Shipping workflow: 约 2,200 tokens x 约 32 messages before it's needed = **约 70,400 context tokens per session**
 
-## Sources & References
+## 来源与参考
 
-- Related PRs: #489 (ce:plan extraction — established the pattern)
-- Related code: `plugins/compound-engineering/AGENTS.md` (extraction rule)
-- Precedent: ce:brainstorm already applied this pattern to its Phase 3/4 content
+- Related PRs: #489（ce:plan extraction -- 建立该 pattern）
+- Related code: `plugins/compound-engineering/AGENTS.md`（extraction rule）
+- Precedent: ce:brainstorm 已将此 pattern 应用于其 Phase 3/4 content

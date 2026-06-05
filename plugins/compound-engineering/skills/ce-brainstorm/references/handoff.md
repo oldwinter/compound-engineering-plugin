@@ -1,29 +1,29 @@
-# Handoff
+# Handoff（交接）
 
-This content is loaded when Phase 4 begins — after the requirements document is written.
+本内容在 Phase 4 开始时加载，也就是 requirements document 写入之后。
 
 ---
 
-#### 4.1 Present Next-Step Options
+#### 4.1 呈现下一步选项
 
-The Phase 4 menu's visible option count varies by state: no requirements doc hides the review and Proof options, `OUTPUT_FORMAT=html` also hides the review option (ce-doc-review is markdown-only today), unresolved `Resolve Before Planning` hides `Plan implementation` and `Build it now`, a failing direct-to-work gate hides `Build it now`. Count the visible options for the current state and choose the rendering mode accordingly:
+Phase 4 菜单的可见选项数量会随状态变化：没有 requirements doc 时隐藏 review 和 Proof 选项，`OUTPUT_FORMAT=html` 也隐藏 review 选项（ce-doc-review 今天是 markdown-only），未解决的 `Resolve Before Planning` 会隐藏 `Plan implementation` 和 `Build it now`，direct-to-work gate 失败会隐藏 `Build it now`。统计当前状态下的可见选项，并据此选择渲染模式：
 
-- **4 or fewer visible:** use the platform's blocking question tool (`AskUserQuestion` in Claude Code — call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded; `request_user_input` in Codex; `ask_user` in Gemini, `ask_user` in Pi (requires the `pi-ask-user` extension)). This is the default.
-- **5 or more visible:** render as a numbered list in chat. This is the narrow option-overflow fallback; trimming would hide legitimate choices (plan, review, Proof, build, refine, pause are all distinct destinations). Include a hint that free-form input is accepted ("Pick a number or describe what you want.") so the numbered list retains the blocking tool's open-endedness.
+- **4 个或更少可见选项：** 使用平台 blocking question tool（Claude Code 中的 `AskUserQuestion`；若 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用；Codex 中的 `request_user_input`；Gemini 中的 `ask_user`；Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。这是默认路径。
+- **5 个或更多可见选项：** 在聊天中渲染为编号列表。这是窄的 option-overflow fallback；删减选项会隐藏合法选择（plan、review、Proof、build、refine、pause 都是不同 destination）。加入接受自由文本输入的提示（"Pick a number or describe what you want."），让编号列表保留 blocking tool 的 open-endedness。
 
-Never silently skip the question.
+绝不要静默跳过问题。
 
-If `Resolve Before Planning` contains any items:
-- Ask the blocking questions now, one at a time, by default
-- If the user explicitly wants to proceed anyway, first convert each remaining item into an explicit decision, assumption, or `Deferred to Planning` question
-- If the user chooses to pause instead, present the handoff as paused or blocked rather than complete
-- Do not offer the `Plan implementation` or `Build it now` options while `Resolve Before Planning` remains non-empty
+如果 `Resolve Before Planning` 包含任何 items：
+- 默认现在逐个询问 blocking questions
+- 如果用户明确仍要继续，先将每个剩余 item 转换为明确 decision、assumption，或 `Deferred to Planning` question
+- 如果用户选择暂停，将 handoff 呈现为 paused 或 blocked，而不是 complete
+- 只要 `Resolve Before Planning` 仍非空，就不要提供 `Plan implementation` 或 `Build it now` 选项
 
-In both preambles below, the "Pick a number or describe what you want." hint applies only in numbered-list mode. When using the blocking tool, omit that line and pass the remaining stem as the question.
+下面两个 preamble 中，"Pick a number or describe what you want." 提示仅适用于 numbered-list mode。使用 blocking tool 时，省略该行，并将剩余 stem 作为问题传入。
 
-**Path format:** Use absolute paths for chat-output file references — relative paths are not auto-linked as clickable in most terminals.
+**Path format（路径格式）：** 聊天输出中的文件引用使用 absolute paths；relative paths 在多数终端中不会自动链接为可点击项。
 
-**Preamble when no blocking questions remain:**
+**没有 blocking questions 剩余时的 preamble：**
 
 ```
 Brainstorm complete.
@@ -33,7 +33,7 @@ Requirements doc: <absolute path to requirements doc>  # omit line if no doc was
 What would you like to do next? (Pick a number or describe what you want.)
 ```
 
-**Preamble when blocking questions remain and user wants to pause:**
+**仍有 blocking questions 且用户想暂停时的 preamble：**
 
 ```
 Brainstorm paused. Planning is blocked until the remaining questions are resolved.
@@ -43,67 +43,67 @@ Requirements doc: <absolute path to requirements doc>  # omit line if no doc was
 What would you like to do next? (Pick a number or describe what you want.)
 ```
 
-Present only the options that apply. Renumber so visible options stay contiguous starting at 1.
+仅呈现适用选项。重新编号，让可见选项从 1 开始保持连续。
 
-1. **Plan implementation with `ce-plan` (Recommended)** - Move to `ce-plan` for structured implementation planning. Shown only when `Resolve Before Planning` is empty.
-2. **Agent review of requirements doc with `ce-doc-review`** - Dispatch reviewer agents to check the doc for coherence, feasibility, scope, and other persona-specific issues; auto-apply safe fixes; route remaining findings interactively. Shown only when a requirements document exists **and `OUTPUT_FORMAT=md`** — ce-doc-review's walkthrough applies markdown-only mutations (`##`/`###` heading inserts, single-file markdown edits via apply-set) and would corrupt an HTML artifact, so HTML brainstorms skip this option until ce-doc-review gains HTML-aware mutation support. Under HTML mode, surface a one-line note above the menu: `Agent review unavailable in output:html mode — ce-doc-review is markdown-only today. Switch to output:md if you want a review pass.`
-3. **Open in Proof — review and comment to iterate with the agent** - Open the doc in Every's Proof editor, iterate with the agent via comments, or copy a link to share with others. Shown only when a requirements document exists. **Render only when `OUTPUT_FORMAT=md`** (Proof operates on markdown and cannot ingest HTML).
-3. **Open in browser** — open the HTML requirements file locally for review and sharing. Shown only when a requirements document exists. **Render only when `OUTPUT_FORMAT=html`.** Replaces "Open in Proof" at the same slot under exclusive output mode — the doc is either markdown OR HTML, never both, so exactly one of the two labels applies per run.
-4. **Build it now with `ce-work` (skip planning)** - Skip planning and move to `ce-work`; suited to lightweight, well-defined changes. Shown only when `Resolve Before Planning` is empty **and** scope is lightweight, success criteria are clear, scope boundaries are clear, and no meaningful technical or research questions remain (the "direct-to-work gate").
-5. **More clarifying questions to sharpen the doc** - Keep refining scope, edge cases, constraints, and preferences through further dialogue. Always shown.
-6. **Done for now** - Pause; the requirements doc is saved and can be resumed later. Always shown.
+1. **Plan implementation with `ce-plan` (Recommended)** - 转入 `ce-plan` 进行结构化 implementation planning。仅当 `Resolve Before Planning` 为空时显示。
+2. **Agent review of requirements doc with `ce-doc-review`** - 分派 reviewer agents 检查 doc 的 coherence、feasibility、scope 和其他 persona-specific issues；自动应用安全修复；交互式 route 剩余 findings。仅当 requirements document 存在**且 `OUTPUT_FORMAT=md`** 时显示；ce-doc-review 的 walkthrough 会应用 markdown-only mutations（`##`/`###` heading inserts、通过 apply-set 进行单文件 markdown edits），会破坏 HTML artifact，因此 HTML brainstorms 跳过此选项，直到 ce-doc-review 获得 HTML-aware mutation support。在 HTML mode 下，在菜单上方显示一行说明：`Agent review unavailable in output:html mode — ce-doc-review is markdown-only today. Switch to output:md if you want a review pass.`
+3. **Open in Proof — review and comment to iterate with the agent** - 在 Every 的 Proof editor 中打开 doc，通过 comments 与 agent 迭代，或复制链接分享给他人。仅当 requirements document 存在时显示。**仅当 `OUTPUT_FORMAT=md` 时渲染**（Proof 作用于 markdown，不能 ingest HTML）。
+3. **Open in browser** — 在本地打开 HTML requirements 文件，用于 review 和 sharing。仅当 requirements document 存在时显示。**仅当 `OUTPUT_FORMAT=html` 时渲染。** 在 exclusive output mode 下替代同一位置的 "Open in Proof"；doc 要么是 markdown，要么是 HTML，绝不同时存在，所以每次运行只适用两个标签之一。
+4. **Build it now with `ce-work` (skip planning)** - 跳过 planning 并转入 `ce-work`；适合轻量、定义清楚的改动。仅当 `Resolve Before Planning` 为空，**且** scope 轻量、success criteria 清晰、scope boundaries 清晰、没有有意义的技术或研究问题剩余时显示（即 "direct-to-work gate"）。
+5. **More clarifying questions to sharpen the doc** - 通过进一步对话继续打磨 scope、edge cases、constraints 和 preferences。始终显示。
+6. **Done for now** - 暂停；requirements doc 已保存，之后可恢复。始终显示。
 
-**Post-review nudge (subsequent rounds only):** If the user has already run `ce-doc-review` this session and residual P0/P1 findings remain unaddressed, add a one-line prose nudge adjacent to the menu (e.g., "Document review flagged 2 P1 findings you may want to address — pick \"Agent review of requirements doc\" to run another pass."). Reference the option by label, not number: the menu renumbers when `Resolve Before Planning` hides `Plan implementation` and `Build it now`, so a hardcoded option number can point users at the wrong action. Do not add a separate menu option; reuse the existing agent-review option. Suppress this nudge when `OUTPUT_FORMAT=html` — the agent-review option is hidden in that mode, so the nudge would point users at a missing action.
+**Post-review nudge（仅后续轮次）：** 如果用户在本 session 已运行 `ce-doc-review`，且 residual P0/P1 findings 仍未处理，在菜单旁添加一行 prose nudge（例如："Document review flagged 2 P1 findings you may want to address — pick \"Agent review of requirements doc\" to run another pass."）。按 label 引用选项，不要按编号：当 `Resolve Before Planning` 隐藏 `Plan implementation` 和 `Build it now` 时，菜单会重新编号，硬编码选项编号可能指向错误动作。不要添加单独菜单选项；复用现有 agent-review 选项。当 `OUTPUT_FORMAT=html` 时抑制该 nudge；agent-review 选项在该模式下隐藏，nudge 会指向不存在的动作。
 
-#### 4.2 Handle the Selected Option
+#### 4.2 处理所选选项
 
-Selections may be the literal option label (when the user types the label or a close paraphrase) or the option number. Match numbers against the currently-rendered (post-trim) list. Free-form input that doesn't match an option or describe an alternative action should be treated as clarification — ask a follow-up rather than guessing.
+选择可以是字面 option label（用户输入 label 或接近的 paraphrase）或选项编号。编号要匹配当前已渲染（post-trim）列表。无法匹配选项、也没有描述替代动作的自由文本输入，应视为 clarification；继续追问，而不是猜测。
 
-**If user selects "Plan implementation with `ce-plan` (Recommended)":**
+**如果用户选择 "Plan implementation with `ce-plan` (Recommended)"：**
 
-Immediately load the `ce-plan` skill in the current session. Pass the requirements document path when one exists; otherwise pass a concise summary of the finalized brainstorm decisions. Do not print the closing summary first.
+立即在当前 session 加载 `ce-plan` skill。当存在 requirements document 时传入其 path；否则传入已 finalized brainstorm decisions 的简洁摘要。不要先打印 closing summary。
 
-**If user selects "Agent review of requirements doc with `ce-doc-review`":**
+**如果用户选择 "Agent review of requirements doc with `ce-doc-review`"：**
 
-Load the `ce-doc-review` skill, passing the requirements document path as the argument. When ce-doc-review returns "Review complete", return to the Phase 4 options and re-render the menu (the doc may have changed, so re-evaluate `Resolve Before Planning`, direct-to-work gate, and residual findings). If residual P0/P1 findings remain unaddressed, include the post-review nudge above the menu. Do not show the closing summary yet.
+加载 `ce-doc-review` skill，并将 requirements document path 作为 argument 传入。当 ce-doc-review 返回 "Review complete" 后，回到 Phase 4 options 并重新渲染菜单（doc 可能已变更，因此重新评估 `Resolve Before Planning`、direct-to-work gate 和 residual findings）。如果 residual P0/P1 findings 仍未处理，在菜单上方包含 post-review nudge。不要显示 closing summary。
 
-**If user selects "Build it now with `ce-work` (skip planning)":**
+**如果用户选择 "Build it now with `ce-work` (skip planning)"：**
 
-Immediately load the `ce-work` skill in the current session using the finalized brainstorm output as context. If a compact requirements document exists, pass its path. Do not print the closing summary first.
+立即在当前 session 加载 `ce-work` skill，并使用 finalized brainstorm output 作为 context。如果存在 compact requirements document，则传入其 path。不要先打印 closing summary。
 
-**If user selects "More clarifying questions to sharpen the doc":** Return to Phase 1.3 (Collaborative Dialogue) and continue asking the user clarifying questions one at a time to further refine scope, edge cases, constraints, and preferences. Continue until the user is satisfied, then return to Phase 4. Do not show the closing summary yet.
+**如果用户选择 "More clarifying questions to sharpen the doc"：** 返回 Phase 1.3（Collaborative Dialogue），继续一次一个地向用户提出 clarifying questions，进一步细化 scope、edge cases、constraints 和 preferences。持续到用户满意后，再返回 Phase 4。不要显示 closing summary。
 
-**If user selects "Open in Proof — review and comment to iterate with the agent":**
+**如果用户选择 "Open in Proof — review and comment to iterate with the agent"：**
 
-Load the `ce-proof` skill in HITL-review mode with:
+以 HITL-review mode 加载 `ce-proof` skill，参数为：
 
-- **source file:** `docs/brainstorms/YYYY-MM-DD-<topic>-requirements.md`
-- **doc title:** `Requirements: <topic title>`
-- **identity:** `ai:compound-engineering` / `Compound Engineering`
-- **recommended next step:** `ce-plan` (shown in the ce-proof skill's final terminal output)
+- **source file（源文件）：** `docs/brainstorms/YYYY-MM-DD-<topic>-requirements.md`
+- **doc title（文档标题）：** `Requirements: <topic title>`
+- **identity（身份）：** `ai:compound-engineering` / `Compound Engineering`
+- **recommended next step（推荐下一步）：** `ce-plan` (shown in the ce-proof skill's final terminal output)
 
-Follow `references/hitl-review.md` in the ce-proof skill. It uploads the doc, prompts the user for review in Proof's web UI, ingests filtered comment threads, applies agreed edits through the current Proof edit APIs, replies/resolves in-thread, and syncs the final markdown back to the source file atomically on proceed.
+遵循 ce-proof skill 中的 `references/hitl-review.md`。它会上传 doc，提示用户在 Proof web UI 中 review，摄取过滤后的 comment threads，通过当前 Proof edit APIs 应用已同意 edits，在线程内 reply/resolve，并在 proceed 时将最终 markdown 原子同步回 source file。
 
-When the ce-proof skill returns control:
+当 ce-proof skill 交还控制权时：
 
-- `status: proceeded` with `localSynced: true` → the requirements doc on disk now reflects the review. Return to the Phase 4 options and re-render the menu (the doc may have changed substantially during review, so option eligibility can shift — re-evaluate `Resolve Before Planning`, direct-to-work gate, and residual ce-doc-review findings against the updated doc).
-- `status: proceeded` with `localSynced: false` → the reviewed version lives in Proof at `docUrl` but the local copy is stale. Offer to pull the Proof doc to `localPath` using the ce-proof skill's Pull workflow. Re-render the Phase 4 menu after the pull completes (or is declined). If the pull was declined, include a one-line note above the menu that `<localPath>` is stale vs. Proof — otherwise `Plan implementation` / `Build it now` / `Agent review of requirements doc` will silently read the pre-review copy.
-- `status: done_for_now` → the doc on disk may be stale if the user edited in Proof before leaving. Offer to pull the Proof doc to `localPath` so the local requirements file stays in sync, then return to the Phase 4 options. If the pull was declined, include the stale-local note above the menu. `done_for_now` means the user stopped the HITL loop without syncing — it does not mean they ended the whole brainstorm.
-- `status: aborted` → fall back to the Phase 4 options without changes.
+- `status: proceeded` 且 `localSynced: true` → 磁盘上的 requirements doc 现在反映了 review。返回 Phase 4 options 并重新渲染菜单（doc 可能在 review 中发生实质变更，因此 option eligibility 可能变化；针对更新后的 doc 重新评估 `Resolve Before Planning`、direct-to-work gate 和 residual ce-doc-review findings）。
+- `status: proceeded` 且 `localSynced: false` → reviewed version 位于 Proof 的 `docUrl`，但 local copy 已陈旧。使用 ce-proof skill 的 Pull workflow，询问是否将 Proof doc 拉取到 `localPath`。pull 完成（或被拒绝）后重新渲染 Phase 4 menu。如果 pull 被拒绝，在菜单上方加入一行说明 `<localPath>` 相比 Proof 已陈旧；否则 `Plan implementation` / `Build it now` / `Agent review of requirements doc` 会静默读取 review 前副本。
+- `status: done_for_now` → 如果用户离开前在 Proof 中编辑过，磁盘上的 doc 可能已陈旧。询问是否将 Proof doc 拉取到 `localPath`，以保持 local requirements file 同步，然后返回 Phase 4 options。如果 pull 被拒绝，在菜单上方加入 stale-local note。`done_for_now` 表示用户没有同步就停止了 HITL loop；不表示他们结束了整个 brainstorm。
+- `status: aborted` → 不做更改，回到 Phase 4 options。
 
-If the initial upload fails (network error, Proof API down), retry once after a short wait. If it still fails, tell the user the upload didn't succeed and briefly explain why, then return to the Phase 4 options — don't leave them wondering why the option did nothing.
+如果初始 upload 失败（network error、Proof API down），短暂等待后重试一次。如果仍失败，告诉用户 upload 没有成功，并简要说明原因，然后返回 Phase 4 options；不要让用户困惑为什么该选项没有效果。
 
-**If user selects "Open in browser":** Display the absolute path to the `.html` requirements file so the user can open it locally. Where the platform exposes a browser-opening primitive (e.g., `open` on macOS, `xdg-open` on Linux, `start` on Windows), the agent may invoke it directly; otherwise print the absolute path and let the user open it. After the path is displayed (or the browser is opened), return to the Phase 4 options so the user can pick a follow-up action.
+**如果用户选择 "Open in browser"：** 显示 `.html` requirements file 的 absolute path，让用户可本地打开。若平台暴露 browser-opening primitive（例如 macOS 的 `open`、Linux 的 `xdg-open`、Windows 的 `start`），agent 可直接调用；否则打印 absolute path，让用户自行打开。显示路径（或打开浏览器）后，返回 Phase 4 options，让用户选择 follow-up action。
 
-**If user selects "Done for now":** Display the closing summary (see 4.3) and end the turn.
+**如果用户选择 "Done for now"：** 显示 closing summary（见 4.3）并结束本 turn。
 
-#### 4.3 Closing Summary
+#### 4.3 Closing Summary（收尾摘要）
 
-Use the closing summary only when this run of the workflow is ending or handing off, not when returning to the Phase 4 options.
+仅当本次 workflow 运行结束或 handoff 时使用 closing summary；返回 Phase 4 options 时不要使用。
 
-In both templates below, substitute `<absolute path to requirements doc>` with the actual file path written this run — `.md` for `OUTPUT_FORMAT=md`, `.html` for `OUTPUT_FORMAT=html`. Do not emit a hardcoded `.md` path when the artifact is HTML, or the closing summary will point users at a file that was never written.
+在下面两个模板中，将 `<absolute path to requirements doc>` 替换为本次运行实际写入的文件路径：`OUTPUT_FORMAT=md` 时为 `.md`，`OUTPUT_FORMAT=html` 时为 `.html`。当 artifact 是 HTML 时，不要输出硬编码 `.md` path，否则 closing summary 会指向一个从未写入的文件。
 
-When complete and ready for planning, display:
+完成且准备 planning 时，显示：
 
 ```text
 Brainstorm complete!
@@ -117,7 +117,7 @@ Key decisions:
 Recommended next step: `ce-plan`
 ```
 
-If the user pauses with `Resolve Before Planning` still populated, display:
+如果用户在 `Resolve Before Planning` 仍有内容时暂停，显示：
 
 ```text
 Brainstorm paused.

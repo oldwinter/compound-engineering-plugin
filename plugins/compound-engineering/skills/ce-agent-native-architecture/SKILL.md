@@ -1,43 +1,43 @@
 ---
 name: ce-agent-native-architecture
-description: Build applications where agents are first-class citizens. Use this skill when designing autonomous agents, creating MCP tools, implementing self-modifying systems, or building apps where features are outcomes achieved by agents operating in a loop.
+description: 构建将 agents 作为 first-class citizens 的应用。设计 autonomous agents、创建 MCP tools、实现 self-modifying systems，或构建“功能是由 agents 在 loop 中操作而达成的 outcomes”的应用时使用此 skill。
 ---
 
 <overview>
-## Agent-Native Architecture
+## Agent-Native Architecture（Agent-native 架构）
 
-Agent-native applications treat agents as first-class citizens. Features are outcomes achieved by an agent with tools operating in a loop, not functions written in code. The same architecture that powers Claude Code can power apps far beyond coding.
+Agent-native applications 将 agents 视为 first-class citizens。功能不是写在代码里的函数，而是 agent 使用 tools 在 loop 中达成的 outcomes。驱动 Claude Code 的同一套架构，也可以驱动远超 coding 范围的应用。
 
-**Five core principles:**
+**五个核心原则：**
 
-1. **Parity** — Whatever the user can do through the UI, the agent can achieve through tools.
-2. **Granularity** — Tools are atomic primitives; features are prompt-defined outcomes. To change behavior, edit prose, not code.
-3. **Composability** — New features = new prompts, not new code. Atomic tools + parity make this possible.
-4. **Emergent Capability** — The agent accomplishes things you didn't explicitly design for. Open-ended requests reveal latent demand.
-5. **Improvement Over Time** — Apps get better through accumulated context (e.g. a `context.md` file) and prompt refinement, without shipping code.
+1. **Parity** — 用户能通过 UI 做到的任何事，agent 都能通过 tools 达成。
+2. **Granularity** — Tools 是 atomic primitives；features 是由 prompt 定义的 outcomes。要改变行为，编辑 prose，而不是代码。
+3. **Composability** — 新功能 = 新 prompts，而不是新代码。Atomic tools + parity 让这成为可能。
+4. **Emergent Capability** — Agent 能完成你没有显式设计过的事情。开放式请求会揭示 latent demand。
+5. **Improvement Over Time** — Apps 通过累积 context（例如 `context.md` 文件）和 prompt refinement 变得更好，而不需要发布代码。
 
-For deep coverage of how these principles translate into architectural patterns, read `references/architecture-patterns.md`.
+要深入了解这些原则如何转化为 architectural patterns，请阅读 `references/architecture-patterns.md`。
 </overview>
 
 <intake>
-## What aspect of agent-native architecture do you need help with?
+## 你需要哪方面的 agent-native architecture 帮助？
 
-1. **Design architecture** - Plan a new agent-native system from scratch
-2. **Files & workspace** - Files as universal interface, shared workspace patterns
-3. **Tool design** - Primitive tools, dynamic capability discovery, CRUD completeness
-4. **Domain tools** - When to add domain tools vs stay with primitives
-5. **Execution patterns** - Completion signals, partial completion, context limits
-6. **System prompts** - Define agent behavior, judgment criteria
-7. **Context injection** - Inject runtime app state into agent prompts
-8. **Action parity** - Ensure agents can do everything users can do
-9. **Self-modification** - Enable agents to safely evolve themselves
-10. **Product design** - Progressive disclosure, latent demand, approval patterns
-11. **Mobile patterns** - iOS storage, background execution, checkpoint/resume
-12. **Testing** - Test agent-native apps for capability and parity
-13. **Refactoring** - Make existing code more agent-native
-14. **Review / checklists** - Architecture checklist, anti-patterns, success criteria
+1. **Design architecture（架构设计）** - 从零规划新的 agent-native system
+2. **Files & workspace（文件与 workspace）** - Files as universal interface、shared workspace patterns
+3. **Tool design（工具设计）** - Primitive tools、dynamic capability discovery、CRUD completeness
+4. **Domain tools（领域工具）** - 什么时候添加 domain tools，什么时候继续使用 primitives
+5. **Execution patterns（执行模式）** - Completion signals、partial completion、context limits
+6. **System prompts（系统 prompts）** - 定义 agent behavior 和 judgment criteria
+7. **Context injection（上下文注入）** - 将 runtime app state 注入 agent prompts
+8. **Action parity（动作对等）** - 确保 agents 能做用户能做的一切
+9. **Self-modification（自我修改）** - 让 agents 能安全地演化自己
+10. **Product design（产品设计）** - Progressive disclosure、latent demand、approval patterns
+11. **Mobile patterns（移动端模式）** - iOS storage、background execution、checkpoint/resume
+12. **Testing（测试）** - 测试 agent-native apps 的 capability 和 parity
+13. **Refactoring（重构）** - 让现有代码更 agent-native
+14. **Review / checklists（审查 / 检查清单）** - Architecture checklist、anti-patterns、success criteria
 
-Pick a number or describe what you want. Wait for the response before proceeding.
+选择一个编号，或描述你想做什么。等待回复后再继续。
 </intake>
 
 <routing>
@@ -58,30 +58,30 @@ Pick a number or describe what you want. Wait for the response before proceeding
 | 13, "refactor", "existing", "migrate" | `references/refactoring-to-prompt-native.md` |
 | 14, "review", "audit", "anti-pattern", "checklist", "success criteria" | `references/checklists.md` |
 
-After reading the reference, apply those patterns to the user's specific context.
+读取 reference 后，将这些 patterns 应用到用户的具体上下文。
 </routing>
 
 <reference_index>
-## Reference Files
+## Reference Files（参考文件）
 
-**Core patterns:**
-- `references/architecture-patterns.md` — Event-driven, unified orchestrator, agent-to-UI; full coverage of the five principles
-- `references/files-universal-interface.md` — Why files, organization, context.md
-- `references/mcp-tool-design.md` — Tool design, dynamic capability discovery, CRUD
-- `references/from-primitives-to-domain-tools.md` — When to graduate primitives to domain tools
-- `references/agent-execution-patterns.md` — Completion signals, partial completion, context limits
-- `references/system-prompt-design.md` — Features as prompts, judgment criteria
+**Core patterns（核心 patterns）：**
+- `references/architecture-patterns.md` — Event-driven、unified orchestrator、agent-to-UI；完整覆盖五个原则
+- `references/files-universal-interface.md` — 为什么是 files、organization、context.md
+- `references/mcp-tool-design.md` — Tool design、dynamic capability discovery、CRUD
+- `references/from-primitives-to-domain-tools.md` — 什么时候从 primitives 升级为 domain tools
+- `references/agent-execution-patterns.md` — Completion signals、partial completion、context limits
+- `references/system-prompt-design.md` — Features as prompts、judgment criteria
 
-**Disciplines:**
+**Disciplines（实践纪律）：**
 - `references/dynamic-context-injection.md` — Runtime context injection
-- `references/action-parity-discipline.md` — Capability mapping, parity workflow
-- `references/shared-workspace-architecture.md` — Shared data space, UI integration
-- `references/product-implications.md` — Progressive disclosure, latent demand, approval
-- `references/agent-native-testing.md` — Testing outcomes, parity tests
-- `references/checklists.md` — Architecture checklist, anti-patterns, success criteria
+- `references/action-parity-discipline.md` — Capability mapping、parity workflow
+- `references/shared-workspace-architecture.md` — Shared data space、UI integration
+- `references/product-implications.md` — Progressive disclosure、latent demand、approval
+- `references/agent-native-testing.md` — Testing outcomes、parity tests
+- `references/checklists.md` — Architecture checklist、anti-patterns、success criteria
 
-**Platform-specific:**
-- `references/mobile-patterns.md` — iOS storage, checkpoint/resume, cost awareness
-- `references/self-modification.md` — Git-based evolution, guardrails
-- `references/refactoring-to-prompt-native.md` — Migrating existing code
+**Platform-specific（平台特定）：**
+- `references/mobile-patterns.md` — iOS storage、checkpoint/resume、cost awareness
+- `references/self-modification.md` — Git-based evolution、guardrails
+- `references/refactoring-to-prompt-native.md` — 迁移现有代码
 </reference_index>

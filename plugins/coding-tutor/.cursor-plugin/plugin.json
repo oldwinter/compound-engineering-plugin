@@ -2,7 +2,7 @@
   "name": "coding-tutor",
   "displayName": "Coding Tutor",
   "version": "1.3.0",
-  "description": "Personalized coding tutorials that use your actual codebase for examples with spaced repetition quizzes",
+  "description": "个性化 coding tutorials：使用你的实际 codebase 作为示例，并用 spaced repetition quizzes 巩固学习",
   "author": {
     "name": "Nityesh Agarwal"
   },

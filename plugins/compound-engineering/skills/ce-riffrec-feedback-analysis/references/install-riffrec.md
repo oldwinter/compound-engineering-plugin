@@ -1,27 +1,27 @@
-# Setup: Add Riffrec to a project
+# Setup：将 Riffrec 添加到项目
 
-Use this path when the user has no recording yet and wants to start capturing product feedback with [Riffrec](https://github.com/kieranklaassen/riffrec).
+当用户还没有 recording，并且想开始用 [Riffrec](https://github.com/kieranklaassen/riffrec) 捕获 product feedback 时，使用这条路径。
 
-Riffrec is a browser-based capture tool that records the screen, microphone audio, console output, network requests, and DOM events into a single `riffrec-*.zip` bundle. The bundle is what this skill consumes downstream.
+Riffrec 是 browser-based capture tool，会把屏幕、麦克风音频、console output、network requests 和 DOM events 记录到单个 `riffrec-*.zip` bundle 中。这个 bundle 是本 skill 后续消费的输入。
 
-## What to tell the user
+## 告诉用户什么
 
-1. Riffrec lives at <https://github.com/kieranklaassen/riffrec>. Refer them to the README for the current install command — it is the source of truth and may change.
-2. The general shape of integration:
-   - Add the Riffrec capture script or package to the project's web app.
-   - Wire a "Record feedback" affordance somewhere accessible during real use (a bug report button, a dev-only floating recorder, or a keyboard shortcut).
-   - Confirm a sample session ends with a downloadable `riffrec-*.zip`.
-3. Once a zip exists, the user runs this skill again with the zip path. The skill will pick the **quick bug report** or **extensive analysis** path automatically based on length and content.
+1. Riffrec 位于 <https://github.com/kieranklaassen/riffrec>。让用户参考 README 获取当前 install command；README 是 source of truth，命令可能变化。
+2. 集成的大致形态：
+   - 将 Riffrec capture script 或 package 添加到项目的 web app。
+   - 在真实使用期间容易触达的位置接入一个 "Record feedback" affordance（bug report button、dev-only floating recorder 或 keyboard shortcut）。
+   - 确认一个 sample session 最终能下载 `riffrec-*.zip`。
+3. zip 存在后，用户带 zip path 再次运行此 skill。Skill 会根据长度和内容自动选择 **quick bug report** 或 **extensive analysis** 路径。
 
-## Recommended capture habits
+## 推荐的 capture 习惯
 
-Surface these to the user during setup so the recordings they share later are easy to analyze:
+在 setup 期间向用户提示这些习惯，让他们后续分享的 recordings 更容易分析：
 
-- Speak the issue out loud while reproducing it. The transcript is the single highest-signal artifact.
-- Click the affected UI even when it does nothing — failed clicks are the strongest signal in event extraction.
-- Keep recordings focused. Many short clips beat one long one when issues are unrelated.
-- Note when a step is intentional vs. accidental ("oops, that wasn't what I meant"). The analyzer cannot infer intent.
+- 复现时把问题说出来。Transcript 是信号最高的单个 artifact。
+- 即使没有反应，也点击受影响的 UI；failed clicks 是 event extraction 中最强的信号。
+- 保持 recordings 聚焦。问题无关时，多个短 clips 优于一个长 clip。
+- 标明某一步是 intentional 还是 accidental（"oops, that wasn't what I meant"）。Analyzer 无法推断意图。
 
-## After install
+## 安装后
 
-When the user returns with their first zip, route to `references/quick-bug-report.md` or `references/extensive-analysis.md` per the SKILL.md routing rules. Do not run the analyzer in the setup path — there is nothing to analyze yet.
+当用户带第一个 zip 返回时，按 SKILL.md routing rules 路由到 `references/quick-bug-report.md` 或 `references/extensive-analysis.md`。不要在 setup path 中运行 analyzer：此时还没有可分析内容。

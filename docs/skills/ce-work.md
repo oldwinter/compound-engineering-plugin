@@ -1,10 +1,10 @@
 # `ce-work`
 
-> Execute against the plan's guardrails — figure out the HOW with code in front of you, ship complete features, hand off to a clean PR.
+> 按 plan 的 guardrails 执行，在代码面前判断 HOW，交付完整 feature，并 hand off 到干净的 PR。
 
-`ce-work` is the **execution** skill. It takes a plan (or, for smaller scope, a bare prompt), executes the implementation against the plan's guardrails, runs tests continuously, dispatches subagents in isolated worktrees when scope warrants, runs quality gates, and hands off to a commit + PR flow. It treats the plan as a **decision artifact** — authoritative for scope, decisions, units, and tests — and figures out the actual implementation itself. **It is the HOW phase that `ce-plan` deliberately does not pre-write.**
+`ce-work` 是 **execution** skill。它接收一个 plan（或在较小范围内接收 bare prompt），按 plan 的 guardrails 执行实现，持续运行 tests，在 scope 需要时把 subagents 分派到隔离 worktrees 中，运行 quality gates，并 hand off 到 commit + PR flow。它把 plan 视为 **decision artifact**：scope、decisions、units 和 tests 的权威来源；实际实现方式由它自己判断。**它就是 `ce-plan` 刻意不预写的 HOW phase。**
 
-This is the fourth and final step in the compound-engineering ideation chain:
+这是 compound-engineering ideation chain 的第四步，也是最后一步：
 
 ```text
 /ce-ideate         /ce-brainstorm      /ce-plan             /ce-work
@@ -13,112 +13,112 @@ This is the fourth and final step in the compound-engineering ideation chain:
                                         this?"
 ```
 
-`ce-work` is software-focused — it commits, runs tests, opens PRs, and integrates with code review skills. For non-software plans (study plans, hot-water-tank maintenance, trip planning) the chain effectively ends at `ce-plan` and a human executes those themselves.
+`ce-work` 面向 software work：它 commit、运行 tests、打开 PR，并与 code review skills 集成。对于非软件 plans（学习计划、hot-water-tank maintenance、trip planning），chain 实际上在 `ce-plan` 结束，由人类自行执行。
 
 ---
 
 ## TL;DR
 
-| Question | Answer |
+| Question（问题） | Answer（答案） |
 |----------|--------|
-| What does it do? | Reads a plan (or scopes a bare prompt), executes against the guardrails, runs tests continuously, ships a reviewed PR |
-| When to use it | Implementing a `ce-plan` plan; small/medium bare-prompt work; resuming partly-shipped work |
-| What it produces | Commits + a PR (or just commits, no-PR path) |
-| What's next | Review the PR; run `/ce-compound` to capture learnings |
-| Distinguishing | Plan-aware idempotency, subagent dispatch with worktree isolation, tiered review with residual gate, operational validation in PR |
+| 它做什么？ | 读取 plan（或 scope 一个 bare prompt），按 guardrails 执行，持续运行 tests，交付 reviewed PR |
+| 何时使用 | 实现 `ce-plan` plan；小/中型 bare-prompt work；恢复 partly-shipped work |
+| 产出什么 | Commits + PR（或 no-PR path 中只产生 commits） |
+| 下一步 | Review PR；运行 `/ce-compound` 捕获 learnings |
+| Distinguishing | Plan-aware idempotency、带 worktree isolation 的 subagent dispatch、带 residual gate 的 tiered review、PR 中的 operational validation |
 
 ---
 
-## The Problem
+## 问题
 
-Asking an agent "implement this plan" goes wrong in predictable ways:
+要求 agent "implement this plan" 常以可预测方式出错：
 
-- **Reimplementing already-shipped work** when picking up a partly-finished branch
-- **Treating the plan as a script** — editing the literal files listed even when a different shape would be cleaner
-- **Tests with everything mocked** — proves logic in isolation; says nothing about whether layers interact correctly
-- **Half-finished features** — visible work done, callbacks unwired, edge cases untouched
-- **Parallel work with silent data loss** — multiple agents writing the same file in a shared directory; only the last write survives
-- **No quality gate** — the diff goes straight to PR with no simplification pass, no review, no operational monitoring
+- **重新实现已经 shipped 的 work**：恢复 partly-finished branch 时尤其常见
+- **把 plan 当脚本**：即使另一种形状更干净，也照着 literal file list 改
+- **Tests 全部 mock**：只能证明孤立 logic，无法说明 layers 是否正确交互
+- **半成品 features**：可见部分完成了，callbacks 未接线，edge cases 没碰
+- **Parallel work 静默丢数据**：多个 agents 在 shared directory 写同一文件，只有最后一次写入保留
+- **没有 quality gate**：diff 直接进 PR，没有 simplification pass、review 或 operational monitoring
 
-## The Solution
+## 方案
 
-`ce-work` runs execution as a structured process with explicit gates:
+`ce-work` 把 execution 作为带 explicit gates 的 structured process：
 
-- The plan is authoritative for **WHAT**; the agent figures out **HOW** with code in front of it
-- An idempotency check before each task — if verification is already satisfied, skip it
-- Scope-appropriate dispatch (inline / serial subagents / parallel subagents in isolated worktrees)
-- Test discovery + integration coverage + a system-wide test check before any task is marked done
-- Tiered code review with a residual-work gate — accept, file, fix, or stop, but never silently ship
-- Every PR carries an operational validation plan — what to monitor, what triggers rollback
-
----
-
-## What Makes It Novel
-
-### 1. Plan-aware execution — honors the WHAT/HOW separation
-
-`ce-work` reads the plan as a decision artifact, not a script. Scope, decisions, U-IDs, files, test scenarios, and verification criteria are authoritative — the agent figures out the actual implementation itself. The plan body stays read-only during execution; progress lives in git commits and the task tracker.
-
-### 2. Idempotent re-execution
-
-Before each task, `ce-work` checks whether the unit's work is already present and matches the plan's intent. If verification is already satisfied, mark the task complete and move on. **No silent reimplementation.** This matters most when resuming after context compaction, picking up someone else's branch, or returning to a partly-shipped plan weeks later.
-
-### 3. Worktree-isolated parallelism — explicit conflicts, not silent data loss
-
-For independent units that can run in parallel, `ce-work` defaults to per-subagent worktree isolation when the harness supports it: each subagent on its own branch in its own directory. Predicted overlaps surface as merge conflicts the orchestrator handles explicitly. When isolation isn't available, subagents are barred from staging or committing and the orchestrator merges the batch serially. Either way, **no silent overwrites.**
-
-### 4. U-ID anchoring across execution
-
-When the plan defines U-IDs, they propagate as task prefixes, into commit messages, and into the final summary. This works *across plan edits* — a deepening pass that splits a unit doesn't break references because U-IDs are stable. Brainstorm-origin IDs (R/A/F/AE) are similarly preserved when present.
-
-### 5. Test quality gates before "done"
-
-A task isn't done when the code compiles. Before marking any feature-bearing task complete, `ce-work` discovers the existing test files for what's being changed, checks that test scenarios cover the categories that apply (happy path, edges, error paths, integration), and traces two levels out for callbacks, middleware, and observers the change might affect. Mocking everything proves logic in isolation; integration coverage is what proves the layers actually work together.
-
-### 6. Tiered code review with explicit residual handling
-
-Every change gets reviewed. Default is harness-native (e.g., `/review` in Claude Code) — fast, sufficient for most diffs. Escalate to `ce-code-review` only on a real signal: sensitive surface, large and diffuse change, or explicit request. When a deeper review surfaces residuals the autofix didn't resolve, `ce-work` doesn't silently ship — it surfaces a four-option gate (apply / file tickets / accept with durable sink / stop). "Accept" requires a real durable record; findings can't live only in the transient session.
-
-### 7. Operational validation as a default
-
-Every PR description includes a `Post-Deploy Monitoring & Validation` section: log queries, metrics to watch, expected healthy signals, failure signals, rollback triggers. If there's truly no production impact, the section still exists with that as the recorded decision rather than an implicit one.
-
-### 8. Smart triage on bare prompts
-
-Not every invocation has a plan. `ce-work` accepts a bare prompt and triages by complexity: trivial work (a couple of files, no behavioral change) goes straight to implementation; small/medium work builds a task list; large or sensitive work surfaces a recommendation to use `/ce-brainstorm` or `/ce-plan` first. The triage is what makes `ce-work` reasonable for direct invocation on small work, without forcing the full chain for everything.
+- Plan 对 **WHAT** 权威；agent 面对代码判断 **HOW**
+- 每个 task 前做 idempotency check；如果 verification 已满足，就 skip
+- 按 scope 选择 dispatch（inline / serial subagents / isolated worktrees 中的 parallel subagents）
+- 在任何 task 标记 done 前，进行 test discovery、integration coverage 和 system-wide test check
+- 带 residual-work gate 的 tiered code review：accept、file、fix 或 stop，但绝不 silently ship
+- 每个 PR 都带 operational validation plan：监控什么、什么触发 rollback
 
 ---
 
-## Quick Example
+## 它的新意
 
-A plan with four implementation units arrives. `ce-work` reads it, picks up an `Execution note: test-first` on one unit, and notes a deferred-implementation question to keep in mind. It builds a task list with U-ID prefixes and confirms the current branch name is meaningful.
+### 1. Plan-aware execution：尊重 WHAT/HOW separation
 
-The Parallel Safety Check finds no file overlap across the four units and worktree isolation is available — so all four dispatch in parallel, each on its own branch. They complete; the orchestrator merges them in dependency order; tests pass after each merge. The idempotency check catches that one unit's verification was already satisfied by a prior session and marks it complete without reimplementation.
+`ce-work` 把 plan 当 decision artifact，而不是脚本。Scope、decisions、U-IDs、files、test scenarios 和 verification criteria 是权威；agent 自行判断实际实现。执行期间 plan body 保持 read-only；progress 存在 git commits 和 task tracker 中。
 
-The diff isn't on a sensitive surface and isn't large/diffuse, so harness-native review handles it; the two suggested findings are addressed inline. Final validation passes; the operational validation plan is drafted; the plan's frontmatter flips `active → completed`; and `ce-commit-push-pr` opens the PR with summary, testing notes, the operational section, and a Compound Engineered badge.
+### 2. Idempotent re-execution（幂等重新执行）
+
+每个 task 前，`ce-work` 检查该 unit 的 work 是否已经存在且符合 plan intent。如果 verification 已满足，就把 task 标为 complete 并继续。**不会 silent reimplementation。** 这在 context compaction 后恢复、接手他人 branch，或几周后回到 partly-shipped plan 时最重要。
+
+### 3. Worktree-isolated parallelism：explicit conflicts，而不是 silent data loss
+
+对于可并行的 independent units，当 harness 支持时，`ce-work` 默认使用 per-subagent worktree isolation：每个 subagent 在自己的 directory 中、自己的 branch 上工作。预测到的 overlap 会作为 merge conflicts 暴露，由 orchestrator 显式处理。隔离不可用时，subagents 禁止 staging 或 committing，由 orchestrator 串行 merge batch。无论哪种方式，**都不会 silent overwrites。**
+
+### 4. 执行全程保持 U-ID anchoring
+
+当 plan 定义 U-IDs 时，它们会作为 task prefixes、commit messages 和 final summary 的锚点继续传播。这在 *plan edits 之间* 也成立：一次 deepening pass 把 unit 拆分后，引用不会断，因为 U-IDs 稳定。存在 Brainstorm-origin IDs（R/A/F/AE）时也同样保留。
+
+### 5. 标记 "done" 前的 test quality gates
+
+Task 不是 code compiles 就算 done。任何 feature-bearing task 标记 complete 前，`ce-work` 会发现正在修改内容对应的 existing test files，检查 test scenarios 是否覆盖适用类别（happy path、edges、error paths、integration），并向外追踪两层 callbacks、middleware 和 observers，确认 change 可能影响的东西。Mocking everything 只能证明孤立 logic；integration coverage 才能证明 layers 真正协同。
+
+### 6. 带 explicit residual handling 的 tiered code review
+
+每个 change 都会被 review。默认使用 harness-native review（例如 Claude Code 中的 `/review`）：快，且对大多数 diffs 足够。只有出现真实 signal 才升级到 `ce-code-review`：sensitive surface、大且 diffuse 的 change，或明确请求。当 deeper review 暴露 autofix 未解决的 residuals 时，`ce-work` 不会 silent ship，而是给出四选一 gate（apply / file tickets / accept with durable sink / stop）。"Accept" 需要真实 durable record；findings 不能只存在 transient session 中。
+
+### 7. 默认包含 operational validation
+
+每个 PR description 都包含 `Post-Deploy Monitoring & Validation` section：log queries、要观察的 metrics、expected healthy signals、failure signals、rollback triggers。如果确实没有 production impact，该 section 仍然存在，并把它作为记录下来的 decision，而不是隐含假设。
+
+### 8. 对 bare prompts 做 smart triage
+
+不是每次 invocation 都有 plan。`ce-work` 接收 bare prompt，并按 complexity triage：trivial work（少量文件、无 behavior change）直接实现；small/medium work 构建 task list；large 或 sensitive work 建议先用 `/ce-brainstorm` 或 `/ce-plan`。这个 triage 让 `ce-work` 可以合理处理小工作，而不强制所有事情都走完整 chain。
 
 ---
 
-## When to Reach For It
+## 快速示例
 
-Reach for `ce-work` when:
+一个包含四个 implementation units 的 plan 到来。`ce-work` 读取它，识别某个 unit 上的 `Execution note: test-first`，并记录一个 deferred-implementation question。它用 U-ID prefixes 构建 task list，并确认当前 branch name 有意义。
 
-- A `ce-plan` plan is ready and you're ready to ship
-- You have small or medium work without a plan — bare-prompt mode handles it
-- You're resuming partly-shipped work
-- You want parallel execution with safe isolation
-- You want a complete shipping flow — tests, simplify, review, residuals, operational validation, PR
+Parallel Safety Check 发现四个 units 之间没有 file overlap，且 worktree isolation 可用，于是四个 subagents 并行分派，各自使用自己的 branch。它们完成后，orchestrator 按 dependency order merge；每次 merge 后 tests 都通过。Idempotency check 捕获到其中一个 unit 的 verification 已被先前 session 满足，于是直接标为 complete，不重新实现。
 
-Skip `ce-work` when:
-
-- Product behavior isn't decided yet → `/ce-brainstorm`
-- Implementation guardrails aren't established for non-trivial work → `/ce-plan`
-- The bug has a known root cause and an obvious fix → `/ce-debug`
-- The task is non-software — execution there is a human activity
+Diff 不在 sensitive surface 上，也不大且 diffuse，所以 harness-native review 处理它；两个 suggested findings 被 inline 修掉。Final validation 通过；operational validation plan 起草完成；plan frontmatter 从 `active` 翻到 `completed`；`ce-commit-push-pr` 打开 PR，PR 包含 summary、testing notes、operational section 和 Compound Engineered badge。
 
 ---
 
-## Use as Part of the Chained Workflow
+## 何时使用
+
+在以下情况使用 `ce-work`：
+
+- `ce-plan` plan 已 ready，准备 ship
+- 有 small 或 medium work 但没有 plan；bare-prompt mode 会处理
+- 正在恢复 partly-shipped work
+- 想要带 safe isolation 的 parallel execution
+- 想要完整 shipping flow：tests、simplify、review、residuals、operational validation、PR
+
+以下情况跳过 `ce-work`：
+
+- Product behavior 尚未决定 -> `/ce-brainstorm`
+- 非 trivial work 的 implementation guardrails 尚未建立 -> `/ce-plan`
+- Bug 已有 known root cause 且 fix obvious -> `/ce-debug`
+- Task 非软件工作；这里的 execution 是 human activity
+
+---
+
+## 作为链式 Workflow 的一部分使用
 
 ```text
 /ce-ideate          (optional)
@@ -128,76 +128,76 @@ Skip `ce-work` when:
    |  requirements / brief
    v
 /ce-plan
-   |  guardrails — U-IDs, files, test scenarios, scope, risks
+   |  guardrails — U-IDs、files、test scenarios、scope、risks
    v
 /ce-work
-   |  honors the guardrails; figures out the HOW with code in front of it
-   |  derives progress from git, not plan body
-   |  ships through quality gates to PR
+   |  遵守 guardrails；面对代码判断 HOW
+   |  从 git 推导 progress，而不是从 plan body 推导
+   |  通过 quality gates ship 到 PR
    v
-/ce-code-review     (optional escalation; auto-invoked at Tier 2)
+/ce-code-review     （可选 escalation；Tier 2 时自动调用）
    |
    v
-/ce-compound        — capture the learning
+/ce-compound        — 捕获 learning
 ```
 
-After shipping, `/ce-compound` captures any reusable learning (bugs encountered, patterns established, conventions adopted) into `docs/solutions/` so future runs of `ce-plan` and `ce-work` benefit from the institutional memory.
+Shipping 之后，`/ce-compound` 会把任何 reusable learning（遇到的 bugs、形成的 patterns、采用的 conventions）捕获到 `docs/solutions/`，让未来的 `ce-plan` 和 `ce-work` 受益于 institutional memory。
 
 ---
 
-## Use Standalone
+## 单独使用
 
-Many people reach for `ce-work` directly with a bare prompt — `ce-plan` is overkill when scope is small and the agent can scope it itself.
+很多人会直接用 bare prompt 调用 `ce-work`：当 scope 很小、agent 能自己 scope 时，`ce-plan` 会过于 heavy。
 
-- **Bug fixes with a clear root cause** — direct implementation if trivial; task list if small/medium
-- **Small refactors** — extract a helper, rename a concept, consolidate duplication
-- **Resuming a partly-shipped plan** — idempotency prevents reimplementation
-- **Wiring a feature you've already designed** in your head, where formal planning would be ceremony
-- **Multi-feature parallel work** — worktree isolation lets you push several independent features through simultaneously without git contention
+- **Root cause 清晰的 bug fixes**：trivial 则直接实现；small/medium 则列 task list
+- **Small refactors**：抽 helper、重命名 concept、合并重复
+- **恢复 partly-shipped plan**：idempotency 防止 reimplementation
+- **把你已经在脑中设计好的 feature 接上线**：formal planning 会显得 ceremonial
+- **Multi-feature parallel work**：worktree isolation 让多个 independent features 同时推进，避免 git contention
 
-For large bare-prompt scope (cross-cutting, sensitive surfaces, many files), `ce-work` recommends `/ce-brainstorm` or `/ce-plan` first — but proceeds with your choice.
+对于 large bare-prompt scope（cross-cutting、sensitive surfaces、many files），`ce-work` 会建议先用 `/ce-brainstorm` 或 `/ce-plan`，但会按你的选择继续。
 
 ---
 
-## Reference
+## 参考
 
-| Argument | Effect |
+| Argument（参数） | Effect（效果） |
 |----------|--------|
-| _(empty)_ | Auto-uses the latest plan in `docs/plans/` |
+| _(empty)_ | 自动使用 `docs/plans/` 中最新的 plan |
 | `<plan path>` | Origin-sourced execution |
-| `<bare prompt>` | Triage by complexity (Trivial / Small-Medium / Large) |
+| `<bare prompt>` | 按 complexity triage（Trivial / Small-Medium / Large） |
 
-Output: commits and (typically) a PR via `ce-commit-push-pr`. The plan body is read-only during execution; only the frontmatter `status` flips to `completed` at shipping.
-
----
-
-## FAQ
-
-**Why doesn't `ce-work` just write all the code from the plan's exact signatures?**
-Because the plan deliberately doesn't have exact signatures — it has decisions, units, files, scope, and test scenarios. The plan is the WHAT; `ce-work` is the HOW. This separation keeps plans portable across weeks of code change and across implementer.
-
-**What if I don't have a plan?**
-Bare-prompt mode triages by complexity. Trivial goes straight to implementation; small/medium builds a task list; large surfaces a recommendation to plan first.
-
-**What's the difference between worktree-isolated and shared-directory parallel mode?**
-Worktree isolation gives each subagent its own branch in its own directory — overlapping writes surface as merge conflicts the orchestrator handles explicitly. Shared-directory mode bars subagents from staging, committing, or running the test suite (the orchestrator does those after the batch). Both are safe; worktree isolation is the cleaner experience.
-
-**Why does it check whether work is already done before each task?**
-Resuming after context compaction, picking up someone else's branch, or returning to a partly-shipped plan are all common. Idempotency ensures `ce-work` doesn't silently reimplement what's already there.
-
-**What's the Residual Work Gate?**
-When a deeper code review tier surfaces things the autofix didn't resolve, `ce-work` won't silently ship them. It asks: apply now / file tickets / accept (with durable sink) / stop. "Accept" requires a real durable record — findings can't live only in the session.
-
-**Does `ce-work` support non-software plans?**
-Not directly. The chain effectively ends at `ce-plan` for non-software work — `ce-work` commits, runs tests, and opens PRs, none of which apply to maintenance routines or trip plans.
+Output：通过 `ce-commit-push-pr` 产生 commits 和（通常）PR。执行期间 plan body read-only；只有 shipping 时 frontmatter `status` 会翻到 `completed`。
 
 ---
 
-## See Also
+## 常见问题
 
-- [`ce-plan`](./ce-plan.md) — produces the guardrails `ce-work` executes against
-- [`ce-brainstorm`](./ce-brainstorm.md) — defines what the plan should accomplish
-- [`ce-ideate`](./ce-ideate.md) — upstream "what's worth exploring" discovery
-- [`ce-code-review`](./ce-code-review.md) — Tier 2 escalation target
-- [`ce-commit-push-pr`](./ce-commit-push-pr.md) — handles the final commit + PR flow
-- [`ce-compound`](./ce-compound.md) — capture reusable learning after shipping
+**为什么 `ce-work` 不直接按 plan 的 exact signatures 写所有代码？**
+因为 plan 刻意不包含 exact signatures；它包含 decisions、units、files、scope 和 test scenarios。Plan 是 WHAT；`ce-work` 是 HOW。这个 separation 让 plans 在数周代码变化后、或不同 implementer 之间仍然 portable。
+
+**如果我没有 plan 怎么办？**
+Bare-prompt mode 会按 complexity triage。Trivial 直接实现；small/medium 构建 task list；large 会建议先 plan。
+
+**Worktree-isolated 和 shared-directory parallel mode 有什么区别？**
+Worktree isolation 给每个 subagent 自己的 branch 和 directory；overlapping writes 会作为 merge conflicts 暴露，由 orchestrator 显式处理。Shared-directory mode 禁止 subagents staging、committing 或运行 test suite（这些由 orchestrator 在 batch 后完成）。两者都安全；worktree isolation 体验更干净。
+
+**为什么每个 task 前要检查 work 是否已经完成？**
+Context compaction 后恢复、接手他人 branch、或回到 partly-shipped plan 都很常见。Idempotency 确保 `ce-work` 不会 silent reimplement 已经存在的 work。
+
+**什么是 Residual Work Gate？**
+当更深层 code review tier 发现 autofix 没解决的问题时，`ce-work` 不会 silent ship。它会询问：apply now / file tickets / accept（with durable sink）/ stop。"Accept" 需要真实 durable record；findings 不能只存在 session 中。
+
+**`ce-work` 支持非软件 plans 吗？**
+不直接支持。对于非软件工作，chain 实际上在 `ce-plan` 结束；`ce-work` 会 commit、运行 tests、打开 PR，这些并不适用于 maintenance routines 或 trip plans。
+
+---
+
+## 另见
+
+- [`ce-plan`](./ce-plan.md) - 产出 `ce-work` 执行时遵守的 guardrails
+- [`ce-brainstorm`](./ce-brainstorm.md) - 定义 plan 应完成什么
+- [`ce-ideate`](./ce-ideate.md) - 上游 "what's worth exploring" discovery
+- [`ce-code-review`](./ce-code-review.md) - Tier 2 escalation target（Tier 2 升级目标）
+- [`ce-commit-push-pr`](./ce-commit-push-pr.md) - 处理最终 commit + PR flow
+- [`ce-compound`](./ce-compound.md) - shipping 后捕获 reusable learning

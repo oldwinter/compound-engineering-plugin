@@ -1,216 +1,216 @@
 # `ce-code-review`
 
-> Structured code review using tiered persona agents, confidence-gated findings, and a merge/dedup pipeline.
+> 使用 tiered persona agents、confidence-gated findings 和 merge/dedup pipeline 做 structured code review。
 
-`ce-code-review` is the **deep code review** skill. It analyzes the diff (PR, branch, or current changes), selects the right reviewer personas for what was actually touched, dispatches them in parallel, then merges and deduplicates their findings into a single report. Each finding carries a severity (P0-P3), an autofix class (`gated_auto`, `manual`, `advisory`) that signals follow-up shape, and an owner. In interactive mode the review applies the safe, verified fixes itself and commits them when the working tree is clean (it never pushes); in `mode:agent` it reports and the caller applies.
+`ce-code-review` 是 **deep code review** skill。它分析 diff（PR、branch 或 current changes），根据实际 touched 内容选择合适的 reviewer personas，并行分派它们，然后把 findings merge 和 deduplicate 成单一 report。每个 finding 都带 severity（P0-P3）、autofix class（`gated_auto`、`manual`、`advisory`，表示 follow-up shape）和 owner。Interactive mode 中，review 会自行应用 safe、verified fixes，并在 working tree clean 时 commit（绝不 push）；`mode:agent` 中只 report，由 caller 应用。
 
-The compound-engineering ideation chain is `/ce-ideate → /ce-brainstorm → /ce-plan → /ce-work`. `ce-code-review` is `/ce-work`'s **Tier 2 escalation** target — invoked automatically for sensitive surfaces, large diffs, or explicit deep-review requests, but also directly invocable any time you want a structured review of the current branch or a specific PR.
+Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-plan -> /ce-work`。`ce-code-review` 是 `/ce-work` 的 **Tier 2 escalation** target：当 sensitive surfaces、large diffs 或明确 deep-review requests 出现时自动调用；也可以在任何时候直接调用，用于 current branch 或 specific PR 的 structured review。
 
 ---
 
-## TL;DR
+## 摘要（TL;DR）
 
-| Question | Answer |
+| 问题 | 答案 |
 |----------|--------|
-| What does it do? | Selects reviewer personas based on diff content, dispatches them in parallel, merges findings into one report with confidence gating and auto-fix routing |
-| When to use it | Before opening a PR for sensitive/large work; explicit deep review requested; harness has no built-in `/review` |
-| What it produces | A structured findings report; in interactive mode it also applies safe, verified fixes (an Applied section), committing them as a `fix(review):` commit when your tree is clean — or leaving them for your commit if it was dirty (it never pushes) |
-| Modes | Interactive (default — applies safe fixes) and `mode:agent` (JSON; report-only, caller applies) |
+| 它做什么？ | 根据 diff content 选择 reviewer personas，并行分派，把 findings merge 成带 confidence gating 和 auto-fix routing 的单一 report |
+| 何时使用？ | Sensitive/large work 打开 PR 前；明确请求 deep review；harness 没有内置 `/review` |
+| 产出什么？ | Structured findings report；interactive mode 还会应用 safe、verified fixes（Applied section），当 tree clean 时作为 `fix(review):` commit，dirty 时留给你的 commit；绝不 push |
+| 模式 | Interactive（default，应用 safe fixes）和 `mode:agent`（JSON；report-only，caller applies） |
 
 ---
 
-## The Problem
+## 问题
 
-Generalist code review prompts collapse in predictable ways:
+Generalist code review prompts 常以可预测方式塌缩：
 
-- **Surface-level findings** — "consider adding tests" without naming what to test for
-- **Wrong findings for the diff** — security feedback on a doc-only change, performance feedback on a typo fix
-- **No severity calibration** — every finding presented as critical, drowning the actual P0s
-- **No confidence calibration** — speculative "could be a bug" presented identically to verified defects
-- **One pass at one model's reasoning** — a single reviewer biased toward whatever it was last trained on most heavily
-- **No structured follow-through** — findings end up in chat; no record, no fix queue, no residual handling
-- **Mutating actions on the wrong checkout** — running review on a shared checkout while another agent runs tests in parallel produces undefined outcomes
+- **Surface-level findings**："consider adding tests"，但不说测什么
+- **Wrong findings for the diff**：doc-only change 上给 security feedback，typo fix 上给 performance feedback
+- **No severity calibration**：每个 finding 都像 critical，淹没真正的 P0s
+- **No confidence calibration**：speculative "could be a bug" 与 verified defects 被同等呈现
+- **One pass at one model's reasoning**：单个 reviewer 偏向最近训练最多的方向
+- **No structured follow-through**：findings 留在 chat 里；没有 record、fix queue 或 residual handling
+- **Mutating actions on the wrong checkout**：在 shared checkout 上跑 review，同时另一个 agent 并行跑 tests，结果 undefined
 
-## The Solution
+## 解决方案
 
-`ce-code-review` runs review as a structured pipeline with explicit gates:
+`ce-code-review` 把 review 作为带 explicit gates 的 structured pipeline：
 
-- **Diff-aware persona selection** — 4 always-on reviewers + 2 CE always-on agents, plus cross-cutting and stack-specific personas chosen for what the diff actually touches
-- **Parallel persona dispatch** — each reviewer focuses on its lens; results return in parallel
-- **Confidence-gated synthesis** — findings merge, dedupe, promote on cross-persona agreement, and route by autofix class
-- **Severity scale (P0-P3) + autofix class** — separates urgency from action ownership
-- **Two modes** — Interactive (default; applies safe verified fixes itself) and `mode:agent` (JSON machine handoff; report-only, the caller applies)
-- **Caller-owned apply + Residual Work Gate** — in `mode:agent` the caller (e.g. `/ce-work`) applies fixes and runs the Residual Work Gate (accept / file tickets / continue / stop); in interactive mode the review commits its applied fixes on a clean tree, and it never pushes
-- **Quick-review short-circuit** — defers to harness-native `/review` for light passes; multi-agent runs only when warranted
+- **Diff-aware persona selection**：4 个 always-on reviewers + 2 个 CE always-on agents，再加上根据实际 touched 内容选择的 cross-cutting 和 stack-specific personas
+- **Parallel persona dispatch**：每个 reviewer 聚焦自己的 lens；结果并行返回
+- **Confidence-gated synthesis**：findings merge、dedupe，因 cross-persona agreement promote，并按 autofix class route
+- **Severity scale（P0-P3）+ autofix class**：分离 urgency 和 action ownership
+- **Two modes**：Interactive（default；自行应用 safe verified fixes）和 `mode:agent`（JSON machine handoff；report-only，由 caller apply）
+- **Caller-owned apply + Residual Work Gate**：`mode:agent` 中 caller（例如 `/ce-work`）应用 fixes 并运行 Residual Work Gate（accept / file tickets / continue / stop）；interactive mode 在 clean tree 上 commit applied fixes，且永不 push
+- **Quick-review short-circuit**：light passes 交给 harness-native `/review`；只有必要时才跑 multi-agent
 
 ---
 
-## What Makes It Novel
+## 新颖之处
 
-### 1. Diff-aware persona selection
+### 1. Diff-aware persona selection（diff 感知的 persona selection）
 
-A small config change triggers 6 reviewers (the 4 always-on + 2 CE always-on). A Rails auth feature with migrations might trigger 10. The skill decides which personas fit the diff:
+小 config change 触发 6 个 reviewers（4 always-on + 2 CE always-on）。带 migrations 的 Rails auth feature 可能触发 10 个。Skill 会判断哪些 personas 适合 diff：
 
-- **Always-on (every review)** — `ce-correctness-reviewer`, `ce-testing-reviewer`, `ce-maintainability-reviewer`, `ce-project-standards-reviewer`, `ce-agent-native-reviewer`, `ce-learnings-researcher`
-- **Cross-cutting conditional** — security, performance, API contract, data migrations, reliability, adversarial, previous-comments — each selected only when the diff touches its concern
-- **Stack-specific conditional** — Julik frontend races, Swift/iOS — only when the matching runtime domain is touched. Structural quality (complexity deletion, 1k-line regressions, spaghetti) lives in the always-on maintainability persona.
-- **CE conditional (migrations)** — `ce-deployment-verification-agent` for risky migration diffs; schema drift and migration safety are handled by the `data-migration` persona
+- **Always-on（每次 review）**：`ce-correctness-reviewer`、`ce-testing-reviewer`、`ce-maintainability-reviewer`、`ce-project-standards-reviewer`、`ce-agent-native-reviewer`、`ce-learnings-researcher`
+- **Cross-cutting conditional**：security、performance、API contract、data migrations、reliability、adversarial、previous-comments；只在 diff 触及对应 concern 时选择
+- **Stack-specific conditional**：Julik frontend races、Swift/iOS；只在 matching runtime domain 被触及时选择。Structural quality（complexity deletion、1k-line regressions、spaghetti）属于 always-on maintainability persona
+- **CE conditional（migrations）**：risky migration diffs 触发 `ce-deployment-verification-agent`；schema drift 和 migration safety 由 `data-migration` persona 处理
 
-Persona selection is agent judgment, not keyword matching. Instruction-prose files (Markdown skills, JSON schemas) are product code but skip runtime-focused reviewers (adversarial, races) — they wouldn't apply.
+Persona selection 是 agent judgment，不是 keyword matching。Instruction-prose files（Markdown skills、JSON schemas）是 product code，但会跳过 runtime-focused reviewers（adversarial、races），因为它们不适用。
 
-### 2. Severity (P0-P3) and autofix class are orthogonal
+### 2. Severity（P0-P3）和 autofix class 是 orthogonal
 
-Severity answers **urgency** (P0=critical breakage, P3=user discretion). The autofix class is **signal** about follow-up shape (not apply permission):
+Severity 回答 **urgency**（P0=critical breakage，P3=user discretion）。Autofix class 是关于 follow-up shape 的 **signal**（不是 apply permission）：
 
-- `gated_auto` → a concrete `suggested_fix` exists — a clear candidate to apply
-- `manual` → actionable work that needs design input or a handoff
-- `advisory` → report-only output (learnings, rollout notes, residual risk)
+- `gated_auto` -> 存在 concrete `suggested_fix`，是明确 apply candidate
+- `manual` -> 需要 design input 或 handoff 的 actionable work
+- `advisory` -> report-only output（learnings、rollout notes、residual risk）
 
-Synthesis owns the final route. Persona-provided routing metadata is input, not the last word — disagreements default to the more conservative route. Whether a finding actually gets applied is a judgment call (interactive review's Stage 5c, or the caller in `mode:agent`), not a function of the class.
+Synthesis 拥有 final route。Persona 提供的 routing metadata 是 input，不是最后决定；disagreements 默认走更 conservative route。Finding 是否实际应用是 judgment call（interactive review 的 Stage 5c，或 `mode:agent` 中的 caller），不是 class 的函数。
 
-### 3. Two modes — human view and machine handoff
+### 3. Two modes：human view 和 machine handoff
 
 | Mode | When | Behavior |
 |------|------|----------|
-| **Interactive** _(default)_ | Direct user invocation | Markdown report; the review applies the safe, verified fixes itself (Stage 5c → Applied section), pushes back on findings it disagrees with, and commits them as an isolated `fix(review):` commit when your tree was clean (or leaves them for your commit if it was dirty). Never pushes |
-| **`mode:agent`** | `mode:agent` (alias `mode:headless`) | One JSON object; report-only — the review mutates nothing and the caller (e.g. `/ce-work`) applies findings and owns the Residual Work Gate |
+| **Interactive** _(default)_ | Direct user invocation | Markdown report；review 自行应用 safe、verified fixes（Stage 5c -> Applied section），对不同意的 findings push back，并在 tree clean 时 commit 为 isolated `fix(review):` commit（dirty 时留给你的 commit）。绝不 push |
+| **`mode:agent`** | `mode:agent`（alias `mode:headless`） | 一个 JSON object；report-only：review 不 mutate，caller（例如 `/ce-work`）应用 findings 并拥有 Residual Work Gate |
 
-The skill never switches branches: a PR/branch argument selects review *scope* (diffed without checkout), not permission to mutate. Interactive apply edits the current checkout in place; to review the current checkout against another ref, pass `base:<ref>`.
+Skill 永不 switch branches：PR/branch argument 选择 review *scope*（无需 checkout 的 diff），不是 mutation permission。Interactive apply 只在当前 checkout 原地编辑；要 review current checkout against another ref，请传 `base:<ref>`。
 
-### 4. Quick-review short-circuit
+### 4. Quick-review short-circuit（quick review 短路）
 
-When the user asks for a "quick", "fast", or "light" review, the skill defers to the harness-native code review (e.g., `/review` in Claude Code) instead of dispatching the multi-agent pipeline. This respects intent — sometimes the right tool is the lighter one. Programmatic callers (`mode:agent`) bypass the short-circuit and always run the full pipeline.
+当用户请求 "quick"、"fast" 或 "light" review 时，skill 会交给 harness-native code review（例如 Claude Code 中的 `/review`），而不是分派 multi-agent pipeline。这尊重 intent：有时正确工具就是更轻的那个。Programmatic callers（`mode:agent`）绕过 short-circuit，总是跑 full pipeline。
 
-### 5. Synthesis pipeline — merge, dedupe, promote, route
+### 5. Synthesis pipeline（综合管线）：merge、dedupe、promote、route
 
-After all dispatched personas return, synthesis:
+所有 dispatched personas 返回后，synthesis 会：
 
-- Validates each finding against the schema
-- Anchors to the actual diff (drops findings about lines that don't exist or aren't in scope)
-- Deduplicates across personas (same issue surfaced by multiple reviewers)
-- **Promotes confidence on cross-persona agreement** (two reviewers spotting the same issue raises priority)
-- Resolves contradictions (different personas disagree about what to do)
-- Routes by tier — applied fixes, gated/manual, FYI
+- Validate 每个 finding against schema
+- Anchor 到 actual diff（丢弃关于不存在或 scope 外 lines 的 findings）
+- 跨 personas deduplicate（多个 reviewers 发现同一问题）
+- **基于 cross-persona agreement promote confidence**（两个 reviewers 发现同一 issue 会提高 priority）
+- Resolve contradictions（不同 personas 对做法意见不一）
+- 按 tier route：applied fixes、gated/manual、FYI
 
-The output is one report with calibrated severity, evidence quotes, and explicit ownership — not a flat list of every reviewer's raw output.
+Output 是带 calibrated severity、evidence quotes 和 explicit ownership 的单一 report，而不是所有 reviewer raw output 的 flat list。
 
-### 6. Plan discovery for requirements verification
+### 6. 用于 requirements verification 的 plan discovery
 
-When the diff has an associated plan (`docs/plans/*.md`), the skill discovers it (via `plan:` argument, PR body link, or auto-discovery from branch name) and reads its Requirements section + Implementation Units. Synthesis then verifies the diff actually satisfies those requirements — catching the case where the code looks fine but doesn't match what the plan said it should do.
+当 diff 有 associated plan（`docs/plans/*.md`）时，skill 会发现它（通过 `plan:` argument、PR body link 或从 branch name auto-discovery），并读取其 Requirements section + Implementation Units。Synthesis 随后验证 diff 是否真的满足这些 requirements，捕捉 code 看起来没问题但不符合 plan 的情况。
 
-### 7. Residual Work Gate
+### 7. Residual Work Gate（残余工作 gate）
 
-When autofix mode runs and the in-skill fixer can't resolve everything, the residual work doesn't just disappear into chat. The Residual Actionable Work summary lists each unresolved finding with stable numbering, severity, file:line, title, and autofix class. Callers (e.g., `/ce-work` Phase 3.4) read this summary and present user options: apply now, file tickets, accept with durable sink, or stop.
+当 autofix mode 运行、in-skill fixer 无法解决全部问题时，residual work 不会消失在 chat 里。Residual Actionable Work summary 列出每个 unresolved finding，带 stable numbering、severity、file:line、title 和 autofix class。Callers（例如 `/ce-work` Phase 3.4）读取此 summary，并向用户提供 options：apply now、file tickets、accept with durable sink，或 stop。
 
-### 8. Protected artifacts
+### 8. Protected artifacts（受保护 artifacts）
 
-Compound-engineering pipeline artifacts (`docs/brainstorms/*`, `docs/plans/*.md`, `docs/solutions/*.md`) are protected — reviewers' findings to delete or gitignore them are discarded during synthesis. These are decision artifacts the pipeline depends on; reviewers shouldn't garbage-collect them.
-
----
-
-## Quick Example
-
-You invoke `/ce-code-review` on a feature branch with a Rails auth change that includes a database migration.
-
-The skill detects you're on a feature branch (no PR yet), resolves the base from `origin/HEAD` (or PR metadata when an open PR exists), and computes the diff. Stage 2 reads commit messages and writes a 2-3 line intent summary. Stage 2b auto-discovers the plan in `docs/plans/` from the branch name and reads its Requirements (R1-R8, U1-U6).
-
-Stage 3 selects reviewers: the 6 always-on, plus security (auth touched), reliability (background job for token cleanup), data-migration (migration file present), and deployment-verification agent when the migration is risky. Seven or eight reviewers total, dispatched in parallel.
-
-After all return, synthesis merges 23 raw findings into 14 distinct findings. Three are clean, reversible fixes (a typo, a rename, dead-code removal) the review applies and verifies itself (Stage 5c → Applied section). Six are `gated_auto` for the auth surface — concrete candidates the review applies, flagging them prominently as green-but-unverifiable (auth) for your review. Two are `manual` (deployment Go/No-Go checklist items). Three are `advisory` (FYI notes). Each finding has anchored evidence and a stable number.
-
-You walk through the 6 gated findings, apply 4, defer 1 to follow-up via the tracker, and decline 1 with a cited harm. Final validation runs; the report is saved.
+Compound-engineering pipeline artifacts（`docs/brainstorms/*`、`docs/plans/*.md`、`docs/solutions/*.md`）受保护；reviewers 提出的 delete 或 gitignore 它们的 findings 会在 synthesis 中被丢弃。这些是 pipeline 依赖的 decision artifacts；reviewers 不应 garbage-collect 它们。
 
 ---
 
-## When to Reach For It
+## 快速示例
 
-Reach for `ce-code-review` when:
+你在包含 database migration 的 Rails auth change feature branch 上调用 `/ce-code-review`。
 
-- You're about to open a PR for sensitive or large work (auth, payments, migrations, public APIs)
-- Your harness lacks a built-in `/review` and you still want a real review
-- You want structured handling of residual work, not just findings dumped in chat
-- You explicitly want a deeper, multi-persona pass (e.g., "review this thoroughly")
-- Another skill is escalating to it (`/ce-work` Phase 3.3 Tier 2, `/ce-optimize` Phase 4.3)
+Skill 检测到你在 feature branch（还没有 PR），从 `origin/HEAD` resolve base（或在有 open PR 时读 PR metadata），并计算 diff。Stage 2 读取 commit messages，写出 2-3 行 intent summary。Stage 2b 从 branch name auto-discover `docs/plans/` 中的 plan，并读取 Requirements（R1-R8、U1-U6）。
 
-Skip `ce-code-review` when:
+Stage 3 选择 reviewers：6 个 always-on，加上 security（auth touched）、reliability（token cleanup 的 background job）、data-migration（存在 migration file），以及 migration risky 时的 deployment-verification agent。总共七八个 reviewers，并行分派。
 
-- You want a quick light review — your harness's built-in `/review` is right; the short-circuit handles this
-- The change is trivial (typo, formatting, dependency bump) — Tier 1 review is sufficient
-- You want to fix bugs you find, not review code → use `/ce-debug`
+全部返回后，synthesis 把 23 个 raw findings merge 为 14 个 distinct findings。三个是 clean、reversible fixes（typo、rename、dead-code removal），review 自行应用并验证（Stage 5c -> Applied section）。六个是 auth surface 上的 `gated_auto`：concrete candidates，review 会应用它们，并明显标记为 green-but-unverifiable（auth），供你 review。两个是 `manual`（deployment Go/No-Go checklist items）。三个是 `advisory`（FYI notes）。每个 finding 都有 anchored evidence 和 stable number。
+
+你逐个查看 6 个 gated findings，应用 4 个，将 1 个 defer 到 tracker follow-up，并用 cited harm 拒绝 1 个。Final validation 运行；report 保存。
 
 ---
 
-## Use as Part of the Workflow
+## 何时使用
 
-`ce-code-review` is invoked from multiple skills as the deep-review path:
+在以下情况使用 `ce-code-review`：
 
-- **`/ce-work` Phase 3.3** — escalates to `ce-code-review mode:agent` for sensitive surfaces, ≥400 lines + diffuse, ≥1,000 lines, or explicit thorough-review requests; ce-work then applies the findings
-- **`/ce-work` Phase 3.4 Residual Work Gate** — reads the Residual Actionable Work summary `ce-code-review` returned and presents user options
-- **`/ce-optimize` Phase 4.3** — runs against the cumulative optimization branch diff before merging
-- **`/ce-doc-review`** — sibling skill for docs (requirements, plans), not code
+- 准备为 sensitive 或 large work 打开 PR（auth、payments、migrations、public APIs）
+- Harness 缺少内置 `/review`，但仍想要真实 review
+- 想要 structured residual work handling，而不是 findings 倒在 chat 里
+- 明确想要 deeper、multi-persona pass（例如 "review this thoroughly"）
+- 另一个 skill 正在升级到它（`/ce-work` Phase 3.3 Tier 2、`/ce-optimize` Phase 4.3）
 
-Tier 1 (harness-native `/review`) handles most cases; `ce-code-review` is the Tier 2 escalation.
+以下情况跳过 `ce-code-review`：
 
----
-
-## Use Standalone
-
-The skill works directly from any starting state:
-
-- **Current branch** — `/ce-code-review`
-- **Specific PR** — `/ce-code-review 1234` or `/ce-code-review <PR URL>`
-- **Specific branch** — `/ce-code-review feat/notification-mute`
-- **With base ref** — `/ce-code-review base:abc1234` or `base:origin/main` (skips scope detection; reviews against that ref)
-- **With plan** — `/ce-code-review plan:docs/plans/.../plan.md` for explicit requirements verification
-
-Concurrent use note: `mode:agent` is report-only and never mutates, so it's safe alongside browser tests on the same checkout. Interactive mode may apply fixes to the working tree, so avoid running it against a checkout another agent is actively using.
+- 想要 quick light review：harness 的内置 `/review` 是正确工具；short-circuit 会处理
+- Change trivial（typo、formatting、dependency bump）：Tier 1 review 足够
+- 想修复发现的 bugs，而不是 review code -> 使用 `/ce-debug`
 
 ---
 
-## Reference
+## 作为工作流的一部分使用
 
-| Argument | Effect |
+`ce-code-review` 被多个 skills 作为 deep-review path 调用：
+
+- **`/ce-work` Phase 3.3**：对 sensitive surfaces、>=400 lines + diffuse、>=1,000 lines 或明确 thorough-review requests，升级到 `ce-code-review mode:agent`；随后 ce-work 应用 findings
+- **`/ce-work` Phase 3.4 Residual Work Gate**：读取 `ce-code-review` 返回的 Residual Actionable Work summary，并展示 user options
+- **`/ce-optimize` Phase 4.3**：merge 前对 cumulative optimization branch diff 运行
+- **`/ce-doc-review`**：docs（requirements、plans）的 sibling skill，不是 code
+
+Tier 1（harness-native `/review`）处理大多数情况；`ce-code-review` 是 Tier 2 escalation。
+
+---
+
+## 单独使用
+
+Skill 可从任何 starting state 直接运行：
+
+- **Current branch（当前 branch）**：`/ce-code-review`
+- **Specific PR**：`/ce-code-review 1234` 或 `/ce-code-review <PR URL>`
+- **Specific branch（指定 branch）**：`/ce-code-review feat/notification-mute`
+- **With base ref**：`/ce-code-review base:abc1234` 或 `base:origin/main`（跳过 scope detection；against 该 ref review）
+- **With plan**：`/ce-code-review plan:docs/plans/.../plan.md`，用于 explicit requirements verification
+
+Concurrent use note：`mode:agent` 是 report-only，绝不 mutate，因此可以与同一 checkout 上的 browser tests 并行。Interactive mode 可能向 working tree 应用 fixes，因此避免在另一个 agent 正活跃使用的 checkout 上运行。
+
+---
+
+## 参考
+
+| 参数 | 效果 |
 |----------|--------|
-| _(empty)_ | Reviews current branch (detects base from `origin/HEAD` or PR metadata) |
-| `<PR number or URL>` | Reviews that PR without checking it out (reads metadata + remote diff) |
-| `<branch name>` | Reviews that branch without checking it out (remote/local ref diff) |
-| `base:<sha-or-ref>` | Skips scope detection; reviews current checkout against that ref |
-| `plan:<path>` | Loads the plan for requirements verification |
-| `mode:agent` | JSON machine handoff; report-only (the caller applies). `mode:headless` is a deprecated alias; `mode:report-only` is ignored |
+| _(empty)_ | Review current branch（从 `origin/HEAD` 或 PR metadata 检测 base） |
+| `<PR number or URL>` | Review that PR without checking it out（读取 metadata + remote diff） |
+| `<branch name>` | Review that branch without checking it out（remote/local ref diff） |
+| `base:<sha-or-ref>` | 跳过 scope detection；review current checkout against that ref |
+| `plan:<path>` | 加载 plan 进行 requirements verification |
+| `mode:agent` | JSON machine handoff；report-only（caller applies）。`mode:headless` 是 deprecated alias；`mode:report-only` 被忽略 |
 
-Conflicting mode flags stop execution with an error. Combining `base:` with a PR/branch target also errors — pass one or the other.
-
----
-
-## FAQ
-
-**Why not just use the harness's built-in `/review`?**
-Use it when it's the right tool — the quick-review short-circuit defers to it explicitly. `ce-code-review` is for cases where you want diff-aware persona selection, structured findings with calibrated severity, autofix routing, and residual work handling. It's the heavier tool; reach for it when the work warrants.
-
-**How does it decide which personas to dispatch?**
-Agent judgment over the actual diff — not keyword matching. The 4 always-on + 2 CE always-on personas run for every review. Cross-cutting and stack-specific personas are added when their concern is touched (e.g., security if auth files changed; `ce-data-migration-reviewer` when migration or schema dump files are present). Instruction-prose files skip runtime-focused reviewers (adversarial, races).
-
-**What's the difference between interactive (default) and `mode:agent`?**
-Interactive is the human-facing mode: a markdown report, and the review applies the safe, verified fixes itself (an Applied section) and commits them when your tree is clean (leaving them for your commit if it was dirty); it never pushes. `mode:agent` is the machine handoff: one JSON object, report-only — the review mutates nothing and the caller (e.g. `/ce-work`) applies findings on its own terms. `mode:headless` is a deprecated alias for `mode:agent`.
-
-**What's the Residual Work Gate?**
-A caller-owned step (not part of the review skill): in `mode:agent`, the caller (typically `/ce-work`) applies what it can, then presents the findings it didn't apply and asks the user: apply now, file tickets, accept with durable sink, or stop. "Accept" requires a real durable record (Known Residuals in PR description, or `docs/residual-review-findings/<sha>.md`) — findings can't disappear into chat.
-
-**Why does it never switch the checkout?**
-The skill never runs `git checkout`/`switch` — passing a PR/branch selects review *scope*, not permission to mutate the tree (it diffs remote/local refs without checking out). Interactive mode may *apply* fixes to the current checkout (a reversible edit), but it never switches branches. To review the current checkout against a different ref, pass `base:<ref>`.
-
-**Can it run concurrently with browser tests?**
-`mode:agent` is report-only and never mutates, so it's safe alongside concurrent tests. Interactive mode may apply fixes to the working tree, so avoid running it against a checkout another agent is actively using.
-
-**Does it support non-software work?**
-No — the skill is tightly coupled to git, code reviewers, and PR contexts. For docs (requirements, plans), use `/ce-doc-review` instead.
+Conflicting mode flags 会以 error 停止。`base:` 与 PR/branch target 组合也会 error；二选一。
 
 ---
 
-## See Also
+## 常见问题（FAQ）
 
-- [`ce-work`](./ce-work.md) — primary upstream caller; escalates to `ce-code-review` at Phase 3.3
-- [`ce-doc-review`](./ce-doc-review.md) — sibling skill for documents (requirements, plans), not code
-- [`ce-debug`](./ce-debug.md) — for fixing bugs found during review, when root-cause investigation matters
-- [`ce-resolve-pr-feedback`](./ce-resolve-pr-feedback.md) — handles incoming reviewer comments after a PR is open
-- [`ce-simplify-code`](./ce-simplify-code.md) — invoked by `ce-work` before review; complement, not substitute
+**为什么不直接用 harness 的内置 `/review`？**
+该用时就用它；quick-review short-circuit 会明确 defer。`ce-code-review` 用于你需要 diff-aware persona selection、calibrated severity 的 structured findings、autofix routing 和 residual work handling 的情况。它是更重的工具；当 work 值得时使用。
+
+**它怎么决定 dispatch 哪些 personas？**
+基于 actual diff 的 agent judgment，不是 keyword matching。4 always-on + 2 CE always-on personas 每次 review 都跑。Cross-cutting 和 stack-specific personas 在对应 concern 被触及时添加（例如 auth files changed 时添加 security；存在 migration 或 schema dump files 时添加 `ce-data-migration-reviewer`）。Instruction-prose files 会跳过 runtime-focused reviewers（adversarial、races）。
+
+**Interactive（default）和 `mode:agent` 有什么区别？**
+Interactive 是 human-facing mode：markdown report；review 自行应用 safe、verified fixes（Applied section），tree clean 时 commit（dirty 时留给你的 commit）；绝不 push。`mode:agent` 是 machine handoff：一个 JSON object，report-only；review 不 mutate，caller（例如 `/ce-work`）按自己的规则应用 findings。`mode:headless` 是 `mode:agent` 的 deprecated alias。
+
+**什么是 Residual Work Gate？**
+Caller-owned step（不是 review skill 的一部分）：在 `mode:agent` 中，caller（通常 `/ce-work`）应用能应用的内容，然后展示未应用 findings 并询问用户：apply now、file tickets、accept with durable sink，或 stop。"Accept" 需要真实 durable record（PR description 中的 Known Residuals，或 `docs/residual-review-findings/<sha>.md`）；findings 不能消失在 chat 里。
+
+**为什么它从不 switch checkout？**
+Skill 永不运行 `git checkout`/`switch`：传 PR/branch 选择 review *scope*，不是 mutate tree 的 permission（它会在不 checkout 的情况下 diff remote/local refs）。Interactive mode 可能 *apply* fixes 到 current checkout（可逆编辑），但永不 switch branches。要 review current checkout against different ref，请传 `base:<ref>`。
+
+**能和 browser tests 并发运行吗？**
+`mode:agent` 是 report-only，绝不 mutate，因此可以与 concurrent tests 并行。Interactive mode 可能向 working tree 应用 fixes，所以避免在另一个 agent 正活跃使用的 checkout 上运行。
+
+**支持 non-software work 吗？**
+不支持。此 skill 与 git、code reviewers 和 PR contexts 紧密耦合。Docs（requirements、plans）请使用 `/ce-doc-review`。
+
+---
+
+## 另见（See Also）
+
+- [`ce-work`](./ce-work.md) - primary upstream caller；Phase 3.3 升级到 `ce-code-review`
+- [`ce-doc-review`](./ce-doc-review.md) - documents（requirements、plans）的 sibling skill，不是 code
+- [`ce-debug`](./ce-debug.md) - 当 root-cause investigation 重要时，用于修复 review 中发现的 bugs
+- [`ce-resolve-pr-feedback`](./ce-resolve-pr-feedback.md) - PR 打开后处理 incoming reviewer comments
+- [`ce-simplify-code`](./ce-simplify-code.md) - `ce-work` 在 review 前调用；是 complement，不是 substitute

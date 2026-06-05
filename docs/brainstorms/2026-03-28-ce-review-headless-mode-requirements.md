@@ -3,56 +3,56 @@ date: 2026-03-28
 topic: ce-review-headless-mode
 ---
 
-# ce:review Headless Mode
+# ce:review Headless Mode（Headless 模式）
 
-## Problem Frame
+## 问题框架
 
-ce:review currently has three modes (interactive, autofix, report-only), but all assume some level of direct user interaction or have mode-specific behaviors that don't fit programmatic callers. When another skill needs code review results as structured input, there's no way to invoke ce:review without it trying to prompt a user or applying fixes with interactive-session assumptions.
+ce:review 当前有三种 modes（interactive、autofix、report-only），但它们都假设某种 direct user interaction，或有不适合 programmatic callers 的 mode-specific behaviors。当另一个 skill 需要把 code review results 作为 structured input 时，没有办法调用 ce:review 而不让它尝试 prompt user，或带着 interactive-session assumptions 应用 fixes。
 
-document-review solved this same problem in PR #425 with a `mode:headless` pattern. ce:review needs the same capability so it can be used as a utility skill by other workflows.
+document-review 在 PR #425 中用 `mode:headless` pattern 解决了同样问题。ce:review 也需要这个 capability，这样它可以被其他 workflows 当作 utility skill 使用。
 
-## Requirements
+## 需求
 
-**Argument Parsing**
-- R1. Add `mode:headless` argument, parsed alongside existing mode flags
+**Argument Parsing（参数解析）**
+- R1. 添加 `mode:headless` argument，并与 existing mode flags 一起 parse
 
-**Runtime Behavior**
-- R2. In headless mode, apply `safe_auto` fixes silently (matching autofix behavior)
-- R4. No `AskUserQuestion` or other interactive prompts in headless mode
-- R5. End with a clear completion signal so callers can detect when the review is done
+**Runtime Behavior（运行时行为）**
+- R2. 在 headless mode 中，静默应用 `safe_auto` fixes（匹配 autofix behavior）
+- R4. headless mode 中没有 `AskUserQuestion` 或其他 interactive prompts
+- R5. 以清晰 completion signal 结束，让 callers 能检测 review 完成
 
-**Output Format**
-- R3. Return all non-auto findings (`gated_auto`, `manual`, `advisory`) as structured text output, preserving their original classifications (severity, autofix_class, owner, confidence, evidence[], pre_existing)
-- R6. Follow document-review's structural output pattern (same envelope format, same section headings, similar parsing heuristics) while adapting per-finding fields to ce:review's own schema
+**Output Format（输出格式）**
+- R3. 将所有 non-auto findings（`gated_auto`、`manual`、`advisory`）作为 structured text output 返回，保留其 original classifications（severity、autofix_class、owner、confidence、evidence[]、pre_existing）
+- R6. 遵循 document-review 的 structural output pattern（相同 envelope format、相同 section headings、类似 parsing heuristics），同时根据 ce:review 自己的 schema 适配 per-finding fields
 
-## Success Criteria
+## 成功标准
 
-- Another skill can invoke ce:review with `mode:headless`, receive structured findings, and act on them without any user interaction
-- Output envelope (section headings, severity grouping, completion signal) is structurally consistent with document-review's headless output so callers can use a similar consumption pattern for both, while per-finding fields reflect ce:review's own schema
+- 另一个 skill 可以用 `mode:headless` 调用 ce:review，接收 structured findings，并在没有任何 user interaction 的情况下对其采取行动
+- Output envelope（section headings、severity grouping、completion signal）与 document-review 的 headless output 在结构上保持一致，因此 callers 可以对二者使用相似 consumption pattern，同时 per-finding fields 反映 ce:review 自己的 schema
 
-## Scope Boundaries
+## 范围边界
 
-- Not changing the existing three modes (interactive, autofix, report-only)
-- Not adding new reviewer personas or changing the review pipeline itself
-- Not building a specific caller workflow in this change — just enabling the capability
+- 不改变 existing three modes（interactive、autofix、report-only）
+- 不新增 reviewer personas，也不改变 review pipeline 本身
+- 本变更不构建 specific caller workflow——只启用 capability
 
-## Key Decisions
+## 关键决策
 
-- **Apply safe_auto fixes in headless**: Matches document-review's pattern where auto-fixes are applied silently and everything else is returned for the caller to handle
-- **Structural consistency with document-review, not schema compatibility**: Same envelope and section headings, but per-finding fields use ce:review's own schema (which has different autofix_class values, owner, pre_existing, etc.). Callers will need skill-aware parsing for individual findings
+- **Apply safe_auto fixes in headless**：匹配 document-review pattern，其中 auto-fixes 被静默应用，其他所有内容返回给 caller 处理
+- **Structural consistency with document-review, not schema compatibility**：相同 envelope 和 section headings，但 per-finding fields 使用 ce:review 自己的 schema（它有不同的 autofix_class values、owner、pre_existing 等）。Callers 需要对 individual findings 做 skill-aware parsing
 
-## Outstanding Questions
+## 待决问题
 
-### Deferred to Planning
+### 延后到 Planning
 
-- [Affects R3][Technical] Exact structured output format — should it mirror document-review's text format verbatim, or adapt to ce:review's richer findings schema (which includes fields like `autofix_class`, `evidence[]`, `pre_existing` that document-review doesn't have)?
-- [Affects R1][Technical] How `mode:headless` interacts with the existing mode parsing — is it a fourth mode, or an overlay that modifies report-only/autofix behavior?
-- [Affects R5][Technical] What the completion signal looks like — "Review complete (headless mode)" text, or a more structured envelope?
-- [Affects R2][Technical] Should headless mode write run artifacts (`.context/compound-engineering/ce-review/<run-id>/`) and create durable todo files like autofix, or suppress them like report-only?
-- [Affects R1][Technical] How should headless mode handle checkout/branch switching in Stage 1? Programmatic callers may need the checkout to stay stable (like report-only) even though headless applies fixes (like autofix).
-- [Affects R1][Technical] Error behavior when headless receives conflicting mode flags (e.g., `mode:headless` + existing mode flags) or missing diff scope (no changes, no PR).
-- [Affects R2][Technical] Should headless mode support bounded re-review rounds (max_rounds: 2) like autofix, or be single-pass?
+- [Affects R3][Technical] exact structured output format——是否逐字 mirror document-review 的 text format，还是适配 ce:review 更丰富的 findings schema（包含 `autofix_class`、`evidence[]`、`pre_existing` 等 document-review 没有的 fields）？
+- [Affects R1][Technical] `mode:headless` 如何与 existing mode parsing 交互——是第四种 mode，还是修改 report-only/autofix behavior 的 overlay？
+- [Affects R5][Technical] completion signal 是什么样子——"Review complete (headless mode)" 文本，还是更 structured envelope？
+- [Affects R2][Technical] headless mode 是否应像 autofix 一样写 run artifacts（`.context/compound-engineering/ce-review/<run-id>/`）并创建 durable todo files，还是像 report-only 一样 suppress？
+- [Affects R1][Technical] headless mode 应如何处理 Stage 1 中的 checkout/branch switching？Programmatic callers 可能需要 checkout 保持 stable（像 report-only），即使 headless 会应用 fixes（像 autofix）。
+- [Affects R1][Technical] 当 headless 收到 conflicting mode flags（例如 `mode:headless` + existing mode flags）或缺少 diff scope（no changes、no PR）时的 error behavior。
+- [Affects R2][Technical] headless mode 是否应支持像 autofix 一样的 bounded re-review rounds（max_rounds: 2），还是 single-pass？
 
-## Next Steps
+## 下一步
 
--> `/ce:plan` for structured implementation planning
+-> `/ce:plan` 进行结构化 implementation planning

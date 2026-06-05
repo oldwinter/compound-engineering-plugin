@@ -1,5 +1,5 @@
 ---
-title: "ce-doc-review confidence scoring: anchored rubric over continuous floats"
+title: "ce-doc-review confidence scoring: 用 anchored rubric 替代 continuous floats"
 date: 2026-04-21
 category: skill-design
 module: compound-engineering / ce-doc-review
@@ -14,195 +14,195 @@ tags:
   - persona-rubric
 ---
 
-# ce-doc-review confidence scoring: anchored rubric over continuous floats
+# ce-doc-review confidence scoring: 用 anchored rubric 替代 continuous floats
 
-## Problem
+## 问题
 
-Persona-based document review originally used a continuous `confidence` field (0.0 to 1.0) that synthesis compared against per-severity numeric gates (0.50 / 0.60 / 0.65 / 0.75) and a 0.40 FYI floor. In practice the continuous scale invited false precision: personas clustered on round values (0.60, 0.65, 0.72, 0.80, 0.85), and gate boundaries created coin-flip bands where trivial score shifts moved findings in and out of the actionable tier. The personas were not genuinely differentiating 0.65 from 0.72; the model cannot calibrate self-reported confidence at that granularity.
+Persona-based document review 最初使用 continuous `confidence` field（0.0 到 1.0），synthesis 会将其与 per-severity numeric gates（0.50 / 0.60 / 0.65 / 0.75）以及 0.40 FYI floor 比较。实践中，continuous scale 诱发 false precision：personas 聚集在 round values（0.60、0.65、0.72、0.80、0.85）上，而 gate boundaries 形成 coin-flip bands，微小 score shifts 就让 findings 进出 actionable tier。personas 并没有真实地区分 0.65 与 0.72；model 无法在这种粒度上校准 self-reported confidence。
 
-Symptoms surfaced in review output:
+review output 中出现的症状：
 
-- Single personas filing 3+ findings all rated 0.68-0.72, all variants of the same root premise
-- Findings at 0.65 admitted into the actionable tier on noise, not signal
-- Residual concerns and deferred questions near-duplicated findings already surfaced, indicating the persona's own ordering did not distinguish "raise this" from "note this"
+- 单个 personas 提交 3+ findings，全部 rated 0.68-0.72，且都是同一 root premise 的 variants
+- 0.65 的 findings 因噪音而不是信号进入 actionable tier
+- Residual concerns 与 deferred questions 近似重复已经 surfaced 的 findings，说明 persona 自身 ordering 没有区分 "raise this" 与 "note this"
 
-## Reference pattern: Anthropic's anchored rubric
+## 参考模式：Anthropic 的 anchored rubric
 
-Anthropic's official code-review plugin (`anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`) solves the calibration problem with 5 discrete anchors (`0`, `25`, `50`, `75`, `100`) each tied to a behavioral criterion the model can honestly self-apply:
+Anthropic official code-review plugin（`anthropics/claude-plugins-official/plugins/code-review/commands/code-review.md`）用 5 个 discrete anchors（`0`、`25`、`50`、`75`、`100`）解决 calibration problem，每个 anchor 都绑定一个 model 可诚实自用的 behavioral criterion：
 
-- `0` — false positive or pre-existing issue
-- `25` — might be real but couldn't verify; stylistic-not-in-CLAUDE.md
-- `50` — verified real but nitpick / not very important
-- `75` — double-checked, will hit in practice, directly impacts functionality
-- `100` — confirmed, evidence directly confirms, will happen frequently
+- `0` -- false positive 或 pre-existing issue
+- `25` -- 可能真实但无法 verify；stylistic-not-in-CLAUDE.md
+- `50` -- verified real 但 nitpick / not very important
+- `75` -- double-checked，会在实践中命中，直接影响 functionality
+- `100` -- confirmed，evidence 直接确认，会频繁发生
 
-The rubric is passed verbatim to a separate scoring agent. Filter threshold: `>= 80`.
+rubric 会 verbatim 传给独立 scoring agent。Filter threshold：`>= 80`。
 
-## Solution adopted for ce-doc-review
+## ce-doc-review 采用的方案
 
-Port the structural techniques — anchored rubric, verbatim persona-facing text, explicit false-positive catalog — and tune the filter threshold for document-review economics. The doc-review threshold is `>= 50`, not Anthropic's `>= 80`.
+移植 structural techniques -- anchored rubric、verbatim persona-facing text、explicit false-positive catalog -- 并根据 document-review economics 调整 filter threshold。doc-review threshold 是 `>= 50`，不是 Anthropic 的 `>= 80`。
 
-### Anchor-to-route mapping
+### Anchor-to-route 映射
 
 | Anchor | Route |
 |--------|-------|
-| `0`, `25` | Dropped silently (counted in Coverage only) |
-| `50` | FYI subsection (surface-only, no forced decision) |
-| `75`, `100` | Actionable tier, classified by `autofix_class` |
+| `0`, `25` | 静默 drop（只在 Coverage 中计数） |
+| `50` | FYI subsection（仅 surface，无 forced decision） |
+| `75`, `100` | Actionable tier，按 `autofix_class` 分类 |
 
-Cross-persona corroboration promotes one anchor step (`50 → 75`, `75 → 100`, `100 → 100`). This replaces the prior `+0.10` numeric boost.
+Cross-persona corroboration 会 promote 一个 anchor step（`50 → 75`、`75 → 100`、`100 → 100`）。这取代了之前的 `+0.10` numeric boost。
 
-Within-severity sort: anchor descending, then document order as the deterministic final tiebreak.
+Within-severity sort：anchor descending，然后 document order 作为 deterministic final tiebreak。
 
-### Files
+### 文件
 
-- `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json` — `confidence` is an integer enum `[0, 25, 50, 75, 100]` with behavioral definitions embedded in the `description` field
-- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md` — the rubric section personas see verbatim, plus the consolidated false-positive catalog
-- `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md` — anchor-based gate in 3.2, anchor-step promotion in 3.4, anchor-sorted ordering in 3.8, anchor+autofix routing in 3.7
-- `plugins/compound-engineering/agents/ce-*-reviewer.md` (the 7 doc-review personas, flat files) — each carries a persona-specific calibration section that maps domain criteria to the shared anchors
-- `tests/pipeline-review-contract.test.ts` — contract tests that assert the schema enforces discrete anchors and the template embeds the rubric
+- `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json` -- `confidence` 是 integer enum `[0, 25, 50, 75, 100]`，behavioral definitions embedded 在 `description` field 中
+- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md` -- personas verbatim 看到的 rubric section，以及 consolidated false-positive catalog
+- `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md` -- 3.2 中的 anchor-based gate、3.4 中的 anchor-step promotion、3.8 中的 anchor-sorted ordering、3.7 中的 anchor+autofix routing
+- `plugins/compound-engineering/agents/ce-*-reviewer.md`（7 个 doc-review personas，flat files）-- 每个都带 persona-specific calibration section，把 domain criteria 映射到 shared anchors
+- `tests/pipeline-review-contract.test.ts` -- contract tests，断言 schema enforce discrete anchors，template embeds rubric
 
-## Why the threshold diverges from Anthropic
+## 为什么 threshold 与 Anthropic 不同
 
-Code review and document review have different economics. Anthropic's `>= 80` filter is load-bearing for code review because of three constraints that do not apply to doc review:
+Code review 和 document review 有不同 economics。Anthropic 的 `>= 80` filter 对 code review 是 load-bearing，因为有三个 constraints 不适用于 doc review：
 
-1. **Code review has a linter backstop.** CI runs linters, typecheckers, and tests. The LLM reviewer is a second layer on top of automated tooling, and a second layer only adds value by being *more selective*. If automation already catches the 50-75 tier, the LLM surfacing it again is noise.
-2. **Code review is high-frequency and publicly visible.** Every surfaced finding becomes a PR comment. A reviewer who cries wolf 5 times gets muted. Precision dominates recall.
-3. **Code claims are ground-truth verifiable.** "The code does X" can be proven or refuted by reading it. A 75 in code review often means "I couldn't verify" — which means waiting for someone who can.
+1. **Code review 有 linter backstop。** CI 运行 linters、typecheckers 和 tests。LLM reviewer 是 automated tooling 之上的第二层，而第二层只有在 *更 selective* 时才有价值。如果 automation 已经捕获 50-75 tier，LLM 再 surface 它就是 noise。
+2. **Code review 高频且 publicly visible。** 每个 surfaced finding 都会变成 PR comment。一个 cry wolf 5 次的 reviewer 会被 muted。Precision 优先于 recall。
+3. **Code claims 可 ground-truth verify。** "The code does X" 可以通过读代码证明或反驳。code review 中的 75 往往意味着 "I couldn't verify" -- 也就是等待能 verify 的人。
 
-Document review inverts all three:
+Document review 将三者反转：
 
-1. **Doc review IS the backstop.** There is no linter that catches a plan's premise gaps or scope drift. A missed finding in the plan derails implementation weeks later.
-2. **Doc review is low-frequency and private.** One review per plan, not per PR. Surfaced findings are dismissed with a keystroke via the routing menu; they are not public commentary.
-3. **Premise claims have a natural confidence ceiling.** "Is the motivation valid?" and "does this scope match the goal?" cannot be verified against ground truth. Personas working in strategy, premise, and adversarial domains (product-lens, adversarial) legitimately cap at anchors 50-75 because full verification is not possible from document text alone. A `>= 80` filter would silence those personas.
+1. **Doc review 就是 backstop。** 没有 linter 能抓 plan 的 premise gaps 或 scope drift。plan 中漏掉一个 finding，可能让 implementation 几周后 derail。
+2. **Doc review 低频且 private。** 每个 plan 一次，不是每个 PR 一次。Surfaced findings 可通过 routing menu 一键 dismiss；它们不是公开 commentary。
+3. **Premise claims 有自然 confidence ceiling。** "Is the motivation valid?" 和 "does this scope match the goal?" 无法针对 ground truth verify。strategy、premise 和 adversarial domains（product-lens、adversarial）中的 personas 合理地 capped at anchors 50-75，因为仅凭 document text 不可能 full verification。`>= 80` filter 会让这些 personas 静音。
 
-Filter at `>= 50` for doc review; let the routing menu handle volume. Dismissing a surfaced finding is cheap; missing a real concern is expensive.
+Doc review 使用 `>= 50` filter；让 routing menu 处理 volume。dismiss 一个 surfaced finding 很便宜；漏掉真实 concern 很贵。
 
-## When to port this pattern
+## 何时移植此 pattern
 
-- Other persona-based review skills with similar economics (no linter backstop, one-shot consumption, dismissal cheap via routing). Default threshold for such skills: `>= 50`.
-- Any scoring workflow where the model is asked to self-report confidence on a continuous scale and clustering on round numbers is observed.
+- 其他具有类似 economics 的 persona-based review skills（无 linter backstop、one-shot consumption、通过 routing dismiss 很便宜）。这类 skills 的默认 threshold：`>= 50`。
+- 任何要求 model 在 continuous scale 上 self-report confidence，且观察到 round numbers clustering 的 scoring workflow。
 
-## When NOT to port directly
+## 何时不要直接移植
 
-- Code review workflows have linter backstops and public-comment costs. Port the rubric structure, but tune the threshold higher (`>= 75`). See the "ce-code-review migration" section below for the completed port.
-- High-throughput pipelines where the `25` anchor ("couldn't verify") represents most findings. Dropping everything below `50` may be too aggressive; consider surfacing `25` as "needs human triage" instead.
+- Code review workflows 有 linter backstops 和 public-comment costs。移植 rubric structure，但 threshold 调高（`>= 75`）。已完成移植见下方 "ce-code-review migration" section。
+- High-throughput pipelines 中，如果 `25` anchor（"couldn't verify"）代表大多数 findings，drop 所有低于 `50` 的内容可能太 aggressive；可考虑把 `25` surface 为 "needs human triage"。
 
-## Migration history
+## Migration 历史
 
-Landed in a single atomic change because the schema, template, synthesis, rendering, personas, and tests are coupled — a partial migration would have failed validation at every boundary. The schema change is the load-bearing commit; the persona updates and test updates consume it.
+以单个 atomic change 落地，因为 schema、template、synthesis、rendering、personas 与 tests 相互耦合 -- partial migration 会在每个 boundary 都 fail validation。schema change 是 load-bearing commit；persona updates 和 test updates consume 它。
 
-## Evaluation
+## 评估
 
-After the migration, an A/B evaluation compared baseline (continuous float) against treatment (anchored integer rubric) across four documents spanning size and type: a 7KB in-repo plan, a 63KB in-repo plan, a 27KB external-repo plan, and a 10KB in-repo brainstorm. Both versions were executed by orchestrator subagents reading their matching skill snapshot as prompt material, dispatching all 7 personas, and emitting the Phase 4 headless envelope. The workspace, per-run envelopes, and timing data live under `.context/compound-engineering/ce-doc-review-eval/` during the evaluation.
+Migration 后，A/B evaluation 对 baseline（continuous float）与 treatment（anchored integer rubric）进行了比较，覆盖四份不同 size/type 的 documents：7KB in-repo plan、63KB in-repo plan、27KB external-repo plan，以及 10KB in-repo brainstorm。两个版本都由 orchestrator subagents 执行，这些 subagents 读取各自匹配的 skill snapshot 作为 prompt material，dispatch 全部 7 personas，并输出 Phase 4 headless envelope。workspace、per-run envelopes 和 timing data 在 evaluation 期间位于 `.context/compound-engineering/ce-doc-review-eval/`。
 
-### Confirmed effects
+### 已确认效果
 
-- **Score dispersion collapsed.** Baseline produced 7-12 distinct float values per document (typical: 0.45, 0.50, 0.55, 0.65, 0.72, 0.80, 0.85) — the exact false-precision clustering the migration targeted. Treatment concentrated on 2-3 anchors per document. Anchors `0` and `25` were never emitted by any persona, which matches the template's "suppress silently" instruction for those tiers.
-- **Cross-persona +1 anchor promotion fires as specified.** Observed on cli-printing-press plan (security-lens + feasibility promoting an IP-range-check finding to anchor 100) and interactive-judgment plan (product-lens + adversarial promoting a premise finding to anchor 100).
-- **Chain linking, safe_auto silent-apply, FYI routing, and per-persona redundancy collapse** all exercised correctly on at least one run.
-- **The `>= 50` threshold is load-bearing on large plans.** On cli-printing-press, baseline's graduated per-severity gates admitted 13 Decisions; treatment admitted 21. Inspection of the delta confirmed the new findings were genuine concerns the old gates' coin-flip behavior at boundaries was suppressing — not noise. The migration doc's prediction that "missing a real concern is expensive" held in practice.
+- **Score dispersion collapsed（分数离散度收敛）。** Baseline 每个 document 产生 7-12 个 distinct float values（典型：0.45、0.50、0.55、0.65、0.72、0.80、0.85）-- 正是 migration 要消除的 false-precision clustering。Treatment 每个 document 集中到 2-3 个 anchors。任何 persona 都没有 emitted anchors `0` 和 `25`，这符合 template 对这些 tiers "suppress silently" 的 instruction。
+- **Cross-persona +1 anchor promotion（跨 persona +1 anchor promotion）按规范触发。** 在 cli-printing-press plan（security-lens + feasibility 将 IP-range-check finding promote 到 anchor 100）和 interactive-judgment plan（product-lens + adversarial 将 premise finding promote 到 anchor 100）上观察到。
+- **Chain linking、safe_auto silent-apply、FYI routing 和 per-persona redundancy collapse** 都至少在一次 run 中正确 exercised。
+- **`>= 50` threshold 对 large plans 是 load-bearing。** 在 cli-printing-press 上，baseline 的 graduated per-severity gates 接纳 13 个 Decisions；treatment 接纳 21 个。检查 delta 后确认 new findings 是旧 gates 在 boundaries 上 coin-flip behavior 抑制掉的真实 concerns，而不是 noise。migration doc 对 "missing a real concern is expensive" 的预测在实践中成立。
 
-### Anchor-75 calibration boundary discovered
+### 发现 Anchor-75 Calibration Boundary（Anchor-75 校准边界）
 
-The evaluation surfaced a boundary issue: on large plans, personas emitted anchor 75 for premise-strength concerns ("motivation is thin," "premise is unconvincing") whose "will be hit in practice" claim was the reviewer's reading, not a concrete downstream outcome. This inflated the actionable tier with strength-of-argument critique that was more appropriately observational.
+Evaluation 暴露了一个 boundary issue：在 large plans 上，personas 对 premise-strength concerns（"motivation is thin"、"premise is unconvincing"）emitted anchor 75，但其 "will be hit in practice" claim 是 reviewer 的解读，而不是 concrete downstream outcome。这把 strength-of-argument critique 过度推入 actionable tier，而它更适合作为 observational。
 
-The subagent template's anchor 75 bullet was refined with a calibration paragraph:
+subagent template 的 anchor 75 bullet 增加了 calibration paragraph：
 
-> **Anchor `75` requires naming a concrete downstream consequence someone will hit** — a wrong deploy order, an unimplementable step, a contract mismatch, missing evidence that blocks a decision. Strength-of-argument concerns ("motivation is thin," "premise is unconvincing," "a different reader might disagree") do not meet this bar on their own — they are advisory observations and land at anchor `50` unless they also name the specific downstream outcome the reader hits.
+> **Anchor `75` 要求命名某人会遇到的 concrete downstream consequence** — 错误 deploy order、无法实现的 step、contract mismatch，或会 block decision 的 missing evidence。Strength-of-argument concerns（"motivation is thin," "premise is unconvincing," "a different reader might disagree"）本身不达到这个门槛；它们是 advisory observations，应落到 anchor `50`，除非同时命名 reader 会遇到的 specific downstream outcome。
 
-The test the template adds: *"will a competent implementer or reader concretely encounter this, or is this my opinion about the document's strength?"* The former is `75`; the latter is `50`.
+template 添加的 test 是：*"will a competent implementer or reader concretely encounter this, or is this my opinion about the document's strength?"* 前者是 `75`；后者是 `50`。
 
-Re-evaluation with the tightened criterion shifted cli-printing-press from 21 Decisions/4 FYI to 10 Decisions/23 FYI — premise-strength concerns moved to observational routing. The change was *not* a blanket suppression of premise findings: on interactive-judgment plan, the premise challenge survived the tightening and got cross-persona-promoted to anchor 100, because its concrete consequence was explicit ("8-unit redesign creates maintenance debt across three reference files if the premise is wrong"). The refinement distinguishes grounded premise challenges from hand-wavy framing critique — which is the exact precision the rubric was meant to have from the start.
+用收紧后的 criterion 重新 evaluation 后，cli-printing-press 从 21 Decisions/4 FYI 变为 10 Decisions/23 FYI -- premise-strength concerns 移到 observational routing。该 change *不是* blanket suppression of premise findings：在 interactive-judgment plan 上，premise challenge 在收紧后仍保留，并因 cross-persona promotion 升到 anchor 100，因为其 concrete consequence 是 explicit 的（"8-unit redesign creates maintenance debt across three reference files if the premise is wrong"）。该 refinement 区分 grounded premise challenges 与 hand-wavy framing critique -- 这正是 rubric 一开始要获得的 precision。
 
-### Limitations
+### 局限
 
-- **Small corpus.** Four documents is enough to confirm macro patterns (clustering, severity inflation, feature coverage) but not to tune threshold values or anchor boundaries at finer granularity.
-- **Harness drift between iterations.** Iteration-1 orchestrators dispatched parallel persona subagents; iteration-2 orchestrators executed personas inline (nested Agent tool unavailable in that session). This affected side metrics (proposed-fix count on cli-printing-press iteration-2 dropped 15 → 4, likely harness-driven rather than tweak-driven) but did not obscure the tweak's core effect, which was large-magnitude.
-- **No absolute-calibration ground truth.** The evaluation measured the migration's stated failure modes disappearing. Whether an anchor-75 finding literally hits 75% of the time remains unmeasured; no labeled doc-review corpus exists.
+- **Small corpus。** 四份 documents 足以确认 macro patterns（clustering、severity inflation、feature coverage），但不足以微调 threshold values 或 anchor boundaries。
+- **Harness drift between iterations。** Iteration-1 orchestrators dispatch parallel persona subagents；iteration-2 orchestrators inline 执行 personas（该 session 中 nested Agent tool 不可用）。这影响 side metrics（cli-printing-press iteration-2 的 proposed-fix count 从 15 降到 4，可能是 harness-driven 而非 tweak-driven），但没有掩盖 tweak 的 core effect，因为 effect magnitude 很大。
+- **No absolute-calibration ground truth。** Evaluation 衡量的是 migration 声明的 failure modes 消失。一个 anchor-75 finding 是否真的有 75% 的命中率仍未衡量；不存在 labeled doc-review corpus。
 
-## ce-code-review migration (2026-04-21)
+## ce-code-review migration（2026-04-21）
 
-Ported the same anchored-rubric structure into `ce-code-review` and bundled it with three additional code-review-specific precision controls. The two skills now share calibration discipline but diverge on threshold and on how independent verification is implemented.
+将同样的 anchored-rubric structure 移植到 `ce-code-review`，并与三个 additional code-review-specific precision controls 打包。两个 skills 现在共享 calibration discipline，但在 threshold 和 independent verification 实现上分歧。
 
-### Threshold: `>= 75` (not `>= 50` like ce-doc-review, not `>= 80` like Anthropic)
+### Threshold（阈值）：`>= 75`（不是 ce-doc-review 的 `>= 50`，也不是 Anthropic 的 `>= 80`）
 
-ce-code-review uses anchor 75 as the gate. P0 findings escape at anchor 50.
+ce-code-review 使用 anchor 75 作为 gate。P0 findings 在 anchor 50 时 escape。
 
-`>= 75` matches the ce-doc-review choice of using the anchor itself as the threshold (no awkward middle-bucket gap). At `>= 75`, anchors 75 ("real, will hit in practice") and 100 ("verifiable from code alone") survive; anchors 0/25/50 are dropped. Anthropic's `>= 80` under a discrete `{0,25,50,75,100}` scale would collapse to "anchor 100 only," which is too narrow — it would silence findings where personas can construct the trace but cannot literally read the bug off the code.
+`>= 75` 与 ce-doc-review 一样，使用 anchor 本身作为 threshold（没有尴尬的 middle-bucket gap）。在 `>= 75` 下，anchors 75（"real, will hit in practice"）和 100（"verifiable from code alone"）保留；anchors 0/25/50 drop。Anthropic 在 discrete `{0,25,50,75,100}` scale 下的 `>= 80` 会变成 "只保留 anchor 100"，过于狭窄 -- 会让 personas 可以 construct trace 但无法 literally read bug off code 的 findings 静音。
 
-The threshold divergence from ce-doc-review (`>= 50`) is correct for the same reasons documented in the "Why the threshold diverges from Anthropic" section above, applied in reverse: code review HAS a linter backstop, IS publicly visible, and code claims ARE ground-truth verifiable. Code review wants narrow precision; doc review wants broad surfacing.
+与 ce-doc-review 的 threshold divergence（`>= 50`）是正确的，理由与上方 "Why the threshold diverges from Anthropic" section 相同，只是反向应用：code review HAS a linter backstop、IS publicly visible、code claims ARE ground-truth verifiable。Code review 需要 narrow precision；doc review 需要 broad surfacing。
 
-### Validation pass (Stage 5b): the deferred follow-up, now landed
+### Validation pass（Stage 5b）：已落地的 deferred follow-up
 
-The ce-doc-review plan deferred a "neutral-scorer second pass" to a follow-up plan. ce-code-review implements it as **Stage 5b**: an independent validator sub-agent per surviving finding, mode-conditional dispatch, and a 15-finding budget cap.
+ce-doc-review plan 将 "neutral-scorer second pass" defer 到 follow-up plan。ce-code-review 将其实现为 **Stage 5b**：每个 surviving finding 一个 independent validator sub-agent、mode-conditional dispatch，以及 15-finding budget cap。
 
-- **Why now for code review, not doc review:** code review has externalizing modes (autofix applies fixes, headless returns findings to programmatic callers) where false positives have real cost — wrong fixes get committed, downstream automation acts on bad signal. Doc review's worst case is a noisy report a user dismisses with a keystroke; code review's worst case is a wrong-fix PR getting merged.
-- **Mode-conditional dispatch:** validation runs in `headless`, `autofix`, and the interactive LFG/File-tickets routing paths. It is skipped in interactive walk-through (the human is the per-finding validator) and report-only (nothing is being externalized). This scopes cost to the cases where false positives have real cost.
-- **Per-finding parallel dispatch, not batched:** independence is the design point. A single batched validator looking at all findings together pattern-matches across them and recreates the persona-bias problem we are escaping. Per-file batching is left as a future optimization for reviews with many findings clustered in few files.
-- **No `validated` field on findings:** an early plan added a `validated: boolean` field; it was removed during planning. Surviving findings post-validation are validated by definition (rejected ones are dropped); in modes where validation does not run, the run's mode tells consumers everything they need. A field constant within any mode does no work.
-- **Conservative failure mode:** validator timeout, malformed output, or dispatch error → drop the finding. Unverified findings should not externalize.
+- **Why now for code review, not doc review:** code review 有 externalizing modes（autofix applies fixes、headless returns findings to programmatic callers），false positives 有真实成本 -- 错误 fixes 会被 committed，下游 automation 会基于坏 signal 行动。Doc review 最坏情况是用户一键 dismiss 的 noisy report；code review 最坏情况是 wrong-fix PR 被 merge。
+- **Mode-conditional dispatch:** validation 在 `headless`、`autofix` 与 interactive LFG/File-tickets routing paths 中运行。在 interactive walk-through 中跳过（human 是 per-finding validator），在 report-only 中跳过（没有 externalized）。这把 cost 限定在 false positives 真有成本的 cases。
+- **Per-finding parallel dispatch, not batched:** independence 是设计重点。一个 batched validator 同时看所有 findings，会在它们之间 pattern-match，重建我们试图摆脱的 persona-bias problem。Per-file batching 留作未来 optimization，用于许多 findings clustered in few files 的 reviews。
+- **No `validated` field on findings:** early plan 添加过 `validated: boolean` field；planning 期间移除。validation 后 surviving findings by definition 已 validated（rejected ones drop）；在 validation 不运行的 modes 中，run mode 已经告诉 consumers 所需信息。任何 mode 内恒定的 field 都不做事。
+- **Conservative failure mode:** validator timeout、malformed output 或 dispatch error → drop finding。未验证 findings 不应 externalize。
 
-The validator's protocol is `{ "validated": true | false, "reason": "<one sentence>" }` answering three questions: is the issue real, is it introduced by THIS diff, and is it not handled elsewhere. Template: `references/validator-template.md`.
+validator protocol 是 `{ "validated": true | false, "reason": "<one sentence>" }`，回答三个问题：issue 是否真实、是否由 THIS diff 引入、是否没有 elsewhere handled。Template：`references/validator-template.md`。
 
-### Mode-aware false-positive demotion
+### Mode-aware false-positive 降级
 
-ce-code-review's broader persona surface (~14 reviewers vs ce-doc-review's 7) means more weak general-quality signal. Stricter precision in externalizing modes was already accomplished by the higher threshold; for interactive mode, a different policy: route weak findings to existing soft buckets (`testing_gaps`, `residual_risks`, `advisory`) rather than suppress.
+ce-code-review 更宽的 persona surface（约 14 reviewers vs ce-doc-review 的 7）意味着更多 weak general-quality signal。Externalizing modes 中的 stricter precision 已通过更高 threshold 实现；interactive mode 则采用另一策略：将 weak findings route 到 existing soft buckets（`testing_gaps`、`residual_risks`、`advisory`），而不是 suppress。
 
-The demotion rule is intentionally narrow: severity P2 or P3, `autofix_class` advisory, contributing reviewer is `testing` or `maintainability`. Headless and autofix suppress these entirely; interactive and report-only demote them to soft buckets where they remain visible without competing for primary-findings attention.
+demotion rule 有意保持 narrow：severity P2 或 P3、`autofix_class` advisory、contributing reviewer 是 `testing` 或 `maintainability`。Headless 和 autofix 完全 suppress 这些；interactive 与 report-only 将它们 demote 到 soft buckets，使它们仍 visible，但不与 primary-findings 争夺注意力。
 
-This is the "tier the precision bar by mode" framing. Synthesis owns it; personas don't change what they flag based on mode.
+这就是 "tier the precision bar by mode" framing。Synthesis own 它；personas 不会根据 mode 改变自己 flag 的内容。
 
-### Lint-ignore suppression
+### Lint-ignore 抑制
 
-Code carrying an explicit lint disable comment for the rule a reviewer is about to flag (`eslint-disable-next-line no-unused-vars`, `# rubocop:disable Style/...`, `# noqa: E501`, etc.) — suppress unless the suppression itself violates a project-standards rule. The author already chose to suppress; re-flagging via a different reviewer creates noise and ignores their decision.
+如果 code 中带有明确 lint disable comment，且正是 reviewer 将要 flag 的 rule（`eslint-disable-next-line no-unused-vars`、`# rubocop:disable Style/...`、`# noqa: E501` 等）-- suppress，除非该 suppression 本身违反 project-standards rule。作者已经选择 suppress；通过另一个 reviewer 再次 flag 会制造 noise，并忽视他们的决定。
 
-This is the only entirely new false-positive category in ce-code-review's catalog; the rest were ported from the existing pre-anchor catalog.
+这是 ce-code-review catalog 中唯一全新的 false-positive category；其余都从 existing pre-anchor catalog 移植。
 
-### PR-mode skip-condition pre-check
+### PR-mode skip-condition 预检查
 
-Before running the full review on a PR, a single `gh pr view` call probes for skip conditions:
-- Closed or merged PR
-- Draft PR
-- Trivial automated PR (conservative `chore(deps)` / `build(deps)` / release-bump pattern with empty body)
-- Already has a ce-code-review report comment
+在对 PR 运行完整 review 前，单个 `gh pr view` call 探测 skip conditions：
+- Closed 或 merged PR
+- Draft PR（草稿 PR）
+- Trivial automated PR（保守的 `chore(deps)` / `build(deps)` / release-bump pattern，且 body empty）
+- 已有 ce-code-review report comment
 
-Skip cleanly without dispatching reviewers. Standalone branch and `base:` modes always run — the skip-check is PR-mode only. Already-reviewed detection deliberately ignores commits-since-comment; the escape hatch for "I want to re-review after pushing more commits" is branch mode or `base:` mode, both of which bypass the skip-check entirely.
+满足条件时 cleanly skip，不 dispatch reviewers。Standalone branch 与 `base:` modes 始终运行 -- skip-check 仅限 PR-mode。Already-reviewed detection 有意忽略 commits-since-comment；"I want to re-review after pushing more commits" 的 escape hatch 是 branch mode 或 `base:` mode，两者都完全 bypass skip-check。
 
-This avoids the wasted multi-agent review cost on PRs that should not be reviewed (closed, draft, dependabot-style, or already-reviewed). It is the cheapest mechanism in this migration and disproportionately valuable for any team that runs the skill against arbitrary PR queues.
+这避免了在不应 review 的 PRs（closed、draft、dependabot-style 或 already-reviewed）上浪费 multi-agent review cost。它是本 migration 中最便宜的机制，并且对任何把 skill 跑在 arbitrary PR queues 上的团队都极其有价值。
 
-### Files
+### 文件
 
-- `plugins/compound-engineering/skills/ce-code-review/references/findings-schema.json` — `confidence` is integer enum `[0, 25, 50, 75, 100]` with code-review-specific behavioral definitions in the description; `_meta.confidence_anchors` and `_meta.confidence_thresholds` document the anchors and `>= 75` gate
-- `plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md` — verbatim 5-anchor rubric with code-review framing, expanded false-positive catalog including lint-ignore rule, hard schema-conformance constraints rejecting floats
-- `plugins/compound-engineering/skills/ce-code-review/references/validator-template.md` — Stage 5b validator subagent prompt
-- `plugins/compound-engineering/skills/ce-code-review/SKILL.md` — Stage 5 anchor gate and one-anchor promotion (replaces `+0.10`), Stage 5 step 7c mode-aware demotion, Stage 5b validation pass with budget cap, Stage 1 PR-mode skip-condition pre-check, After-Review options B and C invoke validation before externalizing
-- `plugins/compound-engineering/agents/ce-*-reviewer.md` — the code-review reviewer personas updated from float bands to anchored language, preserving each persona's specific calibration signal
-- `plugins/compound-engineering/skills/ce-code-review/references/review-output-template.md` — Confidence column renders as integer (`75`, `100`), not float
-- `tests/review-skill-contract.test.ts` — schema, synthesis, validation pass, skip-conditions, mode-aware demotion, and per-persona anchored-language assertions
+- `plugins/compound-engineering/skills/ce-code-review/references/findings-schema.json` -- `confidence` 是 integer enum `[0, 25, 50, 75, 100]`，description 中含 code-review-specific behavioral definitions；`_meta.confidence_anchors` 与 `_meta.confidence_thresholds` document anchors 和 `>= 75` gate
+- `plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md` -- verbatim 5-anchor rubric with code-review framing、expanded false-positive catalog including lint-ignore rule、reject floats 的 hard schema-conformance constraints
+- `plugins/compound-engineering/skills/ce-code-review/references/validator-template.md` -- Stage 5b validator subagent prompt
+- `plugins/compound-engineering/skills/ce-code-review/SKILL.md` -- Stage 5 anchor gate 与 one-anchor promotion（替代 `+0.10`）、Stage 5 step 7c mode-aware demotion、Stage 5b validation pass with budget cap、Stage 1 PR-mode skip-condition pre-check、After-Review options B 与 C 在 externalizing 前调用 validation
+- `plugins/compound-engineering/agents/ce-*-reviewer.md` -- code-review reviewer personas 从 float bands 更新为 anchored language，并保留每个 persona 的 specific calibration signal
+- `plugins/compound-engineering/skills/ce-code-review/references/review-output-template.md` -- Confidence column 渲染为 integer（`75`、`100`），不是 float
+- `tests/review-skill-contract.test.ts` -- schema、synthesis、validation pass、skip-conditions、mode-aware demotion 和 per-persona anchored-language assertions
 
-### When to apply this combined pattern to a new skill
+### 何时把这个 combined pattern 应用到新 skill
 
-Apply the full bundle (anchored rubric + validation pass + mode-aware demotion + skip-conditions + lint-ignore) when **all** of:
-1. The skill is a multi-persona review workflow producing structured findings.
-2. The skill has externalizing modes — outputs that get acted on without further human review (PR comments, autofix, downstream automation, headless callers).
-3. The skill is invoked frequently enough that wasted runs are visible (skip-conditions are pure win in this case; modest cost in low-volume cases).
+当 **全部** 条件成立时，应用完整 bundle（anchored rubric + validation pass + mode-aware demotion + skip-conditions + lint-ignore）：
+1. skill 是 multi-persona review workflow，产生 structured findings。
+2. skill 有 externalizing modes -- outputs 会在没有 further human review 的情况下被行动（PR comments、autofix、downstream automation、headless callers）。
+3. skill 调用频率足以让 wasted runs 可见（此时 skip-conditions 是 pure win；低频 cases 中成本适中）。
 
-Apply only the **anchored rubric** (the ce-doc-review subset) when:
-- The skill is single-shot or dismissal is cheap via UI/menu — validation pass adds cost without protecting anything that wasn't already going to be triaged by a human.
-- The skill operates on premise/strategy claims that lack ground-truth verification — anchor 100 is unreachable; threshold should be `>= 50`.
+只应用 **anchored rubric**（ce-doc-review subset）当：
+- skill 是 single-shot，或通过 UI/menu dismiss 很便宜 -- validation pass 增加成本，却没有保护任何原本不会由 human triage 的东西。
+- skill 处理缺乏 ground-truth verification 的 premise/strategy claims -- anchor 100 不可达；threshold 应为 `>= 50`。
 
-Skip the entire pattern when:
-- The skill produces a single value, not a population of findings.
-- The skill operates on user input where the user IS the source of truth (e.g., interactive Q&A skills).
+跳过整个 pattern 当：
+- skill 输出单个 value，而不是一组 findings。
+- skill 处理 user input，且用户本身就是 source of truth（例如 interactive Q&A skills）。
 
-### Migration history (ce-code-review)
+### Migration 历史（ce-code-review）
 
-Landed in a single PR with anchored rubric, validation pass, skip-conditions, mode-aware demotion, lint-ignore suppression, and persona sweep all together. The schema change is the load-bearing commit; subagent template, synthesis, and persona updates consume it. Branch: `refactor/ce-code-review-precision-and-validation`. The plan with full decision rationale lives at `docs/plans/2026-04-21-002-refactor-ce-code-review-precision-and-validation-plan.md`.
+以单个 PR 落地 anchored rubric、validation pass、skip-conditions、mode-aware demotion、lint-ignore suppression 和 persona sweep。schema change 是 load-bearing commit；subagent template、synthesis 和 persona updates consume 它。Branch：`refactor/ce-code-review-precision-and-validation`。包含完整 decision rationale 的 plan 位于 `docs/plans/2026-04-21-002-refactor-ce-code-review-precision-and-validation-plan.md`。
 
-## Deferred follow-ups
+## 延后 follow-ups
 
-- **PR inline comment posting mode for ce-code-review.** Anthropic's plugin posts findings as inline GitHub PR comments via `mcp__github_inline_comment__create_inline_comment` with full-SHA link discipline and committable suggestion blocks. ce-code-review currently has no PR-comment mode at all (terminal output, fixer auto-apply, or headless return only). Real workflow gap; deferred because it is a substantial new mode (link format, suggestion-block handling, deduplication semantics, tracker integration overlap).
-- **Per-file validator batching.** When real-world reviews routinely surface many findings clustered in few files (large refactors), a per-file validator that reads the file once and evaluates all findings against it could meaningfully reduce cost while preserving cross-file independence. Implement when data shows the saving matters.
-- **Haiku-tier orchestrator-side checks.** ce-code-review currently uses sonnet for all subagent dispatch including the cheap PR skip-condition probe. Push obvious cheap checks (skip-conditions, standards path discovery) to haiku.
-- **Re-evaluate which always-on personas earn their noise.** ce-code-review keeps `testing` and `maintainability` always-on with mode-aware demotion as the safety valve. If real review runs show the demotion is firing constantly, consider making them conditional rather than always-on.
+- **ce-code-review 的 PR inline comment posting mode。** Anthropic's plugin 通过 `mcp__github_inline_comment__create_inline_comment` 发布 findings 为 inline GitHub PR comments，并带 full-SHA link discipline 与 committable suggestion blocks。ce-code-review 当前完全没有 PR-comment mode（只有 terminal output、fixer auto-apply 或 headless return）。这是实际 workflow gap；defer 是因为它是 substantial new mode（link format、suggestion-block handling、deduplication semantics、tracker integration overlap）。
+- **Per-file validator batching。** 当真实 reviews 经常 surface 许多 clustered in few files 的 findings（large refactors）时，per-file validator 可读一次 file，并对所有 findings 评估它，能在保持 cross-file independence 的同时显著降低成本。等数据表明 savings 重要时再实现。
+- **Haiku-tier orchestrator-side checks。** ce-code-review 当前所有 subagent dispatch 都用 sonnet，包括 cheap PR skip-condition probe。把明显便宜 checks（skip-conditions、standards path discovery）推到 haiku。
+- **重新评估哪些 always-on personas 值得它们的 noise。** ce-code-review 保留 `testing` 和 `maintainability` always-on，并用 mode-aware demotion 作为 safety valve。如果真实 review runs 显示 demotion 经常触发，考虑让它们 conditional，而不是 always-on。
