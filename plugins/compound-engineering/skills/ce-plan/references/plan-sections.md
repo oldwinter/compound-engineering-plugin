@@ -80,6 +80,23 @@ agent 还会按 artifact 选择：
 - 每个 section 承载多少 detail
 - HTD 是一个 diagram、多个 diagram 还是没有 diagram；以及 visualizations 位于 HTD 还是嵌入其他 sections
 
+## Prose economy（文字经济性）
+
+"Include when material" 决定保留哪些 sections；本节决定保留下来的 prose 应该如何写。一个 section 可以很有实质，但仍写得松散；失败形态是把有实质的 section 填成一堵文字墙，contradictions 藏在里面，implementing agent 丢掉主线。Deep plan 通过 coverage 赢得长度（更多 units、更多 traced requirements、真实 risks），而不是靠这些 coverage 周围的 wordiness。
+
+对每个保留的 section 应用这些约束：
+
+- **一句话只承载一个 idea。** Summary 应该是几句句子，而不是一个带五个分号和四个括号的长句。KTD 的 rationale 是 load-bearing reason，不是 every reason。
+- **一个 requirement 或 unit 是一句 intent，最多带一个 qualifier。** 当它要指定两个 outcomes（"either A or B, the implementer decides"）时，写清 intent，把 fork 放进 Open Questions；不要在 item 里完整写两条分支。
+- **删掉 hedges 和 intensifiers。** "Critically"、"deliberately"、"explicitly"、"genuinely"、"actually"、"simply" 不承载 implementer 可执行的信息。
+- **优先使用动词，而不是 nominalization。** 写 "Demote the grid"，不要写 "the demotion of the grid is the deliberate change in this plan"。
+
+Precision 不是 padding：file paths、IDs、conditionals 和 exact thresholds 保持原样。Economy 只针对它们周围的 connective tissue，绝不削弱 precision 本身。
+
+**Resolve in place; don't stratify。** 当 deepening、doc-review pass 或 later decision supersede 了 earlier text，直接 rewrite 或删除 original。不要保留 strikethrough，也不要在上面堆一个 separate "resolutions" layer。Version control 保存 history。堆叠 strata 会让阅读面翻倍，并隐藏哪段 text 仍然 live。
+
+**在宣称 plan written 前运行 named test：** implementer 能否一遍在每个 section 中找到 contradiction？如果一句话有超过一个 parenthetical，或一个 item 指定两个 outcomes，就失败；拆句，或 defer。
+
 ## Plan metadata fields（计划元数据字段）
 
 每个 plan 都携带一小组 downstream tooling 依赖的 stable metadata fields。该 contract 与格式无关：在 markdown 中，这些 fields 出现在文件顶部的 YAML frontmatter；在 HTML 中，它们作为 visible header text 出现（通常是 `<dt>`/`<dd>` pairs 组成的 `<dl>` 或 stats strip）。两个格式中的 field names 和 semantics 相同，因此 consumers 无需知道 plan 由哪种格式产出，也能定位它们。
@@ -97,6 +114,7 @@ agent 还会按 artifact 选择：
 
 - **`origin`** — 指向 upstream brainstorm requirements doc 的 repo-relative path（例如 `docs/brainstorms/2026-05-12-pagination-requirements.md`）。从 upstream brainstorm planning 时设置；用于 traceability，并在 `ce-plan` re-deepens 时重新 resolve。HITL Proof flow 使用 `origin` 追溯到 source brainstorm。
 - **`deepened`** — ISO 8601 date，标记 confidence check 首次实质性强化 plan 的日期。存在与否会影响 Phase 0.1 resume fast-path logic（见 `references/deepening-workflow.md`）。
+- **`execution`** — downstream routing 使用的 execution domain：`code`（缺省时的默认值）或 `knowledge-work`。`ce-work` 的 input triage 会读取它：标记为 `execution: knowledge-work` 的 plan 会进入 non-code carve-out（读取 sources、synthesize、产出 deliverable，跳过 branch/test/commit/CI lifecycle）；缺省或 `code` 进入正常 code path。由 `ce-plan` 的 approach-altitude flow（`references/approach-altitude.md`）在持久化 non-code deliverable 时写入。
 
 Field names 跨 plan revisions 稳定；绝不要 rename field 或 repurpose semantics。编写 new plans 的 agents 必须使用这些精确 names；添加新 fields 可以，但将 `status` 改名为 `state` 或将 `origin` 改名为 `source` 会破坏上方 downstream consumers。
 

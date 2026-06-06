@@ -22,7 +22,7 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
 
 根据 `<input_document>` 中提供的内容决定如何继续。
 
-**Plan document**（input 是 existing plan 或 specification 的 file path）→ 跳到 Phase 1。
+**Plan document**（input 是 existing plan 或 specification 的 file path）：先读取 plan metadata，markdown plan 读取 YAML frontmatter，HTML plan 读取 visible header text（两种格式携带同一组 fields）。如果它带有 `execution: knowledge-work`，这是 **non-code plan**：读取 `references/non-code-execution.md` 并遵循该 carve-out，而不是继续本 workflow 的其余部分。否则（field 缺省或为 `execution: code`）→ 跳到 Phase 1 并运行正常 code lifecycle。（marker check 放在 plan-document handling 内部，因为检测 marker 必须先有文件；下方 "Bare prompt" 不受影响。）
 
 **Bare prompt**（input 是 work 描述，而不是 file path）：
 
@@ -36,9 +36,9 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
 
    | Complexity（复杂度） | Signals（信号） | Action（动作） |
    |-----------|---------|--------|
-| **Trivial** | 1-2 files，无 behavioral change（typo、config、rename） | 进入 Phase 1 step 2（environment setup），然后直接实现：不建 task list，不进 execution loop。如果 change 触及 behavior-bearing code，应用 Test Discovery |
-| **Small / Medium** | Clear scope，少于约 10 个 files | 从 discovery 构建 task list。进入 Phase 1 step 2 |
-| **Large** | Cross-cutting、architectural decisions、10+ files、触及 auth/payments/migrations | 告知用户这会受益于 `/ce-brainstorm` 或 `/ce-plan`，用于浮现 edge cases 和 scope boundaries。尊重用户选择。如果继续，构建 task list 并进入 Phase 1 step 2 |
+   | **Trivial** | 1-2 files，无 behavioral change（typo、config、rename） | 进入 Phase 1 step 2（environment setup），然后直接实现：不建 task list，不进 execution loop。如果 change 触及 behavior-bearing code，应用 Test Discovery |
+   | **Small / Medium** | Clear scope，少于约 10 个 files | 从 discovery 构建 task list。进入 Phase 1 step 2 |
+   | **Large** | Cross-cutting、architectural decisions、10+ files、触及 auth/payments/migrations | 告知用户这会受益于 `/ce-brainstorm` 或 `/ce-plan`，用于浮现 edge cases 和 scope boundaries。尊重用户选择。如果继续，构建 task list 并进入 Phase 1 step 2 |
 
 ---
 

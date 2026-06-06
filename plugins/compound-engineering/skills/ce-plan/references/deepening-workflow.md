@@ -224,7 +224,10 @@ echo "$SCRATCH_DIR"
 
 **在 interactive mode 中：** 只 integrate 用户在 5.3.6b 接受的 findings。如果不同 agents 的 findings 触及同一 section，coherently reconcile 它们，但不要重新引入 rejected findings。
 
+Deepening 可以 tighten，而不只是 grow。Section 的强化可以通过删减和添加完成：collapse multi-idea sentences、drop hedges，并直接删除 superseded text，而不是保留 strikethrough 或在上面堆一个 separate "resolutions" layer。更短且 contradiction-free 的 section 更强。这不同于下方仍然禁止的 "rewrite the entire plan from scratch"。
+
 Allowed changes（允许的 changes）：
+- Tighten strengthened section 中的 prose：cut hedges、split sentences carrying more than one idea，并 in place remove superseded text（version control holds the history）
 - Clarify 或 strengthen decision rationale
 - Tighten requirements trace 或 origin fidelity
 - 当 sequencing 较弱时 reorder 或 split implementation units；但**绝不要 renumber existing U-IDs**。Reordering 会在新顺序中保留 U-IDs（例如 U1、U3、U5 reordered 是正确的；renumbering to U1、U2、U3 不正确）。Splitting 会将 original U-ID 保留给 original concept，并将下一个 unused number 分配给 new unit。Renumbering 会破坏针对 original IDs 写下的 ce-work blocker 和 verification references

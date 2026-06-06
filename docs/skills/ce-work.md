@@ -13,7 +13,7 @@
                                         this?"
 ```
 
-`ce-work` 面向 software work：它 commit、运行 tests、打开 PR，并与 code review skills 集成。对于非软件 plans（学习计划、hot-water-tank maintenance、trip planning），chain 实际上在 `ce-plan` 结束，由人类自行执行。
+`ce-work` 主要面向 software work：它 commit、运行 tests、打开 PR，并与 code review skills 集成。它也有一个 lightweight **non-code carve-out**：由 `ce-plan` approach-altitude flow 产出、并标记为 `execution: knowledge-work` 的 plan，会 route 到 knowledge-work path，读取 sources、synthesize 并产出 deliverable，跳过 code lifecycle。其他没有该 marker 的 non-software work 仍然通常在 `ce-plan` 结束，由人类执行。
 
 ---
 
@@ -189,7 +189,7 @@ Context compaction 后恢复、接手他人 branch、或回到 partly-shipped pl
 当更深层 code review tier 发现 autofix 没解决的问题时，`ce-work` 不会 silent ship。它会询问：apply now / file tickets / accept（with durable sink）/ stop。"Accept" 需要真实 durable record；findings 不能只存在 session 中。
 
 **`ce-work` 支持非软件 plans 吗？**
-不直接支持。对于非软件工作，chain 实际上在 `ce-plan` 结束；`ce-work` 会 commit、运行 tests、打开 PR，这些并不适用于 maintenance routines 或 trip plans。
+对于标记为 `execution: knowledge-work` 的 plan（由 `ce-plan` 的 approach-altitude flow 产出），支持：lightweight carve-out 会读取 sources、synthesize 并产出 deliverable，跳过 commit/test/PR lifecycle。其他没有该 marker 的 non-software work 仍然在 `ce-plan` 结束，由人类执行。
 
 ---
 

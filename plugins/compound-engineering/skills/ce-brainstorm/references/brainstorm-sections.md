@@ -29,6 +29,23 @@ Brainstorm dialogue 不一定总要产出 durable document。当**两个**条件
 
 当 doc 有必要时，depth 与 dialogue 产出匹配。内容 sparse 的 brainstorm 产出 sparse doc；内容 rich 的产出 rich doc。不要添加 ceremony 让 slim brainstorm 看起来 substantial。
 
+## Prose economy（文字经济性）
+
+Match-depth-to-content 决定保留哪些 sections，以及每个 section 深到什么程度。本节决定保留下来的 prose 应该如何写。一个 section 可以很有实质，但仍写得松散；失败形态是把有实质的 section 填成一堵文字墙，contradictions 藏在里面，downstream agent 丢掉主线。值得存在的长度没有问题；围绕这些长度的 wordiness 才是问题。
+
+对每个保留的 section 应用这些约束：
+
+- **一句话只承载一个 idea。** Summary 应该是几句句子，而不是一个带五个分号和四个括号的长句。如果一个句子需要第二个 parenthetical 才能保持准确，把它拆开。
+- **一个 requirement 是一句 intent，最多带一个 qualifier。** 当 requirement 要指定两个 outcomes（"either A or B, planning decides"）时，写清 intent，把 fork 放进 Outstanding Questions；不要在 requirement 里完整写两条分支。
+- **删掉 hedges 和 intensifiers。** "Critically"、"deliberately"、"explicitly"、"genuinely"、"actually"、"simply" 不承载 downstream agent 可执行的信息。
+- **优先使用动词，而不是 nominalization。** 写 "Demote the grid"，不要写 "the demotion of the grid is the deliberate change in this brief"。
+
+Precision 不是 padding：domain terms、conditionals 和 exact thresholds 保持原样。Economy 只针对它们周围的 connective tissue，绝不削弱 precision 本身。
+
+**Resolve in place; don't stratify。** 当 later decision 回答了 parked question 或 supersede 了 earlier text，直接 rewrite 或删除 original entry。不要追加一个单独的 "resolutions" layer，让被 supersede 的文本仍然站在原处；也不要把 superseded prose 保留为 strikethrough。Version control 保存 history。堆叠 question/resolution strata 会让阅读面翻倍，并隐藏哪段 text 仍然 live。
+
+**在宣称 doc written 前运行 named test：** 读者能否一遍在每个 section 中找到 contradiction？如果一句话有超过一个 parenthetical，或一个 requirement 指定两个 outcomes，就失败；拆句，或 defer。
+
 ## Hard floor（最低要求）
 
 当 doc 有必要时，这些必须存在。

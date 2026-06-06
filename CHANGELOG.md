@@ -1,5 +1,19 @@
 # 更新日志
 
+## [3.11.1](https://github.com/EveryInc/compound-engineering-plugin/compare/cli-v3.11.0...cli-v3.11.1) (2026-06-05)
+
+
+### 其他维护
+
+* **cli:** 同步 compound-engineering versions
+
+## [3.11.0](https://github.com/EveryInc/compound-engineering-plugin/compare/cli-v3.10.0...cli-v3.11.0) (2026-06-04)
+
+
+### 修复
+
+* **ce-polish:** 从 beta 提升到 stable ([#880](https://github.com/EveryInc/compound-engineering-plugin/issues/880)) ([63b6b26](https://github.com/EveryInc/compound-engineering-plugin/commit/63b6b260c345ba70ce9d9a393eeedefb64e4e0a0))
+
 ## [3.10.0](https://github.com/EveryInc/compound-engineering-plugin/compare/cli-v3.9.4...cli-v3.10.0) (2026-06-03)
 
 

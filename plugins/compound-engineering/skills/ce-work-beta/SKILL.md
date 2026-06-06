@@ -76,7 +76,7 @@ Config keys（配置 keys）：
 
 根据 `<input_document>` 中提供的内容决定如何继续。
 
-**Plan document（Plan 文档）**（input 是 existing plan 或 specification 的 file path）→ 跳到 Phase 1。
+**Plan document（Plan 文档）**（input 是 existing plan 或 specification 的 file path）：先读取 plan metadata，markdown plan 读取 YAML frontmatter，HTML plan 读取 visible header text（两种格式携带同一组 fields）。如果它带有 `execution: knowledge-work`，这是 **non-code plan**：读取 `references/non-code-execution.md` 并遵循该 carve-out，而不是继续本 workflow 的其余部分。否则（field 缺省或为 `execution: code`）→ 跳到 Phase 1 并运行正常 code lifecycle。（marker check 放在 plan-document handling 内部，因为检测 marker 必须先有文件；下方 "Bare prompt" 不受影响。）
 
 **Bare prompt（裸 prompt）**（input 是 work 描述，而不是 file path）：
 

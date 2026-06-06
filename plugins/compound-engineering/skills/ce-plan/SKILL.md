@@ -107,6 +107,25 @@ Normal editing requests（例如 "update the test scenarios"、"add a new implem
 
 **Resume 会 preserve existing artifact format，pipeline mode 除外。** Resuming existing plan 时，resume run 按 existing artifact 使用的 format 写回：existing file 是 `.md` 则 markdown，是 `.html` 则 HTML，这样 resume 不会 silently change artifact shape。本 run 的 explicit `output:` arguments 会 override（例如用 `output:md` resume `.html` plan 会将 artifact switch 到 markdown）。Pipeline mode（LFG、任何 `disable-model-invocation` context）始终按 Phase 0.0 获胜：即使 resuming existing `.html` plan，pipeline runs 也强制 `OUTPUT_FORMAT=md`，让 downstream automation 收到其预期的 markdown shape。Resume 会在 parallel path（`<plan-basename>.md`）rewrite markdown file，原 `.html` 保持 untouched。
 
+#### 0.1a Recognize Approach-Altitude Requests（识别 Approach-Altitude 请求）
+
+有些请求应该在更高一层回答：先产出 grounded **approach-plan**，也就是 *deliverable 将如何被制作* 的 plan，并停在那里，而不是 zero-shot 产出 deliverable。本步骤在 Phase 0.1 的 resume 和 deepen fast paths 之后运行（所以 "deepen the plan" 和 resume 会先 short-circuit），在 Phase 0.1b 的 domain split 之前运行（所以该能力是 domain-general，适用于 software 和 knowledge-work）。
+
+两种入口，gating 完全不同：
+
+**Explicit（总是遵守，不设 gate）。** 当用户要求 approach 本身，例如 "plan for a plan"、"plan the approach"、"plan how you'll do X"、"don't do it yet -- just plan how you'd approach it"，进入 approach altitude 并停在 approach。不要开始产出 deliverable。关键是识别要求 *producing something 的 approach* 的语言，而不是那个 something 本身。这不同于 "deepen" / "strengthen"（Phase 0.1 deepening fast path），也不同于普通 plan request。
+
+**Proactive（少见且保守）。** 当用户给出 plain request 且没有 approach-language 时，只有在下面两个信号都明显高时，才 offer approach-plan：
+
+- **Method uncertainty** — core approach 真的未定：竞争方法会产出不同 deliverables，disparate sources 或 constraints 如何组合不清楚，或 outcome 只在 value level 表述（"something I can actually use"）。如果 task 的 core method 很明确，只是 rollout、sequencing、scope 或 ordering 有 routine variants（big-bang vs. incremental、batch order、phased vs. one-shot），这不满足条件；这些是 Phase 0.7 scoping synthesis 会 surface 的普通 plan decisions，不是 method-uncertainty。大型或机械性 change（40-endpoint migration、wide rename、framework bump）通常 costly but method-obvious；cost alone 永远不触发 offer。
+- **Cost of getting it wrong** — deliverable 制作昂贵或耗时，wrong approach 会浪费真实 effort（heavy inputs to process、long synthesis、large or risky change）。
+
+如果任一信号低，**保持沉默并正常 plan/do**。Borderline 时也保持沉默。只从 request shape 和 input metadata 评估，不要先读取 inputs（recon 在 offer 被接受后进行）。当 offer 触发时，它是一条 **single dismissible line**，命名具体 signal（例如 "Three heavy sources are about to get synthesized and you might want them weighted differently -- want my approach first, or should I just go?"）；绝不是 blocking question，绝不是 ceremony。因为 explicit path 总是可用，missed offer 很便宜；真正要避免的是 **new-hammer nag**：method 明确时开头总问 "want me to plan the approach first?"
+
+**与其他 approach surfaces 保持 disjoint（R16）。** 没有 approach-language、且不是 both-signals-high 的 investigative 或 analytical request 不是 approach-altitude request；必须原样通过本 gate 进入 Phase 0.1b，让 answer-seeking 的 plan-of-attack 处理。Gate 的前置位置不能拦截它。"Deepen the plan" 和 resume 已由 Phase 0.1 short-circuit。Phase 0.7 / 5.1.5 scoping synthesis 和 Phase 5.3 deepening pass 处理的是已经 committed 的 deliverable；approach altitude 发生在 commitment 之前。完整区别见 `references/approach-altitude.md`。
+
+进入本模式时（explicit，或 accepted offer），读取 `references/approach-altitude.md` 并遵循它。否则继续 Phase 0.1b，不做其他改变。
+
 #### 0.1b 分类任务领域
 
 如果 task 要求 build、modify、refactor、deploy 或 architect software（code、schemas、infrastructure），继续 Phase 0.2。
@@ -682,6 +701,8 @@ docs/plans/YYYY-MM-DD-NNN-<type>-<descriptive-name>-plan.<md|html>
 Extension 遵循 Phase 0.0 的 `OUTPUT_FORMAT`：markdown 时为 `.md`，HTML 时为 `.html`。Sequence number `NNN` 根据 `docs/plans/` 中已有 plan files 计算，不区分 extension（同时计入 `.md` 和 `.html`），以保证当天排序唯一。
 
 使用 `references/plan-sections.md` 的内容，以及 Phase 0.0 加载的 rendering reference 中的 format-specific principles（`markdown-rendering.md` 或 `html-rendering.md`）来撰写 plan。
+
+**Write tight。** 一个 section 有实质，不代表可以 padding。对每个保留的 section 应用 `references/plan-sections.md` 中的 prose-economy discipline：一句话一个 idea；一个 requirement 或 unit 是 intent 加最多一个 qualifier；把 forks defer 到 Open Questions，不要同时写完整两条分支；对 superseded text 做 in-place resolution，不要堆叠 strata。宣称 plan written 前，运行其中的 named test：implementer 能否一遍在每个 section 中找到 contradiction？
 
 **HTML composition timing。** 当 `OUTPUT_FORMAT=html` 时，Phase 5.3 deepening 会在本次写入最终成形前运行，但 HTML mode 会跳过 `ce-doc-review`（它今天的 mutation mechanics 仅支持 markdown；见 `references/plan-handoff.md` 的 Phase 5.3.8 format gate）。HTML artifact 会反映 deepening synthesis，但不包含 doc-review autofixes；这是 `ce-doc-review` 支持 HTML-aware mutation 前的已知 gap。
 

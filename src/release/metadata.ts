@@ -63,10 +63,10 @@ export type CompoundEngineeringCounts = {
 }
 
 const COMPOUND_ENGINEERING_DESCRIPTION =
-  "AI-powered development tools for code review, research, design, and workflow automation."
+  "用于 code review、research、design 和 workflow automation 的 AI-powered development tools。"
 
 const COMPOUND_ENGINEERING_MARKETPLACE_DESCRIPTION =
-  "AI-powered development tools that get smarter with every use. Make each unit of engineering work easier than the last."
+  "每次使用都会变得更聪明的 AI-powered development tools。让每个工程工作单元都比上一个更容易。"
 
 function resolveExpectedVersion(
   explicitVersion: string | undefined,

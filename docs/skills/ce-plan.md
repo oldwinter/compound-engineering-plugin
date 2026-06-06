@@ -96,6 +96,10 @@ Guardrails-not-choreography frame 可以干净跨 domains。真实（非 hypothe
 
 Universal planning 还区分两种 **dispositions**。*Plan-seeking* tasks（trip、study curriculum、event）产出 saved plan；artifact 就是 deliverable。*Answer-seeking* tasks 是 investigative 或 analytical questions（"how often does X happen — is it a big deal?"、"how does our approach compare to Y?"），此时 *answer* 才是 deliverable，没有人想要 plan file。对这些任务，`ce-plan` 不会 bail，也不会写文档：它在 chat 中说明简短、right-sized plan-of-attack，作为引导 agent 并展示 approach 的 working scaffold，然后执行（research and synthesis，never code）并交付 answer。Plan 会用问题自身的语言表达，而不是 skill 的语言；internal machinery 保持隐藏，但影响 answer trust 的 caveats 必须 surface。只有真正 trivial 的 single-fact lookups 会完全跳过 planning，直接回答。
 
+### 8. Approach altitude：当 deliverable 很难时，先 plan the plan
+
+面对 hard problem，`ce-plan` 可以上提一层回答：先产出 grounded **approach-plan**，也就是 *deliverable 将如何被制作* 的 plan，并在 checkpoint 停住，再决定是否 commit 到 deliverable。这让用户获得 structure 和 certainty，而不是 zero-shot 一个脆弱结果。入口可以是 explicit（"plan for a plan"、"don't write it yet -- plan how you'd approach it"），也可以很少见地 proactive offer：只有当 method 真的未定且搞错成本很高时才触发，所以不会变成 nag。对提供的 inputs 做 light recon（skim，不 deep-read）后，它在 chat 中给出 approach；file-optional，也可 deepen。Checkpoint 时，用户选择现在执行或保存到以后。它划出的边界是 **code vs. knowledge-work**，不是 plan vs. execute：code 仍进入 `ce-work` 正常路径；non-code deliverable 会标记为 `execution: knowledge-work`，并通过 `ce-work` 的 lightweight carve-out 运行（或交给任何 agent；plan 保持 portable）。`ce-plan` 自己永远不 execute；它产出 approach-plan 并 hand off。
+
 ---
 
 ## 快速示例

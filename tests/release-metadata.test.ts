@@ -9,6 +9,8 @@ import {
 } from "../src/release/metadata"
 
 const tempRoots: string[] = []
+const COMPOUND_DESCRIPTION =
+  "用于 code review、research、design 和 workflow automation 的 AI-powered development tools。"
 
 afterEach(async () => {
   for (const root of tempRoots.splice(0, tempRoots.length)) {
@@ -160,9 +162,7 @@ describe("release metadata", () => {
   test("builds a stable compound-engineering manifest description", async () => {
     const description = await buildCompoundEngineeringDescription(process.cwd())
 
-    expect(description).toBe(
-      "AI-powered development tools for code review, research, design, and workflow automation.",
-    )
+    expect(description).toBe(COMPOUND_DESCRIPTION)
   })
 
   test("detects cross-surface version drift even without explicit override versions", async () => {
@@ -207,7 +207,7 @@ describe("release metadata", () => {
       JSON.stringify(
         {
           version: "2.42.0",
-          description: "AI-powered development tools for code review, research, design, and workflow automation.",
+          description: COMPOUND_DESCRIPTION,
         },
         null,
         2,
@@ -230,9 +230,7 @@ describe("release metadata", () => {
     await syncReleaseMetadata({ root, write: true })
 
     const afterContents = JSON.parse(await Bun.file(codexPath).text())
-    expect(afterContents.description).toBe(
-      "AI-powered development tools for code review, research, design, and workflow automation.",
-    )
+    expect(afterContents.description).toBe(COMPOUND_DESCRIPTION)
   })
 
   test("reports missing Codex manifest as a structural error", async () => {

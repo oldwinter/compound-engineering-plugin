@@ -161,6 +161,14 @@ For `needs-human` verdicts（需要人工决策的 verdict），post reply，但
 
 ### Review threads（review threads，审查线程）
 
+0. **Reply 前先 verify thread ID。** GitHub Enterprise 可能因 query path 不同，为同一 thread 返回不一致的 node IDs。始终用 comment 的 numeric URL ID 通过 [scripts/get-thread-for-comment](../scripts/get-thread-for-comment) 确认 `get-pr-comments` 返回的 ID 是否 resolve 到正确 thread：
+```bash
+# 从 comment URL 提取 numeric comment ID（例如 discussion_r2589700 → 2589700）
+GH_REPO=OWNER/REPO gh api repos/{owner}/{repo}/pulls/comments/COMMENT_ID --jq .node_id
+bash scripts/get-thread-for-comment PR_NUMBER COMMENT_NODE_ID OWNER/REPO
+```
+返回的 `id` 是 reply 和 resolve 应使用的 authoritative thread ID。如果它不同于 `get-pr-comments` 返回的 ID，使用这个 script 返回的 ID。
+
 1. 使用 [scripts/reply-to-pr-thread](../scripts/reply-to-pr-thread) **Reply**：
 ```bash
 echo "REPLY_TEXT" | bash scripts/reply-to-pr-thread THREAD_ID
