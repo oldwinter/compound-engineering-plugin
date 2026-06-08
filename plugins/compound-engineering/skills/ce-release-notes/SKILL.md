@@ -75,12 +75,12 @@ For each release, render（对每个 release 渲染）：
 
 {body, soft-capped at 25 rendered lines}
 
-[Full release notes →]({url})
+Full release notes: {url}
 ```
 
 `{published_at_human}` 是从 `published_at` 派生的 `YYYY-MM-DD` date。`{body}` 是 release-please body verbatim，只做一个 transformation：
 
-**Soft 25-line cap.** 如果 body 超过 25 rendered lines，保留前 25 行，并追加 `— N more changes, [see full release notes →]({url})`。Truncation 必须 **markdown-fence aware**：统计 kept portion 中出现的 triple-backtick fence lines。如果数量为 odd，说明 cut 落在 open code fence 中；在追加 "see more" link 前，用 `` ``` `` line 关闭 truncated output，避免 renderer 吞掉 link 或后续内容。
+**Soft 25-line cap.** 如果 body 超过 25 rendered lines，保留前 25 行，并追加 `— N more changes, see full release notes: {url}`。Truncation 必须 **markdown-fence aware**：统计 kept portion 中出现的 triple-backtick fence lines。如果数量为 odd，说明 cut 落在 open code fence 中；在追加 "see more" link 前，用 `` ``` `` line 关闭 truncated output，避免 renderer 吞掉 link 或后续内容。
 
 所有 releases render 后，追加 two-line footer：
 
@@ -139,7 +139,7 @@ gh pr view <linked_prs[0]> --repo EveryInc/compound-engineering-plugin --json ti
 写出直接回答用户问题的 narrative answer。将 **primary** matching release 以内联 version 形式引用，例如 `(v2.67.0)`，并用 markdown link 指向 release URL。如果存在 older matches，按如下形式 inline reference：
 
 ```
-previously: [v2.65.0]({older_url}), [v2.62.0]({older_url})
+previously: v2.65.0 ({older_url}), v2.62.0 ({older_url})
 ```
 
 Narrative 要 grounded in release body，以及（可用时）enriched PR title/body。少量引用；用用户 framing paraphrase change，而不是 verbatim dump release notes。回答保持 scoped to 用户问题；不要用同一 release 中无关 changes padding。
