@@ -91,19 +91,7 @@
 
    记录 completed work 是否有 observable behavior（UI rendering、CLI output、带 runnable example 的 API/library behavior、generated artifacts 或 workflow output）。只有当 evidence 可能存在时，`ce-commit-push-pr` skill 才会询问是否 capture evidence。
 
-2. **Update Plan Status（更新 Plan 状态）**
-
-   将 plan 的 `status` field 从 `active` 更新为 `completed`。机制取决于 plan 格式：
-
-   - **Markdown plan (`.md`).** 文件顶部的 YAML frontmatter 承载 status。直接编辑 YAML：
-     ```
-     status: active  ->  status: completed
-     ```
-   - **HTML plan (`.html`).** Status 作为 visible text 存在于 rendered header 中（通常是 `<span class="status">active</span>` 或类似结构）。直接编辑 visible element 的 text content。没有需要同步的 hidden JSON-frontmatter copy；根据 html-rendering invariants，HTML metadata 的单一真源就是 visible text。
-
-   如果任一格式中都没有 status field，跳过本步骤；有些 plans 会完全省略 frontmatter。
-
-3. **Commit and Create Pull Request（提交并创建 Pull Request）**
+2. **Commit and Create Pull Request（提交并创建 Pull Request）**
 
    加载 `ce-commit-push-pr` skill 处理 committing、pushing 和 PR creation。该 skill 负责 convention detection、branch safety、logical commit splitting、adaptive PR descriptions 和 attribution badges。
 
@@ -117,7 +105,7 @@
 
    如果用户偏好 commit 但不创建 PR，改为加载 `ce-commit` skill。
 
-4. **Notify User（通知用户）**
+3. **Notify User（通知用户）**
    - 总结已完成内容
    - 链接到 PR（如果创建了）
    - 说明任何需要的 follow-up work

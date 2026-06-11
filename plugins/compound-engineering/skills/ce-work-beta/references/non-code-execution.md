@@ -9,7 +9,7 @@
 - 不做 branch/worktree setup（Phase 1 Step 2）。
 - 不从 implementation units 构建 task list；不根据 `Files:` 做 execution-strategy/subagent dispatch。
 - 不做 Test Discovery、test-scenario completeness、system-wide test check。
-- 不做 incremental code commits，也不运行 `references/shipping-workflow.md`（没有 PR、CI，也不对 code plan 做 `active -> completed` flip）。
+- 不做 incremental code commits，也不运行 `references/shipping-workflow.md`（没有 PR、CI）。
 
 ## Execute the production plan（执行 production plan）
 

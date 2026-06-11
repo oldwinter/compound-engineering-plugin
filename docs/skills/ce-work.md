@@ -95,7 +95,7 @@ Task 不是 code compiles 就算 done。任何 feature-bearing task 标记 compl
 
 Parallel Safety Check 发现四个 units 之间没有 file overlap，且 worktree isolation 可用，于是四个 subagents 并行分派，各自使用自己的 branch。它们完成后，orchestrator 按 dependency order merge；每次 merge 后 tests 都通过。Idempotency check 捕获到其中一个 unit 的 verification 已被先前 session 满足，于是直接标为 complete，不重新实现。
 
-Diff 不在 sensitive surface 上，也不大且 diffuse，所以 harness-native review 处理它；两个 suggested findings 被 inline 修掉。Final validation 通过；operational validation plan 起草完成；plan frontmatter 从 `active` 翻到 `completed`；`ce-commit-push-pr` 打开 PR，PR 包含 summary、testing notes、operational section 和 Compound Engineered badge。
+Diff 不在 sensitive surface 上，也不大且 diffuse，所以 harness-native review 处理它；两个 suggested findings 被 inline 修掉。Final validation 通过；operational validation plan 起草完成；`ce-commit-push-pr` 打开 PR，PR 包含 summary、testing notes、operational section 和 Compound Engineered badge。Plan 本身保持 untouched：它是 decision artifact，是否已经 shipped 由 git 派生，不记录在 doc 中。
 
 ---
 
@@ -167,7 +167,7 @@ Shipping 之后，`/ce-compound` 会把任何 reusable learning（遇到的 bugs
 | `<plan path>` | Origin-sourced execution |
 | `<bare prompt>` | 按 complexity triage（Trivial / Small-Medium / Large） |
 
-Output：通过 `ce-commit-push-pr` 产生 commits 和（通常）PR。执行期间 plan body read-only；只有 shipping 时 frontmatter `status` 会翻到 `completed`。
+Output：通过 `ce-commit-push-pr` 产生 commits 和（通常）PR。整个过程中 plan 都是 read-only；`ce-work` 永远不 mutate plan。是否已经 shipped 由 git 派生，不记录在 doc 中。
 
 ---
 

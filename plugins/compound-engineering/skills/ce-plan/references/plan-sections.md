@@ -105,8 +105,9 @@ Precision 不是 padding：file paths、IDs、conditionals 和 exact thresholds 
 
 - **`title`** — verbatim plan title。匹配 H1（markdown）或 document `<h1>`（HTML），避免 file metadata 和 visible heading drift。
 - **`type`** — conventional-commit-prefix-aligned classification（`feat`、`fix`、`refactor`、`chore`、`docs`、`perf`、`test` 等）。承载最终 commit message 应反映的 intent。
-- **`status`** — 创建时为 `active`；`ce-work` 在 ship 时翻转为 `completed`。`ce-plan` 的 Phase 0.1 resume fast path 以 `active` 为 key。在 HTML 中，status 必须渲染为 `<span class="status">{value}</span>`，这样 flip mechanic 能通过 selector 定位并 rewrite 它（见 `references/html-rendering.md`）。
 - **`date`** — ISO 8601 (`YYYY-MM-DD`) creation date，仅 ASCII digits。
+
+Plans carry **no status field**（不携带 `status` field）：plan 是 decision artifact，不是 tracked work item。`ce-work` 在 ship 时不 mutate plan；是否 shipped 由 git 推导，不存进 doc。不要添加 `status` field 或 `active → completed` lifecycle。
 
 ### Optional but well-known（可选但约定俗成）
 
@@ -116,7 +117,7 @@ Precision 不是 padding：file paths、IDs、conditionals 和 exact thresholds 
 - **`deepened`** — ISO 8601 date，标记 confidence check 首次实质性强化 plan 的日期。存在与否会影响 Phase 0.1 resume fast-path logic（见 `references/deepening-workflow.md`）。
 - **`execution`** — downstream routing 使用的 execution domain：`code`（缺省时的默认值）或 `knowledge-work`。`ce-work` 的 input triage 会读取它：标记为 `execution: knowledge-work` 的 plan 会进入 non-code carve-out（读取 sources、synthesize、产出 deliverable，跳过 branch/test/commit/CI lifecycle）；缺省或 `code` 进入正常 code path。由 `ce-plan` 的 approach-altitude flow（`references/approach-altitude.md`）在持久化 non-code deliverable 时写入。
 
-Field names 跨 plan revisions 稳定；绝不要 rename field 或 repurpose semantics。编写 new plans 的 agents 必须使用这些精确 names；添加新 fields 可以，但将 `status` 改名为 `state` 或将 `origin` 改名为 `source` 会破坏上方 downstream consumers。
+Field names 跨 plan revisions 稳定；绝不要 rename field 或 repurpose semantics。编写 new plans 的 agents 必须使用这些精确 names；添加新 fields 可以，但将 `origin` 改名为 `source` 或将 `date` 改名为 `created` 会破坏上方 downstream consumers。
 
 ## ID and content rules（ID 与内容规则）
 

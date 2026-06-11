@@ -103,7 +103,7 @@ agent 还会按 artifact 选择：
 
 ### Status flip does not apply to brainstorm（status flip 不适用于 brainstorm）
 
-不同于 plans，brainstorm artifacts 没有 `status` field，也没有 `active → completed` lifecycle。brainstorm 是 one-time output，downstream consumers（`ce-plan`、`ce-doc-review`）通过 plan 的 `origin:` field 引用它。`html-rendering.md` 中描述的 `<span class="status">` HTML hook 是 plan-side mechanic，不会渲染在 brainstorm artifacts 上。
+不同于 plans，brainstorm artifacts carry no `status` field，也没有 `active → completed` lifecycle。brainstorm 是 one-time output，downstream consumers（`ce-plan`、`ce-doc-review`）通过 plan 的 `origin:` field 引用它。`html-rendering.md` 中描述的 `<span class="status">` HTML hook 是 plan-side mechanic，不会渲染在 brainstorm artifacts 上。
 
 ### Field-name stability（field name 稳定性）
 

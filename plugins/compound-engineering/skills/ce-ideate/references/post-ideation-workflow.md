@@ -32,206 +32,113 @@ Target output（目标输出）：
 - 如果 survive 太多，运行第二轮更严格 pass
 - 如果少于 5 个 survive，如实报告，而不是降低标准
 
-## Phase 4：Present the Survivors（呈现保留想法）
+## Phase 4：Write and Present the Deliverable（写入并呈现 Deliverable）
 
-**Checkpoint B (V17).** presenting 前，写入 `<scratch-dir>/survivors.md`（使用 Phase 1 中捕获的 absolute path），内容包含 survivor list 和 key context（focus hint、grounding summary、rejection summary）。这会在用户到达 persistence menu 前保护 post-critique state。Best-effort：如果写入失败（disk full、permissions），记录 warning 并继续；checkpoint 不是 load-bearing。复用 Phase 1 生成的同一个 `<run-id>` 和 `<scratch-dir>`；运行结束时不清理（保留 run directory，让 V15 cache 在同一 session 的不同 run-ids 间仍可复用；见 Phase 6）。
+Ideation artifact 会 **automatically** 自动产出：persistence is **not opt-in**。Filtering 后，先写 deliverable，再展示 concise summary，并按格式打开它。完整内容存在文件里；session 只展示 orienting summary，让 reader 实际阅读 rich format。
 
-向用户呈现 surviving ideas。terminal review loop 本身就是完整 ideation cycle；persistence 是 opt-in（Phase 5），refinement 在 conversation 中发生，没有 file 或 network cost（Phase 6）。
+**Checkpoint B (V17).** 写 deliverable 前，写入 `<scratch-dir>/survivors.md`（Phase 1 中的 absolute path），内容包含 survivor list 和 key context（focus hint、grounding summary、rejection summary）。Best-effort：如果写入失败，记录 warning 并继续；checkpoint 不是 load-bearing。复用 Phase 1 生成的同一个 `<run-id>` / `<scratch-dir>`。
 
-只以 structured form 呈现 surviving ideas：
+### 4.1 Write the Deliverable（自动，所有 modes）
 
-- title（标题）
-- description（描述）
-- **axis（轴）** (when Phase 1.5 produced an axis list)
-- **basis（依据）** (tagged `direct:` / `external:` / `reasoned:`, with the quoted evidence, cited source, or written-out argument)
-- rationale（理由：basis 如何连接到 move 的 significance）
-- downsides（缺点）
-- confidence score（置信度分数）
-- estimated complexity（预估复杂度）
+`OUTPUT_FORMAT`（在 SKILL.md Phase 0.0 resolve；默认 `html`）决定 extension。每次 run 都写文件：不要等用户请求。
 
-然后包含 brief rejection summary，让用户看到哪些内容被考虑过并 cut。
+1. **Resolve target directory and extension（解析目标目录和扩展名）。**
+   - Extension 跟随 `OUTPUT_FORMAT`（默认 `.html`；override 时 `.md`）。
+   - **Repo mode：** 确保 `docs/ideation/` 存在（不存在则创建）。
+   - **Elsewhere mode 且 `docs/ideation/` 已存在：** 使用它。
+   - **否则（无 repo，或 elsewhere 且无 `docs/ideation/`）：** 写入本 run 的 CE temp area，即 Phase 1 resolve 的 `<scratch-dir>`（`/tmp/compound-engineering/ce-ideate/<run-id>/`）。**不要**写入用户 current working directory，也**不要**为与 repo 无关的 subject 创建 `docs/ideation/` tree。Announce absolute path，并说明它是 temporary（`/tmp` reboot 后会清理；想保留就移动它）。
+2. **Choose file path：** `<dir>/YYYY-MM-DD-<topic>-ideation.<ext>`；无 focus 时用 `<dir>/YYYY-MM-DD-open-ideation.<ext>`。
+3. **Load section contract and rendering reference（从 Phase 0.0 deferred）：** 读取 `references/ideation-sections.md`，并读取与 `OUTPUT_FORMAT` 匹配的 format-rendering reference：`md` 用 `references/markdown-rendering.md`，`html` 用 `references/html-rendering.md`。
+4. **Write document：** 按这些 references 写入。`ideation-sections.md` 定义 section contract（metadata、Grounding Context、Topic Axes、Ranked Ideas 及 per-idea fields、Rejection Summary）；rendering reference 定义 resolved format 如何呈现。两种格式内容相同，presentation 不同。
+   - **写入失败**（无 writable path、permissions）：announce failure，并提供 custom path（validate writable；创建 parent dirs）。绝不要静默丢失 survivors。
 
-保持 presentation concise。允许 brief follow-up questions 和 lightweight clarification。
+**Resume：** 就地更新 existing file，并使用其 existing format（按 SKILL.md Phase 0.1 format precedence）；保留 prior ideas 和 rejection summary，在其上追加，而不是覆盖。
 
-## Phase 5：Persistence（持久化，Opt-In，Mode-Aware）
+### 4.2 Present a Concise Summary（不是完整 deliverable）
 
-Persistence 是 opt-in。terminal review loop 是完整 ideation cycle。Refinement loops 在 conversation 中发生，没有 file 或 network cost。只有当用户明确选择 save、share 或 hand off（Phase 6 中选择）时，才触发 persistence。
+完整 cards、rationale、downsides、diagrams 和 rejection table 都在文件中。**不要**在 session 中复刻它们：把整个 deliverable 作为 chat text 重新打印会破坏 rich format，让 reader 在看到文件前先读一遍 plain text。只展示 tight orientation：
 
-当用户在 Phase 6 选择需要 durable record 的选项（Open and iterate in Proof、Brainstorm、Save and end）时，先确保 record 存在。当用户选择 keep refining 时，除非用户要求，否则不需要 record。
+- 一行 counts 和 path，例如：`Wrote 7 ranked ideas (36 raw, 13 cut) across 5 axes → <absolute path>`。
+- Ranked list，**每个 survivor 一行**：`1. <Title> · <axis> · Conf <High/Med/Low> · Cx <S/M/L>`。
+- 用一句话 call out top pick。
+- 如果某个 axis 有 zero survivors，用一行注明（deliberate gap）。
 
-**Mode-determined defaults（由 mode 决定的默认值）:**
+这个 ranked list 同时是用户在 Phase 5 选择 idea 时引用的 index。Terminal-only readers 仍然获得 usable view；深入内容只需打开文件。
 
-| Action | Repo mode default | Elsewhere mode default |
-|---|---|---|
-| Save | `docs/ideation/YYYY-MM-DD-<topic>-ideation.md` | Proof |
-| Share | Proof（additional） | Proof（primary） |
-| Brainstorm handoff | `ce-brainstorm` | `ce-brainstorm`（universal-brainstorming） |
-| End | Conversation only is fine | Conversation only is fine |
+### 4.3 Open It（打开它）
 
-任一 mode 都可在 explicit request 下使用另一 destination（"save to Proof even though this is repo mode"、"save to a local file even though this is elsewhere"）。直接尊重这些 overrides。
+- **HTML：** 在 interactive session 中，best-effort 使用平台 open primitive 打开 browser（macOS `open`、Linux `xdg-open`、Windows `start`）；始终打印 absolute path，方便 reopen 或 share。Headless / pipeline runs 中跳过 auto-open（无 interactive surface）。
+- **Markdown：** 打印 path。Proof（markdown iterate surface）通过 Phase 5 menu 进入；这是 network action，不自动调用。
 
-### 5.1 File Save（repo mode 默认；elsewhere mode 按需）
+## Phase 5：Next Steps（下一步）
 
-1. 确保 `docs/ideation/` 存在
-2. 选择 file path：
-   - `docs/ideation/YYYY-MM-DD-<topic>-ideation.md`
-   - `docs/ideation/YYYY-MM-DD-open-ideation.md` when no focus exists
-3. 写入或更新 ideation document
+使用平台 blocking question tool 询问下一步：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错时（例如 Codex edit modes），才退回聊天中的 numbered options；不要因为需要 schema load 就退回。绝不要静默跳过问题。接受 free-text answers。
 
-使用此结构，仅在必要时省略明显 irrelevant fields：
+Deliverable 已经存在（Phase 4），所以 menu 只决定 **what next**：没有 "save" step。
 
-```markdown
----
-date: YYYY-MM-DD
-topic: <kebab-case-topic>
-focus: <optional focus hint>
-mode: <repo-grounded | elsewhere-software | elsewhere-non-software>
----
+**Stem:** "Your ideation is saved to `<path>`. What next?"
 
-# Ideation: <Title>
+提供四个 options（labels self-contained，并把 distinguishing word 放前面，避免截断后混淆）。Option 1 是 **format-keyed**：每次 run 只渲染两个 labels 中与 `OUTPUT_FORMAT` 匹配的一个。
 
-## Grounding Context
-[Grounding summary from Phase 1 — labeled "Codebase Context" in repo mode, "Topic Context" in elsewhere mode]
+1. *(当 `OUTPUT_FORMAT=html`)* **Open in browser** — 打开已保存的 HTML deliverable（如果已打开，则重新打开）。
+   *(当 `OUTPUT_FORMAT=md`)* **Open and iterate in Proof** — 在 Proof 的 HITL review loop 中打开已保存 markdown；reviewed edits sync 回 local file。
+2. **Brainstorm one idea with `ce-brainstorm`** — 将选中的 idea commit 到 requirements doc；离开 ce-ideate。先询问哪一个 idea。
+3. **Iterate on one idea (adjust / ask, stay here)** — 在 commit 前 sharpen 或 interrogate 某个 idea。询问哪一个 idea 以及如何处理。
+4. **Done — keep the file and stop.**
 
-## Topic Axes
-[3-5 axes from Phase 1.5, one per line, OR a single line `Decomposition skipped — atomic subject` / `Decomposition skipped — surprise-me mode` when Phase 1.5 was skipped. Omit this section entirely if not applicable.]
+**Adjacent nudge（prose，不占 option slot）：** "Don't want it kept? Say 'discard' and the agent deletes the file." 通过 free text 处理（见 §5.5）；仅适用于本次新建文件，永远不删除 resumed 或 pre-existing doc。
 
-## Ranked Ideas
+如果用户 inline 已命名 idea（例如 "brainstorm the table tool"、"tighten the highlighter idea"），§5.2 / §5.3 跳过 "which idea?" follow-up。
 
-### 1. <Idea Title>
-**Description:** [Concrete explanation]
-**Axis:** [Topic axis this idea targets — omit when decomposition was skipped]
-**Basis:** [`direct:` / `external:` / `reasoned:` — quoted, cited, or written-out argument]
-**Rationale:** [How the basis connects to the move's significance]
-**Downsides:** [Tradeoffs or costs]
-**Confidence:** [0-100%]
-**Complexity:** [Low / Medium / High]
-**Status:** [Unexplored / Explored]
+### 5.1 Open in Browser (html) / Open and Iterate in Proof (md)
 
-## Rejection Summary
+- **HTML — Open in browser。** 尽可能通过平台 primitive 重新打开 saved file；否则打印 absolute path。随后回到 Phase 5 menu。没有 Proof，没有 sync；HTML file 是 canonical record。
+- **Markdown — Open and iterate in Proof。** Local markdown file 已在 Phase 4 存在，所以 Proof 是其 review surface，不是 primary record。以 HITL-review mode 加载 `ce-proof` skill，参数为：
+  - **source file:** Phase 4 中保存的 `.md` file。
+  - **doc title:** `Ideation: <topic>` 或 doc 的 H1。
+  - **identity:** `ai:compound-engineering` / `Compound Engineering`。
+  - **recommended next step:** `/ce-brainstorm`。
 
-| # | Idea | Reason Rejected |
-|---|------|-----------------|
-| 1 | <Idea> | <Reason rejected> |
+  返回后，proof skill 将 reviewed markdown sync 回 local file；然后无论 status 如何，都返回 Phase 5 menu。如果 Proof handoff 在 proof skill internal retry 和一次 orchestrator-side retry（约 2 秒 pause，并叙述 "Retrying Proof... attempt 2/2"）后仍失败，告诉用户 Proof unavailable，且 local file 完整保留在 `<path>`，然后返回 menu：deliverable 从未有风险，因为 Phase 4 已写入。*(如果用户在 HTML run 中明确要求 Proof：Proof is markdown-only；Proof 仅支持 markdown，cannot ingest HTML。因此渲染一个 throwaway markdown copy of survivors 作为 Proof source，不上传 `.html`，并说明 Proof edits 不会 sync 回 HTML canonical。)*
 
-[When applicable, append axis-coverage gaps as their own rows so the gap is visible:]
-| - | axis: <name> | recovery skipped (cap reached) — no survivors on this axis |
-```
+### 5.2 Brainstorm One Idea
 
-如果 resuming：
-- 就地更新 existing file
-- 保留 explored markers
+1. **Identify the idea** by number or name（如果用户已命名则跳过）。根据 Phase 4.2 的 ranked list 匹配。
+2. **从 orchestrator context 中已有的 idea substance 构建 focused seed。** do **not** pass the whole file：那既浪费又噪声（其它 survivors、grounding、rejection table 与定义这个 idea 无关；HTML 还带 CSS/SVG chrome）。也不要只传 file pointer：这会迫使 `ce-brainstorm` 重新 open 并 extract orchestrator 已经持有的 idea。Seed 采用 feature-description shape：
 
-### 5.2 Proof Save（elsewhere mode 默认；repo mode 按需）
+   > `<title> — <description>. Basis: <basis/evidence>. Why it matters: <rationale>. Known tradeoffs: <downsides>.`
 
-以 HITL review mode 将 ideation content hand off 给 `ce-proof` skill。它会上传 doc，运行 iterative review loop（用户在 Proof 中 annotate，agent ingest feedback、apply agreed edits，并在线程中 replies/resolves），并且（在 repo mode 中）将 reviewed markdown 同步回 `docs/ideation/`。
+   Basis/evidence 会直接 feed `ce-brainstorm` 的 product-pressure-test，避免它重新推导已有信息。追加一行 provenance pointer：`(Seeded from ce-ideate: <path>, idea "<title>")`，用于记录 origin，并允许 brainstorm 在需要时 pull adjacent detail，而不是强迫它读取全部内容。
+3. **Load `ce-brainstorm` skill** with that seed。Saved file 已经是 record；无需额外 write step。
 
-以 HITL-review mode 加载 `ce-proof` skill，参数为：
+**Repo mode only:** **不要**跳过 brainstorming 直接进入 `ce-plan`；`ce-plan` 需要 brainstorm-grounded requirements。在 elsewhere modes 中，ideation 是合法 terminal state；brainstorming 是对某个 idea 的 optional deeper development，而不是这些 modes 中不存在的 implementation ladder 上的 required next rung。
 
-- **source content:** Phase 4 的 survivors 和 rejection summary（在 repo mode 中，这是 5.1 写入的文件；在 elsewhere mode 中，渲染到 temp file 作为 upload source）
-- **doc title:** `Ideation: <topic>` 或 ideation doc 的 H1
-- **identity（身份）:** `ai:compound-engineering` / `Compound Engineering`
-- **recommended next step:** `/ce-brainstorm`（显示在 proof skill 的最终 terminal output 中）
+### 5.3 Iterate on One Idea
 
-当此 hand-off 失败时，由 Phase 6.5 的 Proof failure ladder 处理。
+这仍停留在 ce-ideate：不 hand off 到其它 skill。它是 "poke at one idea before committing" step。
 
-**Caller-aware return.** 下方 return-rule bullets 描述默认 control flow，但下一步取决于哪个 Phase 6 option 调用了 Proof save。为 caller 应用正确 branch：
+1. **Identify the idea**（number 或 name）以及用户想怎么 iterate：adjust、ask，还是 go deeper。能从 phrasing 推断则推断，否则询问。
+2. **Route by intent：**
+   - **Adjust**（"smaller scope"、"drop the paste-import part"、"reframe around X"）：按讨论 revise 该 idea 的 framing、scope 或 basis，然后 **rewrite saved file**，确保 deliverable 保持 current。
+   - **Ask**（"why High confidence?"、"how does this compare to FigJam?"）：基于该 idea 的 basis 和 Phase 1 grounding 在 conversation 中回答。除非讨论产生用户想 capture 的 change，否则 **不 rewrite file**。
+   - **Deepen**（"expand the second-order effects"）：扩展该 idea 的 analysis；只有当用户想保留时才 capture 到 file。
+3. **Rewrite only on change。** 只有 idea content 确实改变时才 rewrite file；纯 Q&A 不 churn。
+4. **Return to Phase 5 menu。** 通常用户下一步会 brainstorm sharpened idea（§5.2）、继续 iterate、打开文件或 finish。
 
-- **§6.2 Open and iterate in Proof.** Behavior 是 mode-aware：
-    - *Repo mode:* 每种 status 都返回 Phase 6 menu。Proof-reviewed content 现在已 local synced，用户通常还有 repo 中的 follow-up action（brainstorm toward a plan、save and end 或 keep refining）。
-    - *Elsewhere mode:* 成功 Proof return（`proceeded` 或 `done_for_now`）后 cleanly exit：叙述 artifact 位于 `docUrl`（如适用，包含任何 stale-local note），然后停止。Proof iteration 在 elsewhere mode 中常是 terminal act；用户已得到所需内容后再强制菜单选择会产生 decision fatigue。只有 `aborted` branch 返回 Phase 6 menu，让用户 retry 或选择其他 path。
-- **§6.3 Brainstorm a selected idea.** 成功 Proof return（`proceeded` 或 `done_for_now`）后，**不要**停在 Phase 6 menu；应用下方 per-status handling（包括任何 stale-local pull offer）后，继续进入 §6.3 的 remaining bullets（将 chosen idea 标记为 `Explored`，然后加载 `ce-brainstorm`）。只有 `aborted` branch 返回 Phase 6 menu，因为没有写入 durable record。
-- **§6.4 Save and end.** 成功 Proof return（`proceeded` 或 `done_for_now`）后 cleanly exit：叙述 ideation 已保存，surface `docUrl`（以及 local-path note，如适用），然后停止。**不要**重新询问 Phase 6 question；用户已经选择结束。只有 `aborted` branch 返回 Phase 6 menu，让用户 retry 或选择其他 path。
+### 5.4 Done
 
-当 proof skill 交还控制权时：
+文件已经写入，所以没有 save step。
 
-- `status: proceeded` 且 `localSynced: true` → 磁盘上的 ideation doc 现在反映了 review。对 invoking branch 应用上方 caller-aware return rule。
-- `status: proceeded` 且 `localSynced: false` → reviewed version 位于 Proof 的 `docUrl`，但 local copy 已陈旧。使用 proof skill 的 Pull workflow，询问是否将 Proof doc 拉取到 `localPath`。应用上方 caller-aware return rule；如果 pull 被拒绝，包含一行 note，说明 `<localPath>` 相比 Proof 已陈旧，避免下一次 handoff（或最终 exit narration）静默读取旧内容。Placement：当 caller-aware rule 返回 menu 时放在 Phase 6 menu 上方；§6.3 时放在 `ce-brainstorm` handoff preamble 中；§6.2 elsewhere / §6.4 时放在 final save/exit narration 旁。
-- `status: done_for_now` → 如果用户离开前在 Proof 中编辑过，磁盘上的 doc 可能已陈旧。询问是否将 Proof doc 拉取到 `localPath`，让 local ideation artifact 保持同步，然后应用上方 caller-aware return rule。`done_for_now` 表示用户停止 HITL loop；不表示他们结束整个 ideation session，除非 caller-aware rule 退出（§6.2 elsewhere mode 或 §6.4）。如果 pull 被拒绝，在上一 bullet 描述的 placement 加入 stale-local note。
-- `status: aborted` → 无论 caller 如何，不做更改并回退到 Phase 6 menu。未写入 durable record，因此 §6.3 不得继续 brainstorm handoff，§6.4 不得结束；menu 允许用户 retry 或选择其他 path。
+- **在 git repo 中：** offer 只 commit ideation doc（不创建 branch，不 push；如果用户拒绝，保留 uncommitted）。
+- **Temp-area 或 non-repo file：** 跳过 commit offer。
 
-## Phase 6：Refine or Hand Off（精修或交接）
+然后 narrate path 并结束 session；不要返回 menu。
 
-使用平台 blocking question tool 询问下一步：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错时（例如 Codex edit modes），才回退到聊天中的编号选项；不能因为需要 schema load 就回退。绝不要静默跳过问题。
+### 5.5 Discard（free text）
 
-**Question:** "Agent 接下来应该做什么？"
+仅当文件是 **本次 run 新建** 时：删除它，确认 deletion，然后结束。对于 **resume run**（pre-existing file 被就地更新），**不要**删除：告诉用户 existing doc at `<path>` remains，不提供 destructive action。Discard 永远不是 default；只在 explicit request 时触发。
 
-提供以下四个 options（labels self-contained，且 distinguishing word front-loaded，让 options 被截断时仍保持 distinct）：
-
-1. **Refine the ideation in conversation (or stop here — no save)** — 添加 ideas、re-evaluate 或 deepen analysis。没有 file 或 network side effects；选择后任何时候结束 conversation 都是 valid no-save exit。
-2. **Open and iterate in Proof** — 将 ideation 保存到 Proof，并进入 proof skill 的 HITL review loop：通过 Proof editor 中的 comments 迭代；在 repo mode 中，reviewed edits 会 sync 回 `docs/ideation/`。
-3. **Brainstorm a selected idea** — 以 chosen idea 作为 seed 加载 `ce-brainstorm`。orchestrator 先使用 Phase 5 的 mode default 写入 durable record。
-4. **Save and end** — 使用 mode default persist ideation（repo mode 中为 file，elsewhere mode 中为 Proof），然后结束。
-
-No-save exit 无需 dedicated menu option 也受支持。选择 option 1 并停止 conversation，或使用 question tool 的 free-text escape 直接说明；persistence 是 opt-in，且 terminal review loop 已经是完整 ideation cycle。
-
-completion 时不要删除本次 run 的 scratch directory（Phase 1 中解析出的 `<scratch-dir>`）。V15 web-research cache 是 session-scoped，并会被同一 session 中后续 ideation invocations 跨 run-ids 复用（见 `references/web-research-cache.md`）；per-run cleanup 会破坏这种复用。Checkpoint A（`raw-candidates.md`）和 Checkpoint B（`survivors.md`）留下成本很低，并符合 repo 的 Scratch Space cross-invocation-reusable convention；OS 会处理最终 cleanup。
-
-### 6.1 在 Conversation 中精修 Ideation
-
-按 intent route refinement：
-
-- `add more ideas` or `explore new angles` -> return to Phase 2
-- `re-evaluate` or `raise the bar` -> return to Phase 3
-- `dig deeper on idea #N` -> expand only that idea's analysis
-
-refinement 期间不触发 persistence。用户准备 persist 时，可以选择 Save and end（或 Brainstorm，或 Open and iterate in Proof）。
-
-refinement 后结束，或根本不 refinement 直接结束，都是 valid no-save exit。没有 required next step；在这里停止 conversation 不留下 durable artifact，这符合 opt-in persistence contract。
-
-### 6.2 在 Proof 中打开并迭代
-
-以 §6.2 作为 caller，通过 §5.2 调用 Proof HITL review path。在 repo mode 中，先确保 local file 存在（运行 §5.1），让 HITL sync-back 有 target；在 elsewhere mode 中，§5.2 照常渲染到 temp file。两种情况下都遵守 Phase 5 的 "ensure a record exists first" contract。
-
-为 §6.2 branch 应用 §5.2 的 caller-aware return rule；behavior 是 mode-aware。在 repo mode 中，每种 status 都返回 Phase 6 menu，让用户在 Proof review 已反映到 local file 后选择 follow-up（brainstorm toward a plan、save-and-end 或 keep refining）。在 elsewhere mode 中，成功 Proof return 后 cleanly exit，因为 Proof iteration 常是 terminal act；artifact 位于 `docUrl`，且是 canonical record；只有 `aborted` status 返回 menu。
-
-如果 Proof handoff 失败，由 §6.5 Proof Failure Ladder 管理 recovery。
-
-### 6.3 Brainstorm 选中的 Idea
-
-- 根据 Phase 5 的 mode default 写入或更新 durable record（repo mode 中为 file，elsewhere mode 中为 Proof）。当这一路径经过 §5.2 Proof Save 时，应用 §5.2 的 caller-aware return rule：成功 Proof return 后继续到下一 bullet，而不是弹回 Phase 6 menu。如果 Proof 返回 `aborted`（未写入 durable record），回到 Phase 6 menu，且**不要**继续 brainstorm handoff。
-- 在 saved record 中将 chosen idea 标记为 `Explored`
-- 以 chosen idea 作为 seed 加载 `ce-brainstorm` skill
-
-**Repo mode only:** **不要**跳过 brainstorming 并从 ideation output 直接进入 `ce-plan`；`ce-plan` 需要 brainstorm-grounded requirements。在 elsewhere modes 中，ideation（或 ideation + Proof iteration）是合法 terminal state；brainstorming 是对某个 idea 的 optional deeper development，而不是这些 modes 中不存在的 implementation ladder 上的 required next rung。
-
-### 6.4 Save and End（保存并结束）
-
-通过 mode default persist（repo mode 中 5.1，elsewhere mode 中 5.2），然后结束。如果用户要求使用 non-default destination，尊重该 explicit request。
-
-当 path 落到 Proof save（5.2）时，为 §6.4 branch 应用 §5.2 的 caller-aware return rule：成功 Proof return 后 cleanly exit；叙述 save，surface `docUrl`（以及 pull 被拒绝时的任何 stale-local note），然后停止。**不要** loop back to Phase 6 menu；用户已经选择结束。只有 Proof 返回 `status: aborted` 时回到 menu，让用户 retry 或选择其他 path（file save、custom path 或 keep refining）。§6.5 Proof Failure Ladder 仍管理 persistent Proof failures，并以 Phase 6 menu 结束；该 failure-recovery path 与这里描述的 successful-save exit 不同。
-
-当 path 落到 file save（5.1）时：
-
-- 仅 offer commit ideation doc
-- 不创建 branch
-- 不 push
-- 如果用户拒绝，保留 file uncommitted
-
-file save（以及 optional commit）后，结束 session；不要返回 Phase 6 menu。
-
-### 6.5 Proof Failure Ladder（Proof 失败阶梯）
-
-`ce-proof` skill 在 surface failure 前，会对 transient failures（`STALE_BASE`、`BASE_TOKEN_REQUIRED`）内部执行 single-retry-once。proof skill 的 return contract 不向 callers 暴露 typed error classes；orchestrator 无法从外部区分 retryable 和 terminal failures。
-
-**Orchestrator-side retry harness（刻意 minimal）：** 将 proof skill invocation 包裹在**一次**额外 best-effort retry 中，并短暂停顿（约 2 秒）。proof skill 已在内部 retry，因此这会捕获 orchestrator boundary 的 transient races，而不会叠加太多 latency。不要从 skill 外部 classify error types；不存在 detection mechanism。
-
-通过检查 proof skill 失败前是否返回了 `docUrl`，区分 create-failure 和 ops-failure：
-
-- **Create-failure**（未返回 `docUrl`）：retry create。
-- **Ops-failure**（已返回 `docUrl`，但后续 operation 失败）：只 retry failing operation。**不要 recreate** document。
-
-**Failure narration.** 向 terminal 叙述这次 single retry，避免 pause 看起来像 hang（"Retrying Proof... attempt 2/2"）。persistent failure 时，在显示 fallback menu 前说明 retry exhausted。
-
-**Fallback menu after persistent failure.** 使用平台 blocking question tool。呈现这些 options（如果 CWD 不在 repo 中，则省略 option (a)）：
-
-- "Save to `docs/ideation/` instead"（改存到 `docs/ideation/`；repo-mode 默认 destination，CWD 位于 git repo 内时可用）
-- "Save to a custom path the user provides"（保存到用户提供的 custom path；validate writable，创建 parent dirs）
-- "Skip save and keep the ideation in conversation"（跳过保存，只把 ideation 留在 conversation 中；no persistence）
-
-如果 proof 在失败前返回 partial `docUrl`，将该 URL 与 fallback options 一起 surface，让用户可 recover 或 share partial record。
-
-fallback 完成后（任意 path），继续回到 Phase 6 menu，让用户仍可 refine、iterate in Proof、brainstorm 或 save and end。
+completion 时不要删除本次 run 的 scratch directory（`<scratch-dir>`）：它保存 V15 web-research cache（供同一 session 后续 ideation invocations 跨 run-ids 复用，见 `references/web-research-cache.md`）、Checkpoint A/B files，以及（no-repo case）deliverable 本身。OS 会处理最终 cleanup。
 
 ## Quality Bar（质量标准）
 

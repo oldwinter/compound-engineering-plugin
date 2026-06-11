@@ -91,14 +91,7 @@
 
    记录 completed work 是否有 observable behavior（UI rendering、CLI output、带 runnable example 的 API/library behavior、generated artifacts 或 workflow output）。只有当 evidence 可能存在时，`ce-commit-push-pr` skill 才会询问是否 capture evidence。
 
-2. **Update Plan Status（更新 Plan 状态）**
-
-   如果 input document 有带 `status` field 的 YAML frontmatter，将其更新为 `completed`：
-   ```
-   status: active  ->  status: completed
-   ```
-
-3. **Commit and Create Pull Request（提交并创建 Pull Request）**
+2. **Commit and Create Pull Request（提交并创建 Pull Request）**
 
    加载 `ce-commit-push-pr` skill 处理 committing、pushing 和 PR creation。该 skill 负责 convention detection、branch safety、logical commit splitting、adaptive PR descriptions 和 attribution badges。
 
@@ -112,7 +105,7 @@
 
    如果用户偏好 commit 但不创建 PR，改为加载 `ce-commit` skill。
 
-4. **Notify User（通知用户）**
+3. **Notify User（通知用户）**
    - 总结已完成内容
    - 链接到 PR（如果创建了）
    - 说明任何需要的 follow-up work

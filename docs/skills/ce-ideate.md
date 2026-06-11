@@ -25,8 +25,8 @@
 |----------|--------|
 | 它做什么？ | 基于真实材料 grounding，把 topic 分解为 orthogonal axes，跨六种 conceptual frames 生成 candidates，adversarially critique，展示 5-7 个 survivors，每个都带 tagged basis |
 | 何时使用 | Greenfield exploration、big-picture thinking、codebase audits、surprise-me runs、naming、decisions、business strategy；任何想要 qualified candidate set 而不是 refined idea 的 domain |
-| 产出什么 | `docs/ideation/` 中的 ranked ideation artifact（或对 non-software topics 输出到 Proof） |
-| 下一步 | 对选中的 survivor 运行 `/ce-brainstorm`，或保存后离开 |
+| 产出什么 | Ranked ideation artifact；默认写成单个 self-contained HTML file（面向 human readers，丰富且可在 browser 打开）。传入 `output:md` 可写成 markdown。存在 `docs/ideation/` 时自动写入那里，否则写到已 announce 的 `/tmp/compound-engineering/` 临时路径 |
+| 下一步 | 对选中的 survivor 运行 `/ce-brainstorm`，先 iterate 某个 idea，或保留已保存文件后结束 |
 
 ---
 
@@ -96,7 +96,7 @@ Orchestrator 用一致 rubric critique 每个 candidate：groundedness、basis s
 
 Grounding agents 并行返回：codebase summary、relevant past learnings、developer-experience patterns 的 external prior art。Orchestrator 将 topic 分解为 4-5 个来自 grounding 的 axes（例如 "DX improvements" 可分为 feedback loops、environment friction、tooling ergonomics、knowledge accessibility、automation surface）。六个 ideation sub-agents 从不同 frames 生成 candidates，每个都标注 target axis。Orchestrator 将 40+ candidates 合并成一个 list，synthesize cross-cutting combinations，运行 axis-coverage check（任何 empty axis 都触发一次 bounded recovery dispatch），再运行 adversarial critique pass；大约 13 个 ideas 因过于 vague、缺乏 justification 或重复而被 cut。
 
-你看到六个分布在 axes 上的 survivors。每个都有 tagged basis（例如 "tests/cli.test.ts:42 spawns 14 different bash invocations"）、连接该 basis 与 move significance 的 rationale、target axis、downsides、confidence 和 complexity。Rejection summary 列出被 cut 的内容和原因，并列出最终仍未覆盖的 deliberate gaps。最后出现四选一 menu：refine in conversation、open in Proof、brainstorm a chosen survivor，或 save and end。
+完整 deliverable 会自动写成 self-contained HTML file 并在 browser 中打开：其中包含全部七张 cards（basis、rationale、downsides、confidence、complexity）和 rejection summary。Session 本身只展示 concise ranked summary 和路径，让你阅读 rich version，而不是一墙 terminal text。随后出现四选一 next-steps menu：在 browser 中打开、用 `ce-brainstorm` brainstorm one idea、iterate on one idea（adjust 或 ask，仍留在这里），或 done。（Markdown runs 会把 "open in browser" 换成 "open and iterate in Proof"。）
 
 ---
 
@@ -137,7 +137,7 @@ Grounding agents 并行返回：codebase summary、relevant past learnings、dev
 /ce-work              "Build it."
 ```
 
-每个 artifact 都是下一步的 structured input：survivor 的 basis 作为 brainstorm 的 evidence base 继续传递；brainstorm 的 decisions 流入 plan 的 requirements 和 scope；plan 的 U-IDs 和 test scenarios 成为 `ce-work` 执行的 guardrails。当你在 Phase 4 menu 选择 "Brainstorm a chosen idea" 时，survivor 会保存（status 为 `Explored`），并用该 idea 作为 seed 加载 `ce-brainstorm`。
+每个 artifact 都是下一步的 structured input：survivor 的 basis 作为 brainstorm 的 evidence base 继续传递；brainstorm 的 decisions 流入 plan 的 requirements 和 scope；plan 的 U-IDs 和 test scenarios 成为 `ce-work` 执行的 guardrails。当你在 next-steps menu 选择 "Brainstorm one idea" 时，`ce-brainstorm` 会用该 idea 作为 substance seed（basis、rationale 和 tradeoffs）加载；ideation file 此时已经保存。
 
 Chain 也能运行在 non-software domains：weekend-trip directions 的 ideation 会进入定义 trip 的 brainstorm，再进入把 bookings、packing 和 itinerary 结构化为 guardrails 的 plan。
 
@@ -145,7 +145,7 @@ Chain 也能运行在 non-software domains：weekend-trip directions 的 ideatio
 
 ## 单独使用
 
-`ce-ideate` 本身就是完整 ideation cycle。Terminal review loop 会产出带 reasons 的可用 idea set；persistence 是 opt-in。
+`ce-ideate` 本身就是完整 ideation cycle：它会产出一个已保存、可打开、可分享、可继续 brainstorm、也可 discard 的 ranked reasoned idea set。
 
 **Software（软件）：**
 
@@ -162,7 +162,7 @@ Chain 也能运行在 non-software domains：weekend-trip directions 的 ideatio
 - **Business strategy（商业策略）**：go-to-market、positioning against a competitor
 - **Travel and events（旅行与活动）**：trip themes、wedding-venue concepts
 
-完全支持 refine 而不 persist：选择 "Refine in conversation"，结束后停止聊天即可。不会写任何文件。
+Deliverable 会自动写入，不需要额外请求。如果某次 run 纯属探索而你不想保留，说 "discard" 即可删除该文件。
 
 ---
 
@@ -176,6 +176,7 @@ Chain 也能运行在 non-software domains：weekend-trip directions 的 ideatio
 | `<constraint>` | 例如 `low-complexity quick wins`、`polish-only` |
 | `surprise me` | Surprise-me mode |
 | `top issue themes in <area>` | 触发 issue-tracker intent |
+| `output:md` | 将 artifact 写成 markdown，而不是默认 self-contained HTML（`output:html` 会显式强制 HTML）。也可通过 `.compound-engineering/config.local.yaml` 中的 `ideate_output` 做 per-project 设置 |
 
 Prompt 任意位置支持 skip phrases：`no external research`、`no slack`。
 
@@ -192,8 +193,8 @@ Single-prompt ideation 会塌缩到 agent 最常训练的方向。不同 frames 
 **它真的适用于 non-software topics 吗？**
 是。相同的 generate-critique-survive engine 会用 domain-native language 处理 naming、narrative、personal decisions 和 business strategy。Codebase grounding 会替换为 user-context synthesis 和 external research。
 
-**如果我只想在对话中 refine ideas，不想保存呢？**
-在 Phase 4 menu 中选择 "Refine the ideation in conversation"。Terminal review loop 本身是完整 cycle。Persistence 是 opt-in。
+**如果我想在进入 brainstorm 前 tweak 某个 idea 呢？**
+选择 "Iterate on one idea"：说明 idea 名称以及你想怎么改（调整 scope、提问、深入分析）。实际调整会更新已保存文件；纯 Q&A 不会。如果你后来不想保留自动写出的文件，说 "discard" 即可。
 
 **如果我的 prompt ambiguous 呢？**
 当 prompt 只指向某种 quality（`improvements`、`quick wins`）而不是 specific thing 时，subject-identification gate 会问一个 scope question。"Surprise me" 会作为真实 option 提供，而不是 fallback。
@@ -205,5 +206,5 @@ Single-prompt ideation 会塌缩到 agent 最常训练的方向。不同 frames 
 - [`ce-brainstorm`](./ce-brainstorm.md) - 选中 survivor 后，将方向 brainstorm 成 requirements doc
 - [`ce-plan`](./ce-plan.md) - requirements 清晰后，规划 implementation
 - [`ce-strategy`](./ce-strategy.md) - 将 ideation 锚定到 documented product strategy
-- [`ce-doc-review`](./ce-doc-review.md) - review saved ideation artifact 的 clarity 和 completeness
-- [`ce-proof`](./ce-proof.md) - 在 Proof 中打开 artifact 进行 collaborative iteration
+- [`ce-doc-review`](./ce-doc-review.md) - review saved ideation artifact 的 clarity 和 completeness（仅 markdown output；先用 `output:md` 运行）
+- [`ce-proof`](./ce-proof.md) - 在 Proof 中打开 artifact 进行 collaborative iteration（仅 markdown output；Proof 不能 ingest HTML）

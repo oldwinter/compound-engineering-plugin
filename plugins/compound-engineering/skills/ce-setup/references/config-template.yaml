@@ -40,6 +40,7 @@
 
 # plan_output: html              # md | html (default: md)
 # brainstorm_output: html        # md | html (default: md)
+# ideate_output: md              # md | html (default: html -- ideation docs are human-facing, so HTML is the default; set md to opt out)
 
 # --- ce-promote ---
 # 当你在 /ce-promote 中拒绝 Spiral setup offer 时自动写入。

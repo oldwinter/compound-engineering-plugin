@@ -89,15 +89,16 @@ Axes 应该：
 
 ## When to wrap up（何时收尾）
 
-在任何 persistence 前展示 survivors。每个 survivor 包含：title、description、**axis**（当 decomposition 产生 axis list 时）、**basis**（标记 `direct:` / `external:` / `reasoned:`，并带 quoted evidence、cited source 或 written-out argument）、rationale（basis 如何连接到 move significance）、downsides、confidence、complexity。然后给出简短 rejection summary，让用户看到考虑过并 cut 掉了什么，包括任何在 recovery 后仍为 zero survivors 的 axis，让 coverage gap 可见。
+使用与 `references/post-ideation-workflow.md` Phases 4-5 相同的流程收尾；本 mode 的 mechanics 完全一致：
 
-Persistence 是 opt-in。Terminal review loop 是完整 ideation cycle。Refinement 在 conversation 中发生，没有 file 或 network cost。只有当用户明确选择 save、share 或 hand off 时，才触发 persistence。
+- **Auto-write the deliverable（Phase 4.1）。** 完整 per-idea detail（title、description、axis、basis、rationale、downsides、confidence、complexity）和 rejection summary 放进 **file**；persistence 是 automatic，不是 opt-in。Location：当 `docs/ideation/` 已存在时写入那里，否则写入本 run 的 CE temp area（`/tmp/compound-engineering/ce-ideate/<run-id>/`），绝不写入用户 CWD。`OUTPUT_FORMAT`（SKILL.md Phase 0.0；默认 `html`）决定 extension。
+- **Present a concise summary（Phase 4.2）。** 展示 ranked list（title · axis · confidence · complexity）、counts、path，以及任何 zero-survivor axis。不要在 session 中重印完整 detail；rich file 才是用户实际阅读的 artifact。HTML 时，best-effort 在 browser 中 open it（Phase 4.3）。
 
-使用 platform 的 blocking question tool：Claude Code 中为 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`），Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或 call errors（例如 Codex edit modes）时，才 fallback 到 chat 中的 numbered options；不要因为需要 schema load 就 fallback。绝不要 silently skip question。提供四个 choices：
+然后通过 platform 的 blocking question tool 提供 Phase 5 next-steps menu：Claude Code 中为 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`），Codex 中为 `request_user_input`，Gemini / Pi 中为 `ask_user`。只有当 harness 没有 blocking tool 或 call errors 时，才 fallback 到 numbered list。绝不要 silently skip。四个 options，option 1 根据 format keyed：
 
-- **Refine the ideation in conversation (or stop here — no save)**：添加 ideas、re-evaluate 或 deepen analysis，不写任何文件。选择后在任意时刻结束 conversation 都是 valid no-save exit。
-- **Open and iterate in Proof**：按 `references/post-ideation-workflow.md` 中 §6.2 contract 调用 Proof HITL review path：将 survivors 上传到 Proof（由于 non-software elsewhere mode 不写 local file，先 render 到 temp file），通过 comments iterate，并在成功返回时以 Proof URL 作为 canonical record 干净退出。Proof iteration 通常是此 mode 的 terminal act，因此 flow 之后不强制另一个 menu choice。只有 `aborted` status 会返回此 menu。Persistent Proof failure 时，应用 `references/post-ideation-workflow.md` 的 §6.5 Proof Failure Ladder，确保 iteration attempt 不会没有 recovery。
-- **Brainstorm a selected idea**：通过 dialogue 深入一个 idea。不同于 repo mode，这不是 implementation chain 的第一步；之后没有 `ce-plan` -> `ce-work`；universal mode 中的 `ce-brainstorm` 会进一步发展该 idea（例如把 name 扩展成 brand brief、把 plot 扩展成 outline、把 decision 扩展成 weighed framework）并在那里结束。先按 `references/post-ideation-workflow.md` §6.3 contract persist：将 survivors 保存到 Proof（elsewhere-mode default），或当用户明确要求 local file 时保存到 `docs/ideation/`，将 chosen idea 标记为 `Explored`，然后以该 idea 作为 seed 加载 `ce-brainstorm`。Proof 成功返回（`proceeded` 或 `done_for_now`）时，按 §5.2 caller-aware return rule 继续进入 brainstorm handoff；`aborted` 时，不 handoff，返回此 menu。Persistent Proof failure 时，在结束前应用 §6.5 Proof Failure Ladder，确保 brainstorm seed 通过 local-save fallback 得以保留。
-- **Save and end**：将 survivors 分享到 Proof（elsewhere-mode default）并结束。只有当用户明确要求 local file 时，才改用 `docs/ideation/`。Proof failure 时（包括单次 orchestrator-side retry 后），应用 `references/post-ideation-workflow.md` 的 §6.5 Proof Failure Ladder：结束前展示 local-save fallback menu（custom path 或 skip），避免用户没有 recovery path。
+1. **Open in browser** *(html)* / **Open and iterate in Proof** *(md)* — 打开 deliverable（按 §5.1）。Proof failure 时，auto-written local file 仍保持 intact。
+2. **Brainstorm one idea with `ce-brainstorm`** — 深入一个 chosen idea（询问哪一个）。在 universal mode 中，这 **不是** implementation chain 的第一步；之后没有 `ce-plan` -> `ce-work`。`ce-brainstorm` 会进一步发展 idea（name 到 brand brief、plot 到 outline、decision 到 weighed framework）并在那里结束。用 idea 的 substance + provenance pointer 作为 seed（按 §5.2），不要传 whole file。
+3. **Iterate on one idea (adjust / ask, stay here)** — 在 commit 前 sharpen 或 interrogate 某个 idea；adjustments rewrite file，Q&A 不 rewrite（按 §5.3）。
+4. **Done — keep the file and stop.**
 
-No-save exit 无需 dedicated menu option 也受支持。选择 Refine 后停止 conversation，或使用 question tool 的 free-text escape 直接说明；persistence 是 opt-in，terminal review loop 已经是完整 ideation cycle。
+Discard 是 free-text escape（说 "discard" 删除它），仅限 create-only；绝不删除 resumed 或 pre-existing doc。

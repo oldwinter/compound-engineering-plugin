@@ -8,7 +8,7 @@
 
 无论 artifact 由哪个 skill 产出，以下规则都成立。
 
-- **文件顶部有 YAML frontmatter。** 标准 `---` 分隔 block，包含 artifact 的 stable metadata（title、status、date、type 等；确切 fields 按 skill 而定，定义在 section contract 中）。可就地编辑；执行 status flips（`active → completed`）的 tools 和 agents 直接更新 YAML。
+- **文件顶部有 YAML frontmatter。** 标准 `---` 分隔 block，包含 artifact 的 stable metadata（title、date、type 等；确切 fields 按 skill 而定，定义在 section contract 中）。
 - **anchors 使用 ASCII identifiers。** Markdown headings 会从 heading text 自动生成 anchors。保持 headings 为 ASCII，让 anchors 可预测（`#implementation-units`，不是 `#implementación-units`）。
 - **file references 使用 repo-relative paths。** 始终如此。绝不要使用 absolute paths；它们会破坏跨 machines、worktrees、teammates 的 portability。
 - **不混入 HTML。** 保持 markdown 纯净。不要 `<div>`、不要 `<details>`、不要 inline `<style>`。如果 layout idea 只有 HTML 能实现，将其留给 HTML rendering。Markdown stays markdown。
@@ -119,8 +119,8 @@ Engineering process metadata 不进入 artifact：
 Per-skill frontmatter fields 定义在各 skill 的 section contract 中（`plan-sections.md` 列出 plan frontmatter；`brainstorm-sections.md` 列出 brainstorm frontmatter）。通用规则：
 
 - YAML 位于文件顶部，上下用独立一行的 `---` 分隔。
-- Field names 使用 lowercase snake_case（`status`、`created_at`，不是 `Status`、`CreatedAt`）。
-- **Status lifecycle 按 contract 而定。** 当 section contract 定义带 lifecycle 的 `status` field 时（plans 使用 `active → completed`，由 ce-work 在 shipping time 通过 direct YAML edit 翻转），可就地编辑。当 section contract 未定义 status lifecycle 时（例如 brainstorms 没有 `active → completed` flip；它们位于 plans 上游，并通过 plan 的 `origin:` 引用），不要引入 lifecycle。
+- Field names 使用 lowercase snake_case（`created_at`、`topic`，不是 `CreatedAt`、`Topic`）。
+- **No status / lifecycle field（无 status / lifecycle 字段）。** Artifacts 是 point-in-time records（decision 或 discovery），不是 tracked work items。不要引入 mutable `status` field 或 `active → completed` lifecycle；work 是否 shipped 由 git 推导，不存进 doc。
 - 跨 artifact revisions 保持稳定；绝不要 rename 或 repurpose field。
 
 ## Post-write audit（写入后审计）

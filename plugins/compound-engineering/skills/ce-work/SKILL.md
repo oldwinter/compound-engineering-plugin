@@ -58,7 +58,7 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
    - 如果任何内容 unclear 或 ambiguous，现在询问 clarifying questions。
    - 如果上方需要 clarifying questions，就让用户 approval resolved answers。如果不需要 clarifications，不做单独 approval step，直接继续：plan scope 是 plan 的 authority，不是要重新谈判的东西。
    - **不要跳过这一步**：现在提问比构建错误内容更好。
-   - **execution 期间不要编辑 plan body。** plan 是 decision artifact；progress 存在于 git commits 和 task tracker 中。ce-work 期间唯一的 plan mutation 是 shipping 时最终 `status: active → completed` flip（见 `references/shipping-workflow.md` Phase 4 Step 2）。Legacy plans 可能在 unit headings 上包含 `- [ ]` / `- [x]` marks：将它们作为 state 忽略；per-unit completion 通过读取当前 file state 在 execution 期间确定。
+   - **execution 期间不要编辑 plan body。** plan 是 decision artifact；progress 存在于 git commits 和 task tracker 中，不存在于 plan 中。`ce-work` 不 mutate plan；是否 shipped 由 git 推导，不记录在 doc 中。Legacy plans 可能在 unit headings 上包含 `- [ ]` / `- [x]` marks 或 `status:` field：将它们作为 state 忽略；per-unit completion 通过读取当前 file state 在 execution 期间确定。
 
 2. **Setup Environment（设置环境）**
 

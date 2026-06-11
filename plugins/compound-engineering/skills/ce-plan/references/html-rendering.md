@@ -18,32 +18,24 @@ HTML artifact 是该 skill 在本次 run 中产出的*唯一* artifact；output 
 
 无论 artifact 由哪个 skill 产出，以下 invariants 都成立。
 
-- **Single self-contained HTML5 file（单个自包含 HTML5 文件）。** 不要 companion `.css`、`.js` 或
+- **Single self-contained HTML5 file（单个自包含 HTML5 文件）。** No companion `.css`、`.js` 或
   `.svg` files。CSS 放在 `<style>` 中。SVG inline。Images 使用 base64 data URIs
   或 inline SVG。唯一允许的 exception 是指向 CDN webfont CSS endpoint
   （Google Fonts、Bunny Fonts 等）的 `<link rel="stylesheet">`，并配套
   offline-readable fallback font stack，确保 CDN unreachable 时 doc 仍 readable。
 - **所有 metadata 以 visible text 出现，且 single source of truth。**
-  artifact 的 metadata（title、type、status、date 等；exact fields 由各 skill
+  artifact 的 metadata（title、type、date 等；exact fields 由各 skill
   的 section contract 定义）render 为 downstream agents 和 humans 可读的 visible
   HTML elements。不要任何形式的 hidden machine-readable copy：不要
   `<script type="application/json">` frontmatter block，不要 `data-*` attribute
-  mirror，也不要在 `<head>` 中用 `<meta name="status">` /
-  `<meta name="created">` / `<meta name="origin">` 去重复 visible header
+  mirror，也不要在 `<head>` 中用 `<meta name="created">` /
+  `<meta name="origin">` 去重复 visible header
   中已有的相同 values。每个 value 只有一种 representation；这条规则防止的 failure
   就是两份 copy 之间 drift。
 
   `<time datetime="2026-05-12">2026-05-12</time>` 中的 text-and-attribute redundancy
   是 acceptable 的，因为 attribute 是 parser hint，不是 hidden copy。
-- **Editable status render 为 `<span class="status">{value}</span>`。**
-  Downstream tooling（下游工具，例如 `ce-work` shipping flip、future HTML-aware consumers）
-  通过 selector 查找并 rewrite status。将 status value embed 到 header `<dl>` cell
-  （`<dt>Status</dt><dd>active</dd>`）、`<meta>` tag，或没有 `class="status"`
-  hook 的 visible text 中，都会 break flip mechanic；consumer 要么找不到 value，
-  要么无法将它与 prose disambiguate。status span 可以位于 doc 任意位置（header
-  metadata 内、stats strip 中、hero banner 中）；placement 是 visual choice，
-  selector shape 才是 contract。
-- **Stable IDs 同时作为 anchor IDs 和 visible text。** 每个带 ID 的 item
+- **Stable IDs as anchor IDs AND visible text（稳定 ID 同时作为 anchor IDs 和 visible text）。** 每个带 ID 的 item
   （R-IDs、U-IDs、A-IDs、F-IDs、AE-IDs、KTDs）都在其 element 上有 `id="r1"`，
   并在 element 内以 visible text 出现（例如 table cell 或 heading 中的 "R1."）。
   Downstream agents 在 source 中查找 ID 的方式与在 markdown 中一样。
@@ -69,7 +61,7 @@ HTML artifact 是该 skill 在本次 run 中产出的*唯一* artifact；output 
 4. **Fallback default（默认 fallback）** — 没有 preference 时，agent 自行选择的 opinionated palette /
    typography（排版）。
 
-### Compose Time 的 Active Recall（compose 时主动回忆）
+### Active-recall at compose time（compose 时主动回忆）
 
 写 CSS 前，扫描 loaded context，寻找用户为这类 documents 指定的 stylesheet reference。
 如果找到且可 inline（short local file、budget 内 fetchable URL），将它 inline 到
@@ -95,34 +87,49 @@ compose time 读取一次。Absent → fall through 到 fallback default。
 仅限 worktree-root；不要 fall through 到 main checkout。使用 worktree 的用户如果想要
 HTML defaults，可以将 DESIGN.md 添加到该 worktree。
 
-**DESIGN.md 是 partial override，不是 all-or-nothing。** 真实 DESIGN.md files 差异很大：
-有些是 token tables，有些是 CSS variables，有些是 prose；多数只覆盖 HTML composition
-所需内容的 subset。应用适合 long-form text doc 的 tokens：typography roles（排版角色）、text colors（文本颜色）、
-contrast targets（对比度目标）、border-radius scale（圆角尺度）、elevation primitives（层级/阴影 primitives）、muted-vs-accent split（弱化色与强调色的分工）。
-跳过其余内容。要防御三个 specific failure modes：
+**DESIGN.md 是 partial override, not all-or-nothing。** 真实 DESIGN.md files 差异很大：
+有些是 token tables，有些是 CSS variables，有些是 prose；多数是为 *product or marketing surface*
+写的，不是为 long-form doc 写的。Governing split：**take the brand's scale-independent
+identity literally, own the scale-dependent layout values yourself, and skip decoration.**
 
+- **Take literally (scale-independent identity)：** color palette（在 contrast rule 下）、
+  font **weight** 和 **style**、OpenType features，以及 radius **character**（sharp vs rounded）。
+  这些承载 brand，且任何尺寸都安全。
+- **Own it yourself (scale-dependent layout)：** **type size scale** 和 **spacing magnitudes**。
+  DESIGN.md values 几乎总是 product/marketing-scaled（display headings 48-80px、airy ~96px
+  section gaps）；只把它们读作 *hierarchy*，然后设置 doc-appropriate values（body 约
+  14-16px，headings 约 body 的 1.2-1.6 倍，comfortable paragraph spacing）。
+- **Skip decoration：** decorative or atmospheric brand voltage with no content to attach to
+  in a doc，例如 gradient orbs、full-bleed hero photography、motion。Take the palette and feel；
+  do not reproduce the decoration。
+
+Specific cases：
+
+- **Fonts: load only open webfonts; never attempt a proprietary brand face。**
+  Self-contained doc 只能通过允许的 webfont `<link>` 加 offline fallback stack 载入 open
+  webfont（Google Fonts 或 open CDN）。**Assume a bespoke brand face is proprietary and do not
+  attempt to load it**：Airbnb Cereal、Coinbase Display/Sans、BMW Type、Waldenburg、Circular
+  这类字体无法在 single file 中 render；尝试只会产生 broken fallback。使用 DESIGN.md
+  自己的 fallback chain，或 family-matched system stack（serif↔serif、sans↔sans、
+  mono↔mono）。只有当 named face 是 known open webfont（Inter、Geist、Cal Sans、Roboto 等）
+  时才 load；不确定 open 与否时，不要尝试。Honor DESIGN.md declared roles（`body` /
+  `display` / `mono`），并且 never promote a display/decorative face into a body or small-text
+  role。Net：复现 brand 的 serif-vs-sans structure 和 weight voice，而不一定复现 exact faces。
+- **Typography-scale mismatch。** DESIGN.md typography tokens 通常为 product UI 而设：
+  marketing pages、app screens、hero sections，display headings 48-80px。Long-form doc 需要
+  body 约 14-16px、headings 约 body 的 1.2-1.6 倍。当 size scale 看起来 product-scaled
+  （common case）时，使用 **family**、**weight** 和 **OpenType feature** assignments
+  （这些承载 design language），并为 doc surface 选择 agent's own size scale。只有当 tokens
+  明确 doc-scaled（body 14-16px、headings 低于约 32px）时，才 literal 应用 DESIGN.md sizes。
 - **Scope mismatch（product UI vs doc surface）。** 面向 product marketing 或 app UI 的
-  DESIGN.md 可能命名 page-surface colors（页面表面色）、button states（按钮状态）、input borders（输入框边框）或 hero backgrounds（hero 背景）；
-  这些 tied to *that* surface，而不是 generic doc。Page-surface colors 是典型陷阱：
-  `--surface: #c0f0fb` 属于 product marketing page，不属于团队写的每个 plan 或
-  requirements doc。当 token 是 product-UI-scoped 时，提取 principle（design language
-  使用 tinted surface），而不是 literal value。只有 token 足够 generic 可 transfer 时
-  才应用 literal values（text color、type scale ratio、radius scale、contrast ratio）。
+  DESIGN.md 可能命名 tied to *that* surface 的 button states、input borders 或 hero backgrounds，
+  而不是 generic doc。Page surface 需要判断：**reading canvas**（white、off-white 或 legible
+  dark）可以 literal transfer，应该成为 doc background；bright product/marketing-hero surface
+  （`--surface: #c0f0fb`）则不行：当 token 是 product-UI-scoped 时，extract the principle
+  rather than the literal value。
 - **Partial coverage。** 当 DESIGN.md 定义了一些 categories 但没有定义其他 categories
-  （例如有 colors 但没有 spacing scale，有 typography 但没有 elevation）时，对它覆盖的部分
-  使用 DESIGN.md，其余使用 fallback default。不要要求 DESIGN.md complete 后才 honor 它。
-- **Named font without a fetchable source。** 当 DESIGN.md 命名 font（例如 "Signifier"、
-  "Every"）但没有 CDN URL 或 local `@font-face` source 可 inline 时，将 name 视为 design
-  intent 的 hint，而不是 literal directive。输出同 family 的 system-font stack（serif vs sans
-  vs mono），并选择匹配 intent 的 weight。single-file invariant 仍然成立；不要 link 到 external
-  stylesheet 来 fetch named font。
-- **Typography-scale mismatch。** DESIGN.md typography tokens 常按 product UI 尺寸设定：
-  marketing pages、app screens、hero sections，body text 为 18-20px、headings 为 32-52px。
-  long-form doc surface 需要 body 约 14-16px，headings 约 body 的 1.2-1.6 倍。当 DESIGN.md
-  size scale 看起来 product-scaled 时，使用 **family**、**weight** 和 **OpenType feature**
-  assignments（这些承载 design language），并为 doc surface 选择 agent 自己的 **size scale**。
-  只有当 tokens 明确 doc-scaled（body tokens 14-16px、headings 低于约 32px）时，才 literal
-  应用 DESIGN.md sizes。
+  （colors but no spacing scale、typography but no elevation）时，对它覆盖的部分使用 DESIGN.md，
+  其余使用 fallback default。不要要求 DESIGN.md complete 后才 honor 它。
 
 ## Format Principles（格式原则）
 
@@ -148,7 +155,7 @@ direction 或 DESIGN.md override），将 document 居中放入 content containe
 和 DESIGN.md overrides。DESIGN.md 或 in-session instruction 可以 override 这些 values；
 这里是没有 layout preference 时的 fallback。
 
-### Markdown Source 是内容，不是设计
+### Markdown source is content, not design（Markdown source 是内容，不是设计）
 
 当 markdown（或 markdown-shaped chat context）是 input 的一部分时，将它用于 semantic
 content：doc 关于什么、有哪些 sections、每个 section establishes 哪些 facts。不要把其中
@@ -157,12 +164,12 @@ space 中按 content shape 重新选择 rendering。如果 markdown 将 13 个 r
 为 bulleted list，这并不意味着 HTML 必须 render 为 list；应问 13 个共享 `ID + body` shape
 的 items 是否更适合 table。
 
-### Prose 具有权威性
+### Prose is authoritative（Prose 具有权威性）
 
 当 visualization（可视化）与 surrounding prose（周边正文）不一致时，以 prose 为准。如果两者 diverge，错的是
 visualization（可视化）。
 
-### 为 Reference Index 添加链接
+### Hyperlink the reference index（为 Reference Index 添加链接）
 
 当 doc 有 Sources & References（或 equivalent reference-index）section 时，将每个 entry
 hyperlink 到其 canonical destination，让 readers 可直接打开。长长的 bare-text paths 和
@@ -185,11 +192,11 @@ git remote get-url origin
   workspace URL 已在 loaded context 中 established（例如 session 早些时候或 `AGENTS.md`
   中出现过 `linear.app/<workspace>/...` URL）时才 link；否则保留为 text。
 
-**不要编造 URLs。** 如果 `origin` 不是 GitHub URL（GitLab、Bitbucket、internal host），
+**Do not invent URLs（不要编造 URLs）。** 如果 `origin` 不是 GitHub URL（GitLab、Bitbucket、internal host），
 且 equivalent main-tree URL pattern 不明显，就将 entries 保留为 `<code>` text。如果 external
 tracker workspace 未 established，保留为 text。broken 或 guessed link 比没有 link 更糟。
 
-**Scope：仅 reference index，不包括 inline prose。** paragraph prose 内 inline `<code>`
+**Scope: reference index only（范围：仅 reference index），not inline prose。** paragraph prose 内 inline `<code>`
 mentions 的 paths 或 PRs 保持 code 或 text。为每个 mention 都加 link 会 clutter；readers
 期待 clickable jumps 出现在 doc 自称为 reference index 的地方。
 
@@ -211,6 +218,16 @@ color（accent-soft 对应 accent-text 等），或完全 drop muting，改靠 f
 body content 中的 `<strong>` 上色。Bold weight 已经承载 emphasis；在 long list 中给每个
 `<strong>` 应用 accent color 会压垮视觉，尤其在 dark mode 中。CSS 应让 `strong` 保持
 `color: inherit`，除非正在 styling specific surface（status pill、ID chip）。
+
+### Chips and pills: uniform shape, no one-sided accent
+
+Status chips、ID chips 和 metric pills 在同一 row 中应共享同一种 shape：相同 border-radius、
+border weight 和 fill treatment。只用整个 pill 的 fill/text color 区分类别（像 soft-tint
+badge），never by an accent on one edge。Colored stripe on one edge reads as
+broken and asymmetric，像 border 一半没 render 出来，所以避免。这个 rule 也适用于任何
+element，不只 chips：用 full tint 区分，而不是一侧 colored stripe。如果 ID chip 需要比
+metric chips 更突出，均匀改变 fill/text color，不要改变 edge treatment，并保持 row 中
+所有 chips 是一个 visual set。
 
 ### 不使用 JS Framework Runtimes（JS framework runtimes）
 
@@ -248,10 +265,11 @@ content 的 shapes。
 - **Key Technical Decisions（关键技术决策）** — repeating cards，包含 decision ID、bold decision title
   （常带 technical identifiers 的 inline code）和 prose rationale。使用 flat cards（不是
   collapsibles）；这些是 readers scan 的 reference material，不是 drill into 的内容。
-- **Risks（风险）** — color-coded cards，带 status eyebrow（例如 "RISK · MITIGATED" /
-  "OPEN · DEFERRED FOLLOW-UP"）和 prose body。left-border 或 accent 的 color 一眼传达 status。
-- **Scope Boundaries（范围边界）** — 当 distinction 有意义时，用 color-coded left borders 的 callout cards
-  表示 in-scope vs deferred vs outside。
+- **Risks（风险）** — cards 带 color-coded status eyebrow（例如 "RISK · MITIGATED" /
+  "OPEN · DEFERRED FOLLOW-UP"）和 prose body。通过 eyebrow color 和 optional subtle full-card
+  tint 传达 status；不要使用 one-edge colored stripe（见 "Chips and pills"）。
+- **Scope Boundaries（范围边界）** — 当 distinction 有意义时，用 colored eyebrow/label 加 subtle
+  full-card tint 区分 in-scope vs deferred vs outside；不要使用 one-edge colored stripe。
 
 agent 会根据每个 specific artifact 的 content needs 选择更 elaborate 或更 simple 的 shapes。
 
@@ -279,16 +297,24 @@ agent 也不会遇到只存在于图片中的 relationship。这扩展了上方 
 ### Layout legibility for hand-authored SVG（手写 SVG 的布局可读性）
 
 agent 在不 rendering 的情况下设计 SVG coordinates；source 中看起来没问题的 layouts 在实践中可能
-collide。emitting 前，trace 每个 labeled arrow 和每个 text label：
+collide。emitting 前，trace 每个 labeled arrow、each shape edge 和每个 text label：
 
-- **No arrow path passes through a text label（箭头路径不要穿过文字 label）。** 如果 arrow line 或 curve 穿过 label 的
-  bounding box，text 会读起来像 struck-through，arrow 也会像是 terminate 在错误 element。
-  通过 re-routing arrow、moving label，或应用 `paint-order: stroke fill` 并使用匹配 diagram
-  background 的 stroke color 给 label 加 halo 来修复。halo width 是 judgment call：要窄到不
-  bleed into glyph strokes（halo width 接近 glyph 自身 stroke width 会 muddle text color），也要
-  宽到能 mask underlying arrows（至少 arrow stroke width 加一条 hairline）。通过在 target font
-  size 下 inspect rendered text 验证；如果 glyphs 看起来比 diagram 外同样 text 更粗或更偏 halo
-  color，halo 就太宽。
+- **No stroke — arrow or shape edge/border — passes through a text label。** 如果 arrow
+  line/curve，或 box、parallelogram、其它 shape 的 border 穿过 label bounding box，text 会像
+  struck-through，stroke 也会像 terminate 在错误 element。通过 re-routing arrow、moving label
+  clear of every edge，或应用 `paint-order: stroke fill` 并使用匹配 diagram background 的
+  stroke color 给 label 加 halo 来修复。halo width 是 judgment call：要窄到不 bleed into glyph
+  strokes，也要宽到能 mask underlying stroke（至少 stroke width 加一条 hairline）。通过在
+  target font size 下 inspect rendered text 验证；如果 glyphs 看起来比 diagram 外同样 text
+  更粗或更偏 halo color，halo 就太宽。
+- **Labels inside skewed or rotated shapes sit in the shape's true interior, not its bounding box。**
+  Parallelogram、isometric face 或 rotated rect 的 interior 会相对 bounding box 偏移，
+  box-aligned（例如 left-aligned）label 可能 spill past slanted edge。Inset label，让它落在
+  actual shape 内；根据 label vertical position 考虑 skew/rotation offset；或者把 label 放在
+  shape 外，用 short leader 连接。这是 **stacked-layers idiom**（offset parallelograms implied
+  z-order）的常见 failure：per-layer labels 左对齐到 container，既 overflow lower layers，又被
+  邻近 layer edge 穿过。Prefer labelling each layer in its own un-overlapped region，或放在
+  stack 侧边。
 - **Arrow labels sit adjacent to the arrow's midpoint（箭头 label 应贴近箭头中点）**（通常在它描述的 line 上方或旁边约
   10-15px 内）。如果 label 漂浮在 diagram edge，readers 必须 trace back 到 arrow，那就是 broken；
   readers 会 misread。
@@ -296,7 +322,7 @@ collide。emitting 前，trace 每个 labeled arrow 和每个 text label：
   在 multi-component layout 中需要 labeled connection，优先 reorder boxes 让 A 和 D adjacent、
   在每个 participant 旁放 numbered step badges 并由 caption 连接，或使用 short labeled-channel
   notation；不要用一条 curve 穿过多个 unrelated elements。
-- **先用 geometry（几何形状）区分 diagram shapes，再用 fill semantics（填充语义）。** Geometry（diamond = decision、
+- **Differentiate diagram shapes by geometry first, fill semantics second（先用 geometry 区分 diagram shapes，再用 fill semantics）。** Geometry（diamond = decision、
   rect = step、oval = start/end、parallelogram = data）能 unambiguously carry role。Fill
   semantics（highlighted path 用 accent-soft、fallthrough 用 warn-soft）carry meaning。
   Resist introducing additional neutral-tint tiers（例如用稍浅的 grey 标记 "decision shapes are
@@ -363,7 +389,8 @@ agent 选择每个 artifact content warrants 的 affordances。content 暗示的
 - **Side-by-side columns（并排 columns）** 用于 parallel content（Request / Response、Before / After、
   Two alternatives，即两个备选方案）。
 - **Tinted callout cards** 用于 "different in kind" 的 content（Deferred、Open Questions、
-  advisory notes、unit-level execution notes）；color-coded left borders 一眼传达 kind。
+  advisory notes、unit-level execution notes）；使用 subtle full-card background tint 加 colored
+  eyebrow/label 一眼传达 kind。避免一侧 colored stripe；tint the whole card instead。
 
 ## Agent-consumability rules（agent 可消费性规则）
 
@@ -397,10 +424,8 @@ return artifact 前，scan 以下 common slips（常见疏漏）：
 - **Single self-contained file（单个自包含文件）。** 不要 companion `.css` / `.js` / `.svg`。
 - **No hidden machine-readable metadata copy（不要隐藏的机器可读 metadata 副本）。** 不要 `<script type="application/json">`
   frontmatter block，不要 mirroring visible values 的 `data-*` attributes，**不要在 `<head>`
-  中用 `<meta name="status">` / `<meta name="created">` / `<meta name="origin">` 等 duplicate
+  中用 `<meta name="created">` / `<meta name="origin">` 等 duplicate
   visible header**。Metadata 位于 visible text；每个 value 一个 source of truth。
-- **Status render 为 `<span class="status">{value}</span>`**，让 downstream tooling 可通过
-  selector 将 `active → completed`。
 - **All stable IDs（所有稳定 IDs）** 同时作为 `id=""` 和 visible text 出现。
 - **Section heading vocabulary（section heading 词汇）** 匹配 section contract names（downstream agents 会 grep 这些）。
 - **Source / composition signal** 作为 doc 底部 visible footer 存在（composition timestamp +

@@ -1,7 +1,7 @@
 ---
 name: ce-ideate
 description: "围绕某个 topic 生成并批判性评估 grounded ideas。当用户询问要改进什么、请求 idea generation、探索 surprising directions，或希望 AI 在深入 brainstorm 某个想法前主动提出强选项时使用。触发短语包括 'what should I improve'、'give me ideas'、'ideate on X'、'surprise me'、'what would you change'，或任何请求 AI-generated suggestions 而不是 refine 用户自己想法的请求。"
-argument-hint: "[feature、focus area 或 constraint]"
+argument-hint: "[feature、focus area 或 constraint] [output:md]"
 
 ---
 
@@ -15,7 +15,7 @@ argument-hint: "[feature、focus area 或 constraint]"
 - `ce-brainstorm` 回答："What exactly should one chosen idea mean?"（选中的 idea 到底意味着什么？）
 - `ce-plan` 回答："How should it be built?"（应该如何构建？）
 
-此 workflow 会在 `docs/ideation/` 中产出 ranked ideation artifact。它 **不** 产出 requirements、plans 或 code。
+此 workflow 会产出 ranked ideation artifact：存在 `docs/ideation/` 时写入那里，否则写到 CE temp path（见 Phase 4）。它 **不** 产出 requirements、plans 或 code。
 
 ## Interaction Method（交互方式）
 
@@ -46,9 +46,33 @@ argument-hint: "[feature、focus area 或 constraint]"
 
 ### Phase 0：Resume and Scope（恢复与定范围）
 
+#### 0.0 Resolve Output Mode（解析输出模式）
+
+为本次 run 可能持久化的 ideation artifact 确定 `OUTPUT_FORMAT`。Output mode 是 **exclusive**：ideation doc 写成 HTML（`.html`）或 markdown（`.md`）之一，绝不同时写两者。Precedence：CLI arg > config > default（`html`），并有 hard pipeline-mode override。
+
+不同于 `ce-plan` 和 `ce-brainstorm`（默认 `md`），`ce-ideate` 默认 **`html`**：ideation artifacts 主要供人类权衡 candidate directions，rich self-contained HTML file（可为 top candidates 加 illustrative diagrams）更容易阅读。
+
+**读取 config（skill load 时 pre-resolved）：**
+!`cat "$(git rev-parse --show-toplevel 2>/dev/null)/.compound-engineering/config.local.yaml" 2>/dev/null || echo '__NO_CONFIG__'`
+
+Resolution steps：
+
+1. **CLI arg。** 扫描 `$ARGUMENTS` 中 literal prefix 为 `output:` 的 token。找到后，在把 remainder 视为 focus hint 前先 strip 该 token，并 case-insensitively 匹配 `md` 和 `html`。
+   - `output:` alone（无 value）→ no-op，fall through 到 step 2。
+   - `output:<unknown>`（例如 `output:pdf`）→ drop token，fall through 到 step 2，并记住在 final resolution 后的 post-ideation menu 上方 emit one-line note：`Ignored unknown output: value '<value>' — using <resolved_format> instead.` 其中 `<resolved_format>` 是 steps 2-4 后 `OUTPUT_FORMAT` 实际 resolved 的值。不要在 note 中 hardcode format；config 或 default 可能与你假设不同。
+2. **Config。** 如果 step 1 未 resolve，且上方 pre-resolved YAML 中有 **active（non-commented）** `ideate_output:` key，value 匹配 `md` 或 `html`（case-insensitive），使用它。Missing、invalid 或 commented values silently fall through。Critical：以 `#` 开头的 lines 是 YAML comments，必须忽略；shipped config template 会包含类似 `# ideate_output: md` 的 commented example 来 document option，把它匹配成 active setting 会在用户未 opt in 时 silently override default。
+3. **Default。** 否则 `OUTPUT_FORMAT=html`。
+4. **Pipeline override。** 当从任何 pipeline 或 `disable-model-invocation` context invoke 时，无论 steps 1-3 如何，强制 `OUTPUT_FORMAT=md`；automated downstream consumers 能 reliably parse markdown，pipeline runs 中 HTML 是 unnecessary friction。
+
+**Token-parsing convention：** 只 consume 并 strip literal-prefix flag tokens（`output:`、适用时的 `mode:`）。其它 `<word>:<word>` tokens，包括 focus hint 中可能出现的 conventional commit prefixes（`feat:`、`fix:`、`chore:`），都原样保留。
+
+**Defer loading format-rendering reference。** Deliverable 在 Phase 4（generation 后）写入，所以 `references/ideation-sections.md` 和 format-rendering references（`markdown-rendering.md` / `html-rendering.md`）只在那时需要；Phase 0.0 加载它们只会把内容带过整个 grounding 和 ideation dispatch。现在只 resolve `OUTPUT_FORMAT`，在 write time 再加载 section contract 和 matching rendering reference（见 `references/post-ideation-workflow.md` §4.1）。
+
+`output:` preference does NOT auto-propagate 到 handoff 后的 `ce-brainstorm`（Phase 5）；`ce-brainstorm` 会 independently re-resolves its own `brainstorm_output` config。Asymmetric output（`ideation.html` + `requirements.md`）可接受；想让二者都用 HTML 的用户可在 `.compound-engineering/config.local.yaml` 中同时设置两个 keys。
+
 #### 0.1 Check for Recent Ideation Work（检查近期 Ideation 工作）
 
-在 `docs/ideation/` 中查找最近 30 天内创建的 ideation documents。
+在 `docs/ideation/` 中查找最近 30 天内创建的 ideation documents（`*.md` 或 `*.html`）。
 
 当满足以下条件时，将 prior ideation doc 视为 relevant：
 
@@ -66,8 +90,9 @@ argument-hint: "[feature、focus area 或 constraint]"
 
 - 读取 document
 - 总结已探索内容
-- 保留 previous idea statuses
+- 保留 previous ideas 和 rejection summary
 - 更新 existing file，而不是创建 duplicate
+- **用 existing file 的格式写回 update**，覆盖 Phase 0.0 baseline：resume `.html` doc 就 rewrite HTML，resume `.md` doc 就 rewrite markdown。Resume 时 format precedence 为：本 run explicit `output:` arg > resumed file extension > config > default (`html`)；pipeline / `disable-model-invocation` run 仍按 Phase 0.0 强制 `md`。如果 explicit `output:` arg 与 existing file 不同，则切换 artifact format（写出 new-format file；保留 original）。
 
 #### 0.2 Subject-Identification Gate（主题识别关口）
 
@@ -155,7 +180,7 @@ Routing（路由）：
 
 **Active confirmation on mode ambiguity。** 仅当 0.2 settled subject 后，mode classification 仍 genuinely ambiguous 时触发：例如 "our docs" 可能表示 repo docs（repo-grounded），也可能表示 public marketing docs（elsewhere-software）。多数在 0.2 settled 的 subjects 在这里都能 cleanly classify。当 ambiguous 时，通过 blocking tool 问一个 confirmation question，使用两个 self-contained labels，以 plain language 命名两个 candidate interpretations（例如 "Treat as repo docs in this codebase" vs "Treat as public marketing docs"）：绝不要泄漏 internal mode names。否则一句 inferred-mode statement 足够，不要提问。
 
-**Routing rule（non-software mode 路由规则）。** 当 Decision 2 = non-software，仍运行 Phase 1 Elsewhere-mode grounding（默认 user-context synthesis + web-research；尊重 skip phrases）。此 mode 默认跳过 Learnings-researcher：CWD 的 `docs/solutions/` 很少能迁移到 naming、narrative、personal 或 non-digital business topics；完整 rationale 见 Phase 1。然后加载 `references/universal-ideation.md`，并用它替代 Phase 2 的 software frame dispatch 和 Phase 6 menu narrative。此加载不可选：该文件包含替代此 mode 中 Phase 2 和 post-ideation menu 的 domain-agnostic generation frames、critique rubric 和 wrap-up menu，而这些 details 不存在于 main body。凭记忆 improvising 会为 non-software topics 产生错误 facilitation。任何时候都不要运行 repo-specific codebase scan。`references/post-ideation-workflow.md` 中的 §6.5 Proof Failure Ladder 仍适用：只要 Proof save（elsewhere-mode 中 Save and end 的默认）失败，就加载并遵循它，确保 local-save fallback path 在 non-software elsewhere runs 中仍可到达。
+**Routing rule（non-software mode 路由规则）。** 当 Decision 2 = non-software，仍运行 Phase 1 Elsewhere-mode grounding（默认 user-context synthesis + web-research；尊重 skip phrases）。此 mode 默认跳过 Learnings-researcher：CWD 的 `docs/solutions/` 很少能迁移到 naming、narrative、personal 或 non-digital business topics；完整 rationale 见 Phase 1。然后加载 `references/universal-ideation.md`，并用它替代 Phase 2 的 software frame dispatch 和 Phase 5 menu narrative。此加载不可选：该文件包含替代此 mode 中 Phase 2 和 post-ideation menu 的 domain-agnostic generation frames、critique rubric 和 wrap-up menu，而这些 details 不存在于 main body。凭记忆 improvising 会为 non-software topics 产生错误 facilitation。任何时候都不要运行 repo-specific codebase scan。此处也会自动写入 deliverable（按 `references/post-ideation-workflow.md` Phase 4）；如果用户把 markdown deliverable 打开到 Proof 且失败，§5.1 Proof handling 适用，auto-written local file 仍是完整记录。
 
 #### 0.4 Context-Substance Gate（仅 Elsewhere Modes）
 
@@ -232,7 +257,7 @@ mkdir -p "$SCRATCH_DIR"
 echo "$SCRATCH_DIR"
 ```
 
-将 echo 出来的 absolute path（`/tmp/compound-engineering/ce-ideate/<run-id>`）作为此 run 中后续每次 checkpoint write 和 cache read 的 `<scratch-dir>`。run directory 不会在 Phase 6 completion 时删除：V15 cache 是 session-scoped 且跨 run-ids 复用，checkpoints 遵循 cross-invocation-reusable convention，将 session-scoped artifacts 留给后续 invocations 查找。
+将 echo 出来的 absolute path（`/tmp/compound-engineering/ce-ideate/<run-id>`）作为此 run 中后续每次 checkpoint write 和 cache read 的 `<scratch-dir>`。run directory 不会在 completion 时删除：V15 cache 是 session-scoped 且跨 run-ids 复用，checkpoints 遵循 cross-invocation-reusable convention；无 repo 时 deliverable 本身也会写在这里（见 `references/post-ideation-workflow.md` Phase 4 和 §5.5）。
 
 在 **foreground** 中并行运行 grounding agents（不要 background：Phase 2 前需要结果）：
 
@@ -332,7 +357,7 @@ dispatch `ce-web-researcher` 时传入：focus hint、一段 brief planning cont
 
 **Surprise-me skip（Surprise-me 跳过）。** 在 surprise-me mode 中，没有 settled subject 可分解：不同 frames 会在 Phase 2 中 surface 不同 subjects，那里 cross-cutting synthesis step 承担类似 coverage role。在 surprise-me mode 中跳过 Phase 1.5，并在 grounding summary 中注明 `Decomposition skipped — surprise-me mode`。
 
-将 axis list（或 skip-reason）追加到 consolidated grounding summary 的 `Topic axes` section 下。Phase 2 读取此 section，将 axes 织入 sub-agent prompts；Phase 3 用它做 axis-spread scoring；Phase 5 的 artifact template 将它包含在 Grounding Context 下。
+将 axis list（或 skip-reason）追加到 consolidated grounding summary 的 `Topic axes` section 下。Phase 2 读取此 section，将 axes 织入 sub-agent prompts；Phase 3 用它做 axis-spread scoring；Phase 4 artifact 会按 `references/ideation-sections.md` 将其包含在 Grounding Context 下。
 
 ### Phase 2：Divergent Ideation（发散式 Ideation）
 
@@ -395,6 +420,6 @@ Basis 是 required，不是 optional。如果 sub-agent 无法阐明至少一种
 4. 如果提供了 focus，将 merged list 向其加权，但不排除更强的 adjacent ideas。
 5. 有理由时，让 ideas 分布到多个 dimensions：workflow/DX、reliability、extensibility、missing capabilities、docs/knowledge compounding、quality/maintenance、leverage on future work。
 
-**Checkpoint A (V17)（Checkpoint A）。** cross-cutting synthesis step 完成且 raw candidate list consolidated 后，立即写入 `<scratch-dir>/raw-candidates.md`（使用 Phase 1 捕获的 absolute path），内容包含带 sub-agent attribution 的完整 candidate list。这会在 Phase 3 critique 可能 compact context 之前，保护最昂贵的 output（6 个 parallel sub-agent dispatches + dedupe）。Best-effort：如果写入失败（disk full、permissions），log warning 并继续；checkpoint 不是 load-bearing。run 结束时不 cleanup（run directory 会保留，让 V15 cache 在同一 session 中跨 run-ids 可复用：见 Phase 6）。
+**Checkpoint A (V17)（Checkpoint A）。** cross-cutting synthesis step 完成且 raw candidate list consolidated 后，立即写入 `<scratch-dir>/raw-candidates.md`（使用 Phase 1 捕获的 absolute path），内容包含带 sub-agent attribution 的完整 candidate list。这会在 Phase 3 critique 可能 compact context 之前，保护最昂贵的 output（6 个 parallel sub-agent dispatches + dedupe）。Best-effort：如果写入失败（disk full、permissions），log warning 并继续；checkpoint 不是 load-bearing。run 结束时不 cleanup（run directory 会保留，让 V15 cache 在同一 session 中跨 run-ids 可复用：见 Phase 5）。
 
-在 merging and synthesis 之后、presenting survivors 之前，加载 `references/post-ideation-workflow.md`。此加载不可选。该文件包含 adversarial filtering rubric、artifact template、quality bar，以及 canonical Phase 6 handoff menu（Refine、Open and iterate in Proof、Brainstorm、Save and end）：这些 options 不出现在 main body 的任何位置。跳过加载会静默降低后续每一步质量：agent 会凭记忆 improvises menu，而不是呈现 documented options。"Quickly" 意味着更少 Phase 2 sub-agents，不是跳过 references。不要在 Phase 2 agent dispatch 完成前加载此文件。
+在 merging and synthesis 之后、writing and presenting deliverable 之前，加载 `references/post-ideation-workflow.md`。此加载不可选。该文件包含 adversarial filtering rubric、auto-write + concise-summary flow（Phase 4）、artifact section contract、quality bar，以及 canonical Phase 5 next-steps menu（Open、Brainstorm one idea、Iterate on one idea、Done）：这些 details 不出现在 main body 的任何位置。跳过加载会静默降低后续每一步质量：agent 会凭记忆 improvises flow 和 menu，而不是遵循 documented options。"Quickly" 意味着更少 Phase 2 sub-agents，不是跳过 references。不要在 Phase 2 agent dispatch 完成前加载此文件。
