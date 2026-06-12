@@ -4,7 +4,7 @@
 
 ## 5.3.8 Document Review（文档审查）
 
-**Format gate（格式门禁）.** 本阶段仅在 `OUTPUT_FORMAT=md` 时运行（在 SKILL.md Phase 0.0 中解析）。`ce-doc-review` 的 mutation 机制是 markdown 专用的：它的 walkthrough 会通过平台 edit tool 将 `gated_auto`/`manual` 修复作为“单文件 markdown 改动”应用，并且 Append-to-Open-Questions flow 会插入 `##`/`###` markdown 标题（见 ce-doc-review skill 中的 `references/walkthrough.md` 和 `references/open-questions-defer.md`）。如果对 HTML artifact 运行这些 mutator，会产生格式错误的输出。在 ce-doc-review 获得 HTML-aware mutation 前，HTML plans 完全跳过本阶段。
+**Format gate（格式门禁）.** 本阶段仅在 `OUTPUT_FORMAT=md` 时运行（在 SKILL.md Phase 0.0 中解析）。`ce-doc-review` 的 mutation 机制是 markdown 专用的：它的 walkthrough 会通过平台 edit tool 将 `gated_auto`/`manual` 修复作为“单文件 markdown 改动”应用，并且 Append-to-Open-Questions flow 会插入 `##`/`###` markdown 标题（见 ce-doc-review skill 中的 walkthrough 和 open-questions-defer references）。如果对 HTML artifact 运行这些 mutator，会产生格式错误的输出。在 ce-doc-review 获得 HTML-aware mutation 前，HTML plans 完全跳过本阶段。
 
 **当 `OUTPUT_FORMAT=html` 时：** 跳过 ce-doc-review 调用。捕获一个合成的 "skipped" envelope，让 5.4 的菜单摘要行能明确说明限制：
 - `fixes_applied = 0`
@@ -81,7 +81,7 @@ confidence check 和 ce-doc-review 是互补的：
 - identity（身份）: `ai:compound-engineering` / `Compound Engineering`
   - recommended next step: `/ce-work`（显示在 ce-proof skill 的最终 terminal output 中）
 
-  遵循 ce-proof skill 中的 `references/hitl-review.md`。它会上传 plan，提示用户在 Proof web UI 中 review，摄取过滤后的 comment threads，通过当前 Proof edit APIs 应用已同意 edits，在线程内 reply/resolve，并在 proceed 时将最终 markdown 原子同步回 plan 文件。
+  遵循 ce-proof skill 中的 HITL review reference。它会上传 plan，提示用户在 Proof web UI 中 review，摄取过滤后的 comment threads，通过当前 Proof edit APIs 应用已同意 edits，在线程内 reply/resolve，并在 proceed 时将最终 markdown 原子同步回 plan 文件。
 
   注意：Proof flow 仅在 `OUTPUT_FORMAT=md` 时运行（菜单也只在那时渲染该选项）。Proof 摄取 markdown；HTML plans 使用 local browser option。
 

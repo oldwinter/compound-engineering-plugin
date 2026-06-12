@@ -82,7 +82,7 @@ What would you like to do next? (Pick a number or describe what you want.)
 - **identity（身份）：** `ai:compound-engineering` / `Compound Engineering`
 - **recommended next step（推荐下一步）：** `ce-plan` (shown in the ce-proof skill's final terminal output)
 
-遵循 ce-proof skill 中的 `references/hitl-review.md`。它会上传 doc，提示用户在 Proof web UI 中 review，摄取过滤后的 comment threads，通过当前 Proof edit APIs 应用已同意 edits，在线程内 reply/resolve，并在 proceed 时将最终 markdown 原子同步回 source file。
+遵循 ce-proof skill 中的 HITL review reference。它会上传 doc，提示用户在 Proof web UI 中 review，摄取过滤后的 comment threads，通过当前 Proof edit APIs 应用已同意 edits，在线程内 reply/resolve，并在 proceed 时将最终 markdown 原子同步回 source file。
 
 当 ce-proof skill 交还控制权时：
 

@@ -27,6 +27,8 @@ bash "${CLAUDE_SKILL_DIR}/scripts/currently-loaded-version.sh"
 bash "${CLAUDE_SKILL_DIR}/scripts/marketplace-name.sh"
 ```
 
+如果 `${CLAUDE_SKILL_DIR}` 未设置或无法解析（上面的 commands 以 `No such file or directory` 失败），说明 harness 没有暴露 skill directory，这不是标准 Claude Code session。按 Step 2 中的 `__CE_UPDATE_NOT_MARKETPLACE__` 情况处理：解释原因并停止。
+
 `scripts/upstream-version.sh` 通过 `gh api` 读取 `main` 上的 `plugin.json`。它打印 version string；如果 `gh` unavailable 或 rate-limited，则打印 sentinel `__CE_UPDATE_VERSION_FAILED__`。
 
 `scripts/currently-loaded-version.sh` 和 `scripts/marketplace-name.sh` 按 marketplace-cache layout 解析 `${CLAUDE_SKILL_DIR}`：`~/.claude/plugins/cache/<marketplace>/compound-engineering/<version>/skills/ce-update`。它们打印 version segment / marketplace segment；如果 path 不匹配（`claude --plugin-dir` local development 的典型情况），则打印 sentinel `__CE_UPDATE_NOT_MARKETPLACE__`。

@@ -304,7 +304,7 @@ grep -E '^description:' skills/*/SKILL.md
 
 ### Adding a New Plugin to This Repo（向本 Repo 添加新 Plugin）
 
-当在 `compound-engineering` 和 `coding-tutor` 旁添加新 plugin 时，repo 会 ship 到三种 marketplace formats（Claude、Cursor、Codex）。三者必须保持 parity，否则下次运行 `bun run release:validate` 会失败。Checklist：
+当在 `compound-engineering` 旁添加新 plugin 时，repo 会 ship 到三种 marketplace formats（Claude、Cursor、Codex）。三者必须保持 parity，否则下次运行 `bun run release:validate` 会失败。Checklist：
 
 - [ ] `.claude-plugin/marketplace.json`：把 plugin 添加到 `plugins[]`
 - [ ] `.cursor-plugin/marketplace.json`：把 plugin 添加到 `plugins[]`

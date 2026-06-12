@@ -28,23 +28,6 @@
         "image-generation"
       ],
       "source": "./plugins/compound-engineering"
-    },
-    {
-      "name": "coding-tutor",
-      "description": "基于你的既有知识、并用你的真实 codebase 做示例的 personalized coding tutorials。包含 spaced repetition quizzes 来强化学习。包含 3 个 commands 和 1 个 skill。",
-      "author": {
-        "name": "Nityesh Agarwal"
-      },
-      "homepage": "https://github.com/EveryInc/compound-engineering-plugin",
-      "tags": [
-        "coding",
-        "programming",
-        "tutorial",
-        "learning",
-        "spaced-repetition",
-        "education"
-      ],
-      "source": "./plugins/coding-tutor"
     }
   ]
 }

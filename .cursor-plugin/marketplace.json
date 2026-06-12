@@ -15,11 +15,6 @@
       "name": "compound-engineering",
       "source": "compound-engineering",
       "description": "每次使用都会变得更聪明的 AI-powered development tools。让每个工程工作单元都比上一个更容易。"
-    },
-    {
-      "name": "coding-tutor",
-      "source": "coding-tutor",
-      "description": "使用你的真实 codebase 提供个性化 coding tutorials，并配合 spaced repetition quizzes。"
     }
   ]
 }

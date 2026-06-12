@@ -57,7 +57,7 @@ Axes 应该：
 
 ## How to generate（如何生成）
 
-在 critique 任何 idea 前，先生成完整 candidate list。使用与 software ideation 相同的六个 frames，并用 domain-agnostic language 描述。每个 frame 是 **starting bias，不是 constraint**；跨 frames 追踪 promising threads。
+在 critique 任何 idea 前，先生成完整 candidate list。使用与 software ideation 相同的六个 frames，并用 domain-agnostic language 描述。每个 frame 是 **starting bias，不是 constraint**；跨 frames 追踪 promising threads。当以 parallel sub-agents dispatch frames（Full depth）时，遵循 SKILL.md Model Tiers：evidence-driven frames（pain、inversion、leverage）使用 generation tier；ceiling frames（assumption-breaking、analogy、constraint-flipping）使用 ceiling tier。
 
 - **Pain and friction（痛点与摩擦）**：topic 当前状态中，什么持续 annoying、slow 或 broken？生成移除或减少 friction 的 ideas。
 - **Inversion, removal, automation（反转、移除、自动化）**：如果某一步被 inverted、entirely removed 或 automated away，会发生什么？即使 inversion 本身不现实，其结果也常是 candidate。
@@ -70,11 +70,12 @@ Axes 应该：
 
 **Axis-coverage check（当 axes 存在时）。** Merge 后，统计每个 axis 的 ideas。如果任何 axis 有 0 个 ideas，使用最适合该 axis 的 frame 额外生成一小批（3-5 ideas）：usability gaps 用 Pain & friction，distribution 或 compounding gaps 用 Cross-domain analogy，等等。Recovery 上限为 2 个 axes；超过后，与其继续 fan out，不如接受 thin coverage。在 rejection summary 中注明任何未 recovered 的 axis，让 gap 可见。
 
-**Per-idea output contract（对应 SKILL.md Phase 2）：** 每个 idea 都包含 title、summary、**axis**（当 decomposition 产生 axis list 时，选择该 idea 最 centrally targets 的一个；跳过 decomposition 时省略）、**basis**（必需，标记为 `direct:` quoted evidence / `external:` named prior art or domain research / `reasoned:` written-out first-principles argument）、把 basis 与 move significance 连接起来的 why-it-matters，以及 one-line meeting-test self-check（Phase 0.5 检测到 tactical focus signals 时免除）。Basis 是必需项，不是 optional；unjustified speculation 不会 surface。
+**Per-idea output contract（对应 `references/divergent-ideation.md` 中 software-mode contract）：** 每个 idea 都包含 title、summary、**axis**（当 decomposition 产生 axis list 时，选择该 idea 最 centrally targets 的一个；跳过 decomposition 时省略）、**basis**（必需，标记为 `direct:` quoted evidence / `external:` named prior art or domain research / `reasoned:` written-out first-principles argument）、把 basis 与 move significance 连接起来的 why-it-matters，以及 one-line meeting-test self-check（Phase 0.5 检测到 tactical focus signals 时免除）。Basis 是必需项，不是 optional；unjustified speculation 不会 surface。
 
 **Generation rules（生成规则）：**
 
 - 每个 idea 都带 articulated basis。要防止的 failure mode 是缺少用户可验证 basis 的 plausible-sounding speculation。
+- Aim past the obvious。每个 frame 的前几个 ideas 是 warm-up；等 non-obvious ideas 出现后，只保留仍能证明自己价值的想法。如果某个 idea 会出现在该 topic 的 generic listicle 中，就用 grounding sharpen 它，或 drop it。
 - 偏向 frame 自然产生的 basis type：pain/inversion/leverage 倾向 `direct:`；analogy 和 constraint-flipping 倾向 `reasoned:`；但不要排除其他 types。当 frame 产生 reasoned basis 时，写出 argument，不要只是 gesture。
 - 将 meeting-test 作为 default floor：这个 idea 是否值得等价于 team discussion（或 topic native domain 中对应的 "worth talking through"）？如果不值得，就低于 floor，不会 surface。只有 Phase 0.5 检测到 tactical focus signals 时，floor 才放松。
 - 保持在 subject identity 内。当 basis 支持时，expansions、new surfaces、new directions、retirements 都可以。Subject-replacement moves（放弃 subject、pivot 到 unrelated domain）无论 basis 如何都排除。
@@ -82,6 +83,8 @@ Axes 应该：
 **本 reference 中的 Surprise-me mode。** 当 Phase 0.2 路由到 surprise-me 时，没有 user-specified subject。通过每个 frame 的 lens 探索 Phase 1 grounding（user-context synthesis + web research），并识别对该 lens 最有趣的 subject(s)。不同 frames 找到不同 subjects 是 feature。Basis 可以包含对 subject 本身的识别：为什么该 subject 值得通过此 lens ideate，并引用 Phase 1 material 中的 signal。
 
 ## How to converge（如何收敛）
+
+Final cut 前，dispatch 一个 fresh-context basis verifier（generation tier，见 SKILL.md Model Tiers），其 payload 只包含 grounding summary 和 candidate list；prompt 它 refute：不支持 claimed move 的 bases、不真实或类比不相关的 prior art、站不住的 reasoned arguments。在此 mode 中，verification 针对 user-supplied context 和 web research 运行，不读取 repo。Cut 时权衡其 verdicts；如需 overrule，说明 reason。如果 dispatch 不可用，fallback 到 facilitator-only critique，并注明 degradation。
 
 应用 adversarial critique。对每个 candidate，如果 rejected，写 one-line reason。**Basis-integrity check：** reject 任何缺少 articulated basis 的 idea、任何 stated basis 实际不支持 claimed move 的 idea（speculation dressed as ambition），以及任何替换 subject 而不是作用于 subject 的 idea。使用一致 rubric 为 survivors 打分，权衡：groundedness in stated context、**basis strength**（`direct:` > `external:` > `reasoned:`；都不排除，但其他条件相同 direct-evidence ideas 得分更高）、expected value、novelty、pragmatism、leverage、implementation burden、与更强 candidates 的 overlap，以及 **axis spread**（当 axes 已定义时）。其他条件相同，覆盖 topic surface 的 survivor sets 优于 cluster 在单一 axis 的 sets。Axis spread 是 list-level concern，不是 per-idea reject reason；在 per-idea filtering 后，在 comparable candidates 中选择时应用。
 

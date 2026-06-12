@@ -36,6 +36,22 @@ Plugin 会以两种 scope 之一安装到 Target：global（user-wide）或 per-
 
 Plugin 针对单个 Target 的 in-memory converted form，即 Converter 产出、Writer 消费的 handoff。
 
+## Skill orchestration（skill 编排）
+
+### Model tier（模型层级）
+
+Dispatched sub-agent 的语义 cost class：extraction（最便宜且能胜任，用于 retrieval 和 quoting）、generation（中档，用于 evidence-driven work 和 mechanical verification），或 ceiling（orchestrator 自己的模型，通过省略 model selection 继承）。Skill 只声明 tier 名称并按 tier 引用，避免在 skill content 中 hardcode model names。
+
+当平台无法为每个 agent 单独选择模型时，所有 roles 都运行在 inherited model 上，cost control 退化为结构控制：read budgets 和 output caps。
+
+### Evidence dossier（证据档案）
+
+一种 bulk evidence artifact：cheap scout agent 收集的逐字 quotes 和 source pointers。它写入 scratch storage，而不是 inline 返回；orchestrator 只携带短 gist，下游 agents 自己读取完整 dossier。
+
+### Load stub（加载桩）
+
+当 load-bearing content 移入 reference file 后，Skill 中留下的 inline remnant：一条 load instruction，说明 reference 包含什么，以及跳过会导致什么 failure mode；同时不保留 agent 可凭空 improvises 的细节，让加载在结构上必要，而不是 advisory。
+
 ### Marketplace（marketplace）
 
 用于分发的 catalog metadata，列出可安装 plugins 及其版本；release validation 会让它与每个 Plugin 的 manifest 保持一致。

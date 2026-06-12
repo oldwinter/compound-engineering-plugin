@@ -5,8 +5,7 @@
 它还包含：
 
 - 把 Claude Code plugins 转换为其他 agent platform formats 的 Bun/TypeScript CLI
-- `plugins/` 下的其他 plugins，例如 `coding-tutor`
-- CLI、marketplace 和 plugins 共用的 release 与 metadata infrastructure
+- CLI、marketplace 和 plugin 共用的 release 与 metadata infrastructure
 
 `AGENTS.md` 是 canonical repo instruction file。根目录 `CLAUDE.md` 只作为仍会查找它的 tools 和 conversions 的 compatibility shim。
 
@@ -24,7 +23,7 @@ bun run release:validate  # check plugin/marketplace consistency
 - **Merge policy:** 所有到 `main` 的 changes 都通过 pull requests。禁止 direct pushes 和 direct merges；`main` 上的 branch protection 要求 `test` status check 通过。Direct path 会绕过 `release:validate`、test suite 和 PR title validation；过去的 direct merges 造成过 version drift，需要多 PR 恢复（见 `docs/solutions/workflow/release-please-version-drift-recovery.md`）。
 - **Safety:** 不要删除或覆盖 user data。避免 destructive commands。
 - **Testing:** 修改 parsing、conversion 或 output 后运行 `bun test`。
-- **Release versioning:** Releases 由 release automation 准备，不由普通 feature PRs 准备。Repo 现在有多个 release components（`cli`、`compound-engineering`、`coding-tutor`、`marketplace`）。GitHub release PRs 和 GitHub Releases 是新 releases 的 canonical release-notes surface；根 `CHANGELOG.md` 只是指向该历史的指针。使用 `feat:`、`fix:` 等 conventional titles，让 release automation 能分类 change intent；但 routine PRs 不要手工 bump release-owned versions，也不要手写 release notes。
+- **Release versioning:** Releases 由 release automation 准备，不由普通 feature PRs 准备。Repo 现在有多个 release components（`cli`、`compound-engineering`、`marketplace`、`cursor-marketplace`）。GitHub release PRs 和 GitHub Releases 是新 releases 的 canonical release-notes surface；根 `CHANGELOG.md` 只是指向该历史的指针。使用 `feat:`、`fix:` 等 conventional titles，让 release automation 能分类 change intent；但 routine PRs 不要手工 bump release-owned versions，也不要手写 release notes。
 - **Linked versions (cli + compound-engineering):** `linked-versions` release-please plugin 会让 `cli` 和 `compound-engineering` 保持同一 version。这是有意的，用于简化 CLI 与其随附 plugin 的 version tracking。结果是：只有 plugin changes 的 release 仍会 bump CLI version（反之亦然）。CLI changelog 也可能包含 `exclude-paths` 通常会过滤的 commits，因为 `linked-versions` 在强制 synced bump 时会覆盖 exclusion logic。这是已知 upstream release-please limitation，不是 misconfiguration。不要把 linked-version bumps 标记为 unnecessary。
 - **Output Paths:** OpenCode output 保持在 `opencode.json` 和 `.opencode/{agents,skills,plugins}`。对 OpenCode，commands 写到 `~/.config/opencode/commands/<name>.md`；`opencode.json` 做 deep-merge（绝不 wholesale overwrite）。
 - **Scratch Space:** 默认使用 OS temp。只有在下面规则明确 justified 时才使用 `.context/`。
@@ -47,7 +46,7 @@ bun run release:validate  # check plugin/marketplace consistency
 
 ```text
 src/              CLI entry point, parsers, converters, target writers
-plugins/          Plugin workspaces (compound-engineering, coding-tutor)
+plugins/          Plugin workspaces (compound-engineering)
 .claude-plugin/   Claude marketplace catalog metadata
 tests/            Converter, writer, and CLI tests + fixtures
 docs/             Requirements, plans, solutions, and target specs
@@ -61,7 +60,6 @@ CONCEPTS.md       Shared domain vocabulary (glossary of project-specific terms)
 - `plugins/compound-engineering/` 下的 `compound-engineering`
 - `.claude-plugin/` 下的 Claude marketplace catalog
 - `src/` 和 `package.json` 中的 converter/install CLI
-- `plugins/coding-tutor/` 等 secondary plugins
 
 不要在未检查 affected files 归属的情况下，假设某个 repo change "just CLI" 或 "just plugin"。
 
@@ -108,7 +106,7 @@ cat plugins/compound-engineering/.claude-plugin/plugin.json | jq .
 
 - **Prefix 基于 intent，而不是 file type。** 使用 conventional prefixes（`feat:`、`fix:`、`docs:`、`refactor:` 等），但按 change 做什么来分类，不按文件扩展名分类。`plugins/*/skills/`、`plugins/*/agents/` 和 `.claude-plugin/` 下的文件即使是 Markdown 或 JSON，也是 product code。只有纯文档用途的文件（`README.md`、`docs/`、`CHANGELOG.md`）才保留 `docs:`。
 - **Type selection：按 intent 分类，不按 diff shape。** 当 `fix:` 和 `feat:` 都看似合适时，默认用 `fix:`：修复 broken 或 missing behavior 的 change 是 `fix:`，即使通过新增代码实现；净增行数不会把 fix 变成 `feat:`。`feat:` 只用于用户此前无法完成、且不是修复 broken behavior 的能力。其他 conventional types（`chore:`、`refactor:`、`docs:`、`perf:`、`test:`、`ci:`、`build:`、`style:`）在比二者更精确时仍为首选。Heuristic：如果今天写的 regression test 在 change 前会失败，它就是 `fix:`。用户可以针对某个 change 覆盖此默认值。
-- **包含 component scope。** Scope 会原样出现在 changelog 中。选择最窄且有用的 label：skill/agent name（`document-review`、`learnings-researcher`）、plugin 或 CLI area（`coding-tutor`、`cli`），或跨域 shared area（`review`、`research`、`converters`）。不要使用 `compound-engineering`，它代表整个 plugin，对读者没有帮助。只有在没有任何单一 label 能增加 clarity 时才省略 scope。
+- **包含 component scope。** Scope 会原样出现在 changelog 中。选择最窄且有用的 label：skill/agent name（`document-review`、`learnings-researcher`）、CLI 或 marketplace area（`cli`、`marketplace`），或跨域 shared area（`review`、`research`、`converters`）。不要使用 `compound-engineering`，它代表整个 plugin，对读者没有帮助。只有在没有任何单一 label 能增加 clarity 时才省略 scope。
 - **没有用户明确确认，不要使用 `!` 或 `BREAKING CHANGE:` footer。** 这些 markers 会触发 release-please 自动 major version bump；即使 change 技术上 breaking，用户也可能不想做这个决定。如果 change 看起来 breaking，告知用户并让他们决定是否应用 marker。
 
 ## Adding a New Target Provider（添加新的 Target Provider）
