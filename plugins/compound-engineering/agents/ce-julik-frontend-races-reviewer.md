@@ -38,7 +38,7 @@ color: blue
 
 ## Output format（输出格式）
 
-返回与 findings schema 匹配的 JSON。JSON 外不要输出 prose。
+Return your findings as JSON matching the findings schema. No prose outside the JSON.
 
 ```json
 {

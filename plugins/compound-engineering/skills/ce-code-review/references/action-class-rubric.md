@@ -13,7 +13,7 @@
 - 当可以为 localized change 写出可辩护的 `suggested_fix` 时，优先使用 `gated_auto`。
 - 当正确修复依赖 product intent、architecture 或 cross-cutting refactors 时，使用 `manual`。
 - 当不修也不会破坏任何东西、但观察结果有价值时，使用 `advisory`。
-- **不要**输出 `safe_auto`：callers 决定 apply 什么；reviewers 负责分类和提出方案。
+- Do **not** emit `safe_auto`：callers 决定 apply 什么；reviewers 负责分类和提出方案。
 
 ## `owner` 字段
 
@@ -23,4 +23,4 @@
 | `human` | implementation 前需要 judgment。 |
 | `release` | Operational / rollout follow-up。 |
 
-不要使用 `review-fixer`。
+Do not use `review-fixer`。

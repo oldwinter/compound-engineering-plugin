@@ -62,7 +62,23 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
    - target path 和 category（除非 category 本身变化，否则与 old learning 相同）
    - 上面列出的三个 support files 的 relevant contents
 2. Subagent 以 support files 作为 source of truth 编写 new learning：`references/schema.yaml` 用于 frontmatter fields 和 enum values，`references/yaml-schema.md` 用于 category mapping 和 array items 的 YAML-safety rules，`assets/resolution-template.md` 用于 section order。如果需要传入内容之外的额外 context，应使用 dedicated file search 和 read tools。
-3. **运行 `python3 scripts/validate-frontmatter.py <new-learning-path>`**，捕获 prose rules 漏掉的 silent-corruption parser-safety issues：malformed `---` delimiter lines、scalar values 中未 quote 的 ` #`（silent comment truncation），以及 scalar values 中未 quote 的 `: `（silent mapping confusion）。Exit 0 表示 doc parser-safe；exit 1 表示 script 的 stderr 会指出 offending field(s) 及修复方式：quote value(s)、重写 doc，并重新运行直到 exit 0。Validation 失败时不要宣称成功。该 script 不强制 schema rules，也不 flag YAML reserved-indicator characters（这些会在 downstream 产生 loud parser errors，而不是 silent corruption，属于 out of scope）。仅使用 Python 3 stdlib（无 PyYAML 或其他 deps）。
+3. **Validate parser-safety of the new learning's frontmatter**，捕获 prose rules 漏掉的 silent-corruption issues：malformed `---` delimiter lines、scalar values 中未 quote 的 ` #`（silent comment truncation），以及 scalar values 中未 quote 的 `: `（silent mapping confusion）。Bundled validator 位于 **skill bundle 内部**；在 Claude Code 中 `${CLAUDE_SKILL_DIR}` resolve 为 skill directory，但 runtime Bash tool 的 CWD 是用户 project，因此不带 `${CLAUDE_SKILL_DIR}` prefix 的 project-relative path 会 miss。通过 existence guard 运行，让无法 locate script 的平台（例如 native Codex/Gemini installs，`${CLAUDE_SKILL_DIR}` unset）fallback 到 manual check，而不是 silent skip protection：
+
+   ```bash
+   if [ -n "${CLAUDE_SKILL_DIR}" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" ]; then
+     python3 "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" <new-learning-path>
+   else
+     echo "Bundled validate-frontmatter.py not resolvable on this platform; applying the parser-safety checklist manually."
+   fi
+   ```
+
+   - **如果 script 已运行：** exit 0 表示 parser-safe；exit 1 表示 stderr 会命名 offending field(s)：quote value(s)、rewrite doc，并重新运行直到 exit 0。Validation 失败时不要 declare success。
+   - **如果 script 未运行**（else branch）：手动应用 validator checks，并匹配它的 exact scope；检查更广可能导致 validator 本不会要求的 edits。继续前通过 quote whole value 修复任何 violation：
+     1. Opening 和 closing frontmatter delimiters 各自必须是一行内容为 `---` 的 line（trailing whitespace 可以；`----` 或 `---extra` 不是 valid delimiter）。
+     2. 对每个 **top-level** mapping entry（`key: value`，无 leading indentation），如果 value **尚未 quoted 或 structured**（不以 `"`, `'`, `[`, `{`, `|`, 或 `>` 开头）：value 不得包含 unquoted ` #`（space-then-hash，YAML 会将其视为 comment 并 silent truncate），也不得包含 unquoted `: `（colon-then-space，strict YAML 可能读成 nested mapping）。如果出现任一情况，quote whole value。
+     Nested values、array items 和 already-quoted values 不在这里的 scope 内（array-item quoting 由上方 schema/YAML-safety step 处理）。然后在 completion output 中说明 bundled script validator 在此平台 unavailable，已手动应用 checks。
+
+   Validator 不 enforce schema rules，也不 flag YAML reserved-indicator characters（那些会 downstream 产生 loud parser errors，而非 silent corruption：out of scope）。仅使用 Python 3 stdlib（无 PyYAML 或其它 deps）。
 4. Subagent 完成后，orchestrator 删除 old learning file。New learning 的 frontmatter 可选包含 `supersedes: [old learning filename]` 以便 traceability，但这不是必须；git history 和 commit message 提供相同信息。
 
 **当 evidence insufficient 时：**

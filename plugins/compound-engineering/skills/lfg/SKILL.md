@@ -10,25 +10,33 @@ CRITICAL：你 MUST 按顺序执行下面每一步。Do NOT 跳过任何 require
 
 1. 使用 `$ARGUMENTS` 调用 `ce-plan` skill。
 
-   GATE：STOP。如果 ce-plan 报告该任务是 non-software，无法以 pipeline mode 处理，停止 pipeline，并告知用户 LFG 需要软件任务。否则，验证 `ce-plan` workflow 是否在 `docs/plans/` 中产出了 plan file。如果没有创建 plan file，再次用 `$ARGUMENTS` 调用 `ce-plan`。在 written plan 存在前，Do NOT 进入 step 2。**记录 plan file path**，它会在 step 3 传给 ce-code-review。
+   GATE：STOP。如果 ce-plan 报告该任务是 non-software，无法以 pipeline mode 处理，停止 pipeline，并告知用户 LFG 需要软件任务。否则，验证 `ce-plan` workflow 是否在 `docs/plans/` 中产出了 plan file。如果没有创建 plan file，再次用 `$ARGUMENTS` 调用 `ce-plan`。在 written plan 存在前，Do NOT 进入 step 2。**记录 plan file path**，它会在 step 4 传给 ce-code-review。
 
 2. 调用 `ce-work` skill。
 
    GATE：STOP。验证 implementation work 已完成：除 plan 外，有文件被创建或修改。如果没有 code changes，Do NOT 进入 step 3。
 
-3. 使用 `mode:agent plan:<plan-path-from-step-1>` 调用 `ce-code-review` skill。
+3. 对 branch diff 调用 `ce-simplify-code` skill。
+
+   此步骤在 review 前运行，让 step 4 的 code review 覆盖 simplified code。当 change 是 docs-only（只改 markdown/docs paths）或 trivial（约 10 changed lines 以下）时，**跳过**此步骤。否则让 `ce-simplify-code` 自行 resolve branch-diff scope；它会保留 behavior 并运行 test suite。
+
+   不要在此步骤 commit。`ce-simplify-code` 会把 changes 留在 working tree；step 4 的 review 会 scope working tree（包括 uncommitted changes），step 8 的 `ce-commit-push-pr` 会 commit 剩余内容。这里 commit 会把仍未 commit 的 `ce-work` edits 扫进误导性的 `refactor` commit，并可能卡在永远不会 clean 的 tree 上。
+
+4. 使用 `ce-code-review mode:agent plan:<plan-path-from-step-1>` 调用 `ce-code-review` skill。
 
    传入 step 1 中的 plan file path，让 ce-code-review 能验证 requirements completeness。读取该 skill 输出的 **Actionable Findings** summary。
 
-4. **Apply and persist review fixes**（step 3 之后、residual handoff 之前 REQUIRED）
+   `mode:agent` **按设计是 report-only**：它会浮现 findings，但绝不会编辑 tree；LFG 在 step 5 应用 eligible findings。向用户叙述进度时，表达为 "review found X -> applied X in step 5"，不要说 "code review did not auto-fix"。Report-only review 后由 LFG 应用 fix 是 intended contract，不是 gap。
 
-   加载 `references/review-followup.md` 并执行其中的 step 4（mechanical apply，并在存在 changes 时 commit/push）。当 eligible review fixes 仍只存在于 working tree 且未 commit 时，不要进入 step 5、运行 browser tests 或输出 DONE。
+5. **Apply and persist review fixes**（step 4 之后、residual handoff 之前 REQUIRED）
 
-5. **Autonomous residual handoff**（仅当 step 3 报告一个或多个未在 step 4 应用的 actionable `downstream-resolver` findings 时执行；如果报告 `Actionable findings: none.`，跳过）
+   加载 `references/review-followup.md`，并执行其中的 apply step（mechanical apply，并在存在 changes 时 commit/push）。当 eligible review fixes 仍只存在于 working tree 且未 commit 时，不要进入 residual handoff、运行 browser tests 或输出 DONE。
 
-   不要询问用户。此步骤遵循 autopilot contract：residuals 必须在 DONE 前变成 durable，但 agent 不会停下来询问。
+6. **Autonomous residual handoff**（仅当 step 4 报告一个或多个未在 step 5 应用的 actionable `downstream-resolver` findings 时执行；如果报告 `Actionable findings: none.`，跳过）
 
-   1. 以 **non-interactive mode** 加载 `references/tracker-defer.md`。传入 step 3/4 的 residual actionable findings（如果 summary 被截断，则传入 run artifact）。
+   Do not prompt the user。此步骤遵循 autopilot contract：residuals 必须在 DONE 前变成 durable，但 agent 不会停下来询问。
+
+   1. 以 **non-interactive mode** 加载 `references/tracker-defer.md`。传入 step 4/5 的 residual actionable findings（如果 summary 被截断，则传入 run artifact）。
    2. 收集结构化返回：`{ filed: [...], failed: [...], no_sink: [...] }`。
    3. 根据结构化返回组成 `## Residual Review Findings` markdown section：
       - 对 `filed` 中的每项：包含 severity、file:line、title，以及 tracker ticket URL 链接的 bullet。
@@ -40,25 +48,25 @@ CRITICAL：你 MUST 按顺序执行下面每一步。Do NOT 跳过任何 require
       gh pr view --json number,url,body,state
       ```
 
-   5. 如果存在 open PR，直接用 `gh` 更新；不要加载任何 confirmation-driven PR update skill。向当前 PR body 追加或替换 `## Residual Review Findings` section，将新 body 写入 OS temp file，然后运行：
+   5. 如果存在 open PR，直接用 `gh` 更新；do not load any confirmation-driven PR update skill。向当前 PR body 追加或替换 `## Residual Review Findings` section，将新 body 写入 OS temp file，然后运行：
 
       ```bash
       gh pr edit PR_NUMBER --body-file BODY_FILE
       ```
 
-   6. 如果不存在 open PR，在 `docs/residual-review-findings/<branch-or-head-sha>.md` 创建 tracked fallback file，包含组成的 section 和 source PR-review run context。只 stage 该文件，用 `docs(review): record residual review findings` commit，并 push 当前 branch。如果存在 upstream，运行 `git push`。如果没有 upstream，动态解析可写 remote：存在 `origin` 时优先使用，否则运行 `git remote` 并选择第一个已配置 remote。然后运行 `git push --set-upstream <remote> HEAD`。这是 durable no-PR sink。在已有 PR body 已更新或 fallback file commit 已 pushed 之前，不要输出 DONE。如果两条路径都失败，停止并报告失败命令；不要静默继续。
+   6. 如果不存在 open PR，在 `docs/residual-review-findings/<branch-or-head-sha>.md` 创建 tracked fallback file，包含组成的 section 和 source PR-review run context。只 stage 该文件，用 `docs(review): record residual review findings` commit，并 push 当前 branch。如果存在 upstream，运行 `git push`。如果没有 upstream，动态解析可写 remote：prefer `origin` when present，否则运行 `git remote` 并 choose the first configured remote。然后运行 `git push --set-upstream <remote> HEAD`。这是 durable no-PR sink。Do not output DONE until either the existing PR body has been updated or this fallback file commit has been pushed. 如果两条路径都失败，停止并报告失败命令；不要静默继续。
 
-   一旦 residuals 已 durable recorded，就不要因为 tracker filing failures 阻塞 DONE。只有当 findings 出现在 PR body 或 pushed fallback file 中时，`no_sink` outcome 才算成功。
+   一旦 residuals 已 durable recorded，Never block DONE on tracker filing failures。只有当 findings 出现在 PR body 或 pushed fallback file 中时，`no_sink` outcome 才算成功。
 
-6. 使用 `mode:pipeline` 调用 `ce-test-browser` skill。
+7. 使用 `mode:pipeline` 调用 `ce-test-browser` skill。
 
-7. 调用 `ce-commit-push-pr` skill。
+8. 调用 `ce-commit-push-pr` skill。
 
-   这会 commit 任何 remaining changes、push branch，并打开 pull request。如果 step 5 已经打开 PR（用 `gh pr view --json number,url,state 2>/dev/null` 检查），跳过 PR 创建，但仍然 commit 并 push 任何 uncommitted changes。
+   这会 commit 任何 remaining changes、push branch，并打开 pull request。如果 step 6 已经打开 PR（用 `gh pr view --json number,url,state 2>/dev/null` 检查），跳过 PR 创建，但仍然 commit 并 push 任何 uncommitted changes。
 
-8. **CI watch and autofix loop**（仅当当前 branch 存在 open PR 时）
+9. **CI watch and autofix loop**（仅当当前 branch 存在 open PR 时）
 
-   检测 PR；如果不存在或 `gh` 不可用，完全跳过此步骤并进入 step 9。
+   检测 PR；如果不存在或 `gh` 不可用，完全跳过此步骤并进入 step 10。
 
    ```bash
    gh pr view --json number,url,state
@@ -72,7 +80,7 @@ CRITICAL：你 MUST 按顺序执行下面每一步。Do NOT 跳过任何 require
       gh pr checks --watch
       ```
 
-      如果命令以 0 退出，说明所有 checks passed。跳出 loop 并进入 step 9。
+      如果命令以 0 退出，说明所有 checks passed。跳出 loop 并进入 step 10。
 
       如果非 0 退出，说明一个或多个 checks failed。继续到 (2)。
 
@@ -105,8 +113,8 @@ CRITICAL：你 MUST 按顺序执行下面每一步。Do NOT 跳过任何 require
      gh pr edit PR_NUMBER --body-file BODY_FILE
      ```
 
-   - Do NOT 继续 loop。autopilot contract 是“make residuals durable, then exit”。进入 step 9。
+   - Do NOT 继续 loop。autopilot contract 是“make residuals durable, then exit”。进入 step 10。
 
-9. 完成时输出 `<promise>DONE</promise>`
+10. 完成时输出 `<promise>DONE</promise>`
 
 现在从 step 1 开始。记住：plan FIRST，然后 work。绝不要跳过 plan。

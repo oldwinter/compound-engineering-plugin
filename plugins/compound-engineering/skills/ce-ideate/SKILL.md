@@ -67,15 +67,17 @@ Sub-agent dispatch 按 task shape 分层，绝不 hardcode 某个 model name：
 
 不同于 `ce-plan` 和 `ce-brainstorm`（默认 `md`），`ce-ideate` 默认 **`html`**：ideation artifacts 主要供人类权衡 candidate directions，rich self-contained HTML file（可为 top candidates 加 illustrative diagrams）更容易阅读。
 
-**读取 config（skill load 时 pre-resolved）：**
-!`cat "$(git rev-parse --show-toplevel 2>/dev/null)/.compound-engineering/config.local.yaml" 2>/dev/null || echo '__NO_CONFIG__'`
+**Read config。** Repo root 在 skill load 时 pre-resolved：
+!`git rev-parse --show-toplevel 2>/dev/null || true`
+
+如果上方行是 absolute path，将其用作 `<repo-root>`。如果为空，或仍显示 backtick command string（non-Claude harness 没有运行 pre-resolution），则在 runtime 用 shell tool 运行 `git rev-parse --show-toplevel` 解析 `<repo-root>`。然后用 native file-read tool 读取 `<repo-root>/.compound-engineering/config.local.yaml`。如果 root 无法解析（不是 git repo）或文件不存在，fall through 到下方 defaults。
 
 Resolution steps：
 
 1. **CLI arg。** 扫描 `$ARGUMENTS` 中 literal prefix 为 `output:` 的 token。找到后，在把 remainder 视为 focus hint 前先 strip 该 token，并 case-insensitively 匹配 `md` 和 `html`。
    - `output:` alone（无 value）→ no-op，fall through 到 step 2。
    - `output:<unknown>`（例如 `output:pdf`）→ drop token，fall through 到 step 2，并记住在 final resolution 后的 post-ideation menu 上方 emit one-line note：`Ignored unknown output: value '<value>' — using <resolved_format> instead.` 其中 `<resolved_format>` 是 steps 2-4 后 `OUTPUT_FORMAT` 实际 resolved 的值。不要在 note 中 hardcode format；config 或 default 可能与你假设不同。
-2. **Config。** 如果 step 1 未 resolve，且上方 pre-resolved YAML 中有 **active（non-commented）** `ideate_output:` key，value 匹配 `md` 或 `html`（case-insensitive），使用它。Missing、invalid 或 commented values silently fall through。Critical：以 `#` 开头的 lines 是 YAML comments，必须忽略；shipped config template 会包含类似 `# ideate_output: md` 的 commented example 来 document option，把它匹配成 active setting 会在用户未 opt in 时 silently override default。
+2. **Config。** 如果 step 1 未 resolve，且上方读取的 config file 有 **active（non-commented）** `ideate_output:` key，value 匹配 `md` 或 `html`（case-insensitive），使用它。Missing、invalid 或 commented values silently fall through。Critical：以 `#` 开头的 lines 是 YAML comments，必须忽略；shipped config template 会包含类似 `# ideate_output: md` 的 commented example 来 document option，把它匹配成 active setting 会在用户未 opt in 时 silently override default。
 3. **Default。** 否则 `OUTPUT_FORMAT=html`。
 4. **Pipeline override。** 当从任何 pipeline 或 `disable-model-invocation` context invoke 时，无论 steps 1-3 如何，强制 `OUTPUT_FORMAT=md`；automated downstream consumers 能 reliably parse markdown，pipeline runs 中 HTML 是 unnecessary friction。
 

@@ -52,6 +52,7 @@ Headless mode 用于 automations 和无人回答问题的 skill-to-skill invocat
 - `references/yaml-schema.md`：从 problem_type 到 directory 的 category mapping（classifying 时读取）
 - `references/concepts-vocabulary.md`：CONCEPTS.md format 和 inclusion rules（Phase 2.4 中 domain terms surface 时读取）
 - `assets/resolution-template.md`：new docs 的 section structure（assembling 时读取）
+- `scripts/validate-frontmatter.py`：frontmatter parser-safety validator（Phase 2 step 8 中通过 documented existence guard 运行；仅 Claude Code 可通过 `${CLAUDE_SKILL_DIR}` resolve，其它平台使用 manual-checklist fallback）
 
 Spawning subagents 时，将 relevant file contents 放进 task prompt，让它们无需 cross-skill paths 也拥有 contract。
 
@@ -249,7 +250,23 @@ Orchestrating agent（main conversation）执行以下 steps：
 5. 根据 `references/schema.yaml` validate YAML frontmatter，包括 array items 的 YAML-safety quoting rule（YAML-safety quoting rule for array items；见 `references/yaml-schema.md` > YAML Safety Rules）
 6. 需要时创建 directory：`mkdir -p docs/solutions/[category]/`
 7. 写入 file：updated existing doc，或新的 `docs/solutions/[category]/[filename].md`
-8. **运行 `python3 scripts/validate-frontmatter.py <output-path>`**，捕获 prose rules 漏掉的 silent-corruption parser-safety issues：malformed `---` delimiter lines、scalar values 中未 quote 的 ` #`（silent comment truncation），以及 scalar values 中未 quote 的 `: `（silent mapping confusion）。Exit 0 表示 doc parser-safe；exit 1 表示 script 的 stderr 会指出 offending field(s) 以及修复方式：quote value(s)、重写 doc，并重跑直到 exit 0。Validation 失败时不要宣称 success。该 script 不 enforce schema rules，也不 flag YAML reserved-indicator characters（这些会在 downstream 产生 loud parser errors，而非 silent corruption：out of scope）。仅使用 Python 3 stdlib（无 PyYAML 或其他 deps）。
+8. **Validate parser-safety of the written frontmatter**，捕获 prose rules 漏掉的 silent-corruption issues：malformed `---` delimiter lines、scalar values 中未 quote 的 ` #`（silent comment truncation），以及 scalar values 中未 quote 的 `: `（silent mapping confusion）。Bundled validator 位于 **skill bundle 内部**；在 Claude Code 中 `${CLAUDE_SKILL_DIR}` resolve 为 skill directory，但 runtime Bash tool 的 CWD 是用户 project，因此不带 `${CLAUDE_SKILL_DIR}` prefix 的 project-relative path 会 miss。通过 existence guard 运行，让无法 locate script 的平台（例如 native Codex/Gemini installs，`${CLAUDE_SKILL_DIR}` unset）fallback 到 manual check，而不是 silent skip protection：
+
+   ```bash
+   if [ -n "${CLAUDE_SKILL_DIR}" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" ]; then
+     python3 "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" <output-path>
+   else
+     echo "Bundled validate-frontmatter.py not resolvable on this platform; applying the parser-safety checklist manually."
+   fi
+   ```
+
+   - **如果 script 已运行：** exit 0 表示 parser-safe；exit 1 表示 stderr 会命名 offending field(s)：quote value(s)、rewrite doc，并重新运行直到 exit 0。Validation 失败时不要 declare success。
+   - **如果 script 未运行**（else branch）：手动应用 validator checks，并匹配它的 exact scope；检查更广可能导致 validator 本不会要求的 edits。继续前通过 quote whole value 修复任何 violation：
+     1. Opening 和 closing frontmatter delimiters 各自必须是一行内容为 `---` 的 line（trailing whitespace 可以；`----` 或 `---extra` 不是 valid delimiter）。
+     2. 对每个 **top-level** mapping entry（`key: value`，无 leading indentation），如果 value **尚未 quoted 或 structured**（不以 `"`, `'`, `[`, `{`, `|`, 或 `>` 开头）：value 不得包含 unquoted ` #`（space-then-hash，YAML 会将其视为 comment 并 silent truncate），也不得包含 unquoted `: `（colon-then-space，strict YAML 可能读成 nested mapping）。如果出现任一情况，quote whole value。
+     Nested values、array items 和 already-quoted values 不在这里的 scope 内（array-item quoting 由上方 schema/YAML-safety step 处理）。然后在 completion output 中说明 bundled script validator 在此平台 unavailable，已手动应用 checks。
+
+   Validator 不 enforce schema rules，也不 flag YAML reserved-indicator characters（那些会 downstream 产生 loud parser errors，而非 silent corruption：out of scope）。仅使用 Python 3 stdlib（无 PyYAML 或其它 deps）。
 
 Creating new doc 时，除非用户明确要求不同 structure，否则保留 `assets/resolution-template.md` 中的 section order。
 

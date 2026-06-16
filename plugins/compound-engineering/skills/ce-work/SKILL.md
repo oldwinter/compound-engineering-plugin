@@ -100,7 +100,8 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
    **Option B：Use a worktree（使用 worktree，推荐用于 parallel development）**
    ```bash
    skill: ce-worktree
-   # The skill will create a new branch from the default branch in an isolated worktree
+   # Ensures isolation: detects an existing worktree, prefers the harness's
+   # native worktree tool, else creates one from the default branch
    ```
 
    **Option C：Continue on the default branch（继续在 default branch 上）**
@@ -330,8 +331,8 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
 
 当 Tier 2 适用时：
 
-1. **Review**：调用 `ce-code-review` skill（invocation command 见 `references/review-findings-followup.md` § Fallback）。在 orchestrated workflows 中使用 `mode:agent`；有 plan 时传 `plan:<path>`，merge base 已知时传 `base:<ref>`。
-2. **Apply fixes**：加载 `references/review-findings-followup.md`。只基于 JSON 过滤 eligibility，**按 file 批处理 applicable findings**，dispatch fix subagents（file sets disjoint 时 parallel）。Orchestrator merge diffs、运行 tests 并 commit；它不预先调查 findings。
+1. **Review**：调用 `ce-code-review` skill（invocation command 见 `references/review-findings-followup.md` § Fallback），作为 review-only `ce-code-review` pass。在 orchestrated workflows 中使用 `mode:agent`；有 plan 时传 `plan:<path>`，merge base 已知时传 `base:<ref>`。
+2. **Apply fixes**：加载 `references/review-findings-followup.md`。只基于 JSON 过滤 eligibility，**batch applicable findings by file**，dispatch fix subagents（file sets disjoint 时 parallel）。Orchestrator merge diffs、运行 tests 并 commit；它不预先调查 findings。
 3. **Residual Work Gate**：只在 followup 后进行；未解决的 actionable findings 进入 `shipping-workflow.md` 中的 gate。
 
 Tier 1 harness-native review 仍可能 inline fix；Tier 2 始终将 review 与 apply 分离。

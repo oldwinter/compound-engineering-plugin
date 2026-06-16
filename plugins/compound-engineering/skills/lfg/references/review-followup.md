@@ -1,8 +1,8 @@
-# Review followup（review 跟进，LFG step 3-4）
+# Review followup（review 跟进，LFG step 4-5）
 
 `ce-code-review` 只负责 review。LFG 自行应用 eligible fixes，然后 commit。
 
-## Step 3 - invoke review（调用 review）
+## Step 4 - invoke review（调用 review）
 
 ```
 ce-code-review mode:agent plan:<plan-path-from-step-1>
@@ -12,7 +12,7 @@ ce-code-review mode:agent plan:<plan-path-from-step-1>
 
 捕获 parsed JSON（`status`、`actionable_findings`、`findings`、`artifact_path`、`run_id`）或 markdown Actionable Findings section。如果 `status` 为 `failed`，停止并展示 `reason`。
 
-## Step 4 - apply and persist review fixes（应用并持久化 review 修复）
+## Step 5 - apply and persist review fixes（应用并持久化 review 修复）
 
 ### 应用什么
 
@@ -27,18 +27,18 @@ ce-code-review mode:agent plan:<plan-path-from-step-1>
 
 ### 不应用什么
 
-- `autofix_class: manual` without a clear mechanical `suggested_fix`
+- `autofix_class: manual` 且没有 clear mechanical `suggested_fix`
 - `autofix_class: advisory`：仅报告
-- `gated_auto` findings that change behavior, contracts, auth, or permissions
-- Anything that needs a design conversation（任何需要 design conversation 的内容）
+- 会改变 behavior、contracts、auth 或 permissions 的 `gated_auto` findings
+- 任何需要 design conversation 的内容
 
 ### Execution（执行）
 
 1. 用上面的 bar 过滤 `actionable_findings`（或 markdown Actionable Findings）。
 2. 按 severity order（review 中稳定的 `#`）在 working tree 中应用 eligible fixes。
 3. 当任一已应用 finding 上有 `requires_verification: true` 时，运行 targeted tests。
-4. 如果 `git status --short` 显示 changes，只 stage review-driven files，commit `fix(review): apply review findings`，并在 step 5 前 push。Push 方式：如果存在 upstream，运行 `git push`。如果没有 upstream（fresh feature branch 上常见，因为 step 7 的 `ce-commit-push-pr` 尚未运行），动态解析 writable remote：存在 `origin` 时优先用 `origin`，否则用 `git remote` 并选择第一个已配置 remote。然后运行 `git push --set-upstream <remote> HEAD`。如果没有应用 eligible fixes，明确说明并跳过 commit。
+4. 如果 `git status --short` 显示 changes，只 stage review-driven files，commit `fix(review): apply review findings`，并在 step 6 前 push。Push 方式：如果存在 upstream，运行 `git push`。如果没有 upstream（fresh feature branch 上常见，因为 step 8 的 `ce-commit-push-pr` 尚未运行），动态解析 writable remote：存在 `origin` 时优先用 `origin`，否则用 `git remote` 并选择第一个已配置 remote。然后运行 `git push --set-upstream <remote> HEAD`。如果没有应用 eligible fixes，明确说明并跳过 commit。
 
-## Step 5 - residual handoff（剩余问题交接）
+## Step 6 - residual handoff（剩余问题交接）
 
-Residuals 是 step 4 中**未**应用的 actionable findings，不是 in-skill autofix 剩下的内容。使用 step 3 的 Actionable Findings summary / artifact。
+Residuals 是 step 5 中**未**应用的 actionable findings，不是 in-skill autofix 剩下的内容。使用 step 4 的 Actionable Findings summary / artifact。

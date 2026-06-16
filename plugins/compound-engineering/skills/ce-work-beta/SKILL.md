@@ -42,12 +42,10 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
 2. **Config file（配置文件）**：从下方 config block 提取 settings。`work_delegate` 值为 `codex` 时激活 delegation；`false` 时停用。
 3. **Hard default（硬默认值）**：`false`（delegation off）
 
-**Config（配置，pre-resolved）：**
-!`cat "$(git rev-parse --show-toplevel 2>/dev/null)/.compound-engineering/config.local.yaml" 2>/dev/null || echo '__NO_CONFIG__'`
+**Read config。** Repo root 在 skill load 时 pre-resolved：
+!`git rev-parse --show-toplevel 2>/dev/null || true`
 
-如果上方 block 包含 YAML key-value pairs，提取下方列出的 keys 的 values。
-如果显示 `__NO_CONFIG__`，说明文件不存在，所有 settings 都落到 defaults。
-如果显示 unresolved command string，使用 native file-read tool（例如 Claude Code 中的 Read，Codex 中的 read_file）从 repo root 读取 `.compound-engineering/config.local.yaml`。如果文件不存在，所有 settings 都落到 defaults。
+如果上方行是 absolute path，将其用作 `<repo-root>`。如果为空，或仍显示 backtick command string（non-Claude harness 没有运行 pre-resolution），则在 runtime 用 shell tool 运行 `git rev-parse --show-toplevel` 解析 `<repo-root>`。然后用 native file-read tool（例如 Claude Code 中的 Read、Codex 中的 read_file）读取 `<repo-root>/.compound-engineering/config.local.yaml`。如果 root 无法解析或文件不存在，所有 settings 都落到 defaults。否则提取下方列出的 keys 的 values。
 
 如果任何 setting 有 unrecognized value，该 setting fallback 到 hard default。对于没有 hard default 的 optional settings（`work_delegate_model`、`work_delegate_effort`），unrecognized 或 unparseable value 解析为 **unset**：对应 flag 会从 `codex exec` invocation 中省略，让 Codex 从 `~/.codex/config.toml` 解析。绝不要把 invalid value 填入 CLI flags。
 
@@ -153,7 +151,8 @@ Config keys（配置 keys）：
    **Option B：Use a worktree（使用 worktree，推荐用于 parallel development）**
    ```bash
    skill: ce-worktree
-   # The skill will create a new branch from the default branch in an isolated worktree
+   # Ensures isolation: detects an existing worktree, prefers the harness's
+   # native worktree tool, else creates one from the default branch
    ```
 
    **Option C：Continue on the default branch（继续在 default branch 上）**

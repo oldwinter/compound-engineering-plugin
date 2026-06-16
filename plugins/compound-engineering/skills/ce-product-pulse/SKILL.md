@@ -51,12 +51,10 @@ allowed-tools:
 
 ### Phase 0：按配置状态路由
 
-**Config（预解析）：**
-!`(top=$(git rev-parse --show-toplevel 2>/dev/null); [ -n "$top" ] && cat "$top/.compound-engineering/config.local.yaml" 2>/dev/null) || echo '__NO_CONFIG__'`
+**Read config。** Repo root 在 skill load 时 pre-resolved：
+!`git rev-parse --show-toplevel 2>/dev/null || true`
 
-如果上面的块包含 YAML 键值对，提取下方 “Config keys” 中列出的 `pulse_*` 键。
-如果显示 `__NO_CONFIG__`，说明文件不存在，将其视为首次运行。
-如果显示未解析的命令字符串，请使用原生文件读取工具（例如 Claude Code 中的 Read、Codex 中的 read_file）从 repo root 读取 `.compound-engineering/config.local.yaml`。如果文件不存在，视为首次运行。
+如果上方行是 absolute path，将其用作 `<repo-root>`。如果为空，或仍显示 backtick command string（non-Claude harness 没有运行 pre-resolution），则在 runtime 用 shell tool 运行 `git rev-parse --show-toplevel` 解析 `<repo-root>`。然后用 native file-read tool（例如 Claude Code 中的 Read、Codex 中的 read_file）读取 `<repo-root>/.compound-engineering/config.local.yaml`。如果 root 无法解析或文件不存在，视为首次运行。否则提取下方 "Config keys" 中列出的 `pulse_*` keys。
 
 **Config keys（配置键）:**
 - `pulse_product_name` -- string，用于报告标题。路由必需：如果未设置，skill 未配置。

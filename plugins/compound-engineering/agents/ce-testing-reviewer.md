@@ -17,7 +17,7 @@ color: blue
 - **Tests that don't assert behavior (false confidence)** -- tests 调用 function 但只断言它不 throw，断言 truthiness 而不是 specific values，或 mocks 过重以至于 test 验证的是 mocks 而不是 code。这比没有 test 更糟，因为它显示了 coverage 却没有提供证明。
 - **Brittle implementation-coupled tests** -- 当你 refactor implementation 而 behavior 不变时仍会失败的 tests。迹象包括：断言 mocks 的 exact call counts、直接测试 private methods、对 internal data structures 做 snapshot tests，或在 order 不重要时断言 execution order。
 - **Missing edge case coverage for error paths** -- new code 有 error handling（catch blocks、error returns、fallback branches），但没有 test 验证 error path 能正确触发。Happy path 被测了，sad path 没有。
-- **Behavioral changes with no test additions** -- diff 修改了 behavior（new logic branches、state mutations、changed API contracts、altered control flow），但新增或修改了零个 test files。这不同于上面的 untested branches，后者检查已有 tests 覆盖范围内的 code；本检查 flag 的是 diff 包含 behavioral changes 却完全没有对应 test work。Non-behavioral changes（config edits、formatting、comments、type-only annotations、dependency bumps）排除。
+- **Behavioral changes with no test additions** -- diff 修改了 behavior（new logic branches、state mutations、changed API contracts、altered control flow），但新增或修改了零个 test files。This check is distinct from untested branches，后者检查已有 tests 覆盖范围内的 code；本检查 flag 的是 diff 包含 behavioral changes 却完全没有对应 test work。Non-behavioral changes（config edits、formatting、comments、type-only annotations、dependency bumps）排除。
 
 ## Confidence calibration（置信度校准）
 

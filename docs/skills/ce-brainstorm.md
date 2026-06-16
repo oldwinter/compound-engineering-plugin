@@ -48,8 +48,10 @@
 - **One question per turn**，即使 sub-questions 看起来相关
 - **Right-sized ceremony（适度 ceremony）**：Lightweight / Standard / Deep / Deep-product tiers
 - **Named gap lenses** 在生成 approaches 前强迫 premises 严谨
+- **Background grounding scout（后台 grounding scout）** 在你回答 opening questions 时，用便宜模型收集 verbatim repo evidence
 - **2-3 个 concrete approaches** 带 tradeoffs，然后给出 stated recommendation
 - **Synthesis Summary** 是 doc 落地前最后一次廉价纠正 scope 的机会
+- **Fresh-context claim verification（fresh-context claim 验证）** 在 doc 落地前检查 repo claims
 - **Right-sized requirements document** 带 stable identifiers（R/A/F/AE），向下游 planning 流动
 
 ---
@@ -96,11 +98,15 @@ Requirements doc 携带 plan-feeding identifiers：R-IDs（Requirements）、A-I
 
 Requirements 描述从用户视角期待的 **what** behavior。默认不描述 libraries、schemas、endpoints、file layouts 或 code structure，除非 brainstorm 本身就是 technical 或 architectural decision。这让 planning 的工作保持干净：发明 **how**，而不是 **what**。
 
+### 9. Grounding and verification ride inside your think-time
+
+On Standard and Deep brainstorms, a cheap extraction-tier scout is dispatched in the background while you answer the first question. It writes a grounding dossier — verbatim quotes with `file:line` pointers — to scratch storage and hands back a short gist, so the dialogue stays lean while the evidence stays available on demand. Before the requirements doc is written, a fresh-context verifier (a mid-tier model that never saw the dialogue) checks the doc's repo claims — absence claims, file references — against the codebase, running while you review the synthesis confirmation. Refuted claims are corrected before the doc lands; unverifiable ones become explicit assumptions. The dossier path is handed to `ce-plan` so planning starts from verified quotes instead of re-scanning. On platforms without per-agent model selection, both run on the inherited model with the same read budgets; with no subagent support at all, the skill falls back to inline scanning and verification.
+
 ---
 
 ## 快速示例
 
-你以 vague feature idea 开始："I want to add a way for users to pause notifications." `ce-brainstorm` 扫描 repo，找到 related artifacts，并将 work 分类为 Standard scope。
+你以 vague feature idea 开始："I want to add a way for users to pause notifications." `ce-brainstorm` 读取 project constraint files，将 work 分类为 Standard scope，并在你回答第一个问题时派出便宜的 background scout 收集 repo evidence。
 
 Pressure test 检测到 specificity gap（这些 "users" 是谁？）和 attachment gap（"pause" 已经是具体 solution shape）。它以 prose 一次 probe 一个。你说出真实 pain：support team 会在凌晨 3 点被 non-urgent stuff ping；并描述能解决它的 smallest version。
 

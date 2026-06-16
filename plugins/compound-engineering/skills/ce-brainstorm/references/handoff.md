@@ -61,7 +61,7 @@ What would you like to do next? (Pick a number or describe what you want.)
 
 **如果用户选择 "Plan implementation with `ce-plan` (Recommended)"：**
 
-立即在当前 session 加载 `ce-plan` skill。当存在 requirements document 时传入其 path；否则传入已 finalized brainstorm decisions 的简洁摘要。不要先打印 closing summary。
+立即在当前 session 加载 `ce-plan` skill。当存在 requirements document 时传入其 path；否则传入已 finalized brainstorm decisions 的简洁摘要。当 Phase 1.1 grounding scout 产出了 dossier 且文件仍存在时，也传入其 path（`/tmp/compound-engineering/ce-brainstorm/<run-id>/grounding.md`）：它给 planning 提供带 `file:line` pointers 的 verified quotes，可从那里开始而不是重新扫描 repo。不要先打印 closing summary。
 
 **如果用户选择 "Agent review of requirements doc with `ce-doc-review`"：**
 

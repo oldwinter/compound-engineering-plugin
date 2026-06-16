@@ -85,7 +85,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`plug
 | [`/ce-commit`](./ce-commit.md) | 创建单个精心组织的 git commit：convention-aware、sensitive-file-safe、file-level logical splitting |
 | [`/ce-commit-push-pr`](./ce-commit-push-pr.md) | 从 working changes 到 open PR，并生成 adaptive descriptions：三种 modes（full workflow / description update / description-only generation） |
 | [`/ce-clean-gone-branches`](./ce-clean-gone-branches.md) | 删除 remote tracking branch 已消失的 local branches，包括关联 worktrees |
-| [`/ce-worktree`](./ce-worktree.md) | 在 `.worktrees/<branch>` 创建 git worktree，包含 `.env` copying、branch-aware dev-tool trust 和 gitignore management |
+| [`/ce-worktree`](./ce-worktree.md) | 确保 work 在 isolated git worktree 中进行：先检测 existing isolation，优先使用 harness native worktree tool，最后才 fallback 到 plain git |
 
 ---
 

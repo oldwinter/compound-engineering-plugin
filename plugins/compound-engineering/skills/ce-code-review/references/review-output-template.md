@@ -29,6 +29,12 @@
 Validation: export tests 11 -> 13; suite 214 pass, lint clean.
 Committed: `fix(review): cover empty-format branch + tighten export perms` (working tree was clean before review).
 
+### Triage Groups
+
+| Group | Findings | Context | Preferred Resolution | Why |
+|-------|----------|---------|----------------------|-----|
+| Export result-set scaling | #2, #3 | Both stem from loading the full order set in one pass | Design the pagination contract first (#3), then stream with `find_each` behind it (#2) | One cursor/page decision resolves the memory bound and the API shape together |
+
 ### P0 -- Critical
 
 | # | File | Issue | Reviewer | Confidence |
@@ -127,15 +133,16 @@ Issue: Another problem
 - **Pipe-delimited markdown tables** 用于 findings；绝不要使用 ASCII box-drawing characters，也不要在 entries 之间使用 per-finding horizontal-rule separators（verdict 前的 report-level `---` 仍然必需）
 - **转义 table cells 中的 literal `|`**；任何出现在 finding title、issue description、code snippet、regex pattern 或 delimited-string example 中的 `|` 都必须写成 `\|`。未转义 pipes 会被解析为 column separators，破坏该 row 的 `Reviewer` 和 `Confidence` columns（以及 Actionable Findings table 中的 `Route`）。尤其适用于 cache-key delimiter examples、regex alternations 和 findings 中引用的 logical-OR operators。
 - **Severity-grouped sections**：`### P0 -- Critical`、`### P1 -- High`、`### P2 -- Moderate`、`### P3 -- Low`。省略空 severity levels。
-- **Stable sequential finding numbers**：排序后只分配一次 finding numbers，跨 severity sections 连续编号，并在 findings 重复出现在 Actionable Findings 中时复用同一编号。不要在每个 severity 或 route bucket 中从 `1` 重新开始。
+- **Stable sequential finding numbers**：排序后只分配一次 finding numbers，跨 severity sections 连续编号，并 reuse those same numbers when findings are repeated in Actionable Findings。不要在每个 severity 或 route bucket 中从 `1` 重新开始。
 - **Always include file:line location（始终包含 file:line 位置）**，用于 code review issues
 - **Reviewer column** 显示哪些 persona(s) 标记了 issue。多个 reviewers = cross-reviewer agreement。
 - **Confidence column** 以整数显示 finding 的 anchor（`50`、`75` 或 `100`）。绝不要渲染为 float。
 - **per-severity tables 中没有 `Route` column**；synthesized route（``<autofix_class> -> <owner>``）只出现在 Actionable Findings table 和 `mode:agent` JSON 中。可扫描的 severity tables 是 5 columns：`# | File | Issue | Reviewer | Confidence`。
-- **Detail line（按 finding 需要）**：将 `Issue` cell 保持为**一个短 clause**（大约 12 个词或更少，不要第二句；它是 scannable index，不是解释）；完整解释放在 severity table 下面的 bullet list 中，使用 stable `#` 作为 key：`- **#N** — <why it matters + concrete fix direction>`。对 one-liner 不足以自解释的 findings 添加 detail line，通常是 P0/P1；P2/P3 通常只需简短项。这个 keyed list 是允许承载深度的地方；绝不要把 finding 展开成 `Field:`-prefixed blocks。
+- **Detail line (per finding)**：将 `Issue` cell 保持为 **one short clause**（大约 12 个词或更少，不要第二句；它是 scannable index，不是解释）；完整解释放在 severity table 下面的 bullet list 中，使用 stable `#` 作为 key：`- **#N** — <why it matters + concrete fix direction>`。对 one-liner 不足以自解释的 findings 添加 detail line，通常是 P0/P1；P2/P3 通常只需简短项。这个 keyed list 是允许承载深度的地方；绝不要把 finding 展开成 `Field:`-prefixed blocks。
 - **Header includes（Header 包含项）**：scope、intent 和 reviewer team，并包含 per-conditional justifications
 - **Mode line**：包含 `interactive` 或 `agent`
-- **Applied section（仅 default mode）**：当 review 已应用 fixes（Stage 5c）时，先列出它们，放在 severity tables 前，格式为 `# | File | Fix | Reviewer`，随后是一行 validation outcome（例如 "suite 214 pass, lint clean"）和 **commit status**：如果 review 前 working tree 干净，则作为 isolated review-labeled fix commit 提交（`fix(review): …`，或当 `review` 不是允许 scope 时使用 repo 最接近 convention）；如果 working tree 已经 dirty，则保持 uncommitted（留给用户 commit）。跨多个文件的 fix 是**一行一个 `#`**（例如 `controller.rb:88 (+test)`），绝不要跨行重复编号。对 green-but-unverifiable edits（auth/contract/concurrency）在 `Fix` cell 中 inline 标记，例如 `(security-posture — verify in diff)`。Applied findings 保留其 stable `#`，且只出现在这里，不出现在 severity tables 中。在 `mode:agent` 或没有 applied 内容时省略。
+- **Triage Groups section（存在 groups 时）**：在 Applied 之后、severity tables 之前渲染 pipe table `| Group | Findings | Context | Preferred Resolution | Why |`。`Findings` cell 列出 stable `#`s（例如 `#2, #3`）；每个 referenced `#` 必须出现在下方 severity table 中。Groups 是 findings 的 triage lens：never replace the severity tables, merge findings, or renumber them。`grouping:off` active 或 Stage 5b/5c pruning 后无 groups 时省略。
+- **Applied section（仅 default mode）**：当 review 已应用 fixes（Stage 5c）时，先列出它们，放在 severity tables 前，格式为 `# | File | Fix | Reviewer`，随后是一行 validation outcome（例如 "suite 214 pass, lint clean"）和 **commit status**：如果 review 前 working tree 干净，则作为 isolated review-labeled fix commit 提交（`fix(review): …`，或当 `review` 不是允许 scope 时使用 repo 最接近 convention）；如果 working tree 已经 dirty，则保持 uncommitted（留给用户 commit）。跨多个文件的 fix 是 one row with one `#`（例如 `controller.rb:88 (+test)`），绝不要跨行重复编号。对 green-but-unverifiable edits（auth/contract/concurrency）在 `Fix` cell 中 inline 标记，例如 `(security-posture — verify in diff)`。Applied findings 保留其 stable `#`，且只出现在这里，不出现在 severity tables 中。在 `mode:agent` 或没有 applied 内容时省略。
 - **Actionable Findings section**：当 actionable queue 非空时包含（供 caller 处理的 findings）
 - **Pre-existing section**：单独 table，没有 confidence column（这些是 informational）
 - **Learnings & Past Solutions section**：来自 ce-learnings-researcher 的结果，并链接到 docs/solutions/ files
@@ -156,6 +163,7 @@ contract 定义在 SKILL.md 的 **`### JSON output format (`mode:agent` only)`**
 
 - **No pipe-delimited tables**：findings 是带 merged fields 的 JSON arrays（`#`、`title`、`severity`、`file`、`line`、`confidence`、`autofix_class`、`owner`、`suggested_fix`、`why_it_matters`、`evidence`、`reviewers` 等）。
 - **`actionable_findings`**：caller apply workflows 的 subset（`gated_auto` / `manual` with `downstream-resolver`）。
+- **`triage_groups`**：markdown Triage Groups section 序列化为 `{title, findings: [<stable #s>], context, preferred_resolution, why}` objects，让 callers 可 batch related fixes by theme。Groups 覆盖 full finding set：它是 triage lens，不是 apply queue。因此 caller 必须先将每个 group 的 `findings` 与 `actionable_findings` 求交集再 apply；apply handoff 始终是 `actionable_findings`。`grouping:off` 或无 groups 时为空。
 - **没有 `applied_fixes`，也没有 Applied section**：`mode:agent` 不应用 fixes；由 caller 执行。Applied work 只出现在 default-mode markdown（Stage 5c/6）中。handoff 是 `actionable_findings`。
 - **Failure/degraded paths**：`{"status":"failed","reason":"..."}` 或带 reason 的 `"status":"degraded"`；绝不要将 markdown tables 混入 JSON response。
 - **Stable `#`**：与 Stage 5 synthesis 相同的编号，携带在 JSON finding objects 中，用于下游 apply/residual tracking。

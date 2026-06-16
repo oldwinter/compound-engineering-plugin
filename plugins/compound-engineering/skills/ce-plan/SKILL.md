@@ -63,15 +63,17 @@ argument-hint: "[optional: feature description、requirements doc path、要 dee
 
 在任何其它 phase 触发前确定 `OUTPUT_FORMAT`。Output mode 是 **exclusive**：plan 写为 markdown（`.md`）或 HTML（`.html`），绝不同时写两者。Precedence：CLI arg > config > default（`md`），并有 hard pipeline-mode override。
 
-**读取 config（skill load 时 pre-resolved）：**
-!`cat "$(git rev-parse --show-toplevel 2>/dev/null)/.compound-engineering/config.local.yaml" 2>/dev/null || echo '__NO_CONFIG__'`
+**Read config。** Repo root 在 skill load 时 pre-resolved：
+!`git rev-parse --show-toplevel 2>/dev/null || true`
+
+如果上方行是 absolute path，将其用作 `<repo-root>`。如果为空，或仍显示 backtick command string（non-Claude harness 没有运行 pre-resolution），则在 runtime 用 shell tool 运行 `git rev-parse --show-toplevel` 解析 `<repo-root>`。然后用 native file-read tool 读取 `<repo-root>/.compound-engineering/config.local.yaml`。如果 root 无法解析（不是 git repo）或文件不存在，fall through 到下方 defaults。
 
 解析步骤：
 
 1. **CLI arg。** 扫描 `$ARGUMENTS` 中以 literal prefix `output:` 开头的 token。如果找到，在将剩余内容作为 feature description 前移除该 token，并将其 value case-insensitively 匹配 `md` 和 `html`。
    - `output:` alone（无 value）→ no-op，fall through 到 step 2。
    - `output:<unknown>`（例如 `output:pdf`）→ drop token，fall through 到 step 2，并记住在 final resolution 后的 post-generation menu 上方 emit one-line note：`Ignored unknown output: value '<value>' — using <resolved_format> instead.` 其中 `<resolved_format>` 是 steps 2-4 后 `OUTPUT_FORMAT` 实际 resolved 的 value。不要在 note 中 hardcode `md`：当 config 设置 HTML 时会误导用户。
-2. **Config。** 如果 step 1 未 resolve，且上方 pre-resolved YAML 有 **active（non-commented）** `plan_output:` key，其 value 匹配 `md` 或 `html`（case-insensitive），使用它。Missing、invalid 或 commented values silently fall through。Critical：以 `#` 开头的 lines 是 YAML comments，必须 ignored：shipped config template 包含 `# plan_output: html` 这类 commented examples 用于 document option，如果把它们匹配为 active settings，会在用户未 opt in 时 silently force HTML mode。
+2. **Config。** 如果 step 1 未 resolve，且上方读取的 config file 有 **active（non-commented）** `plan_output:` key，其 value 匹配 `md` 或 `html`（case-insensitive），使用它。Missing、invalid 或 commented values silently fall through。Critical：以 `#` 开头的 lines 是 YAML comments，必须 ignored：shipped config template 包含 `# plan_output: html` 这类 commented examples 用于 document option，如果把它们匹配为 active settings，会在用户未 opt in 时 silently force HTML mode。
 3. **Default。** 否则 `OUTPUT_FORMAT=md`。
 4. **Pipeline override。** 当从 LFG 或任何 `disable-model-invocation` context invoke 时，无论 steps 1-3 如何，强制 `OUTPUT_FORMAT=md`。`ce-work` 和其它 automated downstream consumers 可 reliably parse markdown；pipeline runs 中 HTML 是 unnecessary friction。
 

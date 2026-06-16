@@ -168,7 +168,32 @@ Broken patterns（错误模式）：
 
 这个 plugin 会 author 一次，然后转换到多个 agent platforms（Claude Code、Codex、Gemini CLI 等）。不要在 skill content 中使用 platform-specific environment variables 或 string substitutions（例如 `${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_SKILL_DIR}`、`${CLAUDE_SESSION_ID}`、`CODEX_SANDBOX`、`CODEX_SESSION_ID`），除非提供在变量 unavailable 或 unresolved 时仍能工作的 graceful fallback。
 
-**Preferred approach — relative paths:** 使用从 skill directory 出发的 relative paths 引用 co-located scripts 和 files（例如 `bash scripts/my-script.sh ARG`）。所有主要 platforms 都会相对于 skill directory resolve。无需 variable prefix。
+Relative path 是否按 skill directory resolve，取决于由谁来 resolve，因此下面两种情况必须分开处理。不要假设裸 `scripts/...` path 在两种情况下都可用。
+
+**Read-time file references — resolve against the skill directory（读取时文件引用按 skill directory resolve）：** 当 skill *content* 指示 agent 读取 co-located file（例如 "read `references/schema.yaml`"）时，使用从 skill root 出发的 relative path。Skill loader 会在所有主要 platforms 上按 skill 自身 directory resolve 这些路径；不需要 variable prefix。这就是上方 *File References in Skills* 的规则。
+
+**Runtime script invocations via the Bash tool — resolve against the project CWD（通过 Bash tool 运行脚本时按项目 CWD resolve）：** 当 skill content 指示 agent 通过 Bash tool *执行* bundled script 时，裸 relative path 在 Claude Code 上**不可用**。Bash tool 的 working directory 是用户 project，不是 skill directory，所以 `bash scripts/my-script.sh` 会 resolve 到 `<project>/scripts/...`，找不到文件，并让该步骤被静默跳过。这是 recurring bug class，见 #764（`ce-worktree`）、#811（`ce-code-review`）和 #898（`ce-compound`）。用 `${CLAUDE_SKILL_DIR}` 上的 file-existence guard 包住 invocation，让它在 Claude Code 上运行，并在其他地方**可见地降级**：
+
+```
+if [ -n "${CLAUDE_SKILL_DIR}" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/my-script.sh" ]; then
+  bash "${CLAUDE_SKILL_DIR}/scripts/my-script.sh" ARG
+else
+  echo "<this step's bundled script is unavailable on this platform; do X instead>"
+fi
+```
+
+（`[ -n "${CLAUDE_SKILL_DIR}" ]` guard 可避免 unset variable 去探测 root-level `/scripts/...` path。）
+
+`${CLAUDE_SKILL_DIR}` 由 Claude Code 替换进 SKILL.md content，覆盖 marketplace-cached installs 和 `claude --plugin-dir` local dev；它 resolve 到 skill 自身 directory，因此 `then` branch 会在那里运行。注意 `${CLAUDE_SKILL_DIR}` 是 SKILL.md *content* substitution，不是 executed process 内可用的 environment variable；脚本如果需要自己的 directory，应从 `BASH_SOURCE` derive，而不是读取 `$CLAUDE_SKILL_DIR`（见 `ce-update/scripts/`）。`ce-compound` 的 `validate-frontmatter.py` invocation 是这个 guard pattern 的 canonical example。
+
+**为什么用 guard，而不是旧的 `${CLAUDE_SKILL_DIR:-.}` shell default（issue #943）。** 在其他 targets（Codex、Gemini CLI 等）上，`${CLAUDE_SKILL_DIR}` 是 unset。早先的 `:-.` 形式会降级为 project-CWD-relative `./scripts/...`，语法上有效，但 resolve 到不存在的 path：bundled script 位于该 runtime 自己的 skill store（例如 `~/.codex/skills/<plugin>/<skill>/scripts/...`），因此调用会静默 miss。Existence guard 会把这种情况显式化：`then` branch 永不触发，`else` branch 告诉 agent 应该怎么做，而不是运行 broken path 或声称成功。两个事实说明这是真实 product gap，而不是 converter bug：
+
+- Converter 不会 rewrite 这些 paths（`src/utils/codex-content.ts` 没有 `CLAUDE_SKILL_DIR` case），而且默认 `--to codex` mode 根本不会由 converter emit skills。
+- **这个 plugin 也会作为 *native* Codex plugin 发布**（通过 Codex 的 `/plugins` TUI marketplace 安装）。这条路径不会运行 converter；Codex 会原样加载 raw `SKILL.md`。`ce_platforms` frontmatter 只被 converter 的 `filterSkillsByPlatform` 尊重，因此它**不会**把 Claude-only skill 排除在 native Codex install 之外。两条 install paths 都尊重的唯一保护是 SKILL.md content 本身。
+
+因此：当 portability matters 时，不要让 skill 的 *core* behavior 依赖 runtime bundled-script call。上面的 existence guard 适合 **optional** guard script（例如 `ce-compound` 的 `validate-frontmatter.py`），其 `else` branch 会运行等价 inline check，让保护在 off-Claude 时仍然触发，而不是静默跳过。对于 *entire* behavior 都是 bundled script 的 skill，guard 并不会让它在 off-Claude 上工作；优先使用 agent 可 inline 执行的逻辑，或 agent 读取的 content（read-time references 在所有 targets 上都按 skill dir resolve）。
+
+**Permission caveat (Claude Code)：** Claude Code 的 permission checker 会评估 compound command 的每个 subcommand，而裸 `[ -f ... ]` test 不会被 pre-approved。因此把 pinned `bash "...sh"` call 包在 `if ... then ... fi` guard 中，会让 narrow `Bash(bash *...sh)` allow-rule 失效，并导致每次运行都 prompt。如果 bundled-script call 必须通过这种 pin 保持 auto-approved，请保留为单个 pinned command，而不是 inline guard。
 
 **When a platform variable is unavoidable:** 使用 pre-resolution pattern（`!` backtick syntax），并在 skill content 中包含 explicit fallback instructions，让 agent 知道 value 为空、literal 或 error 时该怎么做：
 

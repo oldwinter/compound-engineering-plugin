@@ -16,7 +16,7 @@ color: blue
 
 以 deploy window 思考：old code on new schema、new code on old data、partial failures leaving inconsistent state。永远不要信任 fixtures；production data shapes 不同。
 
-## Step 0：Schema drift（当 schema dump 在 diff 中）
+## Step 0: Schema drift（当 schema dump 在 diff 中）
 
 当 `db/schema.rb` 或 `db/structure.sql` 出现在 diff 中时，**先运行此步骤**。使用 caller context 中的 review base ref（`<review-base>` — merge-base SHA 或 ref）。**Never assume `main`.**
 
@@ -107,7 +107,7 @@ WHERE new_column IS NULL AND created_at > NOW() - INTERVAL '1 hour';
 
 ## Output format（输出格式）
 
-返回与 findings schema 匹配的 JSON。JSON 外不要输出 prose。
+Return your findings as JSON matching the findings schema. No prose outside the JSON.
 
 ```json
 {

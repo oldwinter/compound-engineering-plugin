@@ -47,9 +47,9 @@
 
    当变更小、集中且不在 sensitive surface list 内时，Tier 1 足够；不要为了 "to be safe" 而升级。
 
-4. **Residual Work Gate（剩余工作 Gate，Tier 2 运行后 REQUIRED）**
+4. **Residual Work Gate**（剩余工作 Gate，Tier 2 运行后 REQUIRED）
 
-   Tier 2 code review 和 review-findings followup 之后，检查 **Actionable Findings** summary（或读取 `/tmp/compound-engineering/ce-code-review/<run-id>/` 中的 run artifact）。如果一个或多个 actionable `downstream-resolver` findings 未在 followup 中应用，在用户决定如何处理前，不要进入 Final Validation。
+   Tier 2 code review 和 review-findings followup 之后，检查 **Actionable Findings** summary（或读取 `/tmp/compound-engineering/ce-code-review/<run-id>/` 中的 run artifact）。如果一个或多个 actionable `downstream-resolver` findings 未在 followup 中应用，do not proceed to Final Validation，直到用户决定如何处理。
 
    使用平台 blocking question tool 询问用户（Claude Code 中的 `AskUserQuestion`，必要时预加载 `ToolSearch select:AskUserQuestion`；Codex 中的 `request_user_input`；Gemini 中的 `ask_user`；Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。只有当 harness 真正缺少 blocking tool 时，才回退到聊天中的编号选项。绝不要静默跳过该 gate。
 
@@ -58,7 +58,7 @@
    Options（选项，四个或更少，self-contained labels）：
    - `Apply/fix now` — 加载 `references/review-findings-followup.md`，为剩余 eligible findings 分派 batched fix subagents，运行 tests，必要时 commit。
    - `File tickets via project tracker` — 以 Interactive mode 加载 `references/tracker-defer.md`；agent 在项目检测到的 tracker 中创建 tickets（或使用 `gh` fallback，若无 sink 则留在 report 中），然后进入 Final Validation。
-   - `Accept and proceed` — shipping 前，将 residual findings 原样记录到 durable "Known Residuals" sink。如果 Phase 4 会创建或更新 PR，将它们包含在 PR description 的 "Known Residuals" section（调用 `ce-commit-push-pr` 时由 agent 负责）。如果用户稍后选择 no-PR `ce-commit` path，创建 `docs/residual-review-findings/<branch-or-head-sha>.md`，包含 accepted findings 和 source review-run context，与 implementation commit 一起 stage，并在最终 summary 中提及 file path。用户已确认风险，但 findings 不能只存在于 transient session。
+   - `Accept and proceed` — shipping 前，将 residual findings 原样记录到 durable "Known Residuals" sink。如果 Phase 4 会创建或更新 PR，将它们包含在 PR description 的 "Known Residuals" section（调用 `ce-commit-push-pr` 时由 agent 负责）。If the user later chooses the no-PR `ce-commit` path，创建 `docs/residual-review-findings/<branch-or-head-sha>.md`，包含 accepted findings 和 source review-run context，与 implementation commit 一起 stage，并在最终 summary 中提及 file path。用户已确认风险，但 findings must not live only in the transient session。
    - `Stop — do not ship` — 中止 shipping workflow。用户会在重新调用前手动处理 findings。
 
    当 review 报告 `Actionable findings: none.`（且 followup 已应用所有 mechanical 项）或仅使用 Tier 1 时，完全跳过该 gate。在 `Accept and proceed` 决策下，在 agent 记录 durable sink 是 `PR Known Residuals` 还是 `docs/residual-review-findings/<branch-or-head-sha>.md` 前，不要越过该 gate。

@@ -50,7 +50,7 @@ Skills 是工程工作的主要入口，以 slash commands 调用。许多 skill
 | [`ce-clean-gone-branches`](../../docs/skills/ce-clean-gone-branches.md) | 清理 remote tracking branch 已消失的 local branches |
 | [`ce-commit`](../../docs/skills/ce-commit.md) | 用表达价值的 message 创建 git commit |
 | [`ce-commit-push-pr`](../../docs/skills/ce-commit-push-pr.md) | Commit、push 并打开带 adaptive description 的 PR；也可更新现有 PR description，或只生成 description 而不 commit |
-| [`ce-worktree`](../../docs/skills/ce-worktree.md) | 管理 Git worktrees 以支持 parallel development |
+| [`ce-worktree`](../../docs/skills/ce-worktree.md) | 确保 work 在 isolated git worktree 中进行：先检测 existing isolation，优先 native worktree tooling，否则才创建一个 |
 
 ### Workflow Utilities（Workflow 工具）
 
