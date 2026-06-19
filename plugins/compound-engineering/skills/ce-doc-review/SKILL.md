@@ -8,10 +8,11 @@ argument-hint: "[mode:headless] [path/to/document.md 文档路径]"
 
 通过 multi-persona analysis review requirements 或 plan documents。并行派发 specialized reviewer agents，自动应用 `safe_auto` fixes，并通过四选项交互（per-finding walk-through、auto-resolve with best judgment、Append-to-Open-Questions、Report-only）路由剩余 findings 供用户决策。
 
-## Interactive Mode Rules（交互模式规则）
+## Interactive mode rules（交互模式规则）
 
 - **任何问题触发前，预加载平台 question tool。** 在 Claude Code 中，`AskUserQuestion` 是 deferred tool，session start 时它的 schema 不可用。在 Interactive-mode work 开始时（routing question、per-finding walk-through questions、bulk-preview Proceed/Cancel 和 Phase 5 terminal question 之前），用 query `select:AskUserQuestion` 调用 `ToolSearch` 以加载 schema。要在 Interactive flow 顶部 eager 地加载一次，不要等到第一个提问点。Codex、Gemini 和 Pi 不需要这个 preload。
 - **只有当 harness 真正缺少 blocking question tool 时，才使用 numbered-list fallback**：`ToolSearch` 没有返回匹配、tool call 明确失败，或 runtime mode 不暴露它（例如 `request_user_input` 不可用的 Codex edit modes）。pending schema load 不是 fallback trigger；按 pre-load rule 先调用 `ToolSearch`。在 genuine-fallback 情况下，以编号列表呈现 options 并等待用户回复，绝不要静默跳过问题。因为 tool 麻烦、模型处于 report-formatting mode，或指令埋在长 skill 里，就把问题渲染为 narrative text，这是 bug。需要用户决策的问题，必须触发 tool，或明确 fallback。
+- **Subagent dispatch 使用 bounded parallelism。** 尊重 active-subagent limit；把 spawn errors as backpressure, not reviewer failure，并 queue the remainder，等 slot 释放后继续。
 
 ## Phase 0：Detect Mode（检测模式）
 

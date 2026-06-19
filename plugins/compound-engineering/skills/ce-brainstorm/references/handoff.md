@@ -46,12 +46,11 @@ What would you like to do next? (Pick a number or describe what you want.)
 仅呈现适用选项。重新编号，让可见选项从 1 开始保持连续。
 
 1. **Plan implementation with `ce-plan` (Recommended)** - 转入 `ce-plan` 进行结构化 implementation planning。仅当 `Resolve Before Planning` 为空时显示。
-2. **Agent review of requirements doc with `ce-doc-review`** - 分派 reviewer agents 检查 doc 的 coherence、feasibility、scope 和其他 persona-specific issues；自动应用安全修复；交互式 route 剩余 findings。仅当 requirements document 存在**且 `OUTPUT_FORMAT=md`** 时显示；ce-doc-review 的 walkthrough 会应用 markdown-only mutations（`##`/`###` heading inserts、通过 apply-set 进行单文件 markdown edits），会破坏 HTML artifact，因此 HTML brainstorms 跳过此选项，直到 ce-doc-review 获得 HTML-aware mutation support。在 HTML mode 下，在菜单上方显示一行说明：`Agent review unavailable in output:html mode — ce-doc-review is markdown-only today. Switch to output:md if you want a review pass.`
-3. **Open in Proof — review and comment to iterate with the agent** - 在 Every 的 Proof editor 中打开 doc，通过 comments 与 agent 迭代，或复制链接分享给他人。仅当 requirements document 存在时显示。**仅当 `OUTPUT_FORMAT=md` 时渲染**（Proof 作用于 markdown，不能 ingest HTML）。
-3. **Open in browser** — 在本地打开 HTML requirements 文件，用于 review 和 sharing。仅当 requirements document 存在时显示。**仅当 `OUTPUT_FORMAT=html` 时渲染。** 在 exclusive output mode 下替代同一位置的 "Open in Proof"；doc 要么是 markdown，要么是 HTML，绝不同时存在，所以每次运行只适用两个标签之一。
-4. **Build it now with `ce-work` (skip planning)** - 跳过 planning 并转入 `ce-work`；适合轻量、定义清楚的改动。仅当 `Resolve Before Planning` 为空，**且** scope 轻量、success criteria 清晰、scope boundaries 清晰、没有有意义的技术或研究问题剩余时显示（即 "direct-to-work gate"）。
-5. **More clarifying questions to sharpen the doc** - 通过进一步对话继续打磨 scope、edge cases、constraints 和 preferences。始终显示。
-6. **Done for now** - 暂停；requirements doc 已保存，之后可恢复。始终显示。
+2. **Agent review of requirements doc with `ce-doc-review`** - 分派 reviewer agents 检查 requirements doc。
+3. **Publish to Proof — shareable link** - 将 requirements doc 发布到 Proof，得到可阅读、评论或分享的链接。
+4. **Start `/ce-work` directly** - 仅对 lightweight scope 显示。
+5. **Ask more clarifying questions** - 继续 brainstorm。
+6. **Pause** - 停在当前 doc。
 
 **Post-review nudge（仅后续轮次）：** 如果用户在本 session 已运行 `ce-doc-review`，且 residual P0/P1 findings 仍未处理，在菜单旁添加一行 prose nudge（例如："Document review flagged 2 P1 findings you may want to address — pick \"Agent review of requirements doc\" to run another pass."）。按 label 引用选项，不要按编号：当 `Resolve Before Planning` 隐藏 `Plan implementation` 和 `Build it now` 时，菜单会重新编号，硬编码选项编号可能指向错误动作。不要添加单独菜单选项；复用现有 agent-review 选项。当 `OUTPUT_FORMAT=html` 时抑制该 nudge；agent-review 选项在该模式下隐藏，nudge 会指向不存在的动作。
 
@@ -65,7 +64,7 @@ What would you like to do next? (Pick a number or describe what you want.)
 
 **如果用户选择 "Agent review of requirements doc with `ce-doc-review`"：**
 
-加载 `ce-doc-review` skill，并将 requirements document path 作为 argument 传入。当 ce-doc-review 返回 "Review complete" 后，回到 Phase 4 options 并重新渲染菜单（doc 可能已变更，因此重新评估 `Resolve Before Planning`、direct-to-work gate 和 residual findings）。如果 residual P0/P1 findings 仍未处理，在菜单上方包含 post-review nudge。不要显示 closing summary。
+Load the `ce-doc-review` skill，并将 requirements document path 作为 argument 传入。当 ce-doc-review 返回 "Review complete" 后，回到 Phase 4 options 并重新渲染菜单（doc 可能已变更，因此重新评估 `Resolve Before Planning`、direct-to-work gate 和 residual findings）。如果 residual P0/P1 findings 仍未处理，在菜单上方包含 post-review nudge。不要显示 closing summary。
 
 **如果用户选择 "Build it now with `ce-work` (skip planning)"：**
 
@@ -73,25 +72,10 @@ What would you like to do next? (Pick a number or describe what you want.)
 
 **如果用户选择 "More clarifying questions to sharpen the doc"：** 返回 Phase 1.3（Collaborative Dialogue），继续一次一个地向用户提出 clarifying questions，进一步细化 scope、edge cases、constraints 和 preferences。持续到用户满意后，再返回 Phase 4。不要显示 closing summary。
 
-**如果用户选择 "Open in Proof — review and comment to iterate with the agent"：**
-
-以 HITL-review mode 加载 `ce-proof` skill，参数为：
-
-- **source file（源文件）：** `docs/brainstorms/YYYY-MM-DD-<topic>-requirements.md`
-- **doc title（文档标题）：** `Requirements: <topic title>`
-- **identity（身份）：** `ai:compound-engineering` / `Compound Engineering`
-- **recommended next step（推荐下一步）：** `ce-plan` (shown in the ce-proof skill's final terminal output)
-
-遵循 ce-proof skill 中的 HITL review reference。它会上传 doc，提示用户在 Proof web UI 中 review，摄取过滤后的 comment threads，通过当前 Proof edit APIs 应用已同意 edits，在线程内 reply/resolve，并在 proceed 时将最终 markdown 原子同步回 source file。
-
-当 ce-proof skill 交还控制权时：
-
-- `status: proceeded` 且 `localSynced: true` → 磁盘上的 requirements doc 现在反映了 review。返回 Phase 4 options 并重新渲染菜单（doc 可能在 review 中发生实质变更，因此 option eligibility 可能变化；针对更新后的 doc 重新评估 `Resolve Before Planning`、direct-to-work gate 和 residual ce-doc-review findings）。
-- `status: proceeded` 且 `localSynced: false` → reviewed version 位于 Proof 的 `docUrl`，但 local copy 已陈旧。使用 ce-proof skill 的 Pull workflow，询问是否将 Proof doc 拉取到 `localPath`。pull 完成（或被拒绝）后重新渲染 Phase 4 menu。如果 pull 被拒绝，在菜单上方加入一行说明 `<localPath>` 相比 Proof 已陈旧；否则 `Plan implementation` / `Build it now` / `Agent review of requirements doc` 会静默读取 review 前副本。
-- `status: done_for_now` → 如果用户离开前在 Proof 中编辑过，磁盘上的 doc 可能已陈旧。询问是否将 Proof doc 拉取到 `localPath`，以保持 local requirements file 同步，然后返回 Phase 4 options。如果 pull 被拒绝，在菜单上方加入 stale-local note。`done_for_now` 表示用户没有同步就停止了 HITL loop；不表示他们结束了整个 brainstorm。
-- `status: aborted` → 不做更改，回到 Phase 4 options。
-
-如果初始 upload 失败（network error、Proof API down），短暂等待后重试一次。如果仍失败，告诉用户 upload 没有成功，并简要说明原因，然后返回 Phase 4 options；不要让用户困惑为什么该选项没有效果。
+**如果用户选择 "Publish to Proof — shareable link"：** 加载 `ce-proof` skill publish requirements doc。传入：
+- **source file：** `docs/brainstorms/YYYY-MM-DD-<topic>-requirements.md`
+- **doc title：** `Requirements: <topic>`
+- **mode：** publish/shareable link；local markdown file 保持 canonical，不做 sync-back side effect
 
 **如果用户选择 "Open in browser"：** 显示 `.html` requirements file 的 absolute path，让用户可本地打开。若平台暴露 browser-opening primitive（例如 macOS 的 `open`、Linux 的 `xdg-open`、Windows 的 `start`），agent 可直接调用；否则打印 absolute path，让用户自行打开。显示路径（或打开浏览器）后，返回 Phase 4 options，让用户选择 follow-up action。
 

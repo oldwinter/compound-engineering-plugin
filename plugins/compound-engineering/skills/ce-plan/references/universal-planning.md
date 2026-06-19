@@ -160,8 +160,7 @@ structuring plan 后，使用平台 blocking question tool 询问用户希望如
    - 使用 filename convention：`YYYY-MM-DD-<descriptive-name>-plan.md`
    - 文档以 `# Title` heading 开头，下一行写 `Created: YYYY-MM-DD`。不要 YAML frontmatter。
 
-2. **Open in Proof (web app) — review and comment to iterate with the agent（在 Proof web app 中打开，用评论与 agent 迭代）** — 在 Every 的 Proof editor 中打开 doc，通过 comments 与 agent 迭代，或复制链接分享给他人。加载 `ce-proof` skill 来创建并打开文档。
-
-3. **Save to disk AND open in Proof（保存到磁盘并在 Proof 中打开）** — 两者都做：将 markdown file 写入 disk，并在 Proof 中打开 doc 进行 review。
+2. **Publish to Proof — shareable link** — 将 doc 发布到 Every 的 Proof editor，并获得可阅读、评论或分享的链接。加载 `ce-proof` skill 创建 shared document 并返回 URL。
+3. **Save summary to disk** — 将 summary 写为 markdown file。
 
 不要提供 `/ce-work`（software-only）或 issue creation（不适用于 non-software plans）。

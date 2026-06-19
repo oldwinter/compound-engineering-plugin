@@ -179,13 +179,11 @@ Routing（路由）：
 
 示例 classifications：
 
-- "Improve conversion on our sign-up page" → elsewhere-software（subject 是 page）
-- "Redesign the onboarding flow" → elsewhere-software（subject 是 flow）
-- "Pricing page A/B test ideas" → elsewhere-software（subject 是 page）
-- "Features to add to our note-taking app"（给 note-taking app 添加 features） → elsewhere-software
-- "Name my new coffee shop" → elsewhere-non-software（subject 是 brand）
-- "Plot ideas for a short story" → elsewhere-non-software（subject 是 narrative）
-- "Options for my next career move" → elsewhere-non-software（subject 是 personal decision）
+**Routing rule（non-software mode）。** 当 Decision 2 = non-software 时，仍运行 Phase 1 Elsewhere-mode grounding（user-context synthesis + 默认 web-research；遵守 skip phrases）。Learnings-researcher 会跳过，因为 non-software ideas 通常没有 repo-grounded source corpus。
+
+- "Improve conversion on our sign-up page" -> elsewhere-software（subject 是 page）
+- "Redesign the onboarding flow" -> elsewhere-software（subject 是 flow）
+- "Pricing page A/B test ideas" -> elsewhere-software（subject 是 page）
 
 在顶部用一句用户能识别的 plain language 说明 inferred approach。绝不要向用户打印 internal taxonomy label（`repo-grounded`、`elsewhere-software`、`elsewhere-non-software`）：这些名称只用于 routing。将下方 template 适配到实际 topic；从 topic 本身选 domain word（例如 "landing page"、"onboarding flow"、"naming"、"career decision"），不要使用 mode label。
 

@@ -136,6 +136,8 @@ Sub-agent dispatch 按 task shape 分层，绝不 hardcode 某个 model name：
 
 Product-tier 会触发额外 Phase 1.2 questions 和 requirements document 中的额外 sections。Feature-tier 使用当前 Deep behavior，不变。
 
+**Visual probe tripwire。** 如果 feature 本质上是 visual 或 spatial，例如 drawing/canvas tools、annotation behavior、visual editors、UI layout/navigation、interaction states、charts、diagrams、animation、maps、timelines 或 spatial flows，现在读取 `references/visual-probes.md`，并记住 visual-probe gate pending。强信号包括 freehand vs constrained drawing behavior、canvas annotation tools、layout comparisons 和 state/flow placement。此处加载 reference 只是 readiness；直到第一个 concrete shape/behavior decision 时才提供 visual path。如果用户之后选择 visual，通过相对已加载的 `ce-brainstorm` skill directory 解析并运行 `scripts/visual-probe-server.js`；如果 runtime 没有暴露具体 skill directory，不要从 project CWD 猜测，使用 text path。
+
 ### Phase 1：Understand the Idea（理解想法）
 
 #### 1.1 Existing Context Scan（现有 Context 扫描）
@@ -212,12 +214,8 @@ Dialogue 中只 carry gist。当 conversation 需要 gist 无法回答的 specif
 **Guidelines（指导原则）：**
 - 在提供自己的 ideas 前，先问用户已经在想什么。这会浮现 hidden context，并防止固定在 AI-generated framings 上。
 - 从 broad 开始（problem、users、value），再 narrow（constraints、exclusions、edge cases）
-- **Rigor probes 在 Phase 2 前触发，并且是 open-ended，不是 menus。** Phase 1.2 中发现的每个 scope-appropriate gap 都作为 **separate** direct open-ended probe 触发：一个 probe 满足一个 gap，不满足多个。把这些 probes 渐进地放进 conversation：可以与 narrowing moves 交错，只要 Phase 1.2 中发现的每个 gap 都在 Phase 2 前被 probe。Menu 会暗示哪些 evidence 算数，并让用户 pick 而不是 produce；open probe 会迫使真实 observation 出现，或显露真实 uncertainty。每条 Phase 1.2 的 "when present, ask..." 都是对应 probe；按 Interaction Rule 6 phrasing。**当 attachment gap 存在时，attachment 是 Phase 2 前的 final rigor probe：presence 根据 Phase 1.2 从 opening 判断，即使 narrowing 已经产出 shape，也不能跳过；它的工作是在 Phase 2 继承用户 implicit framing 前 pressure-test 它。** 如果 probe 的答案揭示 genuine uncertainty，将其作为 requirements document 中的 explicit assumption 记录，而不是跳过 probe。
-- 澄清 problem frame、validate assumptions，并询问 success criteria
-- 让 requirements 足够具体，使 planning 不需要发明 behavior
-- 只有当 dependencies 或 prerequisites materially affect scope 时才呈现它们
-- 在这里 resolve product decisions；把 technical implementation choices 留给 planning
-- 带来 ideas、alternatives 和 challenges，而不只是 interviewing
+- **Rigor probes 在 Phase 2 前触发，并且是 open-ended probes，不是 leading yes/no questions**
+- **Visual gate before shape questions。** 当 Phase 0.3 标记了 visual-probe gate pending，或当前 decision 会在 drawing/canvas、annotation、UI layout、interaction state、flow placement 或 behavior shape 上分叉时，先读取 `references/visual-probes.md`，并在询问 behavior/shape 细节前提供真实的 **text-vs-visual opt-in**。该 opt-in takes precedence over the default blocking-question path for the underlying shape decision：Use the platform's blocking question tool for the text-vs-visual opt-in when available, then follow the selected path. ASCII preview text does not satisfy the visual-probe offer for genuinely visual decisions.
 
 **Before exiting Phase 1.3：integration check。** 在脑中组合用户目前所说内容，并浮现 dialogue 尚未 probe 的任何 non-obvious consequences。如果 user-stated X 加 user-stated Y 加 your-default-Z 会产生用户不太可能通过 one-question-at-a-time dialogue 跟踪到的 downstream effect（"if mute lives on the rule AND we don't warn on delete, then rule-delete silently loses pause state"），趁仍在 dialogue 中现在 probe。每个 genuine combination effect 一个 probe，open-ended 提问，纪律同 rigor probes。Phase 2.5 的 call-outs 是 residuals 的安全网（silent agent inferences、无 dialogue 的 pre-loaded contexts），不是把现在本可以询问的 consequences 推后的 punt list。
 
@@ -231,8 +229,7 @@ Dialogue 中只 carry gist。当 conversation 需要 gist 无法回答的 specif
 
 先呈现 approaches，再 evaluate。让用户先看到所有 options，再听推荐哪一个：在用户看到 alternatives 前就先给 recommendation，会过早 anchor conversation。
 
-有用时，包含一个刻意的 higher-upside alternative：
-- 识别哪个 adjacent addition 或 reframing 最能提高 usefulness、compounding value 或 durability，且不带来 disproportionate carrying cost。将其作为 challenger option 与 baseline 并列呈现，而不是默认项。当工作已明显 over-scoped，或 baseline request 明显是正确 move 时省略。
+如果 approach differences 足够 spatial、behavioral 或 visual，以至于 prose 更慢或 fidelity 更低，在呈现 choice 前使用 `references/visual-probes.md`。对于 Phase 0.3 tripwire 捕获的 inherently visual topics，默认提供 visual probe option，而不是只靠文字比较。
 
 在 product tier，alternatives 应在构建 *what* 上不同（product shape、actor set、positioning），而不是构建 *how* 不同。Implementation-variant alternatives 属于 feature tier。
 

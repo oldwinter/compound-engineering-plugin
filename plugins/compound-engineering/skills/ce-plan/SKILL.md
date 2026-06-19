@@ -48,6 +48,7 @@ argument-hint: "[optional: feature description、requirements doc path、要 dee
 - 可追溯回 request 或 origin document 的 concrete requirements traceability
 - Proposed work 的 repo-relative file paths（绝不使用 absolute paths：见 Planning Rules）
 - Feature-bearing implementation units 的 explicit test file paths
+- Phase 5.1 review checklist 要把 feature-bearing units 上 blank or missing test scenarios 视为 incomplete
 - 带 rationale 的 decisions，而不只是 tasks
 - 要 follow 的 existing patterns 或 code references
 - 每个 feature-bearing unit 的 enumerated test scenarios，足够 specific，让 implementer 无需自行 invent coverage 就知道 exactly what to test
@@ -513,7 +514,7 @@ Tree 是展示 expected output shape 的 scope declaration。它不是 constrain
 - **Execution note**：optional，仅当 unit 受益于 non-default execution posture，如 test-first 或 characterization-first
 - **Technical design**：optional pseudo-code 或 diagram；当 unit approach non-obvious 且 prose alone 会留下 ambiguity 时使用。明确 frame 为 directional guidance，而不是 implementation specification
 - **Patterns to follow**：要 mirror 的 existing code 或 conventions
-- **Test scenarios**：枚举 implementer 应写的 specific test cases，按 unit complexity 和 risk right-sized。考虑下方每个 category，并包含该 unit 适用的每个 category 的 scenarios。Simple config change 可能只需一个 scenario；payment flow 可能需要一打。Quality signal 是 specificity：每个 scenario 应命名 input、action 和 expected outcome，让 implementer 无需 invent coverage。对于无 behavioral change 的 units（pure config、scaffolding、styling），使用 `Test expectation: none -- [reason]`，不要留空 field。**AE-link convention：** 当 test scenario 直接 enforce origin Acceptance Example 时，用 `Covers AE<N>.` prefix（或 `Covers F<N> / AE<N>.`）。这 sparse-by-design：大多数 test scenarios 比 AEs 更 fine-grained，不需要 link。不要将 AE links 强行加到只覆盖 lower-level implementation details 的 tests 上。
+- **Test scenarios**：枚举 implementer 应写的 specific test cases，按 unit complexity 和 risk right-sized。考虑下方每个 category，并包含该 unit 适用的每个 category 的 scenarios。Simple config change 可能只需一个 scenario；payment flow 可能需要一打。Quality signal 是 specificity：每个 scenario 应命名 input、action 和 expected outcome，让 implementer 无需 invent coverage。对于无 behavioral change 的 units（pure config、scaffolding、styling），使用 `Test expectation: none -- [reason]`，不要留空 field。Feature-bearing units 上的 blank or missing test scenarios 是 incomplete；只有 non-behavioral units 可写 `Test expectation: none` 或 `Test expectation: none -- [reason]`。**AE-link convention：** 当 test scenario 直接 enforce origin Acceptance Example 时，用 `Covers AE<N>.` prefix（或 `Covers F<N> / AE<N>.`）。这 sparse-by-design：大多数 test scenarios 比 AEs 更 fine-grained，不需要 link。不要将 AE links 强行加到只覆盖 lower-level implementation details 的 tests 上。
   - **Happy path behaviors**：带 expected inputs 和 outputs 的 core functionality
   - **Edge cases**（当 unit 有 meaningful boundaries 时）：boundary values、empty inputs、nil/null states、concurrent access
   - **Error and failure paths**（当 unit 有 failure modes 时）：invalid input、downstream service failures、timeout behavior、permission denials
@@ -767,29 +768,22 @@ Interactive mode 存在是因为 on-demand deepening 是不同的用户姿态：
 
 ##### 5.3.8–5.4 Document Review、Final Checks 和 Post-Generation Options
 
-**STOP。继续前立刻加载 `references/plan-handoff.md`。** 它包含 5.3.8（document review）、5.3.9（final checks and cleanup）和 5.4（post-generation handoff，包括 Proof HITL flow、post-HITL re-review 和 Issue Creation branching）的完整 instructions。**这一步不可选**；否则 agent 会渲染 post-generation menu、捕获用户选择，然后没有触发 routed action 就停下。只要 `OUTPUT_FORMAT=md`，无论 confidence check 是否已经运行，5.3.8 的 document review 都无条件运行；对于 `OUTPUT_FORMAT=html`，plan-handoff 的 5.3.8 format gate 会跳过 `ce-doc-review`，因为它今天的 mutation mechanics 仅支持 markdown。Markdown 的默认模式是 headless（`mode:headless`）：`safe_auto` fixes 静默应用，remaining findings 在 menu 上方按上下文 surface，更深的 interactive review 通过 free-form prompt opt in。
+**STOP。继续前立刻加载 `references/plan-handoff.md`。** 它包含 5.3.8（document review）、5.3.9（final checks and cleanup）和 5.4（post-generation handoff，包括 Publish to Proof flow 和 Issue Creation branching）的完整 instructions。**
+
+Document review is mandatory for markdown plans; HTML plans use the `references/plan-handoff.md` format gate because ce-doc-review is markdown-only today.
 
 Document review 和 final checks 后，在 menu 上方打印一行 headless review state summary（例如 `Doc review applied 3 fixes. 2 decisions, 1 proposed fix, 4 FYI observations remain (1 at P1).`；对于 5.3.8 被跳过的 HTML plans，打印 `Doc review skipped — ce-doc-review is markdown-only today; the HTML plan was not reviewed.`），然后呈现 menu。当仍有 actionable findings（`proposed_fixes_count + decisions_count > 0`）时，menu 有 5 个 options；否则有 4 个 options，包括 FYI-only case 和 HTML-skip case（`skipped_reason: output_format_html`）。后两者都隐藏 option 2，因为 `ce-doc-review` walkthrough 只面向 actionable markdown findings，此时没有有效内容可 walkthrough。完整规则见 `references/plan-handoff.md`。5-option menu 按 AGENTS.md 对 legitimate option overflow 的 narrow exception，在 chat 中渲染为 numbered list，并附上提示 "Pick a number or describe what you want." 对 blocking question tool 没有 option 上限的平台（Codex `request_user_input`、Pi `ask_user`），使用平台 blocking tool；当该 tool 不可用或报错（例如 Codex edit modes 未暴露 `request_user_input`）时，fallback 到同样的 numbered-list-in-chat 渲染，并保留 "Pick a number or describe what you want." 提示。4-option case 正常通过平台 blocking tool routing（Claude Code 中是 `AskUserQuestion`；如果 schema 未加载，先调用 `ToolSearch` 并使用 `select:AskUserQuestion`），当 blocking tool 不可用或调用失败时，同样 fallback 为 numbered-list-in-chat。绝不要静默跳过该 question。
 
 **问题：** "Plan ready at `<absolute path to plan>`. What would you like to do next?"（使用 absolute path，让现代 terminal 中的引用可点击）
 
-**选项。** Option 4 的 label 要匹配 artifact 的 format。在 exclusive output mode 下，每次运行只适用 "Open in Proof" 或 "Open in browser" 之一：`OUTPUT_FORMAT=md` 显示 Proof；`OUTPUT_FORMAT=html` 显示 browser。Proof 基于 markdown，不能 ingest HTML；browser option 会打开本地 `.html` 文件。渲染与本次产出 format 匹配的 option。
+**选项。** Option 4 的 label 要匹配 artifact 的 format。在 exclusive output mode 下，每次运行只适用 "Publish to Proof" 或 "Open in browser" 之一：`OUTPUT_FORMAT=md` 显示 Proof；`OUTPUT_FORMAT=html` 显示 browser。Proof 基于 markdown，不能 ingest HTML；browser 是 HTML 的正确 surface。
 
-1. **Start `/ce-work`**（recommended）- 在当前 session 中开始实现这个 plan
-2. **Run deeper doc review** - 以 interactive 方式 walkthrough remaining findings（完整 `ce-doc-review` walkthrough）
-3. **Create Issue** - 从这个 plan 在已配置的 issue tracker（GitHub 或 Linear）中创建 tracked issue
-4. **Open in Proof (web app) — review and comment to iterate with the agent** - 在 Every 的 Proof editor 中打开 doc，通过 comments 与 agent 迭代，或复制 link 分享给他人。**仅当 `OUTPUT_FORMAT=md` 时渲染。**
-4. **Open in browser** - 在本地打开 HTML plan file，用于 review 和 sharing。**仅当 `OUTPUT_FORMAT=html` 时渲染。**
-5. **Done for now** - 暂停；plan file 已保存，之后可 resume
-
-**路由。** 根据用户选择采取行动；不要只是宣布。复杂 sub-flows（Proof HITL state machine、Issue Creation tracker detection、post-HITL resync）位于 `references/plan-handoff.md`。
-
-- **Start `/ce-work`** — 通过平台的 skill-invocation primitive（Claude Code 中的 `Skill`、Codex 中的 `Skill`、Gemini/Pi 上的等价机制）调用 `ce-work` skill，并把 plan path 作为 skill argument。不要只是告诉用户输入 `/ce-work`；现在就触发 invocation，让 plan 在本 session 中执行。
-- **Run deeper doc review** — 在 plan path 上重新调用 `ce-doc-review` skill，且**不带** `mode:headless`，以触发 interactive routing question 和 walkthrough。返回后，用刷新后的 counts 重新渲染此 menu，让用户选择 next-stage action。
-- **Create Issue** — 检测 project tracker（GitHub 用 `gh`，Linear 用 `linear`），并按 `references/plan-handoff.md` 中 "Issue Creation" 的说明，从 plan file 创建 issue。创建后显示 issue URL，并通过平台 blocking question tool 询问是否继续 `/ce-work`。
-- **Open in Proof (web app) — review and comment to iterate with the agent** — 以 HITL-review mode 加载 `ce-proof` skill，参数包括：plan file 作为 `source file`，plan title 作为 `doc title`，identity 为 `ai:compound-engineering` / `Compound Engineering`，recommended next step 为 `/ce-work`。然后遵循 `references/plan-handoff.md` 的 post-HITL resync logic；它会处理四种 `ce-proof` return statuses，在 material edits 后重新运行 `ce-doc-review`，并在 upload failure 时 graceful fallback。
-- **Open in browser** — 显示 `.html` plan file 的 absolute path，让用户可在本地打开。若平台暴露 browser-opening primitive（例如 macOS 的 `open`、Linux 的 `xdg-open`、Windows 的 `start`），agent 可以使用；否则打印 absolute path，让用户打开。不要从这个 option 调用 `ce-work`；用户选择 HTML 是为了 review/sharing，不是 handoff。
-- **Done for now** — 简短确认 plan file 已保存，然后结束本 turn。没有用户明确后续 prompt 时，不要启动 follow-up work。
+根据选择进行 inline routing：
+- **Start `/ce-work`** — Invoke the `ce-work` skill via the platform's skill-invocation primitive, passing the plan path as the skill argument.
+- **Create Issue** — 按 issue tracker configuration 创建 issue。
+- **Publish to Proof** — 调用 `ce-proof` publish local markdown file，返回 shareable link；local file 保持 canonical。
+- **Open in browser** — 打开 HTML artifact。
+- **Done for now** — End the turn after naming the plan path and any remaining blockers.
 
 如果用户输入针对 findings 的 free-form prompts（例如 "review"、"walk through"、"deep review"），按其选择了 `Run deeper doc review` 来 routing；触发 skill，而不是回到 menu。对于其他 free-text revisions，接受输入，应用 revision 后再回到此 menu。
 

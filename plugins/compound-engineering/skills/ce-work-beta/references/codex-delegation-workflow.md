@@ -9,20 +9,20 @@
 **推荐 Codex delegation 时：**
 
 > "Codex delegation 已激活。[N] 个 implementation units -- 将作为一个 batch 委托。"
-> 1. 委托给 Codex *(recommended)*
-> 2. 改由 Claude Code 执行
+> 1. Delegate to Codex anyway *(recommended)*（委托给 Codex）
+> 2. Execute with Claude Code instead（改由 Claude Code 执行）
 
 **推荐 Codex delegation 且有 multiple batches 时：**
 
 > "Codex delegation 已激活。[N] 个 implementation units -- 将分 [X] 个 batches 委托。"
-> 1. 委托给 Codex *(recommended)*
-> 2. 改由 Claude Code 执行
+> 1. Delegate to Codex anyway *(recommended)*（委托给 Codex）
+> 2. Execute with Claude Code instead（改由 Claude Code 执行）
 
 **推荐 Claude Code 时（所有 units 都是 trivial）：**
 
-> "Codex delegation 已激活，但这些都是 small changes，delegation 成本高于直接让 Claude Code 完成。"
-> 1. 使用 Claude Code 执行 *(recommended)*
-> 2. 仍然委托给 Codex
+> "Codex delegation 已激活，但这些都是 small changes，the cost of delegating outweighs having Claude Code do them。"
+> 1. Execute with Claude Code instead *(recommended)*（使用 Claude Code 执行）
+> 2. Delegate to Codex anyway（仍然委托给 Codex）
 
 如果用户选择 delegation option，继续到下方 Pre-Delegation Checks。如果用户选择 Claude Code option，将 `delegation_active` 设为 false，并返回 parent skill 中的标准执行。
 
@@ -342,7 +342,7 @@ git checkout -- .
 git clean -fd -- <paths from the batch's combined Files list>
 ```
 
-不要使用不带 path arguments 的 bare `git clean -fd`。
+Do NOT use bare `git clean -fd` without path arguments（不要使用不带 path arguments 的 bare `git clean -fd`）。
 
 **Commit on success（成功后提交）：**
 
@@ -353,7 +353,7 @@ git commit -m "feat(<scope>): <batch summary>"
 
 **Between batches（批次之间）**（plans 被拆成 multiple batches 时）：报告已完成内容、test results 和下一步。除非用户介入，否则立即继续——checkpoint 的存在是为了让用户 *可以* steer，而不是必须输入。
 
-**Circuit breaker（熔断器）：** 连续 3 次 failures 后，将 `delegation_active` 设为 false，并输出："Codex delegation 已在连续 3 次 failures 后停用 -- 剩余 units 将用 standard mode 完成。"
+**Circuit breaker（熔断器）：** 3 consecutive failures 后，将 `delegation_active` 设为 false，并输出："Codex delegation 已在连续 3 次 failures 后停用 -- 剩余 units 将用 standard mode 完成。"
 
 **Scratch cleanup（scratch 清理）：** 不需要显式 cleanup——OS temp 会最终处理（macOS `$TMPDIR` periodic purge；Linux/WSL `/tmp` reboot 或 periodic cleanup）。run 后保留 `<scratch-dir>` 也有助于在出错时保留 intermediate artifacts 供 debugging。
 

@@ -64,6 +64,8 @@ Caller context 决定哪些 dimensions 权重更高。Code-bug query 权重 modu
 
 使用 native file-search/glob tool（例如 Claude Code 中的 Glob）动态发现 invocation 时 `docs/solutions/` 下实际存在的 subdirectories。不要假设 fixed list；subdirectory names 是 per-repo convention，可能包括：
 
+Probe live `docs/solutions/` to discover which subdirectories actually exist before narrowing searches.
+
 - Bug-shaped（bug 形态）: `build-errors/`, `test-failures/`, `runtime-errors/`, `performance-issues/`, `database-issues/`, `security-issues/`, `ui-bugs/`, `integration-issues/`, `logic-errors/`
 - Knowledge-shaped（knowledge 形态）: `architecture-patterns/`, `design-patterns/`, `tooling-decisions/`, `conventions/`, `workflow/`, `workflow-issues/`, `developer-experience/`, `documentation-gaps/`, `best-practices/`, `skill-design/`, `integrations/`
 - Other per-repo categories（其他 repo-specific categories）

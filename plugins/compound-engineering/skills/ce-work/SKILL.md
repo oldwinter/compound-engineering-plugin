@@ -206,9 +206,9 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
      - 按 existing conventions 实现
      - 添加、更新或移除 tests，使其匹配 implementation changes（见下方 Test Discovery）
      - 运行 System-Wide Test Check（见下方）
-     - Changes 后运行 tests
-     - 评估 testing coverage：这个 task 是否改变 behavior？如果是，是否写入或更新了 tests？如果没有添加 tests，理由是否明确且有意（例如 pure config、无 behavioral change）？
-     - 将 task 标记为 completed
+     - Run tests after changes（changes 后运行 tests）
+     - Assess testing coverage（评估 testing coverage）：这个 task 是否改变 behavior？如果是，是否写入或更新了 tests？如果没有添加 tests，理由是否明确且有意（例如 pure config、无 behavioral change）？
+     - Mark task as completed（将 task 标记为 completed）
      - 评估是否 incremental commit（见下方）
    ```
 

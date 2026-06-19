@@ -96,7 +96,7 @@ Critique 分两层运行。**fresh-context verifier**（一个从未看过 gener
 
 Grounding agents 并行返回：codebase summary、relevant past learnings、developer-experience patterns 的 external prior art。Orchestrator 将 topic 分解为 4-5 个来自 grounding 的 axes（例如 "DX improvements" 可分为 feedback loops、environment friction、tooling ergonomics、knowledge accessibility、automation surface），然后 cheap evidence scouts 为每个 axis 收集 quote-and-pointer dossier。覆盖六个 frames 的五个 ideation sub-agents 基于这些 evidence 生成 candidates，每个 idea 都标注 target axis，并在提交前 against actual files verification。Orchestrator 将 40+ candidates 合并成一个 list，synthesize cross-cutting combinations，运行 axis-coverage check（任何 empty axis 都触发一次 bounded recovery dispatch），再运行 two-layer critique pass：fresh-context verifier 尝试 refute 每个 candidate，然后 orchestrator 做 final cut。大约 13 个 ideas 会因过于 vague、缺乏 justification、被 refuted 或重复而被 cut。
 
-完整 deliverable 会自动写成 self-contained HTML file 并在 browser 中打开：其中包含全部七张 cards（basis、rationale、downsides、confidence、complexity）和 rejection summary。Session 本身只展示 concise ranked summary 和路径，让你阅读 rich version，而不是一墙 terminal text。随后出现四选一 next-steps menu：在 browser 中打开、用 `ce-brainstorm` brainstorm one idea、iterate on one idea（adjust 或 ask，仍留在这里），或 done。（Markdown runs 会把 "open in browser" 换成 "open and iterate in Proof"。）
+完整 deliverable（全部七张 cards，包含 basis、rationale、downsides、confidence、complexity，以及 rejection summary）会自动写成 self-contained HTML file 并在 browser 中打开；session 本身只展示 concise ranked summary 和路径，让你阅读 rich version，而不是一墙 terminal text。
 
 ---
 
@@ -204,8 +204,6 @@ Single-prompt ideation 会塌缩到 agent 最常训练的方向。不同 frames 
 
 ## 另见
 
-- [`ce-brainstorm`](./ce-brainstorm.md) - 选中 survivor 后，将方向 brainstorm 成 requirements doc
+- [`ce-brainstorm`](./ce-brainstorm.md) - 选中 survivor 后，将 chosen direction brainstorm 成 requirements doc
 - [`ce-plan`](./ce-plan.md) - requirements 清晰后，规划 implementation
 - [`ce-strategy`](./ce-strategy.md) - 将 ideation 锚定到 documented product strategy
-- [`ce-doc-review`](./ce-doc-review.md) - review saved ideation artifact 的 clarity 和 completeness（仅 markdown output；先用 `output:md` 运行）
-- [`ce-proof`](./ce-proof.md) - 在 Proof 中打开 artifact 进行 collaborative iteration（仅 markdown output；Proof 不能 ingest HTML）

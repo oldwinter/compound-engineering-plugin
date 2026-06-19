@@ -59,5 +59,4 @@
 
 - **Create a plan** -> 带上已决定的 goal 和 constraints hand off 到 `/ce-plan`
 - **Save summary to disk** -> 将 summary 作为 markdown file 写入当前 working directory
-- **Open in Proof (web app) — review and comment to iterate with the agent** -> 加载 `ce-proof` skill，在 Every 的 Proof editor 中打开 doc，通过 comments 与 agent iterate，或复制 link 与他人分享
-- **Done** -> conversation 本身就是价值，不需要 artifact
+- **Publish to Proof — shareable link** -> 将 summary 发布到 Every 的 Proof editor，并返回可分享链接

@@ -26,10 +26,7 @@
 | 问题 | 答案 |
 |----------|--------|
 | 它做什么？ | Research context，捕获 decisions 和 scope，把 work 拆成带 stable IDs 的 atomic units，为每个 unit 枚举 test scenarios，并通过 confidence check 自动 strengthen weak sections |
-| 何时使用？ | Requirements 已 ready，需要 execution guardrails；task 清晰时做 solo planning；non-software multi-step tasks（study plans、research、maintenance、events、trips） |
-| 产出什么？ | `docs/plans/YYYY-MM-DD-NNN-<type>-<name>-plan.md` 中的 plan |
-| 下一步 | `/ce-work`、创建 tracked issue、在 Proof 中打开 review，或 pause |
-| 区分点 | Guardrails over choreography（WHAT，不是 HOW）；U-IDs（stable）；origin tracing（R/A/F/AE -> U）；每 unit 的 test scenarios；automatic deepening；multi-agent research |
+| 何时使用？ | Requirements 已 ready，需要 execution guardrails；task 足够复杂，值得 plan doc、verification matrix 和 handoff |
 
 ---
 
@@ -110,7 +107,7 @@ Universal planning 还区分两种 **dispositions**。*Plan-seeking* tasks（tri
 
 Plan 写入。Confidence check 随后自动运行：它发现 `Risks & Dependencies` 对 mute-leak risk 描述较薄，且某 unit 的 test scenarios 缺少 permission edge cases，于是分派 data-integrity reviewer 和 correctness reviewer，并把 findings synthesis 回 plan。Plan 加盖 `deepened:` date。
 
-Document review 随后以 headless mode 运行。因为 plan 设置了 origin 且不触及 high-stakes domains，cheap minimum dispatches（coherence + feasibility）；`safe_auto` fixes（typo、broken cross-reference）静默应用。Remaining findings 作为 one-line summary 出现在 post-generation menu 上方，例如：`Doc review applied 2 fixes. 3 decisions, 1 FYI remain.` Menu 提供：start `/ce-work`、在有 actionable findings 时运行 deeper doc review、创建 tracked issue、在 Proof 中打开 HITL review，或 pause。
+Document review 随后以 headless mode 运行。因为 plan 设置了 origin 且不触及 high-stakes domains，cheap minimum dispatches（coherence + feasibility）；`safe_auto` fixes（typo、broken cross-reference）静默应用。Remaining findings 作为 one-line summary 回到 plan handoff。
 
 ---
 

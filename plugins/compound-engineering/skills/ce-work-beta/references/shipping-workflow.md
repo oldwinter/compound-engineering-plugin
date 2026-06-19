@@ -24,7 +24,7 @@
 
    当 plan 或用户收窄了变更范围时，传入 `plan:<path>` 或 scope hint。如果 harness 上没有该 skill，跳过或对明显 duplicate/dead code 做一次简短 manual pass；不要因为 simplify 被跳过就升级到 Tier 2。
 
-3. **Code Review（代码审查）**
+3. **Code Review**（代码审查）
 
    当 harness 提供 built-in review 时使用 **Tier 1**。仅当下面的 escalation criteria 匹配时使用 **Tier 2**；**不要**因为 Tier 1 缺失就使用 Tier 2。
 
@@ -65,7 +65,7 @@
 
 5. **Final Validation（最终验证）**
    - 所有 tasks 已标记 completed
-   - Testing 已处理：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
+   - Testing addressed（测试已处理）：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
    - Linting passes（lint 通过）
    - Code 遵循 existing patterns
    - Figma designs match（如适用）
@@ -117,7 +117,7 @@
 
 - [ ] 所有 clarifying questions 已问并已回答
 - [ ] 所有 tasks 已标记 completed
-- [ ] Testing 已处理：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
+- [ ] Testing addressed（测试已处理）：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
 - [ ] Linting passes（使用 linting-agent）
 - [ ] Code 遵循 existing patterns
 - [ ] Figma designs 与 implementation match（如适用）

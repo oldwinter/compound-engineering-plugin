@@ -13,7 +13,9 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
 
 此 command 接收 work document（plan 或 specification）或描述 work 的 bare prompt，并系统性执行。重点是通过快速理解 requirements、遵循 existing patterns，并全程保持质量来 **shipping complete features**。
 
-**Beta rollout note：** 当你想 trial Codex delegation 时，手动调用 `ce-work-beta`。Beta 期间，planning 和 workflow handoffs 仍指向 stable `ce-work`，以避免 dual-path orchestration complexity。
+**Beta rollout note：** Invoke `ce-work-beta` manually when trialing Codex delegation. Beta 期间，planning and workflow handoffs remain pointed at stable `ce-work`，以避免 dual-path orchestration complexity。
+
+**Frontend Design Guidance**：当 work 涉及 frontend、web UI、UX 或 visual polish 时，加载并遵循 `ce-frontend-design` skill。
 
 ## Input Document（输入文档）
 
@@ -256,13 +258,13 @@ Config keys（配置 keys）：
      - **如果 unit 的 work 已经存在且符合 plan intent**（files 已具备预期 capability，或当前 code 已满足该 unit 的 `Verification` criteria），说明 work 很可能已经在先前 branch 或 session 中 shipped。验证匹配后，将 task 标记完成并继续。不要静默重新实现。
      - 在 codebase 中查找 similar patterns
      - 为正在修改的 implementation files 找到 existing test files（Test Discovery，见下方）
-     - 如果 delegation_active：切换到 Codex Delegation Execution Loop
+     - If delegation_active: branch to the Codex Delegation Execution Loop
        （见 `references/codex-delegation-workflow.md`）
      - 否则：按 existing conventions 实现
      - 添加、更新或移除 tests，使其匹配 implementation changes（见下方 Test Discovery）
      - 运行 System-Wide Test Check（见下方）
-     - Changes 后运行 tests
-     - 评估 testing coverage：这个 task 是否改变 behavior？如果是，是否写入或更新了 tests？如果没有添加 tests，理由是否明确且有意（例如 pure config、无 behavioral change）？
+     - Run tests after changes（changes 后运行 tests）
+     - Assess testing coverage（评估 testing coverage）：这个 task 是否改变 behavior？如果是，是否写入或更新了 tests？如果没有添加 tests，理由是否明确且有意（例如 pure config、无 behavioral change）？
      - 将 task 标记为 completed
      - 评估是否 incremental commit（见下方）
    ```

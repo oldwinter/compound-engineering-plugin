@@ -207,5 +207,4 @@ Personas 专门针对这两种类型调校。Review learning doc 或 release not
 
 - [`ce-brainstorm`](./ce-brainstorm.md) - 产出此 skill review 的 requirements docs
 - [`ce-plan`](./ce-plan.md) - 产出此 skill review 的 plan docs；在 Phase 5.3.8 调用此 skill
-- [`ce-code-review`](./ce-code-review.md) - code（diffs）的 sibling skill；相同 multi-persona pattern，不同 artifact
-- [`ce-proof`](./ce-proof.md) - 通过 Every 的 collaborative editor 做 alternative HITL review path；complementary，不是 substitute
+- [`ce-code-review`](./ce-code-review.md) - code（diffs）的 sibling review surface

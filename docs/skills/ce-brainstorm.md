@@ -24,9 +24,7 @@
 | 问题 | 答案 |
 |----------|--------|
 | 它做什么？ | 通过 collaborative dialogue clarify scope、pressure-test premises、explore approaches，并写出 right-sized requirements doc |
-| 何时使用？ | Vague feature ideas、"let's brainstorm"、多个 plausible directions、unclear scope；non-software decisions 和 projects |
-| 产出什么？ | `docs/brainstorms/` 中的 requirements doc（software mode 带 R-IDs、A-IDs、F-IDs、AE-IDs） |
-| 下一步 | `/ce-plan`、trivial scope 可用 `/ce-work`、doc review 或 Proof iteration |
+| 何时使用？ | Vague feature ideas、"let's brainstorm"、多个 plausible directions、unclear scope；non-software brainstorm 也支持 |
 
 ---
 
@@ -46,13 +44,10 @@
 `ce-brainstorm` 运行 structured but conversational flow，并以 durable artifact 结束：
 
 - **One question per turn**，即使 sub-questions 看起来相关
-- **Right-sized ceremony（适度 ceremony）**：Lightweight / Standard / Deep / Deep-product tiers
+- **Right-sized ceremony**：Lightweight / Standard / Deep / Deep-product tiers
 - **Named gap lenses** 在生成 approaches 前强迫 premises 严谨
-- **Background grounding scout（后台 grounding scout）** 在你回答 opening questions 时，用便宜模型收集 verbatim repo evidence
-- **2-3 个 concrete approaches** 带 tradeoffs，然后给出 stated recommendation
-- **Synthesis Summary** 是 doc 落地前最后一次廉价纠正 scope 的机会
-- **Fresh-context claim verification（fresh-context claim 验证）** 在 doc 落地前检查 repo claims
-- **Right-sized requirements document** 带 stable identifiers（R/A/F/AE），向下游 planning 流动
+- **Background grounding** 在用户思考时并行运行
+- **Display-only visual probes** 在空间、行为或视觉决策需要看图胜过读文字时提供本地粗糙探针
 
 ---
 
@@ -82,7 +77,9 @@
 
 Phase 2 会浮现 2-3 个 concrete approaches，其中至少一个是 **non-obvious angle**：inversion、constraint removal 或 cross-domain analogy。Approaches 在 mechanism / product-shape granularity 呈现，不是 architecture。（基于 intentionally-shallow research 做 architecture decisions 容易提前 commit 到坏选择；这些属于 `ce-plan`。）Approaches 会在 recommendation 前展示，让用户先看到 alternatives，而不是被 anchor。
 
-### 5. Synthesis Summary：最后一个便宜的纠正时刻
+### 5. Display-only visual probes：看图比读文字更快时
+
+当 decision 本质上是 spatial、behavioral 或 visual 时，`ce-brainstorm` 可以提供一个选择：继续用文字探索，或创建粗糙的 local visual probe。Visual probes 不是 implementation，也不是 final UI；它们是低成本决策 artifact，用于让用户看见 drawing/canvas behavior、annotation tools、layout comparisons、state/flow placement、charts、diagrams、animation、maps、timelines 或 spatial flows 的候选形态。
 
 写 doc 前，`ce-brainstorm` 会发出 **scoping synthesis**，形状像两个 product collaborators 在写 PRD 前会确认的内容。它浮现正在 build 的东西、对话产生的 key trade-offs、deferred 内容，以及用户应 weigh in 的真实 forks。每个 section 只有在有内容时才渲染；不会为了 ceremony 填空 bucket。当上游对话 short-circuited（Phase 0.2 fast path、requirements 已清楚、没有 questions）时，scoping synthesis 会压缩为一个 forward-looking sentence，并保留 end-of-turn interrupt window。
 
@@ -112,7 +109,7 @@ Pressure test 检测到 specificity gap（这些 "users" 是谁？）和 attachm
 
 三个 approaches 浮现：per-notification-type mute with TTL、global do-not-disturb schedule、mute on the rule rather than the channel，附带 tradeoffs 和 recommendation。Synthesis Summary 读回出现的形状（"per-channel mute on notification rules, 24h preset for the 3 AM support pings"），列出对话中的 trade-offs（per-channel over per-user、mute lives on the rule）、deferred 内容（presence-based mute、quiet-hours schedules），以及关于 rule-delete loss path 的单个 call-out。你确认并添加 24h preset。
 
-Right-sized requirements doc 写入，Phase 4 menu 提供 next steps：`/ce-plan`（recommended）、agent doc review、Proof iteration，或对 trivial scope skip-to-build。
+Right-sized requirements doc 写入，Phase 4 menu 提供 next steps：`/ce-plan`（recommended）、agent doc review、publish to Proof，或对 trivial scope skip-to-build。
 
 ---
 
@@ -169,7 +166,7 @@ Right-sized requirements doc 写入，Phase 4 menu 提供 next steps：`/ce-plan
 - **Strategic decisions**：Deep-product tier 浮现 durability 和 adjacent-product risks
 - **Non-software brainstorms**：命名 product、规划 event、决定 roadmap
 
-Phase 4 handoff 提供 planning、agent doc review、Proof iteration、lightweight scope 的 direct-to-work、更多 clarifying questions，或 pause。
+Phase 4 handoff 提供 planning、agent doc review、publish to Proof、lightweight scope 的 direct-to-work、更多 clarifying questions，或 pause。
 
 ---
 

@@ -93,6 +93,8 @@ Important：不能因为 developer 的 installed plugin 可能过期，就排除
 
 ## Known External Limitations（已知外部限制）
 
+**Proof surfaces a ghost "AI collaborator" agent**（记录于 2026-04-16，未来可能变化）：Proof API 会把任何不带 headers 的 `/state` read 自动加入到 synthetic `ai:auto-<hash>` identity 下，因此 `ce-proof` publish flow 创建的 docs 可能显示一个 ghost AI collaborator。带 `X-Agent-Id: ai:compound-engineering` 的 presence / mutation calls 仍会正确归属到 Compound Engineering；这是 Proof 当前 read-path 行为，不是本 plugin 的 identity drift。
+
 **Proof HITL 会显示一个 ghost "AI collaborator" agent**（记录于 2026-04-16，未来可能变化）：Proof API 会在任何无 header 的 `/state` read 下，用 synthetic `ai:auto-<hash>` identity 自动加入，因此由 `skills/proof/` HITL workflow 创建的 docs 会在 `Compound Engineering` 旁显示一个 phantom participant。唯一的抑制方式是在 create 时设置 `ownerId: "agent:ai:compound-engineering"`，但这会把 document ownership 转给 agent，阻止用户把它 claim 到自己的 Proof library，所以我们不使用它。把它视为 cosmetic noise；不要重新引入 `ownerId` workaround。Upstream tracking: https://github.com/EveryInc/proof/issues/951。
 
 ## Skill Design Principles（Skill 设计原则）

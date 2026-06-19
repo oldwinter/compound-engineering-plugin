@@ -113,9 +113,8 @@ Plans carry **no status field**（不携带 `status` field）：plan 是 decisio
 
 这些 fields 不是 required，但一旦设置，它们有固定 names 和 semantics，便于 downstream tooling 依赖：
 
-- **`origin`** — 指向 upstream brainstorm requirements doc 的 repo-relative path（例如 `docs/brainstorms/2026-05-12-pagination-requirements.md`）。从 upstream brainstorm planning 时设置；用于 traceability，并在 `ce-plan` re-deepens 时重新 resolve。HITL Proof flow 使用 `origin` 追溯到 source brainstorm。
-- **`deepened`** — ISO 8601 date，标记 confidence check 首次实质性强化 plan 的日期。存在与否会影响 Phase 0.1 resume fast-path logic（见 `references/deepening-workflow.md`）。
-- **`execution`** — downstream routing 使用的 execution domain：`code`（缺省时的默认值）或 `knowledge-work`。`ce-work` 的 input triage 会读取它：标记为 `execution: knowledge-work` 的 plan 会进入 non-code carve-out（读取 sources、synthesize、产出 deliverable，跳过 branch/test/commit/CI lifecycle）；缺省或 `code` 进入正常 code path。由 `ce-plan` 的 approach-altitude flow（`references/approach-altitude.md`）在持久化 non-code deliverable 时写入。
+- **`origin`** — 指向 upstream brainstorm requirements doc 的 repo-relative path（例如 `docs/brainstorms/2026-05-12-pagination-requirements.md`）。从 upstream brainstorm planning 时设置；用于 traceability，并在 `ce-plan` re-deepens 时重新读取 source context。
+- **`deepened`** — ISO 8601 (`YYYY-MM-DD`) date，表示 plan 已经完成 deepening pass。用于 resume / re-deepening flows 判断是否需要再次加深。
 
 Field names 跨 plan revisions 稳定；绝不要 rename field 或 repurpose semantics。编写 new plans 的 agents 必须使用这些精确 names；添加新 fields 可以，但将 `origin` 改名为 `source` 或将 `date` 改名为 `created` 会破坏上方 downstream consumers。
 

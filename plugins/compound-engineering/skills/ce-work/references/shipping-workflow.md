@@ -24,13 +24,13 @@
 
    当 plan 或用户收窄了变更范围时，传入 `plan:<path>` 或 scope hint。如果 harness 上没有该 skill，跳过或对明显 duplicate/dead code 做一次简短 manual pass；不要因为 simplify 被跳过就升级到 Tier 2。
 
-3. **Code Review（代码审查）**
+3. **Code Review**（代码审查）
 
-   当 harness 提供 built-in review 时使用 **Tier 1**。仅当下面的 escalation criteria 匹配时使用 **Tier 2**；**不要**因为 Tier 1 缺失就使用 Tier 2。
+   当 harness 提供 built-in review 时使用 **Tier 1**。仅当下面的 escalation criteria 匹配时使用 **Tier 2**；Escalate to Tier 2 by criteria, **not** because Tier 1 is missing。
 
    **Tier 1 -- harness-native review（可用时默认）。** 运行 harness built-in code review（例如 Claude Code 中的 `/review`）。在 Final Validation 前 inline 处理 blocking 和 suggested findings。跳过 Residual Work Gate。
 
-   **Tier 2 -- `ce-code-review`（仅升级时）。** 两步：**review is not fix.**
+   **Tier 2 -- `ce-code-review` (escalation only).**（仅升级时）两步：**review is not fix.**
 
    **2a. Review（read-only）。** 用 `mode:agent` 调用 `ce-code-review`（已知时加 `plan:<path>`；diff base 已 resolve 时加 `base:<ref>`）。解析 JSON 或 Actionable Findings。不要传 `mode:autofix`。
 
@@ -65,7 +65,7 @@
 
 5. **Final Validation（最终验证）**
    - 所有 tasks 已标记 completed
-   - Testing 已处理：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
+   - Testing addressed（测试已处理）：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
    - Linting passes（lint 通过）
    - Code 遵循 existing patterns
    - Figma designs match（如适用）
@@ -117,7 +117,7 @@
 
 - [ ] 所有 clarifying questions 已问并已回答
 - [ ] 所有 tasks 已标记 completed
-- [ ] Testing 已处理：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
+- [ ] Testing addressed（测试已处理）：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
 - [ ] Linting passes（使用 linting-agent）
 - [ ] Code 遵循 existing patterns
 - [ ] Figma designs 与 implementation match（如适用）
@@ -125,7 +125,7 @@
 - [ ] Commit messages 遵循 conventional format
 - [ ] PR description 包含 Post-Deploy Monitoring & Validation section（或明确 no-impact rationale）
 - [ ] Simplify：diff >=30 lines 时运行 `ce-simplify-code`（或带 reason 跳过）
-- [ ] Code review：Tier 1 completed；或升级时 Tier 2；或 skipped（no Tier 1 + Tier 2 criteria not met，并在 summary 中注明）
+- [ ] Code review: Tier 1 completed, or Tier 2 when escalated；或 skipped（no Tier 1 + Tier 2 criteria not met，并在 summary 中注明）
 - [ ] PR description 包含 summary、testing notes，以及 captured evidence
 - [ ] PR description 包含准确 model 和 harness 的 Compound Engineered badge
 

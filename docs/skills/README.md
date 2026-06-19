@@ -102,7 +102,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`plug
 
 | Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-proof`](./ce-proof.md) | 通过 [Proof](https://www.proofeditor.ai)（Every 的 collaborative editor）创建、share 并运行 human-in-the-loop review loops，覆盖 markdown、Web API 和 Local Bridge surfaces |
+| [`/ce-proof`](./ce-proof.md) | 通过 [Proof](https://www.proofeditor.ai)（Every 的 collaborative editor）publish、view、comment 和 edit markdown；支持 shareable doc、Web API 和 Local Bridge surfaces |
 
 ---
 

@@ -14,7 +14,7 @@
 
 **不要向用户叙述 remap / validation diagnostics。** Schema-drift notes（“persona X returned unknown enum Y, remapped to Z”）、persona-prompt-drift commentary，以及其他 validator-internal diagnostics 都是 maintainer-facing information。它们不属于用户阅读的 Phase 4 output。如果某个 persona 的 output malformed，唯一 user-visible consequence 是 Coverage row annotation（例如 persona 显示更少 findings 或 `malformed` marker）。其他内容都留在 internal。
 
-### 3.2 Confidence Gate（基于 Anchor）
+### 3.2 Anchor-Based Confidence Gate（基于 Anchor 的 Confidence Gate）
 
 按 `confidence` anchor value gate findings。Anchors 是离散整数（`0`、`25`、`50`、`75`、`100`），其行为定义记录在 `references/findings-schema.json`，并嵌入 persona rubric（`references/subagent-template.md`）。这用 per-severity gates 替代了先前连续的 0.0-1.0 scale：doc-review economics 不值得按 severity 做 threshold gradation，而粗粒度 anchors 能防止 false-precision gaming。
 
@@ -66,7 +66,7 @@
 
 当 2 个以上 independent personas 标记同一个 merged finding（来自 3.3）时，将 merged finding 的 anchor 提升一个 step：`50 → 75`，`75 → 100`。Anchor `100` 不再提升（已在 ceiling）。Anchors `0` 或 `25` 的 findings 不会到达此步骤（它们已在 3.2 dropped）。
 
-Independent corroboration 是强 signal：多个 reviewers 收敛到同一 issue，比任何单个 reviewer 的 anchor 更可靠。提升一个 anchor step 在语义上有意义（两个 personas 独立提出的 “verified but nitpick” finding 很可能是 “will hit in practice”）。这替代了先前的 `+0.10` boost：magic-number bump 是针对连续 scale 校准的，不再适用。
+Independent corroboration 是强 signal：多个 reviewers 收敛到同一 issue，比任何单个 reviewer 的 anchor 更可靠。提升 one anchor step 在语义上有意义（两个 personas 独立提出的 “verified but nitpick” finding 很可能是 “will hit in practice”）。这替代了先前的 `+0.10` boost：magic-number bump 是针对连续 scale 校准的，不再适用。
 
 在 output 的 Reviewer column 中注明 promotion（例如 `coherence, feasibility (+1 anchor)`）。
 

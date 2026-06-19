@@ -24,16 +24,7 @@ Skills 是工程工作的主要入口，以 slash commands 调用。许多 skill
 | Skill | Description（说明） |
 |-------|-------------|
 | [`/ce-strategy`](../../docs/skills/ce-strategy.md) | 创建或维护 `STRATEGY.md`，记录产品的 target problem、approach、persona、key metrics 和 tracks。可重复运行以更新。`/ce-ideate`、`/ce-brainstorm`、`/ce-plan` 会在它存在时读取作为 grounding |
-| [`/ce-ideate`](../../docs/skills/ce-ideate.md) | 可选 big-picture ideation：生成并严格评估 grounded ideas，然后把最强的一个 route into brainstorming。默认将 ranked ideation artifact 写成单个 self-contained HTML file（面向 human readers）；传入 `output:md` 可写成 markdown（互斥：html 或 md，永远不会两者同时生成） |
-| [`/ce-brainstorm`](../../docs/skills/ce-brainstorm.md) | 通过交互式 Q&A 思考 feature 或 problem，并在 planning 前写出尺寸合适的 requirements doc。传入 `output:html` 可把 doc 写成单个 self-contained HTML file，而不是 markdown（互斥：md 或 html，不会两者同时生成） |
-| [`/ce-plan`](../../docs/skills/ce-plan.md) | 为任何 multi-step task 创建结构化 plans，包括 software features、research workflows、events、study plans，并自动进行 confidence checking。传入 `output:html` 可把 plan 写成单个 self-contained HTML file，而不是 markdown（互斥：md 或 html，不会两者同时生成） |
-| [`/ce-code-review`](../../docs/skills/ce-code-review.md) | 使用 tiered persona agents、confidence gating 和 dedup pipeline 的 structured code review |
-| [`/ce-work`](../../docs/skills/ce-work.md) | 系统执行 work items |
-| [`/ce-debug`](../../docs/skills/ce-debug.md) | 系统找出 root causes 并修复 bugs；追踪 causal chains，形成 testable hypotheses，并实现 test-first fixes |
-| [`/ce-compound`](../../docs/skills/ce-compound.md) | 记录已解决的问题，让 team knowledge compound |
-| [`/ce-compound-refresh`](../../docs/skills/ce-compound-refresh.md) | 刷新 stale 或 drifting learnings，并决定 keep、update、replace 或 archive |
-| [`/ce-optimize`](../../docs/skills/ce-optimize.md) | 用 parallel experiments、measurement gates 和 LLM-as-judge quality scoring 运行 iterative optimization loops |
-| [`/ce-product-pulse`](../../docs/skills/ce-product-pulse.md) | 生成单页、time-windowed report，覆盖 usage、performance、errors 和 followups。保存到 `docs/pulse-reports/`，形成可浏览的用户体验 timeline |
+| [`/ce-ideate`](../../docs/skills/ce-ideate.md) | 生成并批判性评估 grounded ideas；选中 survivor 后可进入 `ce-brainstorm` |
 
 ### Research & Context（研究与 context）
 
