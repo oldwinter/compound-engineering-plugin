@@ -32,9 +32,9 @@ Brainstorming 通过 collaborative dialogue 帮助回答要构建 **WHAT**。它
 1. **一次只问一个问题** - 每轮一个问题，即使 sub-questions 看起来相关。单条消息堆叠多个问题会稀释回答；选择最有用的单个问题并提出。
 2. **优先使用单选 multiple choice** - 选择一个 direction、priority 或 next step 时使用 single-select。
 3. **谨慎且少量使用多选** - 只用于可以共存的 compatible sets，例如 goals、constraints、non-goals 或 success criteria。如果 prioritization 重要，follow up 询问所选项中哪一个是 primary。
-4. **默认使用平台的 blocking question tool** - 使用 Claude Code 中的 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。这些工具包含 free-text fallback（例如 Claude Code 中的 "Other"），因此 options 会 scaffold answer 而不限制它：选得好的 options 能浮现用户可能尚未区分的 dimensions，而 pick-plus-optional-note 比从零写 prose 更低 activation energy。这个 default 也适用于 opening 和 elicitation questions，不只适用于 narrowing。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中的编号选项；不要仅因为需要加载 schema 就退回。绝不要静默跳过问题。
+4. **默认使用平台的 blocking question tool** - 使用 Claude Code 中的 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。这些工具包含 free-text fallback（例如 Claude Code 中的 "Other"），因此 options 会 scaffold answer 而不限制它：选得好的 options 能浮现用户可能尚未区分的 dimensions，而 pick-plus-optional-note 比从零写 prose 更低 activation energy。这个 default 也适用于 opening 和 elicitation questions，不只适用于 narrowing。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中的编号选项；不要仅因为需要加载 schema 就退回。绝不要静默跳过问题。**Exception — visual-probe gate：** 对 inherently-visual topic（Phase 0.3 tripwire），在提出第一个 shape/behavior/state/layout/flow/diagram decision 前，必须先单独提供 text-vs-visual offer；在普通聊天或 blocking tool 问题中嵌入 ASCII 或文字 mockup 不算满足该 offer。详见 Phase 1.3 gate。
 5. **只有问题确实开放时才使用 open-ended question** - 只有在以下情况才放下 blocking tool：(a) answer 天然是 narrative（"walk me through how you got here"），(b) question 是 diagnostic 或 introspective，且呈现 options 会无意影响用户答案（例如 "what concerns you most?"：4-option menu 会把用户推向那些 axes，而不是他们脑中真实 axes），或 (c) 你无法写出 3-4 个 genuinely distinct、plausibly-correct、覆盖空间且不 padding/strawmen 的 options。测试方法：如果你费力填 option slots，这个 question 就是 open，问 open-ended。Rule 1 仍适用：仍然每轮一个问题。
-6. **open-ended questions 必须具体到能引出实质答案** - 静默应用 Rule 5：直接问问题，不要叙述 form choice。问题本身必须给用户一个具体 anchor。Good：*"What's the most concrete thing someone's already done about this — paid for it, built a workaround, quit a tool over it?"*（这是 Phase 1.2 的 rigor probes 之一：它通过说明什么算答案，赢得 open-endedness）。Too thin：*"What's your take?"*（没有可咬合点；用户默认给一行回答，浪费 open question）。避免 (a) 叙述 form choice（"the most useful question I can ask here is..."），(b) 暗示短回答的 framing（"briefly"、"in one sentence"），(c) yes/no traps，以及 (d) AI-slop warmth wrappers（"take it wherever feels relevant"）。
+6. **open-ended questions 必须具体到能引出实质答案** - 静默应用 Rule 5：直接问问题，不要叙述 form choice。问题本身必须给用户一个具体 anchor。Good：*"What's the most concrete thing someone's already done about this — paid for it, built a workaround, quit a tool over it?"*（它说明了什么算答案，赢得 open-endedness）。Too thin：*"What's your take?"*（没有可咬合点；暗示短回答的 framing，例如 "briefly" 和 yes/no 问法，会同样浪费 open question）。
 
 ## Output Guidance（输出指导）
 
@@ -211,11 +211,20 @@ Dialogue 中只 carry gist。当 conversation 需要 gist 无法回答的 specif
 
 遵循上方 Interaction Rules。可用时使用平台的 blocking question tool。
 
+**Visual-probe gate — 把它当作前置条件检查，不要依赖记忆。** 如果 Phase 0.3 tripwire fired（inherently-visual topic），那么在提出第一个关于 shape、behavior、state、layout、flow 或 diagram 的 decision 前，无论是 plain chat 还是 blocking tool，都必须先通过 `references/visual-probes.md` 中的 text-vs-visual offer。这个条件是 state-based：除非这个 specific decision 已经经过 offer（用户已为它选择 text 或 visual），否则就要 offer。检查要锚定到你即将提出的 decision，而不是记忆里从 Phase 0.3 保留下来的 "pending gate"。
+
+此 gate **优先于 default blocking-question path**（Interaction Rule 4）：在用户 decline visual（或 visual feedback 已回到 chat）之前，不要把 shape decision 作为 `AskUserQuestion`/`request_user_input` menu 提出，也不要在 plain-chat 中直接问 shape question。**在问题选项里放 ASCII preview 或 text mockup 不满足 offer，这是此 gate 要阻止的捷径。** Offer 本身是一个 prior question，带两个 options：在 local browser 中 sketch rough options，或在 chat 中描述它们。可用时使用平台 blocking question tool 提出 text-vs-visual offer。用户选择 text 后，继续在 chat 中推进，且不要为同一个 decision 重复 offer。用户选择 visual 时，按 `references/visual-probes.md` 构建 cheapest display-only probe，再用 blocking question tool 收集 bounded feedback；browser artifact 保持 display-only。
+
 **Guidelines（指导原则）：**
 - 在提供自己的 ideas 前，先问用户已经在想什么。这会浮现 hidden context，并防止固定在 AI-generated framings 上。
 - 从 broad 开始（problem、users、value），再 narrow（constraints、exclusions、edge cases）
-- **Rigor probes 在 Phase 2 前触发，并且是 open-ended probes，不是 leading yes/no questions**
-- **Visual gate before shape questions。** 当 Phase 0.3 标记了 visual-probe gate pending，或当前 decision 会在 drawing/canvas、annotation、UI layout、interaction state、flow placement 或 behavior shape 上分叉时，先读取 `references/visual-probes.md`，并在询问 behavior/shape 细节前提供真实的 **text-vs-visual opt-in**。该 opt-in takes precedence over the default blocking-question path for the underlying shape decision：Use the platform's blocking question tool for the text-vs-visual opt-in when available, then follow the selected path. ASCII preview text does not satisfy the visual-probe offer for genuinely visual decisions.
+- **Rigor probes 在 Phase 2 前触发，并且是 open-ended，不是 menus。** Phase 1.2 中发现的每个 scope-appropriate gap 都作为 **separate** direct open-ended probe 触发：一个 probe 只满足一个 gap，不要合并多个。它们可以穿插在 narrowing moves 中逐步浮现，但在 Phase 2 前必须 probe 每个发现的 gap。Menu 会暗示哪些证据算数并让用户选择；open probe 会迫使真实 observation 出现，或浮现真实 uncertainty。Phase 1.2 每条 "when present, ask..." 就是该 probe；按 Interaction Rule 6 phrasing。**当 Attachment gap 存在时，它是 Phase 2 前最后一个 rigor probe：是否存在由 opening 判断，不能因为 narrowing 已经产出 shape 就跳过；它的职责是在 Phase 2 继承该 framing 前 pressure-test 用户的 implicit framing。** 如果 probe 的答案暴露 genuine uncertainty，把它作为 explicit assumption 记录在 requirements document 中，而不是跳过 probe。
+- Clarify the problem frame、validate assumptions，并询问 success criteria
+- 让 requirements 具体到 planning 不需要发明 behavior
+- 只有当 dependencies 或 prerequisites materially affect scope 时才浮现它们
+- Product decisions 在这里解决；technical implementation choices 留给 planning
+- 带来 ideas、alternatives 和 challenges，而不是只做 interview
+- **Visual-probe gate。** 由本 phase 顶部的 bold gate checkpoint 管理：offer 在第一个 shape/behavior/state/layout/flow/diagram question 前触发；blocking question 中的 ASCII 或 text mockup 永远不满足该 gate。
 
 **Before exiting Phase 1.3：integration check。** 在脑中组合用户目前所说内容，并浮现 dialogue 尚未 probe 的任何 non-obvious consequences。如果 user-stated X 加 user-stated Y 加 your-default-Z 会产生用户不太可能通过 one-question-at-a-time dialogue 跟踪到的 downstream effect（"if mute lives on the rule AND we don't warn on delete, then rule-delete silently loses pause state"），趁仍在 dialogue 中现在 probe。每个 genuine combination effect 一个 probe，open-ended 提问，纪律同 rigor probes。Phase 2.5 的 call-outs 是 residuals 的安全网（silent agent inferences、无 dialogue 的 pre-loaded contexts），不是把现在本可以询问的 consequences 推后的 punt list。
 
