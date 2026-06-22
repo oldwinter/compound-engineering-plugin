@@ -148,7 +148,7 @@ Codex app install 对 Compound Engineering 来说是自包含的。Specialist re
 
 ### Codex CLI
 
-注册 marketplace，然后通过 Codex 的 TUI 安装 plugin。
+注册 marketplace，然后安装 plugin。
 
 1. **在 Codex 中注册 marketplace：**
 
@@ -156,7 +156,13 @@ Codex app install 对 Compound Engineering 来说是自包含的。Specialist re
    codex plugin marketplace add EveryInc/compound-engineering-plugin
    ```
 
-2. **通过 Codex 的 TUI 安装 plugin：** 启动 `codex`，运行 `/plugins`，找到 **Compound Engineering** marketplace，选择 **compound-engineering** plugin，然后选择 **Install**。安装完成后重启 Codex。Codex CLI 可以注册 marketplaces，但目前没有暴露用于从已添加 marketplace 安装 plugin 的 plugin-install subcommand；因此需要 `/plugins` TUI install。
+2. **安装 plugin：**
+
+   ```bash
+   codex plugin add compound-engineering@compound-engineering-plugin
+   ```
+
+   也可以启动 `codex`，运行 `/plugins`，找到 **Compound Engineering** marketplace，选择 **compound-engineering** plugin，然后选择 **Install**。安装完成后重启 Codex。
 
 Native Codex plugin install 对 Compound Engineering 来说是自包含的。Specialist reviewer 和 research behavior 位于 skills 内的 local prompt assets；不需要单独的 custom-agent install 步骤。
 
@@ -164,10 +170,10 @@ Native Codex plugin install 对 Compound Engineering 来说是自包含的。Spe
 
 ```bash
 CODEX_HOME="$HOME/.codex/profiles/work" codex plugin marketplace add EveryInc/compound-engineering-plugin
-CODEX_HOME="$HOME/.codex/profiles/work" codex
+CODEX_HOME="$HOME/.codex/profiles/work" codex plugin add compound-engineering@compound-engineering-plugin
 ```
 
-在 Codex 内运行 `/plugins`，选择 **Compound Engineering**，然后安装 **compound-engineering**。Marketplace 步骤只让 plugin 可用；TUI install 才会为该 profile 激活 native CE skills。
+Marketplace 步骤只让 plugin 可用；plugin install 才会为该 profile 激活 native CE skills。
 
 ### GitHub Copilot
 
@@ -316,10 +322,10 @@ claude --plugin-dir "$PWD"
 
 ```bash
 codex plugin marketplace add "$PWD"
-codex
+codex plugin add compound-engineering@compound-engineering-plugin
 ```
 
-然后运行 `/plugins`，选择 **Compound Engineering**，安装 **compound-engineering**。如果要把 local testing 与常规 Codex profile 隔离，请使用单独的 `CODEX_HOME`。
+如果要把 local testing 与常规 Codex profile 隔离，请使用单独的 `CODEX_HOME`。Codex marketplace entry 指向公开 Git plugin source，因此 root-shaped plugin repos 可以正确安装；如果要 end-to-end 测试尚未发布的 plugin-content changes，请使用带 `source.url` 和 `ref` 的临时 marketplace catalog。
 
 **OpenCode**
 
