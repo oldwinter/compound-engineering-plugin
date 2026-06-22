@@ -3,6 +3,7 @@ title: Codex Conversion Skills、Prompts 与 Canonical Entry Points
 category: architecture
 tags: [codex, converter, skills, prompts, workflows, deprecation]
 created: 2026-03-15
+last_refreshed: 2026-06-20
 severity: medium
 component: codex-target
 problem_type: convention
@@ -144,9 +145,13 @@ Unknown slash references 应在 copied skill content 中保持不变。否则 Co
 - `src/converters/claude-to-codex.ts`
 - `src/targets/codex.ts`
 - `src/types/codex.ts`
+- `src/utils/codex-content.ts`
+- `src/utils/legacy-cleanup.ts`
 - `tests/codex-converter.test.ts`
 - `tests/codex-writer.test.ts`
+- `tests/legacy-cleanup.test.ts`
+- `.codex-plugin/plugin.json`
 - `README.md`
-- `plugins/compound-engineering/skills/ce-brainstorm/SKILL.md`
-- `plugins/compound-engineering/skills/ce-plan/SKILL.md`
-- `docs/solutions/adding-converter-target-providers.md`
+- `skills/ce-brainstorm/SKILL.md`
+- `skills/ce-plan/SKILL.md`
+- `docs/solutions/integrations/native-plugin-install-strategy.md`

@@ -81,7 +81,7 @@ compound-engineering plugin CLI 的 `install` command 总是从 GitHub clone def
 
 ```bash
 bun run src/index.ts plugin-path compound-engineering --branch feat/new-agents
-# Output: claude --plugin-dir ~/.cache/compound-engineering/branches/compound-engineering-feat~new-agents/plugins/compound-engineering
+# Output: claude --plugin-dir ~/.cache/compound-engineering/branches/compound-engineering-feat~new-agents
 ```
 
 `src/commands/plugin-path.ts` 中的关键 implementation details：
@@ -96,7 +96,7 @@ bun run src/index.ts plugin-path compound-engineering --branch feat/new-agents
 将 branch name 贯穿完整 resolution chain，让 `install` 从指定 branch 而不是 default clone。
 
 ```bash
-bun run src/index.ts install compound-engineering --to codex --branch feat/new-agents
+bun run src/index.ts install compound-engineering --to opencode --branch feat/new-agents
 ```
 
 `src/commands/install.ts` 中的变更：

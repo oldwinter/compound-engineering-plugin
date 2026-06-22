@@ -23,7 +23,6 @@ converter CLI 的两项相关改进：
 
 ```bash
 bunx @every-env/compound-plugin install compound-engineering --to opencode
-bunx @every-env/compound-plugin install compound-engineering --to codex
 bunx @every-env/compound-plugin install compound-engineering --to droid
 bunx @every-env/compound-plugin install compound-engineering --to cursor
 bunx @every-env/compound-plugin install compound-engineering --to pi

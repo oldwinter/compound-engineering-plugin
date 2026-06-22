@@ -51,10 +51,10 @@ Generalist code review prompts 常以可预测方式塌缩：
 
 小 config change 触发 6 个 reviewers（4 always-on + 2 CE always-on）。带 migrations 的 Rails auth feature 可能触发 10 个。Skill 会判断哪些 personas 适合 diff：
 
-- **Always-on（每次 review）**：`ce-correctness-reviewer`、`ce-testing-reviewer`、`ce-maintainability-reviewer`、`ce-project-standards-reviewer`、`ce-agent-native-reviewer`、`ce-learnings-researcher`
+- **Always-on（每次 review）**：`correctness-reviewer`、`testing-reviewer`、`maintainability-reviewer`、`project-standards-reviewer`、`agent-native-reviewer`、`learnings-researcher`
 - **Cross-cutting conditional**：security、performance、API contract、data migrations、reliability、adversarial、previous-comments；只在 diff 触及对应 concern 时选择
 - **Stack-specific conditional**：Julik frontend races、Swift/iOS；只在 matching runtime domain 被触及时选择。Structural quality（complexity deletion、1k-line regressions、spaghetti）属于 always-on maintainability persona
-- **CE conditional（migrations）**：risky migration diffs 触发 `ce-deployment-verification-agent`；schema drift 和 migration safety 由 `data-migration` persona 处理
+- **CE conditional（migrations）**：risky migration diffs 触发 `deployment-verification-agent`；schema drift 和 migration safety 由 `data-migration` persona 处理
 
 Persona selection 是 agent judgment，不是 keyword matching。Instruction-prose files（Markdown skills、JSON schemas）是 product code，但会跳过 runtime-focused reviewers（adversarial、races），因为它们不适用。
 
@@ -191,7 +191,7 @@ Conflicting mode flags（或 conflicting grouping flags）会以 error 停止。
 该用时就用它；quick-review short-circuit 会明确 defer。`ce-code-review` 用于你需要 diff-aware persona selection、calibrated severity 的 structured findings、autofix routing 和 residual work handling 的情况。它是更重的工具；当 work 值得时使用。
 
 **它怎么决定 dispatch 哪些 personas？**
-基于 actual diff 的 agent judgment，不是 keyword matching。4 always-on + 2 CE always-on personas 每次 review 都跑。Cross-cutting 和 stack-specific personas 在对应 concern 被触及时添加（例如 auth files changed 时添加 security；存在 migration 或 schema dump files 时添加 `ce-data-migration-reviewer`）。Instruction-prose files 会跳过 runtime-focused reviewers（adversarial、races）。
+基于 actual diff 的 agent judgment，不是 keyword matching。4 always-on + 2 CE always-on personas 每次 review 都跑。Cross-cutting 和 stack-specific personas 在对应 concern 被触及时添加（例如 auth files changed 时添加 security；存在 migration 或 schema dump files 时添加 `data-migration-reviewer`）。Instruction-prose files 会跳过 runtime-focused reviewers（adversarial、races）。
 
 **Interactive（default）和 `mode:agent` 有什么区别？**
 Interactive 是 human-facing mode：markdown report；review 自行应用 safe、verified fixes（Applied section），tree clean 时 commit（dirty 时留给你的 commit）；绝不 push。`mode:agent` 是 machine handoff：一个 JSON object，report-only；review 不 mutate，caller（例如 `/ce-work`）按自己的规则应用 findings。`mode:headless` 是 `mode:agent` 的 deprecated alias。

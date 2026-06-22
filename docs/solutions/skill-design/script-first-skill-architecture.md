@@ -8,7 +8,7 @@ tags:
   - bundled-scripts
   - data-processing
 severity: "high"
-component: "plugins/compound-engineering/skills"
+component: "skills"
 ---
 
 # Script-First Skill 架构

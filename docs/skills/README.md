@@ -2,7 +2,7 @@
 
 面向最终用户的 compound-engineering plugin skills 文档。每个页面覆盖该 skill 的 high-level purpose、novel mechanics、use cases，以及它在其他 skills 链条中的位置。
 
-Runtime behavior 和 contributor reference 以每个 skill source folder（`plugins/compound-engineering/skills/`）下的 `SKILL.md` 为准。
+Runtime behavior 和 contributor reference 以每个 skill source folder（`skills/`）下的 `SKILL.md` 为准。
 
 ---
 
@@ -124,4 +124,4 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`plug
 
 ## 另请参阅
 
-完整 skills catalog（包括这里没有独立文档的 skills）见 [`plugins/compound-engineering/README.md`](../../plugins/compound-engineering/README.md)。每个 skill 的权威 runtime spec 位于 `plugins/compound-engineering/skills/<skill>/SKILL.md`。
+完整 skills catalog（包括这里没有独立文档的 skills）见 [`README.md`](../../README.md)。每个 skill 的权威 runtime spec 位于 `skills/<skill>/SKILL.md`。

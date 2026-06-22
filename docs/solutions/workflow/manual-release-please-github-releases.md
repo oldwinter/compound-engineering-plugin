@@ -2,12 +2,12 @@
 title: "用 GitHub Releases 手动运行 release-please，支持 multi-component plugin 与 marketplace releases"
 category: workflow
 date: 2026-03-17
+last_refreshed: 2026-06-20
 created: 2026-03-17
 severity: process
 component: release-automation
 tags:
   - release-please
-  - semantic-release
   - github-releases
   - marketplace
   - plugin-versioning
@@ -65,7 +65,9 @@ Release intent、component ownership、release-note ownership 和 metadata synch
 
 第一次 live run 失败时直接暴露了这一点：
 
-- `release-please failed: illegal pathing characters in path: plugins/compound-engineering/../../CHANGELOG.md`
+- Treat GitHub Releases as the canonical release-notes surface.
+- Keep root `CHANGELOG.md` as a pointer to GitHub Releases.
+- Validate `.github/release-please-config.json` in CI so unsupported changelog paths fail before the workflow reaches GitHub Actions.
 
 这意味着 multi-component repo 无法使用如下 `changelog-path` values，强行把 subpackage release entries 写回同一个 shared root changelog file：
 
@@ -166,6 +168,7 @@ Release intent、component ownership、release-note ownership 和 metadata synch
 - `scripts/release/validate.ts`
 - `AGENTS.md`
 - `CLAUDE.md`
+- `GEMINI.md`
 
 ## 预防措施
 
@@ -209,5 +212,3 @@ Merge generated release PR 后：
 - `docs/solutions/plugin-versioning-requirements.md`
 - `docs/solutions/adding-converter-target-providers.md`
 - `AGENTS.md`
-- `plugins/compound-engineering/AGENTS.md`
-- `docs/specs/kiro.md`

@@ -2,6 +2,7 @@
 title: "Release-please version drift recovery（版本漂移恢复）"
 category: workflow
 date: 2026-04-24
+last_refreshed: 2026-06-20
 created: 2026-04-24
 severity: high
 component: release-automation
@@ -11,7 +12,6 @@ tags:
   - version-drift
   - plugin-versioning
   - recovery-playbook
-  - linked-versions
   - extra-files
 ---
 
@@ -32,29 +32,24 @@ tags:
 
 repo 有五个 release components。每个 component 拥有一个或多个 files。Release-please 读取 manifest，并写入 extra-files。
 
-```
-.github/.release-please-manifest.json       (release-please memory: last released per component)
-├── "."                                     → cli component              (v = X.Y.Z)
-├── "plugins/compound-engineering"          → compound-engineering       (v = X.Y.Z)
-├── "plugins/coding-tutor"                  → coding-tutor               (v = A.B.C)
-├── ".claude-plugin"                        → marketplace                (v = M.N.O)
-└── ".cursor-plugin"                        → cursor-marketplace         (v = P.Q.R)
+```text
+.github/.release-please-manifest.json
+├── "."                -> compound-engineering package/plugin (v = X.Y.Z)
+├── ".claude-plugin"   -> Claude marketplace                 (v = M.N.O)
+└── ".cursor-plugin"   -> Cursor marketplace                 (v = P.Q.R)
 
-.github/release-please-config.json          (component config: extra-files, plugins)
-└── "plugins": [{ type: "linked-versions", components: ["cli", "compound-engineering"] }]
-    ← forces cli and compound-engineering to bump together
-
-Each component's extra-files get rewritten by release-please when a release is cut:
-
-  cli (".")                               compound-engineering
-  ├── package.json ($.version)            ├── .claude-plugin/plugin.json  ($.version)
-                                          ├── .cursor-plugin/plugin.json  ($.version)
-                                          └── .codex-plugin/plugin.json   ($.version)
-
-  coding-tutor                            marketplace / cursor-marketplace
-  ├── .claude-plugin/plugin.json          ├── marketplace.json ($.metadata.version)
-  ├── .cursor-plugin/plugin.json
-  └── .codex-plugin/plugin.json
+.github/release-please-config.json
+└── packages
+    ├── "." extra-files
+    │   ├── package.json
+    │   ├── .claude-plugin/plugin.json
+    │   ├── .cursor-plugin/plugin.json
+    │   ├── .codex-plugin/plugin.json
+    │   └── gemini-extension.json
+    ├── ".claude-plugin" extra-files
+    │   └── marketplace.json ($.metadata.version)
+    └── ".cursor-plugin" extra-files
+        └── marketplace.json ($.metadata.version)
 ```
 
 **关键 invariants：**
@@ -96,18 +91,23 @@ Release-please 把 **manifest 视为 "last released version per component" 的 s
 
 ```
 release:validate reports drift
-    ↓
-1. Identify which component(s) have drifted. Check:
-    - extra-files vs each other within the component
-    - extra-files vs the manifest entry for that component
-    - linked-versions: is cli in sync with compound-engineering?
-    ↓
-2. Is anyone installed at the drifted (higher) version?
-    ├── YES (or unknown — developers using `/plugin install --dev` from main)
-    │       → Forward-sync: update all lower files UP to match the drifted high
-    │
-    └── NO (can verify no git tag, no npm publish, no marketplace cache entry)
-            → Backward-revert: revert the drifted file DOWN to match the rest
+    |
+    v
+1. Identify the affected component:
+   - "." root package/plugin
+   - ".claude-plugin" marketplace
+   - ".cursor-plugin" marketplace
+    |
+    v
+2. Compare:
+   - extra-files vs each other within that component
+   - extra-files vs .github/.release-please-manifest.json
+   - any active release-as pins in .github/release-please-config.json
+    |
+    v
+3. Is anyone installed at the drifted higher version?
+   - Yes or unknown -> forward-sync
+   - Verified no -> backward-revert
 ```
 
 ### Path A：Forward-sync（向前同步）

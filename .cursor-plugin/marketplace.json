@@ -6,14 +6,13 @@
     "url": "https://github.com/kieranklaassen"
   },
   "metadata": {
-    "description": "Every Inc plugins 的 Cursor plugin marketplace",
-    "version": "1.0.1",
-    "pluginRoot": "plugins"
+    "description": "Cursor plugin marketplace for Every Inc plugins",
+    "version": "1.0.1"
   },
   "plugins": [
     {
       "name": "compound-engineering",
-      "source": "compound-engineering",
+      "source": ".",
       "description": "每次使用都会变得更聪明的 AI-powered development tools。让每个工程工作单元都比上一个更容易。"
     }
   ]

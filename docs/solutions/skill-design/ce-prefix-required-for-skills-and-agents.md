@@ -1,13 +1,14 @@
 ---
 title: 新 skills 和 agents 必须使用 ce- 前缀；用测试强制执行，而不只写在 prose 中
 date: 2026-05-01
+last_refreshed: 2026-06-20
 category: skill-design
 module: compound-engineering
 problem_type: convention
-component: plugins/compound-engineering
+component: root plugin
 severity: low
 applies_when:
-  - 在 plugins/compound-engineering/skills/ 下新增 skill directory
+  - 在 skills/ 下新增 skill directory
   - 在 plugins/compound-engineering/agents/ 下新增 agent file
   - 编写或 review 引入 plugin 新组件的 PR
 tags:
@@ -43,18 +44,13 @@ related_pr: https://github.com/EveryInc/compound-engineering-plugin/pull/747
 强制逻辑位于专用测试文件 `tests/skill-agent-ce-prefix.test.ts`，它遍历 skill directories 和 agent files，并同时断言 directory/file name 与 frontmatter `name` 都带有前缀。豁免项是显式命名的 `Set`，且每个 entry 都需要书面理由：
 
 ```ts
-const PREFIX = "ce-"
-
-// Exemptions from the ce- prefix rule. Add entries here only with a written
-// reason — the exemption list shouldn't become a silent junk drawer.
-const SKILL_EXEMPTIONS = new Set<string>([
-  // lfg ships as the public command `/lfg` (see plugins/compound-engineering/README.md).
+const SKILL_PREFIX_ALLOWLIST = new Set([
+  // lfg ships as the public command `/lfg` (see README.md).
   "lfg",
 ])
-const AGENT_EXEMPTIONS = new Set<string>([])
 ```
 
-Agents 是 `plugins/compound-engineering/agents/` 下的扁平 `.md` files，按扩展名过滤，并用与 skills 相同的方式检查：
+Agents 是 `skills/*/references/agents/` 下的扁平 `.md` files，按扩展名过滤，并用与 skills 相同的方式检查：
 
 ```ts
 const agentFiles = readdirSync(AGENTS_DIR, { withFileTypes: true })

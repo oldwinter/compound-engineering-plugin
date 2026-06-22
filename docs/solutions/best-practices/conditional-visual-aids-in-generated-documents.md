@@ -134,9 +134,9 @@ Visual aids 取决于 **content patterns** -- 内容描述了什么 -- 而不是
 
 | Surface（输出 surface） | Reading pattern（阅读模式） | Trigger bar（触发门槛） | Abstraction level（抽象层级） | Typical diagram size（典型 diagram 大小） |
 |---|---|---|---|---|
-| Requirements (ce:brainstorm) | Studied deeply | Standard | Conceptual/product-level: user flows, information flows, mode comparisons | 5-20 nodes |
-| Plan -- Technical Design (ce:plan 3.4) | Studied deeply | Work-characteristic-driven | Solution architecture: component interactions, data flow, state machines | 5-15 nodes |
-| Plan -- Readability (ce:plan 4.4) | Studied deeply | Standard | Document structure: unit dependencies, impact surfaces, mode overviews | 5-15 nodes |
+| Requirements (ce-brainstorm) | Studied deeply | Standard | Conceptual/product-level: user flows, information flows, mode comparisons | 5-20 nodes |
+| Plan -- Technical Design (ce-plan 3.4) | Studied deeply | Work-characteristic-driven | Solution architecture: component interactions, data flow, state machines | 5-15 nodes |
+| Plan -- Readability (ce-plan 4.4) | Studied deeply | Standard | Document structure: unit dependencies, impact surfaces, mode overviews | 5-15 nodes |
 | PR description (git-commit-push-pr) | Scanned quickly | High | Change impact: what changed architecturally, what flows differently | 5-10 nodes |
 
 关键区别：

@@ -1,9 +1,8 @@
 # Compound Engineering
 
 [![Build Status](https://github.com/EveryInc/compound-engineering-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/EveryInc/compound-engineering-plugin/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@every-env/compound-plugin)](https://www.npmjs.com/package/@every-env/compound-plugin)
 
-让每个工程工作单元都比上一个更容易的 AI skills 和 agents。
+让每个工程工作单元都比上一个更容易的 AI skills。
 
 ## Philosophy（理念）
 
@@ -22,7 +21,6 @@ Compound engineering 反过来做：80% 放在 planning 和 review，20% 放在 
 
 **Learn more（了解更多）**
 
-- [Full component reference](plugins/compound-engineering/README.md) - 所有 agents 和 skills
 - [Compound engineering: how Every codes with agents](https://every.to/chain-of-thought/compound-engineering-how-every-codes-with-agents)
 - [The story behind compounding engineering](https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it)
 
@@ -72,9 +70,41 @@ Compound engineering 反过来做：80% 放在 planning 和 review，20% 放在 
 
 ## Getting Started（开始使用）
 
-安装后，在任意 project 中运行 `/ce-setup`。它会检查你的 environment、安装缺失工具，并 bootstrap project config。
+安装后，在任意 project 中运行 `/ce-setup`。它会检查 repo-local config，报告 optional tool capabilities，并帮助把 machine-local CE settings 安全地加入 gitignore。
 
-`compound-engineering` plugin 当前包含 39 个 skills 和 43 个 agents。完整清单见 [full component reference](plugins/compound-engineering/README.md)。
+`compound-engineering` plugin 当前发布 27 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于 owning skills 内的 skill-local prompt assets。
+
+### Full Skill Inventory（完整 Skill 清单）
+
+| Skill | Purpose（用途） |
+|-------|---------|
+| `/ce-strategy` | 创建或维护 `STRATEGY.md` |
+| `/ce-ideate` | 生成并严格评估 grounded ideas |
+| `/ce-brainstorm` | 探索 requirements，并写出尺寸合适的 requirements doc |
+| `/ce-plan` | 创建 structured implementation plans |
+| `/ce-work` | 系统执行 implementation plans |
+| `/ce-code-review` | 使用 skill-local reviewer personas review code |
+| `/ce-doc-review` | Review requirements 和 plan documents |
+| `/ce-debug` | 复现 failures、追踪 root cause，并修复 bugs |
+| `/ce-compound` | 记录已解决问题，让 team knowledge compound |
+| `/ce-compound-refresh` | 刷新 stale 或 drifting learnings |
+| `/ce-optimize` | 运行 iterative optimization loops |
+| `/ce-product-pulse` | 生成 time-windowed product pulse reports |
+| `/ce-riffrec-feedback-analysis` | 将 Riffrec recordings 或 notes 转成 structured feedback |
+| `/ce-resolve-pr-feedback` | 解决 PR review feedback |
+| `/ce-commit` | 创建 message 清晰的 git commit |
+| `/ce-commit-push-pr` | Commit、push 并打开 PR |
+| `/ce-worktree` | 确保 work 发生在 isolated git worktree 中 |
+| `/ce-promote` | 起草 user-facing announcement copy |
+| `/ce-test-browser` | 在 PR 影响的 pages 上运行 browser tests |
+| `/ce-test-xcode` | 在 simulator 上 build 和 test iOS apps |
+| `/ce-setup` | 诊断 optional tool capabilities 和 project config |
+| `/ce-simplify-code` | 简化 recent code changes |
+| `/ce-polish` | 启动 dev server 并迭代 UX polish |
+| `/ce-proof` | 创建、编辑并分享 Proof documents |
+| `/ce-dogfood-beta` | 对 active branch 做 diff-scoped browser QA |
+| `/ce-work-beta` | 带 Codex delegation mode 的 experimental execution workflow |
+| `/lfg` | 完整 autonomous engineering workflow |
 
 ---
 
@@ -97,9 +127,28 @@ Compound engineering 反过来做：80% 放在 planning 和 review，20% 放在 
 
 也可以在 plugin marketplace 搜索 "compound engineering"。
 
-### Codex
+### Codex App
 
-三步：注册 marketplace，安装 agent set，然后通过 Codex 的 TUI 安装 plugin。
+Compound Engineering 还没有列在 Codex 内置 plugin marketplace 中。请把它作为 custom marketplace 添加：
+
+1. 在 Codex app 中，从 sidebar 打开 **Plugins**。
+2. 点击 **Add** / **Add plugin marketplace**。
+3. 输入：
+
+   | Field | Value |
+   | --- | --- |
+   | Source | `EveryInc/compound-engineering-plugin` |
+   | Git ref | `main` |
+   | Sparse paths | 留空 |
+
+4. 点击 **Add marketplace**。
+5. 选择 **Compound Engineering**，安装 **compound-engineering**，然后重启 Codex。
+
+Codex app install 对 Compound Engineering 来说是自包含的。Specialist reviewer 和 research behavior 位于 skills 内的 local prompt assets；不需要单独的 custom-agent install 步骤。
+
+### Codex CLI
+
+注册 marketplace，然后通过 Codex 的 TUI 安装 plugin。
 
 1. **在 Codex 中注册 marketplace：**
 
@@ -107,41 +156,18 @@ Compound engineering 反过来做：80% 放在 planning 和 review，20% 放在 
    codex plugin marketplace add EveryInc/compound-engineering-plugin
    ```
 
-2. **安装 Compound Engineering agents**（Codex 的 plugin spec 目前还不会注册 custom agents）：
+2. **通过 Codex 的 TUI 安装 plugin：** 启动 `codex`，运行 `/plugins`，找到 **Compound Engineering** marketplace，选择 **compound-engineering** plugin，然后选择 **Install**。安装完成后重启 Codex。Codex CLI 可以注册 marketplaces，但目前没有暴露用于从已添加 marketplace 安装 plugin 的 plugin-install subcommand；因此需要 `/plugins` TUI install。
 
-   ```bash
-   bunx @every-env/compound-plugin install compound-engineering --to codex
-   ```
-
-3. **通过 Codex 的 TUI 安装 plugin：** 启动 `codex`，运行 `/plugins`，找到 **Compound Engineering** marketplace，选择 **compound-engineering** plugin，然后选择 **Install**。安装完成后重启 Codex。Codex CLI 可以注册 marketplaces，但目前没有暴露用于从已添加 marketplace 安装 plugin 的 plugin-install subcommand，所以 CE skills 需要通过 `/plugins` TUI 安装。
-
-这三步都需要。Marketplace registration 加 TUI install 会处理 skills；Bun 步骤会添加 review、research 和 workflow agents，让 `$ce-code-review`、`$ce-plan`、`$ce-work` 等 skills 能在 Codex 中 spawn 它们。缺少 agent 步骤时，delegating skills 会报告 agents missing。
+Native Codex plugin install 对 Compound Engineering 来说是自包含的。Specialist reviewer 和 research behavior 位于 skills 内的 local prompt assets；不需要单独的 custom-agent install 步骤。
 
 如果使用非默认 Codex profile，请让每个 Codex 相关步骤使用同一个 `CODEX_HOME`。下面示例把 CE 安装到 `work` profile：
 
 ```bash
 CODEX_HOME="$HOME/.codex/profiles/work" codex plugin marketplace add EveryInc/compound-engineering-plugin
-CODEX_HOME="$HOME/.codex/profiles/work" bunx @every-env/compound-plugin install compound-engineering --to codex
 CODEX_HOME="$HOME/.codex/profiles/work" codex
 ```
 
 在 Codex 内运行 `/plugins`，选择 **Compound Engineering**，然后安装 **compound-engineering**。Marketplace 步骤只让 plugin 可用；TUI install 才会为该 profile 激活 native CE skills。
-
-如果要从当前 checkout 做 local development，请注册当前 worktree 并使用 local CLI：
-
-```bash
-CODEX_HOME="$HOME/.codex/profiles/work" codex plugin marketplace add "$PWD"
-CODEX_HOME="$HOME/.codex/profiles/work" bun run src/index.ts install ./plugins/compound-engineering --to codex
-CODEX_HOME="$HOME/.codex/profiles/work" codex
-```
-
-> **Heads up:** 一旦 Codex 的 native plugin spec 支持 custom agents，Bun agent 步骤就会移除。届时只需要 TUI install。
-
-如果你之前使用过 Bun-only Codex install，请在切换前备份 stale CE artifacts：
-
-```bash
-bunx @every-env/compound-plugin cleanup --target codex
-```
 
 ### GitHub Copilot
 
@@ -169,12 +195,6 @@ copilot plugin install compound-engineering@compound-engineering-plugin
 
 Copilot CLI 会读取现有 Claude-compatible plugin manifests，因此不需要单独的 Bun install 步骤。
 
-如果你之前使用过旧的 Bun Copilot install，请在切换到 native plugin 前备份 stale CE artifacts：
-
-```bash
-bunx @every-env/compound-plugin cleanup --target copilot
-```
-
 ### Factory Droid
 
 从带有 `droid` binary 的 shell 中：
@@ -186,12 +206,6 @@ droid plugin install compound-engineering@compound-engineering-plugin
 
 Droid 使用 `plugin@marketplace` plugin IDs；这里 `compound-engineering` 是 plugin，`compound-engineering-plugin` 是 marketplace 名称。Droid 会安装现有 Claude Code-compatible plugin，并自动转换格式，因此不需要 Bun install 步骤。
 
-如果你之前使用过旧的 Bun Droid install，请在切换到 native plugin 前备份 stale CE artifacts：
-
-```bash
-bunx @every-env/compound-plugin cleanup --target droid
-```
-
 ### Qwen Code
 
 ```bash
@@ -200,51 +214,71 @@ qwen extensions install EveryInc/compound-engineering-plugin:compound-engineerin
 
 Qwen Code 会直接从 GitHub 安装 Claude Code-compatible plugins，并在安装期间转换 plugin format，因此不需要 Bun install 步骤。
 
-如果你之前使用过旧的 Bun Qwen install，请在切换到 native extension 前备份 stale CE artifacts：
+### OpenCode
 
-```bash
-bunx @every-env/compound-plugin cleanup --target qwen
+Add Compound Engineering to the `plugin` array in your global or project `opencode.json`:
+
+```json
+{
+  "plugin": ["compound-engineering@git+https://github.com/EveryInc/compound-engineering-plugin.git"]
+}
 ```
 
-### OpenCode, Pi, Gemini, and Kiro
+Restart OpenCode after changing the config. The OpenCode plugin registers the Compound Engineering skills directory directly; no Bun installer or generated skill copy is required. See [`.opencode/INSTALL.md`](.opencode/INSTALL.md) for pinning examples.
 
-本仓库包含一个 Bun/TypeScript installer，可把 Compound Engineering plugin 转换到 OpenCode、Pi、Gemini CLI 和 Kiro CLI。
+### Pi
 
-```bash
-bunx @every-env/compound-plugin install compound-engineering --to opencode
-bunx @every-env/compound-plugin install compound-engineering --to pi
-bunx @every-env/compound-plugin install compound-engineering --to gemini
-bunx @every-env/compound-plugin install compound-engineering --to kiro
-```
-
-**Pi prerequisites.** Pi 没有内置 native subagent primitive，所以 Pi install 依赖 [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents)（必需），并推荐 [edlsh/pi-ask-user](https://github.com/edlsh/pi-ask-user)，用于更好的 blocking user questions：
+从本仓库安装 Compound Engineering 作为 Pi package：
 
 ```bash
-pi install npm:pi-subagents    # required — provides the `subagent` tool used by skills that dispatch parallel agents
-pi install npm:pi-ask-user     # recommended — provides the `ask_user` tool; skills fall back to numbered options in chat when it is missing
+pi install git:github.com/EveryInc/compound-engineering-plugin
 ```
 
-自动检测 custom-install targets 并全部安装：
+CE workflows 需要 dispatch reviewer、research 或 implementation subagents 时，必需 companion：
 
 ```bash
-bunx @every-env/compound-plugin install compound-engineering --to all
+pi install npm:pi-subagents
 ```
 
-Custom install targets 会在安装期间运行 CE legacy cleanup。要手动为特定 target 运行 cleanup：
+更好的 blocking questions 推荐 companion：
 
 ```bash
-bunx @every-env/compound-plugin cleanup --target codex
-bunx @every-env/compound-plugin cleanup --target opencode
-bunx @every-env/compound-plugin cleanup --target pi
-bunx @every-env/compound-plugin cleanup --target gemini
-bunx @every-env/compound-plugin cleanup --target kiro
-bunx @every-env/compound-plugin cleanup --target copilot   # old Bun installs only
-bunx @every-env/compound-plugin cleanup --target droid     # old Bun installs only
-bunx @every-env/compound-plugin cleanup --target qwen      # old Bun installs only
-bunx @every-env/compound-plugin cleanup --target windsurf  # deprecated legacy installs only
+pi install npm:pi-ask-user
 ```
 
-Cleanup 会把已知 CE artifacts 移动到 target root 下的 `compound-engineering/legacy-backup/` 目录。
+### Gemini CLI
+
+从本仓库安装 native Gemini extension：
+
+```bash
+gemini extensions install https://github.com/EveryInc/compound-engineering-plugin
+```
+
+之后用这个命令更新：
+
+```bash
+gemini extensions update compound-engineering
+```
+
+### Existing Installs（现有安装）
+
+Marketplace-managed installs 会在 marketplace/plugin version 更新时迁移到 root plugin layout。在 Claude Code 上，更新 plugin 前先 refresh cached marketplace definition：
+
+```text
+/plugin marketplace update compound-engineering-plugin
+/plugin update compound-engineering
+```
+
+只更新 plugin 本身仍可能读取指向旧 `plugins/compound-engineering` path 的 stale cached marketplace entry。如果你为某个 host 配置了 `plugins/compound-engineering` 下的 direct path 或 sparse path，请编辑或重装该 source，让它指向 repository root，且不带 sparse path。
+
+如果之前 Bun-installed copy 仍在 shadow native plugin skills，请从本仓库 checkout 运行当前 cleanup command：
+
+```bash
+git clone https://github.com/EveryInc/compound-engineering-plugin.git /tmp/compound-engineering-plugin-cleanup
+cd /tmp/compound-engineering-plugin-cleanup
+bun install
+bun run cleanup --target all
+```
 
 ---
 
@@ -260,145 +294,70 @@ bun run release:validate
 
 用于 active development；对 plugin source 的 edits 会立即反映出来。
 
-**Claude Code** -- 添加一个 shell alias，让本地副本和常规 plugins 一起加载：
+用于 active development；直接在目标 harness 中加载当前 checkout。
+
+**Claude Code**
 
 ```bash
-alias cce='claude --plugin-dir ~/Code/compound-engineering-plugin/plugins/compound-engineering'
+claude --plugin-dir "$PWD"
 ```
 
-运行 `cce` 而不是 `claude` 来测试 changes。你的 production install 不会被触碰。
+**Codex App**
 
-**Codex and other targets** -- 针对当前 checkout 运行 local CLI：
+在 app 的 **Add plugin marketplace** 表单中，把当前 checkout 作为 source：
+
+| Field | Value |
+| --- | --- |
+| Source | `/path/to/compound-engineering-plugin` |
+| Git ref | 当前 branch，或作为 local folder 留空 |
+| Sparse paths | 留空 |
+
+**Codex CLI**
 
 ```bash
-# from the repo root
-bun run src/index.ts install ./plugins/compound-engineering --to codex
-
-# same pattern for other targets
-bun run src/index.ts install ./plugins/compound-engineering --to opencode
+codex plugin marketplace add "$PWD"
+codex
 ```
 
-### From a pushed branch（从已 push 的 branch）
+然后运行 `/plugins`，选择 **Compound Engineering**，安装 **compound-engineering**。如果要把 local testing 与常规 Codex profile 隔离，请使用单独的 `CODEX_HOME`。
 
-用于测试别人的 branch，或从 worktree 测试自己的 branch，而不切换 checkout。它使用 `--branch` 把 branch clone 到 deterministic cache directory。
+**OpenCode**
 
-> **Unpushed local branches**: 如果 branch 只存在于本地 worktree、尚未 push，请直接把 `--plugin-dir` 指向该 worktree path（例如 `claude --plugin-dir /path/to/worktree/plugins/compound-engineering`）。
-
-**Claude Code** -- 用 `plugin-path` 获取 cached clone path：
-
-```bash
-# from the repo root
-bun run src/index.ts plugin-path compound-engineering --branch feat/new-agents
-# Output:
-#   claude --plugin-dir ~/.cache/compound-engineering/branches/compound-engineering-feat~new-agents/plugins/compound-engineering
-```
-
-Cache path 是 deterministic 的。重新运行会把 checkout 更新到该 branch 的最新 commit。
-
-**Codex, OpenCode, and other targets** -- 给 `install` 传 `--branch`：
-
-```bash
-# from the repo root
-bun run src/index.ts install compound-engineering --to codex --branch feat/new-agents
-
-# works with any target
-bun run src/index.ts install compound-engineering --to opencode --branch feat/new-agents
-
-# combine with --also for multiple targets
-bun run src/index.ts install compound-engineering --to codex --also opencode --branch feat/new-agents
-```
-
-两个功能都使用 `COMPOUND_PLUGIN_GITHUB_SOURCE` env var 解析 repository，默认是 `https://github.com/EveryInc/compound-engineering-plugin`。
-
-### Shell aliases（Shell aliases，shell 别名）
-
-添加到 `~/.zshrc` 或 `~/.bashrc`。所有 aliases 都使用 local CLI，因此不依赖 npm publish。`plugin-path` 只向 stdout 打印路径，所以可以与 `$()` 组合。
-
-```bash
-CE_REPO=~/Code/compound-engineering-plugin
-
-ce-cli() { bun run "$CE_REPO/src/index.ts" "$@"; }
-
-# --- Local checkout (active development) ---
-alias cce='claude --plugin-dir $CE_REPO/plugins/compound-engineering'
-
-codex-ce() {
-  ce-cli install "$CE_REPO/plugins/compound-engineering" --to codex "$@"
-}
-
-# --- Pushed branch (testing PRs, worktree workflows) ---
-ccb() {
-  claude --plugin-dir "$(ce-cli plugin-path compound-engineering --branch "$1")" "${@:2}"
-}
-
-codex-ceb() {
-  ce-cli install compound-engineering --to codex --branch "$1" "${@:2}"
+```json
+{
+  "plugin": ["/path/to/compound-engineering-plugin"]
 }
 ```
 
-Usage：
+修改 `opencode.json` 后重启 OpenCode。
+
+**Pi**
 
 ```bash
-cce                              # local checkout with Claude Code
-codex-ce                         # install local checkout to Codex
-ccb feat/new-agents              # test a pushed branch with Claude Code
-ccb feat/new-agents --verbose    # extra flags forwarded to claude
-codex-ceb feat/new-agents        # install a pushed branch to Codex
+pi -e "$PWD"
 ```
 
-Codex installs 会把 generated plugin skills 隔离在 `~/.codex/skills/compound-engineering/` 下，并且不会向 `~/.agents` 写入新文件。当 installer 能证明旧的 CE-managed `.agents/skills` symlinks 指回 CE 的 Codex-managed store 时，会移除它们，以防 stale Codex installs shadow Copilot 的 native plugin install。
-
-## Troubleshooting（故障排查）
-
-### Codex skills work but review or research delegation fails（Codex skills 可用但 review/research delegation 失败）
-
-运行 agent install 步骤：
+**Gemini CLI**
 
 ```bash
-bunx @every-env/compound-plugin install compound-engineering --to codex
-```
-
-Native Codex plugin install 会处理 skills。Bun 步骤会安装这些 skills delegate 到的 custom agents。
-
-### Codex shows stale or duplicate CE skills（Codex 显示 stale 或重复的 CE skills）
-
-切换到 native Codex plugin flow 前，备份旧 Bun-installed artifacts：
-
-```bash
-bunx @every-env/compound-plugin cleanup --target codex
-```
-
-### Copilot, Droid, or Qwen loads stale CE skills（Copilot、Droid 或 Qwen 加载 stale CE skills）
-
-使用 native plugin path 前，备份旧 Bun-installed artifacts：
-
-```bash
-bunx @every-env/compound-plugin cleanup --target copilot
-bunx @every-env/compound-plugin cleanup --target droid
-bunx @every-env/compound-plugin cleanup --target qwen
+gemini extensions install "$PWD"
 ```
 
 ## Limitations（限制）
 
-Codex native plugin install 目前处理 skills，不处理 custom agents。在 Codex native plugin spec 支持 agents 前，仍需要文档中的 Bun followup。
-
-OpenCode、Pi、Gemini 和 Kiro installs 由 converter 支撑，并可能随着这些 target formats 演进而变化。
+OpenCode、Pi 和 Gemini 使用本仓库的 native package/plugin loading。Bun CLI 仍用于 repository development 和 converter maintenance，不用于常规安装。
 
 Release versions 由 release automation 管理。常规 feature PR 不应手工 bump plugin 或 marketplace manifest versions。
 
 ## FAQ（常见问题）
 
-### Do I need Bun for Claude Code?（Claude Code 需要 Bun 吗？）
+### Do I need Bun to install Compound Engineering?（安装 Compound Engineering 需要 Bun 吗？）
 
-不需要。Claude Code 直接从 plugin marketplace 安装。只有 converter-backed targets、Codex 当前的 agent followup、local development，以及清理旧 converted installs 时才需要 Bun。
+不需要。Bun 只用于 repo development tasks 和 converter maintenance。
 
-### Why does Codex need a separate Bun step?（为什么 Codex 需要单独的 Bun 步骤？）
+### Where do I see all available skills?（在哪里查看所有可用 skills？）
 
-Codex native plugin flow 会从 Codex plugin manifest 安装 skills。它目前不会安装 Compound Engineering skills delegate 到的 custom reviewer、researcher 和 workflow agents。Bun 步骤填补这个缺口。
-
-### Where do I see all available skills and agents?（在哪里查看所有可用 skills 和 agents？）
-
-阅读 [Compound Engineering plugin README](plugins/compound-engineering/README.md)。它列出了当前 skill 和 agent inventory。
+Skill inventory 在本 README 中。每个 skill 的权威 runtime spec 位于 `skills/<skill>/SKILL.md`。
 
 ### Where is release history?（release history 在哪里？）
 

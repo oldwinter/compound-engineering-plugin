@@ -2,7 +2,7 @@
 title: "ce-compound-refresh skill redesign：无 live user context 的 autonomous maintenance"
 category: skill-design
 date: 2026-03-13
-module: plugins/compound-engineering/skills/ce-compound-refresh
+module: skills/ce-compound-refresh
 component: SKILL.md
 tags:
   - skill-design

@@ -1,6 +1,7 @@
 ---
 title: "Colon-namespaced skill names 会破坏 Windows filesystem paths"
 date: 2026-03-26
+last_refreshed: 2026-06-20
 category: integration-issues
 module: cli-converter
 problem_type: integration_issue

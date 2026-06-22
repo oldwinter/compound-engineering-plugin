@@ -1,6 +1,6 @@
 # Agent Instructions（Agent 运行约定）
 
-本仓库主要承载 `compound-engineering` coding-agent plugin，以及用于分发它的 Claude Code marketplace/catalog metadata。
+本仓库是 `compound-engineering` coding-agent plugin 的根目录，以及用于分发它的 marketplace/catalog metadata。
 
 它还包含：
 
@@ -23,7 +23,7 @@ bun run release:validate  # check plugin/marketplace consistency
 - **Merge policy:** 所有到 `main` 的 changes 都通过 pull requests。禁止 direct pushes 和 direct merges；`main` 上的 branch protection 要求 `test` status check 通过。Direct path 会绕过 `release:validate`、test suite 和 PR title validation；过去的 direct merges 造成过 version drift，需要多 PR 恢复（见 `docs/solutions/workflow/release-please-version-drift-recovery.md`）。
 - **Safety:** 不要删除或覆盖 user data。避免 destructive commands。
 - **Testing:** 修改 parsing、conversion 或 output 后运行 `bun test`。
-- **Release versioning:** Releases 由 release automation 准备，不由普通 feature PRs 准备。Repo 现在有多个 release components（`cli`、`compound-engineering`、`marketplace`、`cursor-marketplace`）。GitHub release PRs 和 GitHub Releases 是新 releases 的 canonical release-notes surface；根 `CHANGELOG.md` 只是指向该历史的指针。使用 `feat:`、`fix:` 等 conventional titles，让 release automation 能分类 change intent；但 routine PRs 不要手工 bump release-owned versions，也不要手写 release notes。
+- **Release versioning:** Releases 由 release automation 准备，不由普通 feature PRs 准备。Repo 有一个 root plugin/package release component（`compound-engineering`）以及 marketplace components（`marketplace`、`cursor-marketplace`）。GitHub release PRs 和 GitHub Releases 是新 releases 的 canonical release-notes surface；根 `CHANGELOG.md` 只是指向该历史的指针。使用 `feat:`、`fix:` 等 conventional titles，让 release automation 能分类 change intent；但 routine PRs 不要手工 bump release-owned versions，也不要手写 release notes。
 - **Linked versions (cli + compound-engineering):** `linked-versions` release-please plugin 会让 `cli` 和 `compound-engineering` 保持同一 version。这是有意的，用于简化 CLI 与其随附 plugin 的 version tracking。结果是：只有 plugin changes 的 release 仍会 bump CLI version（反之亦然）。CLI changelog 也可能包含 `exclude-paths` 通常会过滤的 commits，因为 `linked-versions` 在强制 synced bump 时会覆盖 exclusion logic。这是已知 upstream release-please limitation，不是 misconfiguration。不要把 linked-version bumps 标记为 unnecessary。
 - **Output Paths:** OpenCode output 保持在 `opencode.json` 和 `.opencode/{agents,skills,plugins}`。对 OpenCode，commands 写到 `~/.config/opencode/commands/<name>.md`；`opencode.json` 做 deep-merge（绝不 wholesale overwrite）。
 - **Scratch Space:** 默认使用 OS temp。只有在下面规则明确 justified 时才使用 `.context/`。
@@ -46,8 +46,12 @@ bun run release:validate  # check plugin/marketplace consistency
 
 ```text
 src/              CLI entry point, parsers, converters, target writers
-plugins/          Plugin workspaces (compound-engineering)
-.claude-plugin/   Claude marketplace catalog metadata
+skills/           Compound Engineering plugin skills
+.claude-plugin/   Claude plugin manifest and marketplace catalog metadata
+.codex-plugin/    Codex plugin manifest
+.cursor-plugin/   Cursor plugin manifest and marketplace catalog metadata
+.opencode/        OpenCode package entrypoint and install docs
+.pi/              Pi extension entrypoint
 tests/            Converter, writer, and CLI tests + fixtures
 docs/             Requirements, plans, solutions, and target specs
 CONCEPTS.md       Shared domain vocabulary (glossary of project-specific terms)
@@ -57,17 +61,17 @@ CONCEPTS.md       Shared domain vocabulary (glossary of project-specific terms)
 
 本 repo 的 changes 可能影响以下一个或多个 surfaces：
 
-- `plugins/compound-engineering/` 下的 `compound-engineering`
-- `.claude-plugin/` 下的 Claude marketplace catalog
+- `skills/`、`AGENTS.md`、`README.md` 和 platform manifests 下的 root plugin content
+- `.claude-plugin/`、`.cursor-plugin/` 和 `.agents/plugins/` 下的 marketplace catalogs
 - `src/` 和 `package.json` 中的 converter/install CLI
 
 不要在未检查 affected files 归属的情况下，假设某个 repo change "just CLI" 或 "just plugin"。
 
 ## Plugin Maintenance（Plugin 维护）
 
-修改 `plugins/compound-engineering/` 内容时：
+修改 plugin content 时：
 
-- 如果 plugin behavior、inventory 或 usage 发生变化，更新 `plugins/compound-engineering/README.md` 等 substantive docs。
+- 如果 plugin behavior、inventory 或 usage 发生变化，更新 `README.md` 等 substantive docs。
 - 不要在 plugin 或 marketplace manifests 中手工 bump release-owned versions。
 - 不要手工向 `CHANGELOG.md` 添加 release entries，也不要把它当作 new releases 的 canonical source。
 - 如果 agents、commands、skills、MCP servers 或 release-owned descriptions/counts 可能改变，运行 `bun run release:validate`。
@@ -80,16 +84,20 @@ Useful validation commands（常用验证命令）：
 ```bash
 bun run release:validate
 cat .claude-plugin/marketplace.json | jq .
-cat plugins/compound-engineering/.claude-plugin/plugin.json | jq .
+cat .claude-plugin/plugin.json | jq .
 ```
+
+## Runtime vs Authoring Context（运行时与创作上下文）
+
+`AGENTS.md`、`CLAUDE.md` 和 `GEMINI.md` 是本 source repository 的 authoring context。Skills 会被安装到 end-user environments，并在用户本地 instruction files 下运行，而不是在本 repo 的 instructions 下运行。必须在 skill runtime 生效的 behavioral rules，应放在该 skill 的 `SKILL.md` 或其自身 `references/` directory 下的文件中。
 
 ## Validating Agent and Skill Changes（验证 Agent 和 Skill 变更）
 
-由于 Claude Code 加载 plugins 的方式，对 plugin agent 或 skill 的 behavioral changes（`plugins/*/agents/` 或 `plugins/*/skills/` 下任何内容）需要不同于 mechanical code changes 的 validation path。
+由于 Claude Code 加载 plugins 的方式，对 plugin skill 或 skill-local persona 的 behavioral changes（`skills/` 下任何内容）需要不同于 mechanical code changes 的 validation path。
 
 - **使用 `skill-creator` skill 测试 changes。** Skill-creator 专门为此设计：它会 spawn 一个 generic subagent，并在 dispatch 时把 agent 或 skill content 注入 subagent prompt，所以每次 run 都会从磁盘读取当前 source。调用 `/skill-creator` 并使用它的 eval workflow，而不是临时 workaround。
 
-- **Plugin agent 和 skill definitions 都会在 session start 时缓存。** 一旦 Claude Code session 打开，dispatch typed agent（例如 `Agent({subagent_type: "compound-engineering:ce-session-historian"})`）会运行 session 开始时加载到 memory 中的 copy。Skills 也一样：调用 `Skill ce-session-inventory` 会经过 cached skill loader，所以同一 session start 后的 skill script edits 也不能用这条路径测试。Session start 之后对任一层的 file edits 都不会在同一 session 中传播。任何围绕同一 session 中 typed-agent dispatch 或 Skill-tool invocation 建立的 iteration loop，测试的都是 pre-edit content，不是你的 changes。
+- **Plugin agent 和 skill definitions 都会在 session start 时缓存。** 一旦 Claude Code session 打开，dispatch typed plugin agent 会运行 session 开始时加载到 memory 中的 copy。Skills 也一样：调用 skill 会经过 cached skill loader，所以同一 session start 后的 skill script edits 也不能用这条路径测试。Session start 之后对任一层的 file edits 都不会在同一 session 中传播。任何围绕同一 session 中 typed-agent dispatch 或 Skill-tool invocation 建立的 iteration loop，测试的都是 pre-edit content，不是你的 changes。
 
 - **不要编辑 `~/.claude/plugins/cache/` 或 `~/.claude/plugins/marketplaces/` 来试图强制 reload。** 这些 paths 是 user machine state，不是 repo-managed。修改它们不能可靠绕过 in-session cache（已观察到不行），还有被 plugin updates 静默覆盖的风险，而且测试层级也不对。Skill-creator pattern 才是正确路径；如果确实需要 typed-agent dispatch path 的 freshly-loaded behavior，请重启 Claude Code session，但快速 iteration 优先用 skill-creator。
 
@@ -104,7 +112,7 @@ cat plugins/compound-engineering/.claude-plugin/plugin.json | jq .
 
 ## Commit Conventions（提交约定）
 
-- **Prefix 基于 intent，而不是 file type。** 使用 conventional prefixes（`feat:`、`fix:`、`docs:`、`refactor:` 等），但按 change 做什么来分类，不按文件扩展名分类。`plugins/*/skills/`、`plugins/*/agents/` 和 `.claude-plugin/` 下的文件即使是 Markdown 或 JSON，也是 product code。只有纯文档用途的文件（`README.md`、`docs/`、`CHANGELOG.md`）才保留 `docs:`。
+- **Prefix 基于 intent，而不是 file type。** 使用 conventional prefixes（`feat:`、`fix:`、`docs:`、`refactor:` 等），但按 change 做什么来分类，不按文件扩展名分类。`skills/`、`skills/*/references/agents/` 和 `.claude-plugin/` 下的文件即使是 Markdown 或 JSON，也是 product code。只有纯文档用途的文件（`README.md`、`docs/`、`CHANGELOG.md`）才保留 `docs:`。
 - **Type selection：按 intent 分类，不按 diff shape。** 当 `fix:` 和 `feat:` 都看似合适时，默认用 `fix:`：修复 broken 或 missing behavior 的 change 是 `fix:`，即使通过新增代码实现；净增行数不会把 fix 变成 `feat:`。`feat:` 只用于用户此前无法完成、且不是修复 broken behavior 的能力。其他 conventional types（`chore:`、`refactor:`、`docs:`、`perf:`、`test:`、`ci:`、`build:`、`style:`）在比二者更精确时仍为首选。Heuristic：如果今天写的 regression test 在 change 前会失败，它就是 `fix:`。用户可以针对某个 change 覆盖此默认值。
 - **包含 component scope。** Scope 会原样出现在 changelog 中。选择最窄且有用的 label：skill/agent name（`document-review`、`learnings-researcher`）、CLI 或 marketplace area（`cli`、`marketplace`），或跨域 shared area（`review`、`research`、`converters`）。不要使用 `compound-engineering`，它代表整个 plugin，对读者没有帮助。只有在没有任何单一 label 能增加 clarity 时才省略 scope。
 - **没有用户明确确认，不要使用 `!` 或 `BREAKING CHANGE:` footer。** 这些 markers 会触发 release-please 自动 major version bump；即使 change 技术上 breaking，用户也可能不想做这个决定。如果 change 看起来 breaking，告知用户并让他们决定是否应用 marker。
@@ -135,14 +143,18 @@ cat plugins/compound-engineering/.claude-plugin/plugin.json | jq .
 5. **Docs（文档）**
    - 更新 README，加入新的 `--to` option 和 output locations。
 
-## Agent References in Skills（Skills 中的 Agent 引用）
+## Specialist Prompt Assets in Skills（Skills 中的专家 Prompt 资产）
 
-在 skill SKILL.md files 中引用 agents（例如通过 `Agent` 或 `Task` tool）时，使用裸 `ce-<agent-name>` 形式。`ce-` prefix 表示该 agent 是 compound-engineering component，足以跨 plugins 保持唯一。
+`compound-engineering` plugin 不再在 `agents/` 下发布 standalone agent definitions。当某个 skill 需要 specialist persona 时，把它存放在该 skill directory 内，通常位于 `references/agents/` 或 `references/personas/`，并让调用方 skill 在 prompt 中注入该文件内容来 dispatch generic subagent。
+
+Internal prompt asset filenames 应使用 descriptive、unprefixed names，因为它们不是 externally exposed agent names。
 
 Example（示例）：
 
-- `ce-learnings-researcher`（正确）
-- `learnings-researcher`（错误，必须有 `ce-` prefix；它能避免与其他 plugins 中同 short name 的 agents 冲突）
+- `references/agents/learnings-researcher.md`（正确）
+- `references/agents/ce-learnings-researcher.md`（错误，作为 internal prompt asset 不应带 prefix）
+
+这些 prompt assets 不得包含 YAML frontmatter。Model selection、tool constraints 和 dispatch policy 属于调用方 skill 的 `SKILL.md`，不属于 prompt asset。
 
 ## File References in Skills（Skills 中的文件引用）
 
@@ -151,7 +163,7 @@ Example（示例）：
 Broken patterns（错误模式）：
 
 - `../other-skill/references/schema.yaml`：relative traversal 到 sibling skill
-- `/home/user/plugins/compound-engineering/skills/other-skill/file.md`：指向另一个 skill 的 absolute path
+- `/home/user/compound-engineering-plugin/skills/other-skill/file.md`：指向另一个 skill 的 absolute path
 - `~/.claude/plugins/cache/marketplace/compound-engineering/1.0.0/skills/other-skill/file.md`：指向 installed plugin location 的 absolute path
 
 为什么这很重要：
@@ -213,6 +225,16 @@ Do not attempt to resolve the version at runtime.
 - **Plans** 位于 `docs/plans/`：implementation plans 和 progress tracking。
 - **Solutions** 位于 `docs/solutions/`：过去问题的 documented solutions（bugs、best practices、workflow patterns），按 category 组织，并带 YAML frontmatter（`module`、`tags`、`problem_type`）。在相关 areas implementation 或 debugging 时有用。
 - **Specs** 位于 `docs/specs/`：target platform format specifications。
+
+### Solution categories（`docs/solutions/`）
+
+本 repo 构建的是面向 developers 的 plugin。Solution 分类应从 end user（使用 plugin 的 developer）视角出发，而不是从本 repo contributor 视角出发。
+
+- **`developer-experience/`**：贡献本 repo 时的问题：local dev setup、shell aliases、test ergonomics、CI friction。如果 fix 只对 checkout 本 repo 的人有意义，就放在这里。
+- **`integrations/`**：plugin output 在某个 target platform 或 OS 上不能正确工作的问题。Cross-platform bugs、target writer output problems 和 converter compatibility issues 都放在这里。
+- **`workflow/`**、**`skill-design/`**：Plugin skill 和 agent design patterns、workflow improvements。
+
+如果拿不准：如果 bug 影响的是运行 `bun install compound-engineering` 或 `bun convert` 的用户，它就是 integration 或 product issue，而不是 developer-experience。
 
 ### Solution categories (`docs/solutions/`，solution 分类)
 

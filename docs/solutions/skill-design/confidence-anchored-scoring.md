@@ -56,9 +56,9 @@ Within-severity sort：anchor descending，然后 document order 作为 determin
 
 ### 文件
 
-- `plugins/compound-engineering/skills/ce-doc-review/references/findings-schema.json` -- `confidence` 是 integer enum `[0, 25, 50, 75, 100]`，behavioral definitions embedded 在 `description` field 中
-- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md` -- personas verbatim 看到的 rubric section，以及 consolidated false-positive catalog
-- `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md` -- 3.2 中的 anchor-based gate、3.4 中的 anchor-step promotion、3.8 中的 anchor-sorted ordering、3.7 中的 anchor+autofix routing
+- `skills/ce-doc-review/references/findings-schema.json` -- `confidence` 是 integer enum `[0, 25, 50, 75, 100]`，behavioral definitions embedded 在 `description` field 中
+- `skills/ce-doc-review/references/subagent-template.md` -- personas verbatim 看到的 rubric section，以及 consolidated false-positive catalog
+- `skills/ce-doc-review/references/synthesis-and-presentation.md` -- 3.2 中的 anchor-based gate、3.4 中的 anchor-step promotion、3.8 中的 anchor-sorted ordering、3.7 中的 anchor+autofix routing
 - `plugins/compound-engineering/agents/ce-*-reviewer.md`（7 个 doc-review personas，flat files）-- 每个都带 persona-specific calibration section，把 domain criteria 映射到 shared anchors
 - `tests/pipeline-review-contract.test.ts` -- contract tests，断言 schema enforce discrete anchors，template embeds rubric
 
@@ -173,12 +173,12 @@ demotion rule 有意保持 narrow：severity P2 或 P3、`autofix_class` advisor
 
 ### 文件
 
-- `plugins/compound-engineering/skills/ce-code-review/references/findings-schema.json` -- `confidence` 是 integer enum `[0, 25, 50, 75, 100]`，description 中含 code-review-specific behavioral definitions；`_meta.confidence_anchors` 与 `_meta.confidence_thresholds` document anchors 和 `>= 75` gate
-- `plugins/compound-engineering/skills/ce-code-review/references/subagent-template.md` -- verbatim 5-anchor rubric with code-review framing、expanded false-positive catalog including lint-ignore rule、reject floats 的 hard schema-conformance constraints
-- `plugins/compound-engineering/skills/ce-code-review/references/validator-template.md` -- Stage 5b validator subagent prompt
-- `plugins/compound-engineering/skills/ce-code-review/SKILL.md` -- Stage 5 anchor gate 与 one-anchor promotion（替代 `+0.10`）、Stage 5 step 7c mode-aware demotion、Stage 5b validation pass with budget cap、Stage 1 PR-mode skip-condition pre-check、After-Review options B 与 C 在 externalizing 前调用 validation
+- `skills/ce-code-review/references/findings-schema.json` -- `confidence` 是 integer enum `[0, 25, 50, 75, 100]`，description 中含 code-review-specific behavioral definitions；`_meta.confidence_anchors` 与 `_meta.confidence_thresholds` document anchors 和 `>= 75` gate
+- `skills/ce-code-review/references/subagent-template.md` -- verbatim 5-anchor rubric with code-review framing、expanded false-positive catalog including lint-ignore rule、reject floats 的 hard schema-conformance constraints
+- `skills/ce-code-review/references/validator-template.md` -- Stage 5b validator subagent prompt
+- `skills/ce-code-review/SKILL.md` -- Stage 5 anchor gate 与 one-anchor promotion（替代 `+0.10`）、Stage 5 step 7c mode-aware demotion、Stage 5b validation pass with budget cap、Stage 1 PR-mode skip-condition pre-check、After-Review options B 与 C 在 externalizing 前调用 validation
 - `plugins/compound-engineering/agents/ce-*-reviewer.md` -- code-review reviewer personas 从 float bands 更新为 anchored language，并保留每个 persona 的 specific calibration signal
-- `plugins/compound-engineering/skills/ce-code-review/references/review-output-template.md` -- Confidence column 渲染为 integer（`75`、`100`），不是 float
+- `skills/ce-code-review/references/review-output-template.md` -- Confidence column 渲染为 integer（`75`、`100`），不是 float
 - `tests/review-skill-contract.test.ts` -- schema、synthesis、validation pass、skip-conditions、mode-aware demotion 和 per-persona anchored-language assertions
 
 ### 何时把这个 combined pattern 应用到新 skill

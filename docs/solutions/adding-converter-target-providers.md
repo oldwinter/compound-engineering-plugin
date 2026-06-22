@@ -3,6 +3,7 @@ title: 添加新的 Converter Target Providers
 category: architecture
 tags: [converter, target-provider, plugin-conversion, multi-platform, pattern]
 created: 2026-02-23
+last_refreshed: 2026-06-20
 severity: medium
 component: converter-cli
 problem_type: architecture_pattern
@@ -13,22 +14,18 @@ root_cause: architectural_pattern
 
 ## 问题
 
-当为新的 AI platform（例如 Copilot、Windsurf、Qwen）添加支持时，converter CLI architecture 要求 types、converters、writers、CLI integration 和 tests 之间保持一致实现。如果没有文档化的 patterns 和 learnings，新 targets 的实现会更慢，也更容易出现 architecture inconsistency。
+当为新的 AI platform 添加支持时，converter CLI architecture 要求 types、converters、writers、CLI integration 和 tests 之间保持一致实现。如果没有文档化的 patterns 和 learnings，新 targets 的实现会更慢，也更容易出现 architecture inconsistency。
 
 ## 方案
 
-compound-engineering-plugin 使用一个已验证的 **6-phase target provider pattern**，并已成功应用到 10 个 targets：
+compound-engineering-plugin 使用一个已验证的 **6-phase target provider pattern**，并已应用到本 repo 维护的 converter targets。一些较旧的 converter modules 仍留在 tests 或 cleanup paths 中用于 compatibility，但当 harness 支持 native package/plugin mechanism 时，新的 user-facing installs 应优先使用 native mechanism。
 
 1. **OpenCode**（primary target，reference implementation，主要参考实现）
 2. **Codex**（second target，established pattern，已验证 pattern）
-3. **Droid/Factory**（workflow/agent conversion，workflow/agent 转换）
-4. **Pi**（MCPorter ecosystem，MCPorter 生态）
-5. **Gemini CLI**（content transformation patterns，内容转换 patterns）
-6. **Copilot**（GitHub native，MCP prefixing，MCP 前缀处理）
-7. **Kiro**（limited MCP support，有限 MCP 支持）
-8. **Windsurf**（rules-based format，基于 rules 的格式）
-9. **OpenClaw**（open agent format，开放 agent 格式）
-10. **Qwen**（Qwen agent format，Qwen agent 格式）
+3. **Pi**（MCPorter ecosystem，MCPorter 生态）
+4. **Gemini CLI**（content transformation patterns，内容转换 patterns）
+5. **Compatibility converter modules**，例如 Copilot、Droid 和 Kiro（在 regression coverage 或 cleanup support 仍然重要时保留）
+6. **Historical removed targets**，例如 Windsurf、OpenClaw 和 Qwen（仅作为 archived lessons 使用）
 
 每个 implementation 都精确遵循该 architecture，以确保 consistency 和 maintainability。
 
@@ -70,8 +67,9 @@ export type {TargetName}Agent = {
 
 **参考实现：**
 - OpenCode：`src/types/opencode.ts`（command + agent split，command 与 agent 拆分）
-- Copilot：`src/types/copilot.ts`（agents + skills + MCP，agents、skills 与 MCP）
-- Windsurf：`src/types/windsurf.ts`（rules-based format，基于 rules 的格式）
+- Codex：`src/types/codex.ts`（agents plus optional copied skills，agents 与 optional copied skills）
+- Pi：`src/types/pi.ts`（plugin/extension output，plugin/extension 输出）
+- Gemini：`src/types/gemini.ts`（extension-style output，extension 风格输出）
 
 ---
 
@@ -208,15 +206,16 @@ function flattenCommandName(name: string): string {
 
 5. **MCP servers 需要 target-specific handling：**
    - **OpenCode:** Merge into `opencode.json`（合并到 `opencode.json`，preserve user keys）
-   - **Copilot:** Prefix env vars with `COPILOT_MCP_`（为 env vars 添加 `COPILOT_MCP_` 前缀），emit JSON
-   - **Windsurf:** Write MCP config in target-specific format（以 target-specific format 写入 MCP config）
-   - **Kiro:** Limited MCP support（有限 MCP 支持），check compatibility
+   - **Pi:** Emit extension/package metadata without requiring CE-owned subagent extensions（输出 extension/package metadata，不要求 CE-owned subagent extensions）
+   - **Gemini:** Prefer native extension manifests and skip unsupported Claude-only surfaces（优先 native extension manifests，跳过 unsupported Claude-only surfaces）
 
-6. **对 unsupported features 发出 warning**：Hooks、Gemini extensions、Kiro-incompatible MCP types。输出到 stderr 并继续 conversion。
+6. **对 unsupported features 发出 warning**：Hooks 和 target-incompatible MCP types 应输出到 stderr 并继续 conversion。
 
 **参考实现：**
 - OpenCode：`src/converters/claude-to-opencode.ts`（most comprehensive，最完整）
-- Copilot：`src/converters/claude-to-copilot.ts`（MCP prefixing pattern，MCP 前缀 pattern）
+- Codex：`src/converters/claude-to-codex.ts`（native-plugin-compatible default with legacy include-skills path，默认兼容 native plugin，并保留 legacy include-skills path）
+- Pi：`src/converters/claude-to-pi.ts`（Pi plugin metadata，Pi plugin metadata）
+- Gemini：`src/converters/claude-to-gemini.ts`（Gemini extension output，Gemini extension 输出）
 - Windsurf：`src/converters/claude-to-windsurf.ts`（rules-based conversion，基于 rules 的转换）
 
 ---
@@ -377,7 +376,7 @@ if (targetName === "{target}") {
 }
 
 // Update --to flag description
-const toDescription = "Target format (opencode | codex | droid | cursor | pi | copilot | gemini | kiro | windsurf | openclaw | qwen | all)"
+const toDescription = "Target format (opencode | codex | pi | gemini | all)"
 ```
 
 ---
@@ -427,7 +426,7 @@ export async function syncTo{Target}(outputRoot: string): Promise<void> {
 
 ```typescript
 // Add to validTargets array
-const validTargets = ["opencode", "codex", "droid", "pi", "copilot", "gemini", "kiro", "windsurf", "openclaw", "qwen", "{target}"] as const
+const validTargets = ["opencode", "codex", "pi", "gemini", "{target}"] as const
 
 // In resolveOutputRoot()
 case "{target}":
@@ -685,7 +684,7 @@ describe("write{Target}Bundle", () => {
 
 ## 相关文件
 
-- `plugins/compound-engineering/.claude-plugin/plugin.json` — version 和 component counts
+- `.claude-plugin/plugin.json` — version 和 component counts
 - `CHANGELOG.md` — 指向 canonical GitHub release history
 - `README.md` — 所有 targets 的 usage examples
 - `docs/solutions/plugin-versioning-requirements.md` — release checklist

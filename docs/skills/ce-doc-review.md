@@ -49,15 +49,15 @@ Document review 比 code review 在几个方面更难：
 
 Conditional personas 根据 doc 实际内容激活，而不是 keyword matching：
 
-- **`ce-product-lens-reviewer`**：当 doc 对 build 什么和为什么提出可 challenge 的 claims，或 proposed work 具有 strategic weight（trajectory、identity、adoption、opportunity cost）时
-- **`ce-design-lens-reviewer`**：当 doc 包含 UI/UX references、user flows、interaction descriptions 或 visual design language 时
-- **`ce-security-lens-reviewer`**：当 doc 触及 auth、public APIs、data handling、PII、payments、third-party trust boundaries 时
-- **`ce-scope-guardian-reviewer`**：当 doc 有多个 priority tiers、大量 requirements，或 scope-boundary language 看起来 misaligned 时
-- **`ce-adversarial-document-reviewer`**：当 doc 触及 high-stakes domains（auth、payments、migrations）、提出 new abstractions、有 missing 或 extended origin、包含 requirements-shape premise content，或呈现 explicit alternatives 时
+- **`product-lens-reviewer`**：当 doc 对 build 什么和为什么提出可 challenge 的 claims，或 proposed work 具有 strategic weight（trajectory、identity、adoption、opportunity cost）时
+- **`design-lens-reviewer`**：当 doc 包含 UI/UX references、user flows、interaction descriptions 或 visual design language 时
+- **`security-lens-reviewer`**：当 doc 触及 auth、public APIs、data handling、PII、payments、third-party trust boundaries 时
+- **`scope-guardian-reviewer`**：当 doc 有多个 priority tiers、大量 requirements，或 scope-boundary language 看起来 misaligned 时
+- **`adversarial-document-reviewer`**：当 doc 触及 high-stakes domains（auth、payments、migrations）、提出 new abstractions、有 missing 或 extended origin、包含 requirements-shape premise content，或呈现 explicit alternatives 时
 
-两个 always-on（`ce-coherence-reviewer`、`ce-feasibility-reviewer`）每次 review 都跑。Conditional personas 在 doc content 值得时增加 depth。
+两个 always-on（`coherence-reviewer`、`feasibility-reviewer`）每次 review 都跑。Conditional personas 在 doc content 值得时增加 depth。
 
-Personas 还会 **按 doc shape 收窄 techniques**。对于带 `Origin:` 的 plan-shape docs，也就是 premise 已在 brainstorm 中 pressure-tested，`ce-product-lens-reviewer`、`ce-adversarial-document-reviewer` 和 `ce-scope-guardian-reviewer` 会抑制 premise-level techniques，只运行 implementation-level checks（technical assumptions、decision stress-testing、architectural alternatives、deferred-work scope creep）。对于 requirements-shape docs，它们运行完整 technique set。`ce-feasibility-reviewer` 反过来：shadow-path tracing、implementability 和 migration mechanics 只用于 plan-shape docs；requirements docs 上只运行紧凑的 "would this direction force a fundamental rework?" check。Doc-type classification 在 orchestrator 中只做一次（content-shape signals：frontmatter、R-IDs vs U-IDs、section structure），并通过 `Origin:` slot 传给每个 persona，避免 personas 自己重复分类。
+Personas 还会 **按 doc shape 收窄 techniques**。对于带 `Origin:` 的 plan-shape docs，也就是 premise 已在 brainstorm 中 pressure-tested，`product-lens-reviewer`、`adversarial-document-reviewer` 和 `scope-guardian-reviewer` 会抑制 premise-level techniques，只运行 implementation-level checks（technical assumptions、decision stress-testing、architectural alternatives、deferred-work scope creep）。对于 requirements-shape docs，它们运行完整 technique set。`feasibility-reviewer` 反过来：shadow-path tracing、implementability 和 migration mechanics 只用于 plan-shape docs；requirements docs 上只运行紧凑的 "would this direction force a fundamental rework?" check。Doc-type classification 在 orchestrator 中只做一次（content-shape signals：frontmatter、R-IDs vs U-IDs、section structure），并通过 `Origin:` slot 传给每个 persona，避免 personas 自己重复分类。
 
 ### 2. 带三层 routing 的 synthesis pipeline
 
@@ -122,7 +122,7 @@ Output 会说明哪些 personas 运行了、哪些 signals 激活了它们，以
 
 `/ce-plan` 完成了 notification-mute feature 的 Standard plan。Phase 5.3.8 以 `mode:headless` 和 plan path 调用 `/ce-doc-review`。
 
-Skill 读取 doc，通过 content-shape signals（U-IDs、plan section structure）将其分类为 `plan`，读取 `Origin:` slot，并分析 content 以选择 conditional personas。Plan 触及 UI surface（mute toggle copy），但没有 high-stakes domains，也没有提出 new abstractions。它激活 `ce-coherence-reviewer`（always-on）、`ce-feasibility-reviewer`（always-on，收窄到 plan-shape techniques）和 `ce-design-lens-reviewer`（UI surface）。Adversarial、scope-guardian、security-lens 和 product-lens skip，因为它们的 triggers 在一个有 origin 的 routine plan 上没有触发。
+Skill 读取 doc，通过 content-shape signals（U-IDs、plan section structure）将其分类为 `plan`，读取 `Origin:` slot，并分析 content 以选择 conditional personas。Plan 触及 UI surface（mute toggle copy），但没有 high-stakes domains，也没有提出 new abstractions。它激活 `coherence-reviewer`（always-on）、`feasibility-reviewer`（always-on，收窄到 plan-shape techniques）和 `design-lens-reviewer`（UI surface）。Adversarial、scope-guardian、security-lens 和 product-lens skip，因为它们的 triggers 在一个有 origin 的 routine plan 上没有触发。
 
 三个 reviewers 并行分派，返回 9 个 raw findings。Synthesis merge 成 6 个 distinct findings：2 个 `safe_auto`（typo、broken cross-reference），3 个 `gated_auto`（durability tradeoff wording、U2 test scenarios 缺 missing edge case、toggle copy 上的 design-lens flag），1 个 FYI（suggested scope clarification）。
 

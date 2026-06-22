@@ -1,14 +1,15 @@
 ---
 title: Research agent dispatch 有意在 skill pipeline 中分段
 date: 2026-04-05
+last_refreshed: 2026-06-20
 category: skill-design
 module: compound-engineering
 problem_type: architecture_pattern
 component: tooling
 severity: low
 applies_when:
-  - Evaluating whether ce-repo-research-analyst or ce-learnings-researcher calls in ce-plan duplicate work from ce-brainstorm or ce-work
-  - Adding a new research agent and deciding which pipeline stage should dispatch it
+  - Evaluating whether repo-research-analyst or learnings-researcher prompt assets in ce-plan duplicate work from ce-brainstorm or ce-work
+  - Adding a new research prompt asset and deciding which pipeline stage should dispatch it
   - Considering pass-through optimizations like the Slack researcher pattern (commit f7a14b76)
 tags:
   - research-agent

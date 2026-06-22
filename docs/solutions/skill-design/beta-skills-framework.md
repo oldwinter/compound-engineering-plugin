@@ -2,7 +2,7 @@
 title: "Beta skills framework：使用 -beta 后缀的 parallel skills 实现安全 rollout"
 category: skill-design
 date: 2026-03-17
-module: plugins/compound-engineering/skills
+module: skills
 component: SKILL.md
 tags:
   - skill-design

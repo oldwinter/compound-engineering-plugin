@@ -1,8 +1,9 @@
 ---
 title: "多步骤 pipeline scripts 优先使用 Python 而不是 bash"
 date: 2026-04-09
+last_refreshed: 2026-06-20
 category: best-practices
-module: "skill scripting / ce-demo-reel"
+module: "skill scripting / historical ce-demo-reel"
 problem_type: tooling_decision
 component: tooling
 severity: medium

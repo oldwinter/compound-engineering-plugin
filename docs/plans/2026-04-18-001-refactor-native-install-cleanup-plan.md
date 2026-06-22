@@ -3,6 +3,7 @@ title: "refactor: 将 installs 重新聚焦到 native packages 和 shared skill 
 type: refactor
 status: active
 date: 2026-04-18
+superseded_by: "2026-06-19-agentless-plugin-surface-reduction"
 ---
 
 # 将 installs 重新聚焦到 native packages 和 shared skill cleanup
@@ -115,7 +116,7 @@ Custom writers 仍应自动 invoke cleanup。Native installers 无法清理 unre
 
 hand-maintained legacy list 应由 script 支撑，该 script 扫描 git history 中的 historical plugin inventories：
 
-- `plugins/compound-engineering/skills/*`
+- `skills/*`
 - `plugins/compound-engineering/agents/*`
 - `plugins/compound-engineering/commands/*`
 - historical `prompts/*` 或 converted command outputs
@@ -229,7 +230,7 @@ hand-maintained legacy list 应由 script 支撑，该 script 扫描 git history
 
 **测试场景：**
 - Existing `.claude-plugin/marketplace.json` parses，并有一个 `compound-engineering` entry whose `source` points at `plugins/compound-engineering`。
-- Existing `plugins/compound-engineering/.claude-plugin/plugin.json` parses，且对 Claude 和 Copilot 都足够 valid。
+- Existing `.claude-plugin/plugin.json` parses，且对 Claude 和 Copilot 都足够 valid。
 - Copilot docs/spec 记录 native install commands 和 `.claude-plugin` compatibility。
 - README 不再将 old direct Copilot Bun install 宣传为 primary path。
 - 如果可能，在 temporary config directory 中 local-path Copilot plugin install 成功，且不修改用户真实 Copilot home。

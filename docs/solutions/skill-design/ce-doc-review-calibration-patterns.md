@@ -15,8 +15,8 @@ tags:
   - fyi-routing
   - calibration
 applies_when:
-  - 修改 doc-review persona agents 中的 persona confidence calibration（`plugins/compound-engineering/agents/` 下扁平的 `ce-*-reviewer.md` files）
-  - 修改 `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md` 中的 synthesis pipeline
+  - 修改 doc-review persona agents 中的 persona confidence calibration（`skills/*/references/agents/` 下扁平的 `ce-*-reviewer.md` files）
+  - 修改 `skills/ce-doc-review/references/synthesis-and-presentation.md` 中的 synthesis pipeline
   - 调整 `references/subagent-template.md` 中 subagent template 的 output contract
   - 新增或修改 `tests/fixtures/ce-doc-review/` 下的 seeded test fixtures
   - 调试为什么 finding 落入不同于预期的 tier
@@ -105,8 +105,8 @@ severity translation rule（"if your persona's prose discusses 'critical/importa
 
 ## 相关文档
 
-- `plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md` — canonical synthesis pipeline spec，包含 3.5c premise-dependency chain linking
-- `plugins/compound-engineering/skills/ce-doc-review/references/subagent-template.md` — output contract，包含 schema conformance block 和 advisory routing rule
-- `plugins/compound-engineering/agents/` — 7 个 doc-review persona agents（扁平 `ce-*-reviewer.md` files：`ce-coherence-reviewer.md`、`ce-feasibility-reviewer.md`、`ce-design-lens-reviewer.md`、`ce-security-lens-reviewer.md`、`ce-scope-guardian-reviewer.md`、`ce-product-lens-reviewer.md`、`ce-adversarial-document-reviewer.md`），以及各自的 confidence calibration bands
+- `skills/ce-doc-review/references/synthesis-and-presentation.md` — canonical synthesis pipeline spec，包含 3.5c premise-dependency chain linking
+- `skills/ce-doc-review/references/subagent-template.md` — output contract，包含 schema conformance block 和 advisory routing rule
+- `skills/*/references/agents/` — 7 个 doc-review persona agents（扁平 `ce-*-reviewer.md` files：`ce-coherence-reviewer.md`、`ce-feasibility-reviewer.md`、`ce-design-lens-reviewer.md`、`ce-security-lens-reviewer.md`、`ce-scope-guardian-reviewer.md`、`ce-product-lens-reviewer.md`、`ce-adversarial-document-reviewer.md`），以及各自的 confidence calibration bands
 - `tests/fixtures/ce-doc-review/` — 用于 manual calibration testing 的三个 seeded fixtures（rename、auth、feature）；每个 fixture 的具体 seed map 见其 header comment
 - `docs/solutions/developer-experience/branch-based-plugin-install-and-testing.md` — 如何从 branch checkout 运行 skill 进行 testing

@@ -2,7 +2,7 @@
 title: "ce-work-beta promotion 需要清理 manual handoff 并迁移 contract"
 category: skill-design
 date: 2026-03-31
-module: plugins/compound-engineering/skills
+module: skills
 component: SKILL.md
 tags:
   - skill-design
@@ -44,7 +44,7 @@ beta 期间，预期行为是：
 
 当 `ce-work-beta` 准备 promote 时：
 
-1. 将 validated implementation 从 `plugins/compound-engineering/skills/ce-work-beta/SKILL.md` 复制到 `plugins/compound-engineering/skills/ce-work/SKILL.md`。
+1. 将 validated implementation 从 `skills/ce-work-beta/SKILL.md` 复制到 `skills/ce-work/SKILL.md`。
 2. 在 `ce-work` 上恢复 stable frontmatter：
    - stable `name:`（稳定版 name）
    - 不带 `[BETA]` 的 stable description

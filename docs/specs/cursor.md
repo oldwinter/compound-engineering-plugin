@@ -26,7 +26,7 @@ repo-owned marketplace files 是：
 
 ```text
 .cursor-plugin/marketplace.json
-plugins/compound-engineering/.cursor-plugin/plugin.json
+.cursor-plugin/plugin.json
 ```
 
 不要再为 Cursor 使用旧的 custom Bun converter/install path。

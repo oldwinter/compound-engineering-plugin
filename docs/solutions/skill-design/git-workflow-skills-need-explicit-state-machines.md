@@ -2,7 +2,7 @@
 title: "Git workflow skills 需要显式 state machines 来处理 branch、push 和 PR state"
 category: skill-design
 date: 2026-03-27
-module: plugins/compound-engineering/skills/ce-commit and ce-commit-push-pr
+module: skills/ce-commit and ce-commit-push-pr
 problem_type: architecture_pattern
 component: tooling
 symptoms:

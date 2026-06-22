@@ -31,7 +31,7 @@ component: plugin-development
 贡献者应：
 
 1. **避免在常规 PR 中做 release bookkeeping**
-   - 不要手动 bump `plugins/compound-engineering/.claude-plugin/plugin.json`
+   - 不要手动 bump `.claude-plugin/plugin.json`
    - 不要手动 bump `.claude-plugin/marketplace.json` 中的 `compound-engineering` 条目
    - 不要在根目录 `CHANGELOG.md` 中切 release sections
 
@@ -46,7 +46,7 @@ component: plugin-development
 ```markdown
 Before committing changes to compound-engineering plugin:
 
-- [ ] No manual version bump in `plugins/compound-engineering/.claude-plugin/plugin.json`
+- [ ] No manual version bump in root package/plugin manifests
 - [ ] No manual version bump in the `compound-engineering` entry inside `.claude-plugin/marketplace.json`
 - [ ] No manual release section added to `CHANGELOG.md`
 - [ ] README.md component counts verified
@@ -57,17 +57,17 @@ Before committing changes to compound-engineering plugin:
 
 ## 文件位置
 
-- Plugin version 由 release 拥有：`plugins/compound-engineering/.claude-plugin/plugin.json`
+- Plugin version 由 release 拥有：`.claude-plugin/plugin.json`
 - Marketplace entry 由 release 拥有：`.claude-plugin/marketplace.json`
 - Release notes 由 release 拥有：GitHub release PRs 和 GitHub Releases
-- Readme（README）：`plugins/compound-engineering/README.md`
+- Readme（README）：`README.md`
 
 ## 示例 Workflow
 
 添加新 agent 时：
 
 1. 在 `plugins/compound-engineering/agents/[category]/` 中创建 agent 文件
-2. 更新 `plugins/compound-engineering/README.md`
+2. 更新 `README.md`
 3. 将 plugin version 选择和 canonical release-note 生成留给 release automation
 4. 运行 `bun run release:validate`
 
@@ -82,8 +82,11 @@ Before committing changes to compound-engineering plugin:
 
 ## 相关文件
 
-- `plugins/compound-engineering/.claude-plugin/plugin.json`
-- `plugins/compound-engineering/README.md`
+- `.claude-plugin/plugin.json`
+- `.cursor-plugin/plugin.json`
+- `.codex-plugin/plugin.json`
+- `gemini-extension.json`
+- `README.md`
 - `package.json`
 - `CHANGELOG.md`
 - `docs/solutions/workflow/manual-release-please-github-releases.md`

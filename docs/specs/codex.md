@@ -66,11 +66,11 @@ https://developers.openai.com/codex/mcp
   - `developer_instructions`
 - Optional fields 可包括 `nickname_candidates`、`model`、`model_reasoning_effort`、`sandbox_mode`、`mcp_servers` 和 `skills.config`。
 - TOML `name` field 是 source of truth；让 filename 匹配 agent name 只是 convention。
-- CE 会把 Claude Markdown agents 转换成 Codex custom-agent TOML files，放在 `~/.codex/agents/compound-engineering/` 下。
-- CE 将 generated agents 保持在 `~/.codex/agents` 下，而不是 `~/.agents/skills`，因为 `~/.agents` 在 harnesses 之间共享，可能 shadow native plugin installs。
-- Generated TOML agent names 保留 CE 的 hyphenated naming，并包含 source category，例如 `review-ce-correctness-reviewer` 和 `research-ce-repo-research-analyst`。
-- 2026-04-19 的 empirical test 确认 Codex 会发现 `~/.codex/agents/compound-engineering/` 下的 nested custom-agent TOML files，并接受 hyphenated TOML `name` values。
-- 2026-04-19 的 empirical plugin test 发现 Codex native plugins 不会注册 bundled 在 plugin-local `agents/`、plugin-local `.codex/agents/` 或 undocumented plugin manifest `agents` field 下的 custom agents。因此，CE 的 agent-heavy workflows 仍需要 custom Bun Codex installer。
+- 对仍发布 standalone agents 的 plugins，generic converter 可以把 Claude Markdown agents 转换成 Codex custom-agent TOML files，放在 `~/.codex/agents/<plugin>/` 下。
+- Generated agents 应保持在 `~/.codex/agents` 下，而不是 `~/.agents/skills`，因为 `~/.agents` 在 harnesses 之间共享，可能 shadow native plugin installs。
+- Generated TOML agent names 保留 source naming，并可为 nested agent trees 包含 source category context。
+- 2026-04-19 的 empirical test 确认 Codex 会发现 `~/.codex/agents/<plugin>/` 下的 nested custom-agent TOML files，并接受 hyphenated TOML `name` values。
+- 2026-04-19 的 empirical plugin test 发现 Codex native plugins 不会注册 bundled 在 plugin-local `agents/`、plugin-local `.codex/agents/` 或 undocumented plugin manifest `agents` field 下的 custom agents。Compound Engineering 现在通过把 specialist behavior 作为 native skills 内的 skill-local prompt assets 发布来避开这个 gap；不再需要 CE custom-agent installer。
 
 ## MCP (Model Context Protocol，MCP 协议)
 

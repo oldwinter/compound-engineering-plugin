@@ -3,6 +3,7 @@ title: "feat: 随 Claude manifests 一起发布 Codex-format plugin manifests"
 type: feat
 status: active
 date: 2026-04-20
+superseded_by: "2026-06-19-agentless-plugin-surface-reduction"
 ---
 
 # feat: 随 Claude manifests 一起发布 Codex-format plugin manifests
@@ -69,7 +70,7 @@ Codex 是 CE installable set 中唯一仍依赖 Bun converter 才能完成 basel
 
 * `.claude-plugin/marketplace.json`, `.cursor-plugin/marketplace.json` — 现有 dual-format marketplace manifests（Cursor mirror Claude schema；Codex 会 diverge）
 
-* `plugins/compound-engineering/.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json` — 现有 dual plugin manifests（name/description/version/author/homepage/keywords 的 source of truth）
+* `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json` — 现有 dual plugin manifests（name/description/version/author/homepage/keywords 的 source of truth）
 
 * `.github/release-please-config.json` — `plugins/compound-engineering` 和 `plugins/coding-tutor` packages 已为 `.claude-plugin/plugin.json` 和 `.cursor-plugin/plugin.json` 列出 `extra-files`；Codex 会在每处添加第三个 entry
 
@@ -175,11 +176,11 @@ Docs 中的 required fields：`name`、`version`、`description`。其它都是 
 
 * **`coding-tutor` 是否获得 Codex manifest？** 是，为了与 Claude 保持 marketplace parity。Native install 会注册其 skills，但不会注册 commands；README 会说明该 gap。
 
-* **`skills:` declaration 的 file paths 是 plugin-relative 还是 marketplace-relative？** Plugin-relative。`plugins/compound-engineering/.codex-plugin/plugin.json` 中的 `"skills": "./skills/"` 表示 `plugins/compound-engineering/skills/`。已通过 vercel 和 github plugin examples 确认。
+* **`skills:` declaration 的 file paths 是 plugin-relative 还是 marketplace-relative？** Plugin-relative。`.codex-plugin/plugin.json` 中的 `"skills": "./skills/"` 表示 `skills/`。已通过 vercel 和 github plugin examples 确认。
 
 * **`source: "local"` marketplace schema 是否适用于 remote-cloned marketplaces，而不仅是 bundled ones？** 是。`openai-curated` marketplace（Codex fetch、clone 并 cache 到 `~/.codex/.tmp/plugins/.agents/plugins/marketplace.json` 的真实 remote-fetched marketplace）使用完全相同的 `source: { source: "local", path: "./plugins/<name>" }` schema。“local” 指 plugin 与 marketplace repo 位于同一 repo 中，而不是“bundled with Codex”。两者使用同一 schema。
 
-* **Codex default skill discovery 能否在 CE 的层级找到 flat `skills/<name>/SKILL.md` layouts？** 可以。Vercel reference plugin 位于 `~/.codex/.tmp/plugins/plugins/vercel/skills/`，使用与 CE ship 完全相同的 layout：flat subdirectories，每个包含 `SKILL.md`。CE 在 `plugins/compound-engineering/skills/` 下有 43 个 skill directories。Unit 7 包含 count-based assertion，用于捕获 partial-discovery regressions。
+* **Codex default skill discovery 能否在 CE 的层级找到 flat `skills/<name>/SKILL.md` layouts？** 可以。Vercel reference plugin 位于 `~/.codex/.tmp/plugins/plugins/vercel/skills/`，使用与 CE ship 完全相同的 layout：flat subdirectories，每个包含 `SKILL.md`。CE 在 `skills/` 下有 43 个 skill directories。Unit 7 包含 count-based assertion，用于捕获 partial-discovery regressions。
 
 ### 推迟到实现阶段
 
@@ -191,7 +192,7 @@ Docs 中的 required fields：`name`、`version`、`description`。其它都是 
 
 ## 实施单元
 
-* [ ] **Unit 1：编写** **`plugins/compound-engineering/.codex-plugin/plugin.json`**
+* [ ] **Unit 1：编写** **`.codex-plugin/plugin.json`**
 
 **目标：** 为 primary CE plugin 编写 Codex plugin manifest，声明 skills 并填充 interface metadata。
 
@@ -201,11 +202,11 @@ Docs 中的 required fields：`name`、`version`、`description`。其它都是 
 
 **文件：**
 
-* 创建：`plugins/compound-engineering/.codex-plugin/plugin.json`
+* 创建：`.codex-plugin/plugin.json`
 
 **方法：**
 
-* 读取 `plugins/compound-engineering/.claude-plugin/plugin.json` 中的 Claude manifest，作为 source-of-truth fields（name、version、description、author、homepage、license、keywords）。
+* 读取 `.claude-plugin/plugin.json` 中的 Claude manifest，作为 source-of-truth fields（name、version、description、author、homepage、license、keywords）。
 
 * 添加 Codex-specific fields：`skills: "./skills/"`，以及包含 `displayName`、`shortDescription`（复用 `description`）、`longDescription`（1-2 sentence pitch，可从 README lead paragraph 提取）、`developerName`（从 author 派生）、`category: "Coding"`、`capabilities: ["Interactive", "Read", "Write"]`、`websiteURL: homepage`、`privacyPolicyURL` / `termsOfServiceURL`（可用时复用 Every 现有 policy URLs；否则省略，按 docs 为 optional）、`defaultPrompt: []`（可留空或添加 2-3 个 starter prompts）的 `interface{}` block。
 
@@ -215,7 +216,7 @@ Docs 中的 required fields：`name`、`version`、`description`。其它都是 
 
 **遵循模式：**
 
-* `plugins/compound-engineering/.claude-plugin/plugin.json` — shared fields 的 source of truth
+* `.claude-plugin/plugin.json` — shared fields 的 source of truth
 
 * `~/.codex/.tmp/plugins/plugins/vercel/.codex-plugin/plugin.json`（locally cached）— `interface{}` field shape 和 `skills:` declaration 的 real-world reference
 
@@ -383,7 +384,7 @@ Docs 中的 required fields：`name`、`version`、`description`。其它都是 
 
 * **`src/release/metadata.ts`：** 扩展 `syncReleaseMetadata`，额外执行：
 
-* 读取 `plugins/compound-engineering/.codex-plugin/plugin.json` 和 `plugins/coding-tutor/.codex-plugin/plugin.json`
+* 读取 `.codex-plugin/plugin.json` 和 `plugins/coding-tutor/.codex-plugin/plugin.json`
 
 * 读取 `.agents/plugins/marketplace.json`
 
@@ -495,7 +496,7 @@ Docs 中的 required fields：`name`、`version`、`description`。其它都是 
 
   1. `codex plugin marketplace add <local-repo-path>` — 应成功，且没有 "marketplace file does not exist" error
   2. `codex plugin install compound-engineering` — 应注册 plugin，并将 skills copy 到 expected install location
-  3. Inspect `~/.codex/plugins/compound-engineering/`（或 install 实际 landed 的位置）— 确认 CE skills 存在。**Count assertion：** installed skill count 必须匹配 source — CE 在 `plugins/compound-engineering/skills/` 下 ship 43 个 skill directories；如果 post-install 数量更少，继续前先 diagnose（表示 Codex discovery 没有 walk CE 使用的 layout，尽管 Vercel reference plugin 使用相同 pattern）
+  3. Inspect `~/.codex/plugins/compound-engineering/`（或 install 实际 landed 的位置）— 确认 CE skills 存在。**Count assertion：** installed skill count 必须匹配 source — CE 在 `skills/` 下 ship 43 个 skill directories；如果 post-install 数量更少，继续前先 diagnose（表示 Codex discovery 没有 walk CE 使用的 layout，尽管 Vercel reference plugin 使用相同 pattern）
   4. Inspect `~/.agents/skills/` — 确认 skills 可通过 default trigger behavior discover
   5. 启动 Codex 并 invoke 一个 CE skill（例如 `$ce-plan`）— 应能 resolve 和 load
   6. `codex plugin uninstall compound-engineering` — 确认 clean removal
