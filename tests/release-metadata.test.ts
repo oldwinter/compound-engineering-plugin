@@ -66,8 +66,9 @@ async function makeFixtureRoot(): Promise<string> {
       2,
     ),
   )
+  await mkdir(path.join(root, ".agy"), { recursive: true })
   await writeFile(
-    path.join(root, "gemini-extension.json"),
+    path.join(root, ".agy", "plugin.json"),
     JSON.stringify({ version: "2.42.0" }, null, 2),
   )
   await writeFile(
@@ -180,31 +181,31 @@ describe("release metadata", () => {
     expect(afterContents.version).toBe("2.41.0")
   })
 
-  test("reports Gemini extension version drift without auto-correcting", async () => {
+  test("reports Antigravity bundle version drift without auto-correcting", async () => {
     const root = await makeFixtureRoot()
     await writeFile(
-      path.join(root, "gemini-extension.json"),
+      path.join(root, ".agy", "plugin.json"),
       JSON.stringify({ version: "2.41.0" }, null, 2),
     )
 
     const result = await syncReleaseMetadata({ root, write: true })
-    const geminiPath = path.join(root, "gemini-extension.json")
-    const geminiUpdate = result.updates.find((u) => u.path === geminiPath)
+    const antigravityPath = path.join(root, ".agy", "plugin.json")
+    const antigravityUpdate = result.updates.find((u) => u.path === antigravityPath)
 
-    expect(geminiUpdate).toBeDefined()
-    expect(geminiUpdate!.changed).toBe(true)
+    expect(antigravityUpdate).toBeDefined()
+    expect(antigravityUpdate!.changed).toBe(true)
 
-    const afterContents = JSON.parse(await Bun.file(geminiPath).text())
+    const afterContents = JSON.parse(await Bun.file(antigravityPath).text())
     expect(afterContents.version).toBe("2.41.0")
   })
 
-  test("reports missing Gemini extension manifest as a structural error", async () => {
+  test("reports missing Antigravity bundle manifest as a structural error", async () => {
     const root = await makeFixtureRoot()
-    await Bun.$`rm ${path.join(root, "gemini-extension.json")}`.quiet()
+    await Bun.$`rm ${path.join(root, ".agy", "plugin.json")}`.quiet()
 
     const result = await syncReleaseMetadata({ root, write: false })
 
-    expect(result.errors.some((err) => err.includes("gemini-extension.json is missing"))).toBe(true)
+    expect(result.errors.some((err) => err.includes(".agy/plugin.json is missing"))).toBe(true)
   })
 
   test("rewrites Codex plugin.json description on write when drifted from Claude", async () => {

@@ -19,7 +19,7 @@ argument-hint: "[feature、focus area 或 constraint] [output:md]"
 
 ## Interaction Method（交互方式）
 
-使用平台的 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中不存在 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中的编号选项；不要仅因为需要加载 schema 就退回。绝不要静默跳过问题。
+使用平台的 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中不存在 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中的编号选项；不要仅因为需要加载 schema 就退回。绝不要静默跳过问题。
 
 一次只问一个问题。存在 natural options 时，优先使用 concise single-select choices。
 
@@ -47,7 +47,7 @@ argument-hint: "[feature、focus area 或 constraint] [output:md]"
 
 Sub-agent dispatch 按 task shape 分层，绝不 hardcode 某个 model name：
 
-- **Extraction tier** — evidence scouts 和其他 retrieval/quoting work。使用平台 cheapest capable model（Claude Code 中为 `model: "haiku"`；Codex 中为最快的 mini-class model；Gemini 中为 flash-class）。"Capable" 是 spec 的一部分：当 repo 很大或 stack 很 obscure 时，提升到 generation tier。
+- **Extraction tier** — evidence scouts 和其他 retrieval/quoting work。使用平台 cheapest capable model（Claude Code 中为 `model: "haiku"`；Codex 中为最快的 mini-class model；Antigravity 中为 flash-class）。"Capable" 是 spec 的一部分：当 repo 很大或 stack 很 obscure 时，提升到 generation tier。
 - **Generation tier** — evidence-driven ideation frames 和 basis verification。使用平台 mid-tier model（Claude Code 中为 `model: "sonnet"`；Codex 中为 standard tier）。
 - **Ceiling tier** — ceiling ideation frames、cross-cutting synthesis 和 final arbitration。通过省略 model parameter 继承 orchestrator 的模型。
 

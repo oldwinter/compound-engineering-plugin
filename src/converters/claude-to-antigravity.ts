@@ -1,19 +1,19 @@
 import { formatFrontmatter } from "../utils/frontmatter"
 import { type ClaudeAgent, type ClaudeCommand, type ClaudeMcpServer, type ClaudePlugin, filterSkillsByPlatform } from "../types/claude"
-import type { GeminiAgent, GeminiBundle, GeminiCommand, GeminiMcpServer } from "../types/gemini"
+import type { AntigravityAgent, AntigravityBundle, AntigravityCommand, AntigravityMcpServer } from "../types/antigravity"
 import type { ClaudeToOpenCodeOptions } from "./claude-to-opencode"
 
-export type ClaudeToGeminiOptions = ClaudeToOpenCodeOptions
+export type ClaudeToAntigravityOptions = ClaudeToOpenCodeOptions
 
-const GEMINI_DESCRIPTION_MAX_LENGTH = 1024
+const ANTIGRAVITY_DESCRIPTION_MAX_LENGTH = 1024
 
-export function convertClaudeToGemini(
+export function convertClaudeToAntigravity(
   plugin: ClaudePlugin,
-  _options: ClaudeToGeminiOptions,
-): GeminiBundle {
+  _options: ClaudeToAntigravityOptions,
+): AntigravityBundle {
   const usedCommandNames = new Set<string>()
 
-  const platformSkills = filterSkillsByPlatform(plugin.skills, "gemini")
+  const platformSkills = filterSkillsByPlatform(plugin.skills, "antigravity")
   const skillDirs = platformSkills.map((skill) => ({
     name: skill.name,
     sourceDir: skill.sourceDir,
@@ -26,14 +26,27 @@ export function convertClaudeToGemini(
 
   const mcpServers = convertMcpServers(plugin.mcpServers)
 
-  if (plugin.hooks && Object.keys(plugin.hooks.hooks).length > 0) {
-    console.warn("Warning: Gemini CLI hooks use a different format (BeforeTool/AfterTool with matchers). Hooks were skipped during conversion.")
-  }
+  // agy accepts a hooks.json shaped { hooks: { ... } }. The per-event matcher /
+  // command schema and supported event names are not yet verified against agy,
+  // so pass the Claude hook map through structurally (container only) rather
+  // than reshaping it into an unverified per-event format.
+  const hooks = plugin.hooks && Object.keys(plugin.hooks.hooks).length > 0
+    ? plugin.hooks.hooks as Record<string, unknown>
+    : undefined
 
-  return { pluginName: plugin.manifest.name, generatedSkills: [], skillDirs, agents, commands, mcpServers }
+  return {
+    pluginName: plugin.manifest.name,
+    version: plugin.manifest.version,
+    generatedSkills: [],
+    skillDirs,
+    agents,
+    commands,
+    mcpServers,
+    hooks,
+  }
 }
 
-function convertAgent(agent: ClaudeAgent, usedNames: Set<string>): GeminiAgent {
+function convertAgent(agent: ClaudeAgent, usedNames: Set<string>): AntigravityAgent {
   const name = uniqueName(normalizeName(agent.name), usedNames)
   const description = sanitizeDescription(
     agent.description ?? `Use this agent for ${agent.name} tasks`,
@@ -41,7 +54,7 @@ function convertAgent(agent: ClaudeAgent, usedNames: Set<string>): GeminiAgent {
 
   const frontmatter: Record<string, unknown> = { name, description, kind: "local" }
 
-  let body = transformContentForGemini(agent.body.trim())
+  let body = transformContentForAntigravity(agent.body.trim())
   if (agent.capabilities && agent.capabilities.length > 0) {
     const capabilities = agent.capabilities.map((c) => `- ${c}`).join("\n")
     body = `## Capabilities\n${capabilities}\n\n${body}`.trim()
@@ -54,14 +67,14 @@ function convertAgent(agent: ClaudeAgent, usedNames: Set<string>): GeminiAgent {
   return { name, content }
 }
 
-function convertCommand(command: ClaudeCommand, usedNames: Set<string>): GeminiCommand {
+function convertCommand(command: ClaudeCommand, usedNames: Set<string>): AntigravityCommand {
   // Preserve namespace structure: workflows:plan -> workflows/plan
   const commandPath = resolveCommandPath(command.name)
   const pathKey = commandPath.join("/")
   uniqueName(pathKey, usedNames) // Track for dedup
 
   const description = command.description ?? `Converted from Claude command ${command.name}`
-  const transformedBody = transformContentForGemini(command.body.trim())
+  const transformedBody = transformContentForAntigravity(command.body.trim())
 
   let prompt = transformedBody
   if (command.argumentHint) {
@@ -73,32 +86,30 @@ function convertCommand(command: ClaudeCommand, usedNames: Set<string>): GeminiC
 }
 
 /**
- * Transform Claude Code content to Gemini-compatible content.
+ * Transform Claude Code content to Antigravity-compatible content.
  *
  * 1. Task agent calls: Task agent-name(args) -> Use the @agent-name subagent to: args
- * 2. Path rewriting: .claude/ -> .gemini/, ~/.claude/ -> ~/.gemini/
- * 3. Agent references: @agent-name -> @agent-name subagent
+ * 2. Agent references: @agent-name -> @agent-name subagent
+ *
+ * Note: unlike the former Gemini converter, this does NOT rewrite `.claude/`
+ * paths. The agy path conventions for such a rewrite are not yet verified, so
+ * emitting one would risk producing incorrect paths (KTD7 in the plan).
  */
-export function transformContentForGemini(body: string): string {
+export function transformContentForAntigravity(body: string): string {
   let result = body
 
   // 1. Transform Task agent calls (supports namespaced names like compound-engineering:research:agent-name)
   const taskPattern = /^(\s*-?\s*)Task\s+([a-z][a-z0-9:-]*)\(([^)]*)\)/gm
   result = result.replace(taskPattern, (_match, prefix: string, agentName: string, args: string) => {
     const finalSegment = agentName.includes(":") ? agentName.split(":").pop()! : agentName
-    const geminiAgentName = normalizeName(finalSegment)
+    const normalizedAgentName = normalizeName(finalSegment)
     const trimmedArgs = args.trim()
     return trimmedArgs
-      ? `${prefix}Use the @${geminiAgentName} subagent to: ${trimmedArgs}`
-      : `${prefix}Use the @${geminiAgentName} subagent`
+      ? `${prefix}Use the @${normalizedAgentName} subagent to: ${trimmedArgs}`
+      : `${prefix}Use the @${normalizedAgentName} subagent`
   })
 
-  // 2. Rewrite .claude/ paths to .gemini/
-  result = result
-    .replace(/~\/\.claude\//g, "~/.gemini/")
-    .replace(/\.claude\//g, ".gemini/")
-
-  // 3. Transform @agent-name references
+  // 2. Transform @agent-name references
   const agentRefPattern = /@([a-z][a-z0-9-]*-(?:agent|reviewer|researcher|analyst|specialist|oracle|sentinel|guardian|strategist))(?!\s+subagent\b)/gi
   result = result.replace(agentRefPattern, (_match, agentName: string) => {
     return `@${normalizeName(agentName)} subagent`
@@ -109,18 +120,19 @@ export function transformContentForGemini(body: string): string {
 
 function convertMcpServers(
   servers?: Record<string, ClaudeMcpServer>,
-): Record<string, GeminiMcpServer> | undefined {
+): Record<string, AntigravityMcpServer> | undefined {
   if (!servers || Object.keys(servers).length === 0) return undefined
 
-  const result: Record<string, GeminiMcpServer> = {}
+  const result: Record<string, AntigravityMcpServer> = {}
   for (const [name, server] of Object.entries(servers)) {
-    const entry: GeminiMcpServer = {}
+    const entry: AntigravityMcpServer = {}
     if (server.command) {
       entry.command = server.command
       if (server.args && server.args.length > 0) entry.args = server.args
       if (server.env && Object.keys(server.env).length > 0) entry.env = server.env
     } else if (server.url) {
-      entry.url = server.url
+      // Antigravity uses `serverUrl` for remote servers, not `url`.
+      entry.serverUrl = server.url
       if (server.headers && Object.keys(server.headers).length > 0) entry.headers = server.headers
     }
     result[name] = entry
@@ -145,7 +157,7 @@ export function toToml(description: string, prompt: string): string {
   const lines: string[] = []
   lines.push(`description = ${formatTomlString(description)}`)
 
-  // Use multi-line string for prompt
+  // Multi-line basic string avoids escaping embedded newlines in prompt text
   const escapedPrompt = prompt.replace(/\\/g, "\\\\").replace(/"""/g, '\\"\\"\\"')
   lines.push(`prompt = """`)
   lines.push(escapedPrompt)
@@ -171,7 +183,7 @@ function normalizeName(value: string): string {
   return normalized || "item"
 }
 
-function sanitizeDescription(value: string, maxLength = GEMINI_DESCRIPTION_MAX_LENGTH): string {
+function sanitizeDescription(value: string, maxLength = ANTIGRAVITY_DESCRIPTION_MAX_LENGTH): string {
   const normalized = value.replace(/\s+/g, " ").trim()
   if (normalized.length <= maxLength) return normalized
   const ellipsis = "..."

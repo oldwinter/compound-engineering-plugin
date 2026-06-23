@@ -252,19 +252,16 @@ pi install npm:pi-subagents
 pi install npm:pi-ask-user
 ```
 
-### Gemini CLI
+### Antigravity CLI (`agy`)
 
-从本仓库安装 native Gemini extension：
-
-```bash
-gemini extensions install https://github.com/EveryInc/compound-engineering-plugin
-```
-
-之后用这个命令更新：
+Google 已用 [Antigravity CLI](https://antigravity.google)（`agy`）取代 consumer Antigravity CLI；它仍运行在 Antigravity models 上。不同于 Antigravity CLI，`agy` 从**本地 checkout** 安装 plugins（不是 repository URL），所以请 clone 本仓库并安装随仓库提交的 `.agy` plugin directory：
 
 ```bash
-gemini extensions update compound-engineering
+git clone https://github.com/EveryInc/compound-engineering-plugin
+agy plugin install ./compound-engineering-plugin/.agy
 ```
+
+`agy` 也会从 checkout 加载 `GEMINI.md` workspace context。
 
 ### Existing Installs（现有安装）
 
@@ -343,15 +340,17 @@ codex plugin add compound-engineering@compound-engineering-plugin
 pi -e "$PWD"
 ```
 
-**Gemini CLI**
+**Antigravity CLI (`agy`)**
 
 ```bash
-gemini extensions install "$PWD"
+agy plugin install "$PWD/.agy"
 ```
+
+`agy` 会安装当前 checkout 中随仓库提交的 `.agy` plugin directory，并加载 `GEMINI.md` workspace context。
 
 ## Limitations（限制）
 
-OpenCode、Pi 和 Gemini 使用本仓库的 native package/plugin loading。Bun CLI 仍用于 repository development 和 converter maintenance，不用于常规安装。
+OpenCode 和 Pi 使用本仓库的 native package/plugin loading。Bun CLI 仍用于 repository development 和 converter maintenance，不用于常规安装。
 
 Release versions 由 release automation 管理。常规 feature PR 不应手工 bump plugin 或 marketplace manifest versions。
 

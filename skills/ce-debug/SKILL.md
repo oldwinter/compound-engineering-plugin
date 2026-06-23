@@ -142,7 +142,7 @@ Tracing 时：
 
 然后提供 next steps。
 
-使用平台的 blocking question tool（Claude Code 中的 `AskUserQuestion`、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`，Pi 需要 `pi-ask-user` extension）。在 Claude Code 中，如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`；pending schema load 不是 fallback 的理由。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中的编号选项。绝不要静默跳过问题。
+使用平台的 blocking question tool（Claude Code 中的 `AskUserQuestion`、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`，Pi 需要 `pi-ask-user` extension）。在 Claude Code 中，如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`；pending schema load 不是 fallback 的理由。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中的编号选项。绝不要静默跳过问题。
 
 提供的 options：
 
@@ -233,7 +233,7 @@ Tracing 时：
 
 #### Pre-existing branch（skill 没有创建它）：询问用户
 
-使用平台的 blocking question tool（Claude Code 中的 `AskUserQuestion`、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`，Pi 需要 `pi-ask-user` extension）。在 Claude Code 中，如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`；pending schema load 不是 fallback 的理由。只有当 harness 中不存在 blocking tool 或调用报错时，才退回到聊天中的编号选项。绝不要在没有收集 response 的情况下结束 phase。
+使用平台的 blocking question tool（Claude Code 中的 `AskUserQuestion`、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`，Pi 需要 `pi-ask-user` extension）。在 Claude Code 中，如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`；pending schema load 不是 fallback 的理由。只有当 harness 中不存在 blocking tool 或调用报错时，才退回到聊天中的编号选项。绝不要在没有收集 response 的情况下结束 phase。
 
 Options（选项）:
 

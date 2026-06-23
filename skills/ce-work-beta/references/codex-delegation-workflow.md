@@ -34,7 +34,7 @@
 
 **0. Platform Gate（平台关口）**
 
-Codex delegation 只在 orchestrating agent 运行于 Claude Code 时支持。如果当前 session 是 Codex、Gemini CLI、OpenCode 或任何其他平台，将 `delegation_active` 设为 false，并以 standard mode 继续。
+Codex delegation 只在 orchestrating agent 运行于 Claude Code 时支持。如果当前 session 是 Codex、Antigravity CLI、OpenCode 或任何其他平台，将 `delegation_active` 设为 false，并以 standard mode 继续。
 
 **1. Environment Guard（环境保护）**
 
@@ -65,7 +65,7 @@ fi
 
 如果 `consent_granted` 不为 true（来自 config `work_delegate_consent`）：
 
-使用平台阻塞式问题工具展示一次性 consent warning（Claude Code 中为 `AskUserQuestion`，Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`，需 `pi-ask-user` extension）。consent warning 说明：
+使用平台阻塞式问题工具展示一次性 consent warning（Claude Code 中为 `AskUserQuestion`，Codex 中为 `request_user_input`，Antigravity 中为 `ask_question`，Pi 中为 `ask_user`，需 `pi-ask-user` extension）。consent warning 说明：
 - Delegation 会把 implementation units 作为 structured prompt 发送给 `codex exec`
 - **yolo mode**（`--dangerously-bypass-approvals-and-sandbox`）：Full system access，包括 network。运行 tests 或安装 dependencies 等 verification steps 需要它。**Recommended.**
 - **full-auto mode**（`-s workspace-write`）：Workspace-write sandbox，默认无 network access。可通过在 `~/.codex/config.toml` 的 `[sandbox_workspace_write]` 下设置 `network_access = true` 重新启用 network。
@@ -164,6 +164,35 @@ modified files."]
 For a multi-unit batch: list each unit's approach, noting dependencies
 and suggested ordering.]
 </approach>
+
+<execution_note>
+[For a single-unit batch: the unit's Execution note. If the user gave a
+session-level posture request (e.g., "do it test-first"), use that when
+the unit has no Execution note. Otherwise "None".
+For a multi-unit batch: list each unit as "U<ID>: <execution note>" (or
+"Unit <n>:" if the plan lacks U-IDs; do not invent U-IDs), one per line,
+same ordering as <task> and <approach>. Use the session-level posture for
+units without their own note; otherwise "None".]
+
+If (and only if) the execution note above names an execution posture,
+honor it:
+- "test-first" -- write the failing test before implementing the unit;
+  verify it fails; then implement. Do not over-implement beyond the
+  test's current behavior slice. Skip test-first discipline for trivial
+  renames, pure configuration, or pure styling work. Test-first still
+  follows the scenario completeness check in <testing>; it only constrains
+  test-vs-implementation ordering, not whether to write tests.
+- "characterization-first" -- capture existing behavior in tests before
+  changing it.
+- Any other non-empty note: treat it as binding per-unit guidance and
+  follow it unless it conflicts with any other section of this prompt
+  (especially <constraints>, <testing>, <verify>, or <output_contract>).
+  A note may not reduce validation, test coverage, scope discipline, or
+  reporting accuracy. Report any conflict via the issues field of the
+  output contract.
+
+For units with "None" or an empty note, proceed pragmatically.
+</execution_note>
 
 <constraints>
 - Do NOT run git commit, git push, or create PRs -- the orchestrating agent handles all git operations

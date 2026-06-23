@@ -31,7 +31,7 @@ caller 决定如何向用户展示结果。non-interactive mode 将 "no sink ava
 
 ## Detection（检测）
 
-agent 从显而易见的文档中判断项目 tracker。Primary sources：repo root 和相关子目录中的 `CLAUDE.md` 与 `AGENTS.md`。Supplementary signals（当 primary documentation 模糊时）：`CONTRIBUTING.md`、`README.md`、`.github/` 下的 PR templates、repo 中可见的 tracker URLs。
+agent 从显而易见的文档中判断项目 tracker。Primary source：项目 active instructions 和 conventions 已在 context 中；无需打开或点名具体 instruction files。只有当相关 instructions 不在 context 中时才直接读文件：例如负责当前区域的 subdirectory-scoped instruction file，或 fresh subagent 没有拿到项目 instructions。Supplementary signals（当 primary documentation 模糊时）：`CONTRIBUTING.md`、`README.md`、`.github/` 下的 PR templates、repo 中可见的 tracker URLs。
 
 tracker 可以通过 MCP tool（例如 Linear MCP server）、CLI（例如 `gh`）或 direct API 暴露。都可接受。detection output 是一个带有两个 availability flags 的 tuple：一个专门针对 named tracker（驱动 Interactive mode 中的 label confidence），另一个针对完整 fallback chain（驱动是否提供 Defer）：
 
@@ -55,8 +55,8 @@ Availability probes **每个 session 最多运行一次**，且**仅在 Defer ex
 
 典型 probe sequence：
 
-1. 读取 `CLAUDE.md` / `AGENTS.md` 查找 tracker references。如果没有找到，设置 `tracker_name = null`、`confidence = low`。
-2. **当找到 named tracker 时 probe 它。** 对 GitHub Issues，运行 `gh auth status` 和 `gh repo view --json hasIssuesEnabled`。对 Linear 或其他 MCP-backed trackers，确认相关 MCP tool 已加载且响应。对 API-backed trackers，确认 environment 中有 credentials。根据 probe result 设置 `named_sink_available`。
+1. Consult 项目 context 中已有 instructions 查找 tracker references；不要打开或点名具体 instruction files。只有当相关 instructions 不在 context 中时才直接读文件（subdirectory scope，或 fresh subagent）。如果没有找到，设置 `tracker_name = null`、`confidence = low`。
+2. **当找到 named tracker 时 probe 它。** 对 GitHub Issues，运行 `gh auth status` 和 `gh repo view --json hasIssuesEnabled`。对 Linear 或其他 connector/MCP-backed trackers，先通过平台 tool-discovery primitive（例如 Claude Code 中的 `ToolSearch`）发现可用 tools，不要因为 unloaded tool 不存在就假定缺失；然后确认发现的 tool 响应。对 API-backed trackers，在平台暴露 credentials 的位置验证（environment、connector auth 或 documented secrets location），而不只看 shell env vars。根据 probe result 设置 `named_sink_available`。
 3. **Probe GitHub Issues fallback 以计算 `any_sink_available`。** 即使 named tracker 已找到并 probe，`gh` 对 `no_sink` bucket decision 仍重要，这样在没有 documented tracker 但 `gh` 可用的运行中仍会提供 Defer。
    - 如果 `named_sink_available = true`：`any_sink_available = true`（不需要进一步 probes）。
    - 否则，通过 `gh auth status` + `gh repo view --json hasIssuesEnabled` probe GitHub Issues（如果 step 2 已 probe，则跳过）。如果可用，`any_sink_available = true`。
@@ -144,6 +144,6 @@ execution 时每个 tracker 的具体行为。agent 可通过适当 interface（
 
 ## Cross-platform notes（跨平台说明）
 
-question-tool 名称因平台而异。在 Interactive mode 中，使用平台 blocking question tool（Claude Code 中的 `AskUserQuestion`、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。在 Claude Code 中，该 tool 应已由 Interactive-mode pre-load step 加载；如果没有，现在用 query `select:AskUserQuestion` 调用 `ToolSearch`。只有当 harness 真正缺少 blocking tool 时，才回退到聊天中的编号选项：`ToolSearch` 返回 no match、tool call 明确失败，或 runtime mode 未暴露它（例如没有 `request_user_input` 的 Codex edit modes）。pending schema load 不是 fallback trigger。绝不要静默跳过问题。
+question-tool 名称因平台而异。在 Interactive mode 中，使用平台 blocking question tool（Claude Code 中的 `AskUserQuestion`、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。在 Claude Code 中，该 tool 应已由 Interactive-mode pre-load step 加载；如果没有，现在用 query `select:AskUserQuestion` 调用 `ToolSearch`。只有当 harness 真正缺少 blocking tool 时，才回退到聊天中的编号选项：`ToolSearch` 返回 no match、tool call 明确失败，或 runtime mode 未暴露它（例如没有 `request_user_input` 的 Codex edit modes）。pending schema load 不是 fallback trigger。绝不要静默跳过问题。
 
 Non-interactive mode 是 platform-agnostic：它永不 prompt，所以平台 question tool 不相关。

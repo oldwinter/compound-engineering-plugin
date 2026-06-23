@@ -108,7 +108,7 @@ PR_HEAD_SHA=$(awk '/refs\/pull\/[0-9]+\/head/ {print $1; exit}' "$(git rev-parse
 |---|---|---|
 | Claude Code | `claude` | `D97757` |
 | Codex | (omit `?logo=` param) | `000000` |
-| Gemini CLI | `googlegemini` | `4285F4` |
+| Antigravity CLI (`agy`) | `googlegemini` | `4285F4` |
 
 **Model slug：** spaces 变为 underscores；如果已知，附加 context window 和 thinking level（用 parens）。**将 literal parens URL-encode 为 `%28` / `%29`**；markdown image URLs 中未编码的 parens 会破坏 release-please 的 commit parser，导致 commit 被静默从 changelog 丢弃。示例：`Opus_4.6_%281M,_Extended_Thinking%29`、`Sonnet_4.6_%28200K%29`、`Gemini_3.1_Pro`。
 

@@ -22,7 +22,7 @@ Polish 会尝试把正在运行的 dev-server URL hand off 给 IDE 的 embedded 
 
 ## Codex 和其他 platforms
 
-Codex（Claude Agent SDK、Gemini CLI 等）尚未暴露 embedded-browser handoff。对这些 platforms，polish 会降级到 terminal branch（打印 URL）。当出现约定后，在上方 detection table 中添加新行。
+Codex（Claude Agent SDK、Antigravity CLI 等）尚未暴露 embedded-browser handoff。对这些 platforms，polish 会降级到 terminal branch（打印 URL）。当出现约定后，在上方 detection table 中添加新行。
 
 ## Detection failure 永不致命
 

@@ -56,7 +56,7 @@ gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
 
 如果上方 context 中的 git status 显示 clean working tree（没有 staged、modified 或 untracked files），报告没有内容可 commit 并停止。
 
-如果上方 context 中 current branch 为空，repo 处于 detached HEAD state。解释：如果用户希望此 work attached to a branch，commit 前需要 branch。询问是否现在创建 feature branch。使用平台 blocking question tool：Claude Code 中用 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 搭配 `select:AskUserQuestion`）、Codex 中用 `request_user_input`、Gemini 中用 `ask_user`、Pi 中用 `ask_user`（需要 `pi-ask-user` extension）。只有 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到在 chat 中展示 options；不要因为需要 schema load 就 fallback。绝不要 silently skip 该问题。
+如果上方 context 中 current branch 为空，repo 处于 detached HEAD state。解释：如果用户希望此 work attached to a branch，commit 前需要 branch。询问是否现在创建 feature branch。使用平台 blocking question tool：Claude Code 中用 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 搭配 `select:AskUserQuestion`）、Codex 中用 `request_user_input`、Antigravity 中用 `ask_question`、Pi 中用 `ask_user`（需要 `pi-ask-user` extension）。只有 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到在 chat 中展示 options；不要因为需要 schema load 就 fallback。绝不要 silently skip 该问题。
 
 - 如果用户选择创建 branch，从 change content derive name，用 `git checkout -b <branch-name>` 创建，然后再次运行 `git branch --show-current`，并在 workflow 剩余部分把该结果作为 current branch name。
 - 如果用户拒绝，继续 detached HEAD commit。

@@ -77,27 +77,21 @@ confidence check 和 ce-doc-review 是互补的：
 
 ## Issue Creation（创建 Issue）
 
-当用户选择 "Create Issue" 时，检测他们的 project tracker：
+当用户选择 "Create Issue" 时：
 
-1. 读取 repo root 的 `AGENTS.md`（或为了兼容读取 `CLAUDE.md`），查找 `project_tracker: github` 或 `project_tracker: linear`。
-2. 如果 `project_tracker: github`：
+1. **Identify the project's issue tracker from the active instructions and conventions already in your context（从已经在上下文中的 active instructions 和约定识别项目 issue tracker）** — 也就是项目实际使用的 issue / project-management tool（例如 GitHub Issues、Linear、Jira）。不要为了这一步打开或点名特定 instruction files；项目 instructions 已经在你的上下文中。查找明确的 `project_tracker:` declaration（`github`、`linear` 等）或任何已记录的 tracker convention。只有当你的上下文没有携带项目 instructions（例如你是 fresh subagent）或其中没有说明时，才查补充信号：`README.md`、`CONTRIBUTING.md`、`.github/` 下的 PR templates，或可见的 tracker URLs。
 
-   ```bash
-   gh issue create --title "<type>: <title>" --body-file <plan_path>
-   ```
+2. **Create the issue through whatever interface that tracker actually exposes in this environment（通过该 tracker 在当前环境实际暴露的接口创建 issue）** — platform connector/MCP tool、documented API/GraphQL credentials，或 documented CLI。先主动 discover 可用能力：使用平台的 tool-discovery primitive（例如 Claude Code 中的 `ToolSearch`）查找 tracker connector 或 MCP tool，再假设不存在。Lazy-loaded connectors 和 shell 外保存的 credentials 不会出现在 passive check 中。Do not assume a tracker means a particular CLI, and do not treat a missing binary, env var, or unloaded MCP server as proof the tracker is unavailable — 当 access 通过 connector 或 raw API（credentials 保存在 shell 外）时，这些都是 false negatives。使用 direct API 时，绝不要打印 secret values；从磁盘读取 plan body，并按 API contract 作为 issue 的 markdown/description 发送。常见情况示例：
+   - **GitHub** — `gh issue create --title "<type>: <title>" --body-file <plan_path>`
+   - **Linear**（no guaranteed first-party CLI）— 按优先级选择：能创建 issues 的 Linear connector 或 MCP tool → documented direct API/GraphQL credentials and endpoint → documented local Linear CLI（仅当项目或用户明确说明它已安装并认证时）。
 
-3. 如果 `project_tracker: linear`：
-
-   ```bash
-   linear issue create --title "<title>" --description "$(cat <plan_path>)"
-   ```
-
-4. 如果未配置 tracker，用平台 blocking question tool 询问用户使用哪个 tracker：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有在不存在 blocking tool 或调用报错时（例如 Codex edit modes）才回退到聊天提问；不能因为需要 schema load 就回退。绝不要静默跳过。Options: `GitHub`, `Linear`, `Skip`。然后：
-   - 使用上方所选 tracker 的命令继续
-   - 提议通过向 `AGENTS.md` 添加 `project_tracker: <value>` 来持久化选择，其中 `<value>` 是小写 tracker key（`github` 或 `linear`），不是 display label，这样未来运行会匹配 step 1 的 detector 并跳过此 prompt
+3. 如果没有配置 tracker，用平台 blocking question tool 询问用户使用哪个 tracker：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先调用 `ToolSearch` 并使用 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Antigravity CLI（`agy`）中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当不存在 blocking tool 或调用报错时（例如 Codex edit modes）才回退到聊天提问；不要因为需要 schema load 就回退。绝不要静默跳过。提供三个显式选项 — `GitHub`、`Linear`、`Skip` — 并允许用户通过 tool 内置的 free-form / "Other" input 命名不同 tracker（Jira 等）：`AskUserQuestion` 总是提供 free-form，`request_user_input` / `ask_user` 也有自己的 free-form。不要额外添加显式第四个 `Other` 选项；在 tool 已经提供 free-form 时这是重复的，并且会超过只接受 2-3 个显式选项的工具上限（例如 Codex `request_user_input`）。如果 tool 没有 free-form path，通过聊天 fallback 捕获 other-tracker name。然后：
+   - 按 step 2 中所选 tracker 的 capability path 创建 issue
+   - 如果用户通过 free-form 命名了不同 tracker，且没有说明其 reachable interface，先询问接口，然后通过 step 2 的 capability path 创建 issue
+   - 提议把选择持久化为 `project_tracker: <value>` declaration，写入项目 root agent-instructions file（例如 `AGENTS.md`；如果它通过 `@` include 另一个文件，则写入 substantive one）。使用小写 tracker key（`github`、`linear`、`jira` 等），不是 display label，这样未来运行会匹配 step 1 并跳过此 prompt
    - 如果选择 `Skip`，不创建 issue，返回 options
 
-5. 如果检测到的 tracker CLI 未安装或未认证，展示清晰错误（例如 "`gh` CLI not found — install it or create the issue manually"），并返回 options。
+4. 如果 actively discovering available connector/MCP tools 并遵循 documented access method 后，检测到的 tracker 仍没有 reachable interface（没有 working connector、MCP tool、CLI 或 API path），显示清晰错误（例如 "`gh` CLI not found or not authenticated for GitHub Issues"；"Linear is documented for this project, but no connector, MCP tool, or API credentials were found"），然后返回 options。不要静默 fallback 到本地 issue-plan document，除非用户明确要求 local-only artifact。
 
 issue 创建后：
 - 显示 issue URL

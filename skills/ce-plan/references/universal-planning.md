@@ -97,7 +97,7 @@ Example（示例），针对 "plan a date night in Seattle this Saturday":
 
 ## Step 1b：Focused Q&A（聚焦问答）
 
-最多问 3 个问题，针对最会改变 plan 的 unknowns。使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当没有 blocking tool 或调用报错时（例如 Codex edit modes）才回退到聊天中的编号选项；不能因为需要 schema load 就回退。绝不要静默跳过问题。
+最多问 3 个问题，针对最会改变 plan 的 unknowns。使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当没有 blocking tool 或调用报错时（例如 Codex edit modes）才回退到聊天中的编号选项；不能因为需要 schema load 就回退。绝不要静默跳过问题。
 
 **How to ask well（如何问得好）：**
 - 提供 informed options，而不是 open-ended blanks。不要问 "When are you going?"，可问 "Mid-week visits have 30-40% shorter lines — are you flexible on timing?" 问题应给用户 frame of reference，而不只是提取信息。
@@ -146,7 +146,7 @@ Example（示例），针对 "plan a date night in Seattle this Saturday":
 
 ## Step 3：Save or Share（保存或分享）
 
-structuring plan 后，使用平台 blocking question tool 询问用户希望如何接收它：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当没有 blocking tool 或调用报错时（例如 Codex edit modes）才回退到聊天中的编号选项；不能因为需要 schema load 就回退。绝不要静默跳过问题。
+structuring plan 后，使用平台 blocking question tool 询问用户希望如何接收它：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当没有 blocking tool 或调用报错时（例如 Codex edit modes）才回退到聊天中的编号选项；不能因为需要 schema load 就回退。绝不要静默跳过问题。
 
 **Question（问题）:** "Plan ready. How would you like to receive it?"
 

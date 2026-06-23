@@ -2,7 +2,7 @@
 title: "用 GitHub Releases 手动运行 release-please，支持 multi-component plugin 与 marketplace releases"
 category: workflow
 date: 2026-03-17
-last_refreshed: 2026-06-20
+last_refreshed: 2026-06-23
 created: 2026-03-17
 severity: process
 component: release-automation

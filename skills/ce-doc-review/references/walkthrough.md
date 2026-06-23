@@ -10,7 +10,7 @@
 
 在应用 `safe_auto` fixes、synthesis 产出剩余 finding 集合之后，orchestrator 会先询问一个四选项路由问题，然后才运行任何 walk-through 或 bulk action。
 
-使用平台的阻塞式问题工具（Claude Code 中为 `AskUserQuestion`，Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`，需 `pi-ask-user` extension）。在 Claude Code 中，该工具应已通过 `SKILL.md` 的 Interactive-mode pre-load step 加载；如果没有，立即用 query `select:AskUserQuestion` 调用 `ToolSearch`。只有当 harness 确实没有阻塞式工具时，才退回到编号列表展示选项：例如 `ToolSearch` 没有返回匹配、工具调用明确失败，或 runtime mode 不暴露该工具（例如没有 `request_user_input` 的 Codex edit modes）。等待 schema 加载不是 fallback 触发条件。绝不能静默跳过问题。把 routing question 渲染成叙述文本且没有 numbered-list fallback 是 bug。
+使用平台的阻塞式问题工具（Claude Code 中为 `AskUserQuestion`，Codex 中为 `request_user_input`，Antigravity 中为 `ask_question`，Pi 中为 `ask_user`，需 `pi-ask-user` extension）。在 Claude Code 中，该工具应已通过 `SKILL.md` 的 Interactive-mode pre-load step 加载；如果没有，立即用 query `select:AskUserQuestion` 调用 `ToolSearch`。只有当 harness 确实没有阻塞式工具时，才退回到编号列表展示选项：例如 `ToolSearch` 没有返回匹配、工具调用明确失败，或 runtime mode 不暴露该工具（例如没有 `request_user_input` 的 Codex edit modes）。等待 schema 加载不是 fallback 触发条件。绝不能静默跳过问题。把 routing question 渲染成叙述文本且没有 numbered-list fallback 是 bug。
 
 **Stem:** `Agent 应该如何处理剩余 N 条 findings？`
 

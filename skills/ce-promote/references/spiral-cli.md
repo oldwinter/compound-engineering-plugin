@@ -33,7 +33,7 @@ cat "$(git rev-parse --show-toplevel 2>/dev/null)/.compound-engineering/config.l
 
 ### Ask（询问）
 
-使用平台 blocking-question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Gemini / Pi 中的 `ask_user`。如果没有 blocking tool 或调用报错，在聊天中以编号列表呈现相同选项并等待回复；绝不要静默跳过。
+使用平台 blocking-question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Antigravity / Pi 中的 `ask_user`。如果没有 blocking tool 或调用报错，在聊天中以编号列表呈现相同选项并等待回复；绝不要静默跳过。
 
 对于 **unauthed** 状态，**agent 自己**运行 `spiral login --json`（CLI >= 1.8.0）：它是 non-blocking，且 API key 永远不会经过 agent；agent 分享返回的 `auth_url`，用户在浏览器中 approve，credential 由 server->CLI 交付。blocking question 主要是 escape hatch。
 

@@ -78,7 +78,7 @@ Ideation artifact 会 **automatically** 自动产出：persistence is **not opt-
 
 ## Phase 5：Next Steps（下一步）
 
-使用平台 blocking question tool 询问下一步：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错时（例如 Codex edit modes），才退回聊天中的 numbered options；不要因为需要 schema load 就退回。绝不要静默跳过问题。接受 free-text answers。
+使用平台 blocking question tool 询问下一步：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错时（例如 Codex edit modes），才退回聊天中的 numbered options；不要因为需要 schema load 就退回。绝不要静默跳过问题。接受 free-text answers。
 
 Deliverable 已经存在（Phase 4），所以 menu 只决定 **what next**：没有 "save" step。
 

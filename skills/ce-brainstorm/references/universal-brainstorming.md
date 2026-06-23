@@ -53,7 +53,7 @@
 
 **始终在 chat 中 synthesize summary。** 在提供任何 next steps 前，回顾浮现出的内容：key decisions、chosen direction、open threads，以及任何 assumptions。这是 brainstorm 的 primary output；用户应能阅读 summary 并知道自己落在了哪里。
 
-**然后提供 next steps**，使用 platform 的 blocking question tool：Claude Code 中为 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`），Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或 call errors（例如 Codex edit modes）时，才 fallback 到 chat 中的 numbered options；不要因为需要 schema load 就 fallback。永远不要 silently skip question。
+**然后提供 next steps**，使用 platform 的 blocking question tool：Claude Code 中为 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`），Codex 中为 `request_user_input`，Antigravity 中为 `ask_question`，Pi 中为 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或 call errors（例如 Codex edit modes）时，才 fallback 到 chat 中的 numbered options；不要因为需要 schema load 就 fallback。永远不要 silently skip question。
 
 **Question（问题）:** "Brainstorm wrapped. What would you like to do next?"
 

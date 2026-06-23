@@ -8,7 +8,7 @@
 
 Phase 4 菜单的可见选项数量会随状态变化：没有 requirements doc 时隐藏 review 和 Proof 选项，`OUTPUT_FORMAT=html` 也隐藏 review 选项（ce-doc-review 今天是 markdown-only），未解决的 `Resolve Before Planning` 会隐藏 `Plan implementation` 和 `Build it now`，direct-to-work gate 失败会隐藏 `Build it now`。统计当前状态下的可见选项，并据此选择渲染模式：
 
-- **4 个或更少可见选项：** 使用平台 blocking question tool（Claude Code 中的 `AskUserQuestion`；若 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用；Codex 中的 `request_user_input`；Gemini 中的 `ask_user`；Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。这是默认路径。
+- **4 个或更少可见选项：** 使用平台 blocking question tool（Claude Code 中的 `AskUserQuestion`；若 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用；Codex 中的 `request_user_input`；Antigravity 中的 `ask_question`；Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。这是默认路径。
 - **5 个或更多可见选项：** 在聊天中渲染为编号列表。这是窄的 option-overflow fallback；删减选项会隐藏合法选择（plan、review、Proof、build、refine、pause 都是不同 destination）。加入接受自由文本输入的提示（"Pick a number or describe what you want."），让编号列表保留 blocking tool 的 open-endedness。
 
 绝不要静默跳过问题。

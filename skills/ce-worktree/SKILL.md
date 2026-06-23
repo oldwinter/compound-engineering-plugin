@@ -44,7 +44,7 @@ git rev-parse --show-superproject-working-tree
 5. 当 remote base 可用时从 remote base 创建 worktree，否则从 local ref 创建：`git worktree add -b <branch-name> .worktrees/<branch-name> origin/<from-branch>`。如果 `origin/<from-branch>` 不存在，改用 local `<from-branch>` ref。
 6. 切进去：`cd .worktrees/<branch-name>`。
 
-如果 `git worktree add` 因 sandbox 或 permission error 失败，说明无法创建请求的 isolation。在触碰 current checkout 前需要一个 **blocking** 用户决策；不要静默继续在那里工作（用户选择 isolation 正是为了避免这一点，尤其是 `ce-work` / `ce-code-review` 因 worktree option 路由到这里时）。报告 failure，并通过平台 blocking question tool 询问：Claude Code 中用 `AskUserQuestion`（schema 未加载时先用 `ToolSearch` 且 `select:AskUserQuestion`）、Codex 中用 `request_user_input`、Gemini 中用 `ask_user`、Pi 中通过 `pi-ask-user` extension 用 `ask_user`。选项可包括 "work in the current checkout" 和 "stop and resolve the permission issue"。如果 harness 没有 blocking tool 或调用失败，在 chat 中展示 numbered options 并等待回复；绝不要跳过确认。只有用户明确确认时，才在 current checkout 中工作；不要自动尝试替代路径。
+如果 `git worktree add` 因 sandbox 或 permission error 失败，说明无法创建请求的 isolation。在触碰 current checkout 前需要一个 **blocking** 用户决策；不要静默继续在那里工作（用户选择 isolation 正是为了避免这一点，尤其是 `ce-work` / `ce-code-review` 因 worktree option 路由到这里时）。报告 failure，并通过平台 blocking question tool 询问：Claude Code 中用 `AskUserQuestion`（schema 未加载时先用 `ToolSearch` 且 `select:AskUserQuestion`）、Codex 中用 `request_user_input`、Antigravity 中用 `ask_question`、Pi 中通过 `pi-ask-user` extension 用 `ask_user`。选项可包括 "work in the current checkout" 和 "stop and resolve the permission issue"。如果 harness 没有 blocking tool 或调用失败，在 chat 中展示 numbered options 并等待回复；绝不要跳过确认。只有用户明确确认时，才在 current checkout 中工作；不要自动尝试替代路径。
 
 ## Other worktree operations（其他 worktree 操作）
 

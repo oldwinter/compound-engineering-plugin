@@ -80,7 +80,7 @@ Skipping (2):
 
 ## Question and options（问题与选项）
 
-Preview body render 后，使用 platform 的 blocking question tool 询问用户（Claude Code 中 `AskUserQuestion`，Codex 中 `request_user_input`，Gemini 中 `ask_user`，Pi 中 `ask_user`（需要 `pi-ask-user` extension））。在 Claude Code 中，该 tool 应已由 Interactive-mode pre-load step 加载；如果没有，现在用 query `select:AskUserQuestion` 调用 `ToolSearch`。下方 text fallback 仅在 harness 真正缺少 blocking tool 时适用：`ToolSearch` 没有 match、tool call 明确失败，或 runtime mode 不暴露它（例如没有 `request_user_input` 的 Codex edit modes）。Pending schema load 不是 fallback trigger。永远不要 silently skip question。
+Preview body render 后，使用 platform 的 blocking question tool 询问用户（Claude Code 中 `AskUserQuestion`，Codex 中 `request_user_input`，Antigravity 中 `ask_user`，Pi 中 `ask_user`（需要 `pi-ask-user` extension））。在 Claude Code 中，该 tool 应已由 Interactive-mode pre-load step 加载；如果没有，现在用 query `select:AskUserQuestion` 调用 `ToolSearch`。下方 text fallback 仅在 harness 真正缺少 blocking tool 时适用：`ToolSearch` 没有 match、tool call 明确失败，或 runtime mode 不暴露它（例如没有 `request_user_input` 的 Codex edit modes）。Pending schema load 不是 fallback trigger。永远不要 silently skip question。
 
 Stem（按 path 调整）：
 

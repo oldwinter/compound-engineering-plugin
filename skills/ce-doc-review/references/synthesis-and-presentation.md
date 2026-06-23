@@ -365,7 +365,7 @@ synthesis 期间，丢弃任何建议删除或移除以下路径中文件的 fin
 
 **Headless mode（无头模式）：** 立即返回 “Review complete”。不要提问。caller 接收 Phase 4 的 text envelope 并处理任何 remaining findings。
 
-**Interactive mode（交互模式）：** 使用平台阻塞式问题工具触发 terminal question（Claude Code 中为 `AskUserQuestion`，Codex 中为 `request_user_input`，Gemini 中为 `ask_user`，Pi 中为 `ask_user`，需 `pi-ask-user` extension）。在 Claude Code 中，该工具应已通过 `SKILL.md` 的 Interactive-mode pre-load step 加载；如果没有，立即用 `select:AskUserQuestion` 调用 `ToolSearch`。只有当 harness 没有阻塞式工具或工具调用报错时（例如 Codex edit modes），才退回到 chat 中的 numbered options；等待 schema 加载不是 fallback 条件。绝不要静默跳过问题。这个问题不同于 mid-flow routing question（`references/walkthrough.md`）：routing question 选择 *如何* 处理 findings，terminal question 选择 engagement 完成后 *下一步做什么*。不要合并它们。
+**Interactive mode（交互模式）：** 使用平台阻塞式问题工具触发 terminal question（Claude Code 中为 `AskUserQuestion`，Codex 中为 `request_user_input`，Antigravity 中为 `ask_question`，Pi 中为 `ask_user`，需 `pi-ask-user` extension）。在 Claude Code 中，该工具应已通过 `SKILL.md` 的 Interactive-mode pre-load step 加载；如果没有，立即用 `select:AskUserQuestion` 调用 `ToolSearch`。只有当 harness 没有阻塞式工具或工具调用报错时（例如 Codex edit modes），才退回到 chat 中的 numbered options；等待 schema 加载不是 fallback 条件。绝不要静默跳过问题。这个问题不同于 mid-flow routing question（`references/walkthrough.md`）：routing question 选择 *如何* 处理 findings，terminal question 选择 engagement 完成后 *下一步做什么*。不要合并它们。
 
 **Stem（问题主干）：** `Apply decisions and what next?`
 

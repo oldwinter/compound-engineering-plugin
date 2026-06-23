@@ -5,7 +5,7 @@ description: Commit、push 并 open PR，生成 adaptive、value-first descripti
 
 # Git Commit、Push 和 PR
 
-**Asking the user（询问用户）：** 当此 skill 说 "ask the user" 时，使用平台 blocking question tool：Claude Code 中用 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 搭配 `select:AskUserQuestion`）、Codex 中用 `request_user_input`、Gemini 中用 `ask_user`、Pi 中用 `ask_user`（需要 `pi-ask-user` extension）。只有 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到在 chat 中展示 question；不要因为需要 schema load 就 fallback。绝不要 silently skip 该问题。
+**Asking the user（询问用户）：** 当此 skill 说 "ask the user" 时，使用平台 blocking question tool：Claude Code 中用 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 搭配 `select:AskUserQuestion`）、Codex 中用 `request_user_input`、Antigravity 中用 `ask_question`、Pi 中用 `ask_user`（需要 `pi-ask-user` extension）。只有 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到在 chat 中展示 question；不要因为需要 schema load 就 fallback。绝不要 silently skip 该问题。
 
 ## Mode（模式）
 

@@ -10,7 +10,7 @@ argument-hint: "[optimization spec YAML 路径，或描述 optimization goal]"
 
 ## Interaction Method（交互方式）
 
-使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
+使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
 
 ## Input（输入）
 

@@ -91,6 +91,24 @@ cat .claude-plugin/plugin.json | jq .
 
 `AGENTS.md`、`CLAUDE.md` 和 `GEMINI.md` 是本 source repository 的 authoring context。Skills 会被安装到 end-user environments，并在用户本地 instruction files 下运行，而不是在本 repo 的 instructions 下运行。必须在 skill runtime 生效的 behavioral rules，应放在该 skill 的 `SKILL.md` 或其自身 `references/` directory 下的文件中。
 
+
+## Referencing Project Conventions in Skills（在 Skills 中引用项目约定）
+
+当某个 skill 需要在运行时发现项目约定（issue tracker、coding standards、commit format、lint command、scope constraints 等）时，描述 **agent 已有 context 中应该寻找什么**，而不是 **要打开哪个文件**。
+
+**在 read path 上，不要点名 instruction files（`AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.cursor/rules`）。** 应表述为“项目 active instructions 和 conventions 已在你的 context 中”。原因有三点：
+
+- **Redundant。** 主流 harness 会在 session start 时自动注入项目 root instruction file（Claude Code 加载 `CLAUDE.md`，Codex 加载 `AGENTS.md`，Antigravity 加载 `GEMINI.md`）。让 agent “read `AGENTS.md`” 等于要求它重新打开已在 context 中的内容。
+- **Brittle / not portable。** 文件名因 harness 而异，而本 plugin 一次 author 后会转换到所有平台。硬编码“read `AGENTS.md`（或 `CLAUDE.md`）”会在使用不同名称的 harness 上静默失效。
+- **Security smell。** 指示 agent 去“read named instruction dotfiles”正是某些 agent framework（例如 Hermes）的 prompt-injection 防御会标记的形状。引用 context 而不是文件名可以避免触发这些 guard。
+
+**只有当 skill 必须做 context reference 无法表达的事情时，才点名具体文件：**
+
+- **写回 convention**（例如持久化 `project_tracker: linear`）需要目标；用最小化示例命名（“项目 root agent-instructions file，例如 `AGENTS.md`；如果它通过 `@` include 另一个文件，则写入 substantive one”）。
+- **读取确实没有自动加载的内容**：负责当前区域的 subdirectory-scoped instruction file、可选项目文档如 `STRATEGY.md` / `CONCEPTS.md` / `README.md`，或 fresh subagent（没有继承 parent loaded instructions）必须打开的文件。必须枚举所有 standards files 的 audit tools（例如 `ce-code-review` 的 project-standards reviewer glob 所有 `CLAUDE.md`/`AGENTS.md`）是合理例外；它们是在 review 这些文件，而不是重新读取它们作为 context。
+
+**描述 capability，而不是 tool。** 同时用类别而不是封闭集合来命名：“项目 issue tracker（例如 GitHub Issues、Linear、Jira）”和“tracker 暴露的任意 interface（connector/MCP、documented API 或 documented CLI）”；永远不要假定某个具体 CLI 存在，也不要把 missing binary / env var / MCP server 当成 capability 不可用的证明。
+
 ## Validating Agent and Skill Changes（验证 Agent 和 Skill 变更）
 
 由于 Claude Code 加载 plugins 的方式，对 plugin skill 或 skill-local persona 的 behavioral changes（`skills/` 下任何内容）需要不同于 mechanical code changes 的 validation path。
@@ -178,7 +196,7 @@ Broken patterns（错误模式）：
 
 ## Platform-Specific Variables in Skills（Skills 中的特定平台变量）
 
-这个 plugin 会 author 一次，然后转换到多个 agent platforms（Claude Code、Codex、Gemini CLI 等）。不要在 skill content 中使用 platform-specific environment variables 或 string substitutions（例如 `${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_SKILL_DIR}`、`${CLAUDE_SESSION_ID}`、`CODEX_SANDBOX`、`CODEX_SESSION_ID`），除非提供在变量 unavailable 或 unresolved 时仍能工作的 graceful fallback。
+这个 plugin 会 author 一次，然后转换到多个 agent platforms（Claude Code、Codex、Antigravity CLI 等）。不要在 skill content 中使用 platform-specific environment variables 或 string substitutions（例如 `${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_SKILL_DIR}`、`${CLAUDE_SESSION_ID}`、`CODEX_SANDBOX`、`CODEX_SESSION_ID`），除非提供在变量 unavailable 或 unresolved 时仍能工作的 graceful fallback。
 
 Relative path 是否按 skill directory resolve，取决于由谁来 resolve，因此下面两种情况必须分开处理。不要假设裸 `scripts/...` path 在两种情况下都可用。
 
@@ -198,7 +216,7 @@ fi
 
 `${CLAUDE_SKILL_DIR}` 由 Claude Code 替换进 SKILL.md content，覆盖 marketplace-cached installs 和 `claude --plugin-dir` local dev；它 resolve 到 skill 自身 directory，因此 `then` branch 会在那里运行。注意 `${CLAUDE_SKILL_DIR}` 是 SKILL.md *content* substitution，不是 executed process 内可用的 environment variable；脚本如果需要自己的 directory，应从 `BASH_SOURCE` derive，而不是读取 `$CLAUDE_SKILL_DIR`（见 `ce-update/scripts/`）。`ce-compound` 的 `validate-frontmatter.py` invocation 是这个 guard pattern 的 canonical example。
 
-**为什么用 guard，而不是旧的 `${CLAUDE_SKILL_DIR:-.}` shell default（issue #943）。** 在其他 targets（Codex、Gemini CLI 等）上，`${CLAUDE_SKILL_DIR}` 是 unset。早先的 `:-.` 形式会降级为 project-CWD-relative `./scripts/...`，语法上有效，但 resolve 到不存在的 path：bundled script 位于该 runtime 自己的 skill store（例如 `~/.codex/skills/<plugin>/<skill>/scripts/...`），因此调用会静默 miss。Existence guard 会把这种情况显式化：`then` branch 永不触发，`else` branch 告诉 agent 应该怎么做，而不是运行 broken path 或声称成功。两个事实说明这是真实 product gap，而不是 converter bug：
+**为什么用 guard，而不是旧的 `${CLAUDE_SKILL_DIR:-.}` shell default（issue #943）。** 在其他 targets（Codex、Antigravity CLI 等）上，`${CLAUDE_SKILL_DIR}` 是 unset。早先的 `:-.` 形式会降级为 project-CWD-relative `./scripts/...`，语法上有效，但 resolve 到不存在的 path：bundled script 位于该 runtime 自己的 skill store（例如 `~/.codex/skills/<plugin>/<skill>/scripts/...`），因此调用会静默 miss。Existence guard 会把这种情况显式化：`then` branch 永不触发，`else` branch 告诉 agent 应该怎么做，而不是运行 broken path 或声称成功。两个事实说明这是真实 product gap，而不是 converter bug：
 
 - Converter 不会 rewrite 这些 paths（`src/utils/codex-content.ts` 没有 `CLAUDE_SKILL_DIR` case），而且默认 `--to codex` mode 根本不会由 converter emit skills。
 - **这个 plugin 也会作为 *native* Codex plugin 发布**（通过 Codex 的 `/plugins` TUI marketplace 安装）。这条路径不会运行 converter；Codex 会原样加载 raw `SKILL.md`。`ce_platforms` frontmatter 只被 converter 的 `filterSkillsByPlatform` 尊重，因此它**不会**把 Claude-only skill 排除在 native Codex install 之外。两条 install paths 都尊重的唯一保护是 SKILL.md content 本身。
@@ -217,7 +235,7 @@ Otherwise (empty, a literal command string, or an error), use the versionless fa
 Do not attempt to resolve the version at runtime.
 ```
 
-这同样适用于任何 platform 的 variables：从 Codex、Gemini 或其他 platform 转换来的 skill，如果假设 platform-only variables 存在且没有 fallback，也会遇到同样问题。
+这同样适用于任何 platform 的 variables：从 Codex、Antigravity 或其他 platform 转换来的 skill，如果假设 platform-only variables 存在且没有 fallback，也会遇到同样问题。
 
 ## Repository Docs Convention（仓库文档约定）
 

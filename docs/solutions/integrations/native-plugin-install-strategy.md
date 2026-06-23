@@ -1,6 +1,7 @@
 ---
 title: "受支持 harnesses 的 native plugin 安装策略"
 date: 2026-06-19
+last_updated: 2026-06-23
 category: integrations
 module: installer
 problem_type: integration_decision
@@ -45,7 +46,7 @@ Compound Engineering 现在把 plugin 视为 self-contained skills package。Spe
 | Qwen Code | 从 CE GitHub repository 和现有 Claude plugin metadata 进行 native extension install | 否 | Qwen 会自动转换 Claude Code extensions。 |
 | OpenCode | `opencode.json` 中的 git-backed OpenCode plugin entry | 否 | `.opencode/plugins/compound-engineering.js` 会直接注册 CE skills directory。 |
 | Pi | 从本仓库进行 git-backed Pi package install | 否 | 根 `package.json` 暴露 `.pi/extensions/compound-engineering.ts` 和 CE skills directory。`pi-ask-user` 是 richer prompts 的推荐 companion。 |
-| Gemini CLI | 从本仓库 root 安装 native Gemini extension | 否 | 根 `gemini-extension.json` 让 Gemini 可以把本仓库安装为单一 extension。 |
+| Antigravity CLI | 从已提交的 `.agy/` bundle 安装 native Antigravity plugin | No | Clone repo，然后执行 `agy plugin install ./compound-engineering-plugin/.agy`。`.agy/` bundle 包含 `plugin.json` 以及 `skills -> ../skills` symlink。`agy` 仍会读取 `GEMINI.md` 作为 workspace context。 |
 
 Kiro 不再是 documented CE install target。Historical converter 和 cleanup code 可以为 regression coverage 或旧 artifact handling 保留，但 user-facing install docs 不应继续宣传 Kiro。
 
@@ -105,15 +106,16 @@ pi install npm:pi-ask-user
 pi -e /path/to/compound-engineering-plugin
 ```
 
-## Gemini CLI
+## Antigravity CLI
 
-因为 `gemini-extension.json` 现在位于 repository root，Gemini 可以直接安装 root extension：
+Antigravity 从**本地目录**安装 plugins，不能从 URL 直接安装。已提交的 `.agy/` bundle 包含 `plugin.json` 以及 `skills -> ../skills` symlink，让 `agy` 通过 symlink 解析所有 skills，而无需复制它们：
 
 ```bash
-gemini extensions install https://github.com/EveryInc/compound-engineering-plugin
+git clone https://github.com/EveryInc/compound-engineering-plugin
+agy plugin install ./compound-engineering-plugin/.agy
 ```
 
-本地开发时，指向 checkout root，让 extension 可以同时看到 `gemini-extension.json`、`GEMINI.md` 和 `skills/`。
+`agy` 仍会读取 `GEMINI.md` 作为 workspace context（即使 Gemini CLI converter target 已移除，仍保留该文件）。本地开发时，让 `agy` 指向 checkout 下的 `.agy/` 子目录，以便它同时找到 `plugin.json`、`skills` symlink 和 `GEMINI.md`。
 
 ## Bun Package Posture（Bun 包定位）
 

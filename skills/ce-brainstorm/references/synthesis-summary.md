@@ -231,7 +231,7 @@ Doc-write 只在 explicit confirm 后，或 soft-cut blocking question 的 "proc
 
 **跨 rounds 的 identity 按 decision dimension 判断，不按 surface wording 或 section。** revision 可能导致 stage 2 re-derive；同一个 underlying decision 可能以改写、与另一个 bullet 合并、或移到不同 section 的形式回来（例如 round one 中的 Trade-off 在用户 push back 后，round two 变成 Call-out）。"Same item" 指同一个 underlying decision，不管当前位于哪个 section。当 re-cut 将多个 prior bullets collapse 成一个时，新的 combined bullet 会继承其中任一 constituent 的 "touched" 状态；如果任何 underlying decision 已经 revised 过一次，soft-cut 就会触发。
 
-soft-cut 触发时，使用平台的 blocking question tool（Claude Code 中是 `AskUserQuestion`，Codex 中是 `request_user_input`，Gemini 中是 `ask_user`，Pi 中是 `ask_user`），并提供两个 options：
+soft-cut 触发时，使用平台的 blocking question tool（Claude Code 中是 `AskUserQuestion`，Codex 中是 `request_user_input`，Antigravity 中是 `ask_user`，Pi 中是 `ask_user`），并提供两个 options：
 
 - `Proceed and write the requirements doc`
 - `Hold off — keep discussing before the doc`

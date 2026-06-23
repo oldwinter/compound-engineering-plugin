@@ -4,6 +4,7 @@ category: workflow
 tags: [versioning, changelog, readme, plugin, documentation]
 created: 2025-11-24
 date: 2026-03-17
+last_updated: 2026-06-23
 severity: process
 component: plugin-development
 ---
@@ -85,7 +86,7 @@ Before committing changes to compound-engineering plugin:
 - `.claude-plugin/plugin.json`
 - `.cursor-plugin/plugin.json`
 - `.codex-plugin/plugin.json`
-- `gemini-extension.json`
+- `.agy/plugin.json`
 - `README.md`
 - `package.json`
 - `CHANGELOG.md`

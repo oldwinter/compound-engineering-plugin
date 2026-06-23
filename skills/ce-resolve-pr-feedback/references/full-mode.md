@@ -49,7 +49,7 @@ processing 前，将每条 feedback 分类为 **new** 或 **already handled**。
 
 区别基于 content，而不是谁发布了什么。来自 teammate、previous skill run 或 manual reply 的 deferral 都算。同样，actionability 基于 content：请求具体 code change 的 bot feedback 是 actionable；包裹这些请求的 bot boilerplate header 不是。
 
-**Silent drop.** Non-actionable items 直接 drop，不叙述。不要在 conversation、task list 或 step 9 summary 中 announce、list 或 count dropped items。CodeRabbit、Codex、Gemini Code Assist 和 Copilot 的 review-bot wrappers（如 "Here are some automated review suggestions..." 这类 bodies）常出现在这里；按 boilerplate content 识别并静默 drop。只有 CI/status bot summaries（Codecov）在 script level 预过滤；其他全部依赖这个 content-aware check，避免 bot format changes 静默隐藏 actionable findings。
+**Silent drop.** Non-actionable items 直接 drop，不叙述。不要在 conversation、task list 或 step 9 summary 中 announce、list 或 count dropped items。CodeRabbit、Codex、Antigravity Code Assist 和 Copilot 的 review-bot wrappers（如 "Here are some automated review suggestions..." 这类 bodies）常出现在这里；按 boilerplate content 识别并静默 drop。只有 CI/status bot summaries（Codecov）在 script level 预过滤；其他全部依赖这个 content-aware check，避免 bot format changes 静默隐藏 actionable findings。
 
 如果所有 feedback types 都没有 new items，跳过 steps 3-8，直接进入 step 9。
 
@@ -287,6 +287,6 @@ Still pending from a previous run (count):
 
 如果 blocking question tool 可用，用它一次性询问所有 pending decisions（新的 `needs-human` 和 previous-run pending）。如果只有 pending decisions 且没有 new work，summary 就只包含 pending items。
 
-使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。用它呈现 decisions 并等待用户回应。用户决定后，处理 remaining items：fix code、compose reply、post it，并 resolve thread。
+使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。用它呈现 decisions 并等待用户回应。用户决定后，处理 remaining items：fix code、compose reply、post it，并 resolve thread。
 
 只有当 harness 中没有 blocking tool 或调用报错时（例如 Codex edit modes），才回退到在 summary output 中呈现 decisions 并在 conversation 中等待；不能因为需要 schema load 就回退。绝不要静默跳过。如果用户未回应，items 会留在 PR 上 open，之后处理。

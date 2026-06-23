@@ -12,7 +12,7 @@
    # Run full test suite (use project's test command)
    # Examples: bin/rails test, npm test, pytest, go test, etc.
 
-   # Run linting (per AGENTS.md)
+   # Run linting (per the project's configured lint command / active instructions)
    # Use linting-agent before pushing to origin
    ```
 
@@ -51,7 +51,7 @@
 
    Tier 2 code review 和 review-findings followup 之后，检查 **Actionable Findings** summary（如果 summary 被截断，则读取 `/tmp/compound-engineering/ce-code-review/<run-id>/` 中的 run artifact）。如果一个或多个 actionable `downstream-resolver` findings 未在 followup 中应用，do not proceed to Final Validation，直到用户决定如何处理。
 
-   使用平台 blocking question tool 询问用户（Claude Code 中的 `AskUserQuestion`，必要时预加载 `ToolSearch select:AskUserQuestion`；Codex 中的 `request_user_input`；Gemini 中的 `ask_user`；Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。只有当 harness 真正缺少 blocking tool 时，才回退到聊天中的编号选项。绝不要静默跳过该 gate。
+   使用平台 blocking question tool 询问用户（Claude Code 中的 `AskUserQuestion`，必要时预加载 `ToolSearch select:AskUserQuestion`；Codex 中的 `request_user_input`；Antigravity 中的 `ask_question`；Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。只有当 harness 真正缺少 blocking tool 时，才回退到聊天中的编号选项。绝不要静默跳过该 gate。
 
    Stem: `Code review 留下 N 个尚未修复的 actionable finding(s)。agent 应如何继续？`
 

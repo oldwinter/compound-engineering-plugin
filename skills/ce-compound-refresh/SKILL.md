@@ -28,7 +28,7 @@ argument-hint: "[optional: scope hint — directory, filename, module, 或 keywo
 
 ## CONCEPTS.md Bootstrap Requests（引导请求）
 
-如果 invocation 明确是创建或 bootstrap `CONCEPTS.md`（例如 "create a CONCEPTS.md"、"build the concept map"、"set up shared vocabulary"），intent 在两个 jobs 之间 ambiguous：building vocabulary file 与 running docs/solutions refresh。因此继续前先 disambiguate。使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。两个 options：
+如果 invocation 明确是创建或 bootstrap `CONCEPTS.md`（例如 "create a CONCEPTS.md"、"build the concept map"、"set up shared vocabulary"），intent 在两个 jobs 之间 ambiguous：building vocabulary file 与 running docs/solutions refresh。因此继续前先 disambiguate。使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。两个 options：
 
 1. **Create CONCEPTS.md（build the concept map）**：seed repo-wide concept map 并 commit；仅跳过 docs/solutions classification phases（Phases 0–4）。读取 `references/concepts-vocabulary.md` 并遵循其 **Seed goal** 和 **Scope of a seed**（repo-wide）rules：从 declared domain model（schema、core types、primary models、top-level domain docs）seed 项目的 core domain nouns，每个都满足 qualifying bar，数量由 codebase 决定。写入 preamble（见 Phase 4.5），按 organization rules cluster，并运行 Discoverability Check，让 `AGENTS.md`/`CLAUDE.md` surface 新 file。然后 **进入 Phase 5（Commit Changes）**，通过 refresh 使用的同一 durable-write flow commit/PR 新 `CONCEPTS.md` 和任何 instruction-file edit：不要让 bootstrap 保持 uncommitted。
 2. **Run a refresh cycle**：继续下方 normal refresh flow；`CONCEPTS.md` 作为 Phase 4.5 的一部分被 seeded（若缺失）并 reconciled。
@@ -41,7 +41,7 @@ Headless mode 中没有 user 可问：default 到 refresh cycle（无论如何 v
 
 遵循与 `ce-brainstorm` 相同的 interaction style：
 
-- **一次只问一个问题**：使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 plain text 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题
+- **一次只问一个问题**：使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 plain text 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题
 - 当存在 natural options 时，优先 **multiple choice**
 - 从 **scope and intent** 开始，然后仅在需要时 narrow
 - 在有 evidence 前，**不要** 要求用户做 decisions
@@ -422,7 +422,7 @@ Headless mode 中，Delete + decorative cleanup 可以。任何 substantive cita
 
 #### Question Style（问题风格）
 
-始终使用平台 blocking question tool 呈现 choices：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 plain text 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
+始终使用平台 blocking question tool 呈现 choices：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 plain text 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
 
 Question rules（提问规则）：
 
@@ -666,7 +666,7 @@ Headless mode 中，report 是唯一 deliverable：没有 user 可问 follow-up 
 
       `docs/solutions/` — documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
       ```
-   c. Interactive mode 中，向用户解释为什么这重要：在此 repo 中工作的 agents（包括 fresh sessions、其它 tools，或没有 plugin 的 collaborators）不会知道要检查 `docs/solutions/`，除非 instruction file surface 了它。展示 proposed change 以及将放置的位置，然后使用平台 blocking question tool 获得 consent 再编辑：Claude Code 中为 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中为 `request_user_input`、Gemini 中为 `ask_user`、Pi 中为 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 proposal；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。Headless mode 中，将它作为 report 中的 "Discoverability recommendation" line 纳入；不要尝试编辑 instruction files（headless scope 是 doc maintenance，不是 project config）。
+   c. Interactive mode 中，向用户解释为什么这重要：在此 repo 中工作的 agents（包括 fresh sessions、其它 tools，或没有 plugin 的 collaborators）不会知道要检查 `docs/solutions/`，除非 instruction file surface 了它。展示 proposed change 以及将放置的位置，然后使用平台 blocking question tool 获得 consent 再编辑：Claude Code 中为 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中为 `request_user_input`、Antigravity 中为 `ask_question`、Pi 中为 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 proposal；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。Headless mode 中，将它作为 report 中的 "Discoverability recommendation" line 纳入；不要尝试编辑 instruction files（headless scope 是 doc maintenance，不是 project config）。
 
 5. **如果 repo root 存在 `CONCEPTS.md`，对它运行 parallel discoverability check。** 使用与上方 `docs/solutions/` check 相同的 workflow：同一个 target file、同样的 edit-placement judgment，以及按 mode 匹配的同样 consent-then-edit interaction shape。当存在 directory listing 时的 example calibration：
 

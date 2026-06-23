@@ -25,7 +25,7 @@ Approach-plan 的意义，是足够具体到值得用户判断。Generic methodo
 
 ## Stage 3: Checkpoint
 
-停在 approach。使用平台 blocking question tool（Claude Code 中的 `AskUserQuestion`；schema 未加载时先用 `ToolSearch` 且 `select:AskUserQuestion`；Codex 中用 `request_user_input`；Gemini/Pi 中用 `ask_user`）。只有在没有 blocking tool 或 tool 调用失败时，才 fallback 到 chat 中的 numbered options。不要 silently skip。
+停在 approach。使用平台 blocking question tool（Claude Code 中的 `AskUserQuestion`；schema 未加载时先用 `ToolSearch` 且 `select:AskUserQuestion`；Codex 中用 `request_user_input`；Antigravity 中用 `ask_question`，Pi 中用 `ask_user`）。只有在没有 blocking tool 或 tool 调用失败时，才 fallback 到 chat 中的 numbered options。不要 silently skip。
 
 **按 orthogonal axes 顺序提问**，不要把它们塞进同一个 menu（遵循 "split orthogonal decisions" rule 和 4-option cap）：
 

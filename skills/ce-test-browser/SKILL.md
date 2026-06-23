@@ -50,7 +50,7 @@ command -v agent-browser >/dev/null 2>&1 && echo "Ready" || echo "NOT INSTALLED"
 
 **Pipeline mode（`mode:pipeline`）：** 完全跳过此步骤。默认 headless：不提问，不 blocking。直接进入 step 3。
 
-**Manual mode：** 使用平台的 blocking question tool 询问用户要 headed 还是 headless：Claude Code 中的 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中呈现 options；不要仅因为需要加载 schema 就退回。绝不要静默跳过问题：
+**Manual mode：** 使用平台的 blocking question tool 询问用户要 headed 还是 headless：Claude Code 中的 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中呈现 options；不要仅因为需要加载 schema 就退回。绝不要静默跳过问题：
 
 ```
 Do you want to watch the browser tests run?

@@ -3,7 +3,7 @@ title: 添加新的 Converter Target Providers
 category: architecture
 tags: [converter, target-provider, plugin-conversion, multi-platform, pattern]
 created: 2026-02-23
-last_refreshed: 2026-06-20
+last_refreshed: 2026-06-23
 severity: medium
 component: converter-cli
 problem_type: architecture_pattern
@@ -23,7 +23,7 @@ compound-engineering-plugin 使用一个已验证的 **6-phase target provider p
 1. **OpenCode**（primary target，reference implementation，主要参考实现）
 2. **Codex**（second target，established pattern，已验证 pattern）
 3. **Pi**（MCPorter ecosystem，MCPorter 生态）
-4. **Gemini CLI**（content transformation patterns，内容转换 patterns）
+4. **Antigravity CLI**（content transformation patterns，内容转换 patterns）
 5. **Compatibility converter modules**，例如 Copilot、Droid 和 Kiro（在 regression coverage 或 cleanup support 仍然重要时保留）
 6. **Historical removed targets**，例如 Windsurf、OpenClaw 和 Qwen（仅作为 archived lessons 使用）
 
@@ -69,7 +69,7 @@ export type {TargetName}Agent = {
 - OpenCode：`src/types/opencode.ts`（command + agent split，command 与 agent 拆分）
 - Codex：`src/types/codex.ts`（agents plus optional copied skills，agents 与 optional copied skills）
 - Pi：`src/types/pi.ts`（plugin/extension output，plugin/extension 输出）
-- Gemini：`src/types/gemini.ts`（extension-style output，extension 风格输出）
+- Antigravity：`src/types/antigravity.ts`（extension-style output，extension 风格输出）
 
 ---
 
@@ -207,7 +207,7 @@ function flattenCommandName(name: string): string {
 5. **MCP servers 需要 target-specific handling：**
    - **OpenCode:** Merge into `opencode.json`（合并到 `opencode.json`，preserve user keys）
    - **Pi:** Emit extension/package metadata without requiring CE-owned subagent extensions（输出 extension/package metadata，不要求 CE-owned subagent extensions）
-   - **Gemini:** Prefer native extension manifests and skip unsupported Claude-only surfaces（优先 native extension manifests，跳过 unsupported Claude-only surfaces）
+   - **Antigravity:** Prefer native extension manifests and skip unsupported Claude-only surfaces（优先 native extension manifests，跳过 unsupported Claude-only surfaces）
 
 6. **对 unsupported features 发出 warning**：Hooks 和 target-incompatible MCP types 应输出到 stderr 并继续 conversion。
 
@@ -215,7 +215,7 @@ function flattenCommandName(name: string): string {
 - OpenCode：`src/converters/claude-to-opencode.ts`（most comprehensive，最完整）
 - Codex：`src/converters/claude-to-codex.ts`（native-plugin-compatible default with legacy include-skills path，默认兼容 native plugin，并保留 legacy include-skills path）
 - Pi：`src/converters/claude-to-pi.ts`（Pi plugin metadata，Pi plugin metadata）
-- Gemini：`src/converters/claude-to-gemini.ts`（Gemini extension output，Gemini extension 输出）
+- Antigravity：`src/converters/claude-to-antigravity.ts`（Antigravity extension output，Antigravity extension 输出）
 - Windsurf：`src/converters/claude-to-windsurf.ts`（rules-based conversion，基于 rules 的转换）
 
 ---
@@ -376,7 +376,7 @@ if (targetName === "{target}") {
 }
 
 // Update --to flag description
-const toDescription = "Target format (opencode | codex | pi | gemini | all)"
+const toDescription = "Target format (opencode | codex | pi | antigravity | all)"
 ```
 
 ---

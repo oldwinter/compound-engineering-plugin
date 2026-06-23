@@ -16,7 +16,7 @@ argument-hint: "[optional: feature description、requirements doc path、要 dee
 
 ## 交互方法
 
-询问用户问题时，使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Gemini 中的 `ask_user`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
+询问用户问题时，使用平台 blocking question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 并设置 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中展示 numbered options；不要因为需要 schema load 就 fallback。绝不要静默跳过问题。
 
 一次只问一个问题。当存在 natural options 时，优先 concise single-select choice。
 
@@ -780,25 +780,32 @@ Interactive mode 存在是因为 on-demand deepening 是不同的用户姿态：
 
 ##### 5.3.8–5.4 Document Review、Final Checks 和 Post-Generation Options
 
-**STOP。继续前立刻加载 `references/plan-handoff.md`。** 它包含 5.3.8（document review）、5.3.9（final checks and cleanup）和 5.4（post-generation handoff，包括 Publish to Proof flow 和 Issue Creation branching）的完整 instructions。**
-
-Document review is mandatory for markdown plans; HTML plans use the `references/plan-handoff.md` format gate because ce-doc-review is markdown-only today.
+**STOP。继续前立刻加载 `references/plan-handoff.md`。** 它包含 5.3.8（document review）、5.3.9（final checks and cleanup）和 5.4（post-generation handoff，包括 Publish to Proof flow 和 Issue Creation branching）的完整 instructions。**此 load 是 non-optional**：否则 agent 会渲染 post-generation menu、捕获用户选择，然后在没有触发 routed action 的情况下停住。Document review is mandatory for markdown plans；5.3.8 中 markdown plan 的 document review 无论 confidence check 是否已运行都无条件执行；HTML plan 通过 plan-handoff 的 5.3.8 format gate 跳过 ce-doc-review，因为它的 mutation mechanics 今天仍是 markdown-only。Markdown 默认使用 headless (`mode:headless`)：`safe_auto` fixes 静默应用，剩余 findings 在 menu 上方 contextual surface，更深的 interactive review 通过自由提示 opt in。
 
 Document review 和 final checks 后，在 menu 上方打印一行 headless review state summary（例如 `Doc review applied 3 fixes. 2 decisions, 1 proposed fix, 4 FYI observations remain (1 at P1).`；对于 5.3.8 被跳过的 HTML plans，打印 `Doc review skipped — ce-doc-review is markdown-only today; the HTML plan was not reviewed.`），然后呈现 menu。当仍有 actionable findings（`proposed_fixes_count + decisions_count > 0`）时，menu 有 5 个 options；否则有 4 个 options，包括 FYI-only case 和 HTML-skip case（`skipped_reason: output_format_html`）。后两者都隐藏 option 2，因为 `ce-doc-review` walkthrough 只面向 actionable markdown findings，此时没有有效内容可 walkthrough。完整规则见 `references/plan-handoff.md`。5-option menu 按 AGENTS.md 对 legitimate option overflow 的 narrow exception，在 chat 中渲染为 numbered list，并附上提示 "Pick a number or describe what you want." 对 blocking question tool 没有 option 上限的平台（Codex `request_user_input`、Pi `ask_user`），使用平台 blocking tool；当该 tool 不可用或报错（例如 Codex edit modes 未暴露 `request_user_input`）时，fallback 到同样的 numbered-list-in-chat 渲染，并保留 "Pick a number or describe what you want." 提示。4-option case 正常通过平台 blocking tool routing（Claude Code 中是 `AskUserQuestion`；如果 schema 未加载，先调用 `ToolSearch` 并使用 `select:AskUserQuestion`），当 blocking tool 不可用或调用失败时，同样 fallback 为 numbered-list-in-chat。绝不要静默跳过该 question。
 
-**问题：** "Plan ready at `<absolute path to plan>`. What would you like to do next?"（使用 absolute path，让现代 terminal 中的引用可点击）
+**Question:** "Plan ready at `<absolute path to plan>`. What would you like to do next?"（使用 absolute path，让现代 terminal 中的引用可点击）
 
-**选项。** Option 4 的 label 要匹配 artifact 的 format。在 exclusive output mode 下，每次运行只适用 "Publish to Proof" 或 "Open in browser" 之一：`OUTPUT_FORMAT=md` 显示 Proof；`OUTPUT_FORMAT=html` 显示 browser。Proof 基于 markdown，不能 ingest HTML；browser 是 HTML 的正确 surface。
+**Options.** Option 4 的 label 要匹配 artifact 的 format。在 exclusive output mode 下，每次运行只适用 "Publish to Proof" 或 "Open in browser" 之一：`OUTPUT_FORMAT=md` 显示 Proof；`OUTPUT_FORMAT=html` 显示 browser。Proof 基于 markdown，不能 ingest HTML；browser 是 HTML 的正确 surface。渲染本次运行产物 format 对应的 option。
 
-根据选择进行 inline routing：
-- **Start `/ce-work`** — Invoke the `ce-work` skill via the platform's skill-invocation primitive, passing the plan path as the skill argument.
-- **Create Issue** — 按 issue tracker configuration 创建 issue。
-- **Publish to Proof** — 调用 `ce-proof` publish local markdown file，返回 shareable link；local file 保持 canonical。
-- **Open in browser** — 打开 HTML artifact。
-- **Done for now** — End the turn after naming the plan path and any remaining blockers.
+1. **Start `/ce-work`** (recommended) - Begin implementing this plan in the current session
+2. **Run deeper doc review** - Walk through the remaining findings interactively (full ce-doc-review walkthrough)
+3. **Create Issue** - Create a tracked issue from this plan in your configured issue tracker (e.g., GitHub Issues, Linear, Jira)
+4. **Publish to Proof — shareable link** - Publish the plan to Every's Proof editor and get a shareable link to read, comment on, or share with others. One-way: the local plan file stays canonical. **Render only when `OUTPUT_FORMAT=md`.**
+4. **Open in browser** - Open the HTML plan file locally for review and sharing. **Render only when `OUTPUT_FORMAT=html`.**
+5. **Done for now** - Pause; the plan file is saved and can be resumed later
+
+**Routing.** 根据用户选择采取动作，不要只宣布。Elaborate sub-flows（Issue Creation tracker detection）位于 `references/plan-handoff.md`。
+
+- **Start `/ce-work`** — Invoke the `ce-work` skill via the platform's skill-invocation primitive (`Skill` in Claude Code, `Skill` in Codex, the equivalent on Gemini/Pi), passing the plan path as the skill argument. Do not merely tell the user to type `/ce-work` — fire the invocation now so the plan executes in this session.
+- **Run deeper doc review** — 对 plan path 重新调用 `ce-doc-review` skill，**without** `mode:headless`，让 interactive routing question 和 walkthrough 触发。返回后用 refreshed counts 重新渲染此 menu，让用户选择 next-stage action。
+- **Create Issue** — Detect the project tracker from the project instructions already in your context and create the issue from the plan file as described under "Issue Creation" in `references/plan-handoff.md`. Create the issue through whatever interface the tracker actually exposes — `gh` for GitHub when it's installed and authenticated, otherwise GitHub's connector/MCP tool or API; for Linear, a connector/MCP tool, documented API/GraphQL, or a documented CLI (no guaranteed `linear` CLI). Do not treat a missing binary, env var, or unloaded MCP tool as proof the tracker is unavailable. 创建后显示 issue URL，并用平台 blocking question tool 询问是否继续 `/ce-work`。
+- **Publish to Proof — shareable link** — 加载 `ce-proof` skill 来发布 plan：从 plan file 创建 shared Proof doc（title = plan title；identity `ai:compound-engineering` / `Compound Engineering`），向用户展示 share URL，然后返回此 menu。One-way publish：local plan file 保持 canonical，不会 sync back。上传失败时见 `references/plan-handoff.md` 中的 graceful-fallback note。
+- **Open in browser** — 显示 `.html` plan file 的 absolute path，供用户本地打开。若平台暴露 browser-opening primitive（例如 macOS `open`、Linux `xdg-open`、Windows `start`），agent 可以使用它；否则打印 absolute path 让用户打开。不要从此 option 调用 `ce-work`；用户选择 HTML 是为了 review/sharing，不是 handoff。
+- **Done for now** — 简短确认 plan file 已保存并结束 turn。没有明确后续用户 prompt 时，不要开始 follow-up work。
 
 如果用户输入针对 findings 的 free-form prompts（例如 "review"、"walk through"、"deep review"），按其选择了 `Run deeper doc review` 来 routing；触发 skill，而不是回到 menu。对于其他 free-text revisions，接受输入，应用 revision 后再回到此 menu。
 
-**完成检查：** 直到上方 post-generation menu 已呈现、用户已选择 action，且该选择的 inline routing 已执行，本 skill 才算 complete。只呈现 menu 并停在用户选择处并不算完成；必须触发 routed action。
+**Completion check:** 直到上方 post-generation menu 已呈现、用户已选择 action，且该选择的 inline routing 已执行，本 skill 才算 complete。只呈现 menu 并停在用户选择处并不算完成；必须触发 routed action。
 
-**Pipeline mode exception：** 在 LFG 或任何 `disable-model-invocation` context 中，跳过 interactive menu；在 plan file 已写入、confidence check 已运行，且 `ce-doc-review` 已按 `references/plan-handoff.md` 以 headless mode 运行后，把控制权交还 caller。Pipeline mode 在 Phase 0.0 强制 `OUTPUT_FORMAT=md`，因此 pipeline runs 中 5.3.8 format gate 永远不会选择 HTML skip path。
+**Pipeline mode exception:** 在 LFG 或任何 `disable-model-invocation` context 中，跳过 interactive menu；在 plan file 已写入、confidence check 已运行，且 `ce-doc-review` 已按 `references/plan-handoff.md` 以 headless mode 运行后，把控制权交还 caller。Pipeline mode 在 Phase 0.0 强制 `OUTPUT_FORMAT=md`，因此 pipeline runs 中 5.3.8 format gate 永远不会选择 HTML skip path。
