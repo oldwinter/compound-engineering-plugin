@@ -38,7 +38,7 @@
       "/ce-code-review my changes"
     ],
     "brandColor": "#C9EFFA",
-    "composerIcon": "./assets/logo.png",
+    "composerIcon": "./assets/icon.svg",
     "logo": "./assets/logo.png",
     "screenshots": []
   }
