@@ -1,31 +1,31 @@
 ---
 name: ce-polish
-description: "启动 dev server，在 browser 中打开 feature，并一起迭代 improvements。仅手动调用：输入 /ce-polish 运行。"
+description: "Start the dev server, inspect the feature in browser, and iterate on polish."
 disable-model-invocation: true
-argument-hint: "[PR number、branch name，或留空使用 current branch]"
+argument-hint: "[PR number, branch name, or blank for current branch]"
 ---
 
-# Polish（打磨）
+# Polish
 
-启动 dev server，在 browser 中打开 feature，并迭代。用户使用 feature，指出哪里 feels off，然后进行修复。
+Start the dev server, open the feature in a browser, and iterate. You use the feature, say what feels off, and fixes happen.
 
-## Phase 0：Get on the right branch（切到正确分支）
+## Phase 0: Get on the right branch
 
-1. 如果提供了 PR number 或 branch name，check it out（先 probe existing worktrees）。
-2. 如果为空，使用 current branch。
-3. 验证 current branch 不是 main/master。
+1. If a PR number or branch name was provided, check it out (probe for existing worktrees first).
+2. If blank, use the current branch.
+3. Verify the current branch is not main/master.
 
-## Phase 1：Start the dev server（启动 dev server）
+## Phase 1: Start the dev server
 
-### 1.1 Check for `.claude/launch.json`（检查 `.claude/launch.json`）
+### 1.1 Check for `.claude/launch.json`
 
-运行 `bash scripts/read-launch-json.sh`。如果找到 configuration，使用它；用户已经告诉我们如何启动 project。
+Run `bash scripts/read-launch-json.sh`. If it finds a configuration, use it — the user already told us how to start the project.
 
-### 1.2 Auto-detect（没有 launch.json 时自动检测）
+### 1.2 Auto-detect (when no launch.json)
 
-运行 `bash scripts/detect-project-type.sh` 识别 framework。
+Run `bash scripts/detect-project-type.sh` to identify the framework.
 
-按 type 路由到匹配的 recipe reference，获取 start command 和 port defaults：
+Route by type to the matching recipe reference for start command and port defaults:
 
 | Type | Recipe |
 |------|--------|
@@ -37,41 +37,41 @@ argument-hint: "[PR number、branch name，或留空使用 current branch]"
 | `remix` | `references/dev-server-remix.md` |
 | `sveltekit` | `references/dev-server-sveltekit.md` |
 | `procfile` | `references/dev-server-procfile.md` |
-| `unknown` | 询问用户如何启动 project |
+| `unknown` | Ask the user how to start the project |
 
-对于需要 package manager 的 framework types，运行 `bash scripts/resolve-package-manager.sh`，并把结果 substitute 到 start command 中。
+For framework types that need a package manager, run `bash scripts/resolve-package-manager.sh` and substitute the result into the start command.
 
-用 `bash scripts/resolve-port.sh --type <type>` resolve port。
+Resolve the port with `bash scripts/resolve-port.sh --type <type>`.
 
-### 1.3 Start the server（启动 server）
+### 1.3 Start the server
 
-在后台启动 dev server，将 output log 到 temp file。Probe `http://localhost:<port>` 最多 30 秒。如果没有起来，展示 log 最后 20 行并询问用户如何处理。
+Start the dev server in the background, log output to a temp file. Probe `http://localhost:<port>` for up to 30 seconds. If it doesn't come up, show the last 20 lines of the log and ask the user what to do.
 
-### 1.4 Open in browser（在 browser 中打开）
+### 1.4 Open in browser
 
-加载 `references/ide-detection.md` 获取 env-var probe table。使用 IDE 的机制打开 browser（Claude Code -> `open`，Cursor -> Cursor browser，VS Code -> Simple Browser）。
+Load `references/ide-detection.md` for the env-var probe table. Open the browser using the IDE's mechanism (Claude Code → `open`, Cursor → Cursor browser, VS Code → Simple Browser).
 
-告诉用户：
+Tell the user:
 ```
 Dev server running on http://localhost:<port>
 Browse the feature and tell me what could be better.
 ```
 
-## Phase 2：Iterate（迭代）
+## Phase 2: Iterate
 
-这是 core loop。用户浏览 feature 并告诉你要改进什么。你修复它。重复直到用户满意。
+This is the core loop. The user browses the feature and tells you what to improve. You fix it. Repeat until they're happy.
 
-- 当用户描述要 fix 的内容 -> 做 change，dev server 会 hot-reload
-- 当用户要求 check 某处 -> 使用 `agent-browser` screenshot 或 inspect page
-- 当用户说 done -> commit fixes 并停止
+- When the user describes something to fix → make the change, the dev server hot-reloads
+- When the user asks to check something → use `agent-browser` to screenshot or inspect the page
+- When the user says they're done → commit the fixes and stop
 
-没有 checklist。没有 envelope。就是 conversation。
+No checklist. No envelope. Just conversation.
 
-## References（参考）
+## References
 
-Reference files（按需加载）：
+Reference files (loaded on demand):
 - `references/launch-json-schema.md` — launch.json schema + per-framework stubs
-- `references/ide-detection.md` — host IDE detection 和 browser-handoff
+- `references/ide-detection.md` — host IDE detection and browser-handoff
 - `references/dev-server-detection.md` — port resolution documentation
 - `references/dev-server-rails.md` — Rails dev-server defaults
 - `references/dev-server-next.md` — Next.js dev-server defaults
@@ -82,7 +82,7 @@ Reference files（按需加载）：
 - `references/dev-server-sveltekit.md` — SvelteKit dev-server defaults
 - `references/dev-server-procfile.md` — Procfile-based dev-server defaults
 
-Scripts（通过 `bash scripts/<name>` 调用）：
+Scripts (invoked via `bash scripts/<name>`):
 - `scripts/read-launch-json.sh` — launch.json reader
 - `scripts/detect-project-type.sh` — project-type classifier
 - `scripts/resolve-package-manager.sh` — lockfile-based package-manager resolver

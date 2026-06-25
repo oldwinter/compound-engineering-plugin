@@ -1,56 +1,56 @@
 ---
 name: ce-test-browser
-description: 对当前 PR 或 branch 影响到的 pages 运行 browser tests
-argument-hint: "[PR number、branch name、'current' 或 --port PORT]"
+description: Run browser tests for pages affected by the current branch or PR.
+argument-hint: "[PR number, branch name, 'current', or --port PORT]"
 ---
 
-# Browser Test Skill（浏览器测试 Skill）
+# Browser Test Skill
 
-使用 `agent-browser` CLI，对 PR 或 branch changes 影响到的 pages 运行 end-to-end browser tests。
+Run end-to-end browser tests on pages affected by a PR or branch changes using the `agent-browser` CLI.
 
-## Browser Automation 只使用 `agent-browser`
+## Use `agent-browser` Only For Browser Automation
 
-此 workflow 只使用 `agent-browser` CLI。不要使用任何 alternative browser automation system、browser MCP integration 或 built-in browser-control tool。如果平台提供多种 browser 控制方式，始终选择 `agent-browser`。
+This workflow uses the `agent-browser` CLI exclusively. Do not use any alternative browser automation system, browser MCP integration, or built-in browser-control tool. If the platform offers multiple ways to control a browser, always choose `agent-browser`.
 
-使用 `agent-browser` 执行：opening pages、clicking elements、filling forms、taking screenshots，以及 scraping rendered content。
+Use `agent-browser` for: opening pages, clicking elements, filling forms, taking screenshots, and scraping rendered content.
 
-Platform-specific hints（平台特定提示）：
-- 在 Claude Code 中，不要使用 Chrome MCP tools（`mcp__claude-in-chrome__*`）。
-- 在 Codex 中，不要替换成无关 browsing tools。
+Platform-specific hints:
+- In Claude Code, do not use Chrome MCP tools (`mcp__claude-in-chrome__*`).
+- In Codex, do not substitute unrelated browsing tools.
 
-## Prerequisites（前置条件）
+## Prerequisites
 
-- Local development server 正在运行（例如 `bin/dev`、`rails server`、`npm run dev`）
-- 已安装 `agent-browser` CLI（见下方 Setup）
-- Git repository 中有待测试 changes
+- Local development server running (e.g., `bin/dev`, `rails server`, `npm run dev`)
+- `agent-browser` CLI installed (see Setup below)
+- Git repository with changes to test
 
-## Setup（设置）
+## Setup
 
-检查是否已安装 `agent-browser`：
+Check whether `agent-browser` is installed:
 
 ```bash
 command -v agent-browser >/dev/null 2>&1 && echo "Installed" || echo "NOT INSTALLED"
 ```
 
-如果未安装，告知用户："`agent-browser` is not installed. Run `/ce-setup` to install required dependencies." 然后停止：没有 agent-browser，此 skill 无法运行。
+If not installed, inform the user: "`agent-browser` is not installed. Run `/ce-setup` for the current install command, then install agent-browser and retry." Then stop — this skill cannot function without agent-browser.
 
-## Workflow（工作流）
+## Workflow
 
-### 1. 验证安装
+### 1. Verify Installation
 
-开始前，验证 `agent-browser` 可用：
+Before starting, verify `agent-browser` is available:
 
 ```bash
 command -v agent-browser >/dev/null 2>&1 && echo "Ready" || echo "NOT INSTALLED"
 ```
 
-如果未安装，告知用户："`agent-browser` is not installed. Run `/ce-setup` to install required dependencies." 然后停止。
+If not installed, inform the user: "`agent-browser` is not installed. Run `/ce-setup` for the current install command, then install agent-browser and retry." Then stop.
 
-### 2. 询问 Browser Mode
+### 2. Ask Browser Mode
 
-**Pipeline mode（`mode:pipeline`）：** 完全跳过此步骤。默认 headless：不提问，不 blocking。直接进入 step 3。
+**Pipeline mode (`mode:pipeline`):** Skip this step entirely. Default to headless — no question, no blocking. Proceed directly to step 3.
 
-**Manual mode：** 使用平台的 blocking question tool 询问用户要 headed 还是 headless：Claude Code 中的 `AskUserQuestion`（如果 schema 尚未加载，先用 `select:AskUserQuestion` 调用 `ToolSearch`）、Codex 中的 `request_user_input`、Antigravity 中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才退回到聊天中呈现 options；不要仅因为需要加载 schema 就退回。绝不要静默跳过问题：
+**Manual mode:** Ask the user whether to run headed or headless using the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question:
 
 ```
 Do you want to watch the browser tests run?
@@ -59,30 +59,30 @@ Do you want to watch the browser tests run?
 2. Headless (faster) - Runs in background, faster but invisible
 ```
 
-保存选择；当用户选择 option 1 时使用 `--headed` flag。
+Store the choice and use the `--headed` flag when the user selects option 1.
 
-### 3. 确定 Test Scope（测试范围）
+### 3. Determine Test Scope
 
-**If PR number provided（如果提供 PR number）：**
+**If PR number provided:**
 ```bash
 gh pr view [number] --json files -q '.files[].path'
 ```
 
-**If 'current' or empty（如果为 current 或空）：**
+**If 'current' or empty:**
 ```bash
 git diff --name-only main...HEAD
 ```
 
-**If branch name provided（如果提供 branch name）：**
+**If branch name provided:**
 ```bash
 git diff --name-only main...[branch]
 ```
 
-### 4. 将 Files 映射到 Routes
+### 4. Map Files to Routes
 
-将 changed files 映射到 testable routes：
+Map changed files to testable routes:
 
-| File Pattern（文件模式） | Route(s)（路由） |
+| File Pattern | Route(s) |
 |-------------|----------|
 | `app/views/users/*` | `/users`, `/users/:id`, `/users/new` |
 | `app/controllers/settings_controller.rb` | `/settings` |
@@ -94,33 +94,29 @@ git diff --name-only main...[branch]
 | `src/app/*` (Next.js) | Corresponding routes |
 | `src/components/*` | Pages using those components |
 
-基于 mapping 构建要测试的 URLs 列表。
+Build a list of URLs to test based on the mapping.
 
-### 5. 检测并占用 Free Port
+### 5. Detect and Claim a Free Port
 
-**仅 Pipeline mode（`mode:pipeline`）：** 当从 LFG 或另一个 automated pipeline 调用时，始终寻找实际 free 的 port：绝不要假设 3000 可用，因为同一机器上可能有多个 agents 并行运行。
+**Pipeline mode only (`mode:pipeline`):** When invoked from LFG or another automated pipeline, always find a port that is actually free — never assume 3000 is available, as multiple agents may be running in parallel on the same machine.
 
-**Manual mode（无 `mode:pipeline`）：** 直接使用 preferred port。不要扫描 alternatives：用户控制自己的 server。
+**Manual mode (no `mode:pipeline`):** Use the preferred port as-is. Do not scan for alternatives — the user controls their own server.
 
-按此优先级确定 preferred port：
+Determine the preferred port using this priority:
 
-1. **Explicit argument** — 如果用户传入 `--port 5000`，直接使用它（跳过 free-port scan）
-2. **Project instructions** — 检查 `AGENTS.md`、`CLAUDE.md` 或其他 instruction files 中的 port references
-3. **package.json** — 检查 dev/start scripts 中的 `--port` flags
-4. **Environment files** — 检查 `.env`、`.env.local`、`.env.development` 中的 `PORT=`
-5. **Default** — 回退到 `3000`
+1. **Explicit argument** — if the user passed `--port 5000`, use that directly (skip free-port scan)
+2. **In-context project instructions** — if your active project instructions already in context explicitly state the dev-server port, use it. Don't grep instruction files for a port: prose mentions (docs, examples, troubleshooting) are unreliable and false-positive-prone — config files and `.env` are the trustworthy sources.
+3. **package.json** — check dev/start scripts for `--port` flags
+4. **Environment files** — check `.env`, `.env.local`, `.env.development` for `PORT=`
+5. **Default** — fall back to `3000`
 
-**在 pipeline mode 中**，验证 preferred port 是否 free；如果不是，向上扫描。**在 manual mode 中**，直接使用 preferred port。
+**In pipeline mode**, verify the preferred port is free and scan upward if not. **In manual mode**, use the preferred port directly.
 
 ```bash
-# Step 1: Determine preferred port
+# Step 1: Determine preferred port.
+# If your in-context project instructions state the dev-server port, set PORT
+# here first (e.g. EXPLICIT_PORT). Do not grep instruction files for a port.
 PORT="${EXPLICIT_PORT:-}"
-if [ -z "$PORT" ]; then
-  PORT=$(grep -Eio '(port\s*[:=]\s*|localhost:)([0-9]{4,5})' AGENTS.md 2>/dev/null | grep -Eo '[0-9]{4,5}' | head -1)
-fi
-if [ -z "$PORT" ]; then
-  PORT=$(grep -Eio '(port\s*[:=]\s*|localhost:)([0-9]{4,5})' CLAUDE.md 2>/dev/null | grep -Eo '[0-9]{4,5}' | head -1)
-fi
 if [ -z "$PORT" ]; then
   PORT=$(grep -Eo '\-\-port[= ]+[0-9]{4,5}' package.json 2>/dev/null | grep -Eo '[0-9]{4,5}' | head -1)
 fi
@@ -143,11 +139,11 @@ fi
 echo "Using dev server port: $PORT"
 ```
 
-当 argument 中存在 `mode:pipeline` 时，在 shell 中设置 `PIPELINE_MODE=1`。
+Set `PIPELINE_MODE=1` in your shell when the argument `mode:pipeline` is present.
 
-### 6. 如果 Dev Server 未运行则启动，然后验证
+### 6. Start Dev Server if Not Running, Then Verify
 
-**仅 Pipeline mode：** 如果 `$PORT` 上尚无 server listening，在后台自动启动一个。在 manual mode 中，告知用户并停止。
+**Pipeline mode only:** If no server is already listening on `$PORT`, start one automatically in the background. In manual mode, inform the user and stop.
 
 ```bash
 if lsof -i ":${PORT}" -sTCP:LISTEN -t >/dev/null 2>&1; then
@@ -189,44 +185,44 @@ agent-browser open http://localhost:${PORT}
 agent-browser snapshot -i
 ```
 
-### 7. 测试每个受影响页面
+### 7. Test Each Affected Page
 
-对每个 affected route：
+For each affected route:
 
-**Navigate and capture snapshot（导航并捕获 snapshot）：**
+**Navigate and capture snapshot:**
 ```bash
 agent-browser open "http://localhost:${PORT}/[route]"
 agent-browser snapshot -i
 ```
 
-**For headed mode（headed mode，带界面模式）：**
+**For headed mode:**
 ```bash
 agent-browser --headed open "http://localhost:${PORT}/[route]"
 agent-browser --headed snapshot -i
 ```
 
-**Verify key elements（验证关键元素）：**
-- 使用 `agent-browser snapshot -i` 获取带 refs 的 interactive elements
-- Page title/heading 存在
-- Primary content 已渲染
-- 无可见 error messages
-- Forms 有 expected fields
+**Verify key elements:**
+- Use `agent-browser snapshot -i` to get interactive elements with refs
+- Page title/heading present
+- Primary content rendered
+- No error messages visible
+- Forms have expected fields
 
-**Test critical interactions（测试关键交互）：**
+**Test critical interactions:**
 ```bash
 agent-browser click @e1
 agent-browser snapshot -i
 ```
 
-**Take screenshots（截图）：**
+**Take screenshots:**
 ```bash
 agent-browser screenshot page-name.png
 agent-browser screenshot --full page-name-full.png
 ```
 
-### 8. Human Verification（需要时）
+### 8. Human Verification (When Required)
 
-当 testing 触及需要 external interaction 的 flows 时，暂停等待 human input：
+Pause for human input when testing touches flows that require external interaction:
 
 | Flow Type | What to Ask |
 |-----------|-------------|
@@ -236,7 +232,7 @@ agent-browser screenshot --full page-name-full.png
 | SMS | "Verify you received the SMS code" |
 | External APIs | "Confirm the [service] integration is working" |
 
-询问用户（使用平台 question tool，或呈现编号选项并等待）：
+Ask the user (using the platform's question tool, or present numbered options and wait):
 
 ```
 Human Verification Needed
@@ -250,15 +246,15 @@ Did it work correctly?
 2. No - describe the issue
 ```
 
-### 9. 处理 Failures
+### 9. Handle Failures
 
-当 test 失败时：
+When a test fails:
 
-1. **Document the failure（记录失败）：**
-   - 截取 error state：`agent-browser screenshot error.png`
-   - 记录 exact reproduction steps
+1. **Document the failure:**
+   - Screenshot the error state: `agent-browser screenshot error.png`
+   - Note the exact reproduction steps
 
-2. **询问用户如何继续：**
+2. **Ask the user how to proceed:**
 
    ```
    Test Failed: [route]
@@ -271,12 +267,12 @@ Did it work correctly?
    2. Skip - continue testing other pages
    ```
 
-3. **如果 "Fix now"：** investigate、propose a fix、apply、重新运行 failing test
-4. **如果 "Skip"：** log as skipped，然后继续
+3. **If "Fix now":** investigate, propose a fix, apply, re-run the failing test
+4. **If "Skip":** log as skipped, continue
 
-### 10. Test Summary（测试摘要）
+### 10. Test Summary
 
-所有 tests 完成后，呈现 summary：
+After all tests complete, present a summary:
 
 ```markdown
 ## Browser Test Results
@@ -306,7 +302,7 @@ Did it work correctly?
 ### Result: [PASS / FAIL / PARTIAL]
 ```
 
-## Quick Usage Examples（快速使用示例）
+## Quick Usage Examples
 
 ```bash
 # Test current branch changes (auto-detects port)
@@ -322,11 +318,11 @@ Did it work correctly?
 /ce-test-browser --port 5000
 ```
 
-## agent-browser CLI Reference（CLI 参考）
+## agent-browser CLI Reference
 
-运行 `agent-browser --help` 查看所有 commands。
+Run `agent-browser --help` for all commands.
 
-Key commands（关键命令）：
+Key commands:
 
 ```bash
 # Navigation

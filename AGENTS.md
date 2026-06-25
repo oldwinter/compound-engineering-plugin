@@ -1,15 +1,14 @@
-# Agent Instructions（Agent 运行约定）
+# Agent Instructions
 
-本仓库是 `compound-engineering` coding-agent plugin 的根目录，以及用于分发它的 marketplace/catalog metadata。
+This repository is the root of the `compound-engineering` coding-agent plugin and the marketplace/catalog metadata used to distribute it.
 
-它还包含：
+It also contains:
+- the Bun/TypeScript CLI that converts Claude Code plugins into other agent platform formats
+- shared release and metadata infrastructure for the CLI, marketplace, and plugin
 
-- 把 Claude Code plugins 转换为其他 agent platform formats 的 Bun/TypeScript CLI
-- CLI、marketplace 和 plugin 共用的 release 与 metadata infrastructure
+`AGENTS.md` is the canonical repo instruction file. Root `CLAUDE.md` exists only as a compatibility shim for tools and conversions that still look for it.
 
-`AGENTS.md` 是 canonical repo instruction file。根目录 `CLAUDE.md` 只作为仍会查找它的 tools 和 conversions 的 compatibility shim。
-
-## Quick Start（快速开始）
+## Quick Start
 
 ```bash
 bun install
@@ -17,34 +16,33 @@ bun test                  # full test suite
 bun run release:validate  # check plugin/marketplace consistency
 ```
 
-## Working Agreement（工作约定）
+## Working Agreement
 
-- **Branching:** 任何非平凡 change 都创建 feature branch。如果已经在任务正确 branch 上，继续使用；除非明确要求，不要创建额外 branches 或 worktrees。
-- **Merge policy:** 所有到 `main` 的 changes 都通过 pull requests。禁止 direct pushes 和 direct merges；`main` 上的 branch protection 要求 `test` status check 通过。Direct path 会绕过 `release:validate`、test suite 和 PR title validation；过去的 direct merges 造成过 version drift，需要多 PR 恢复（见 `docs/solutions/workflow/release-please-version-drift-recovery.md`）。
-- **Safety:** 不要删除或覆盖 user data。避免 destructive commands。
-- **Testing:** 修改 parsing、conversion 或 output 后运行 `bun test`。
-- **Release versioning:** Releases 由 release automation 准备，不由普通 feature PRs 准备。Repo 有一个 root plugin/package release component（`compound-engineering`）以及 marketplace components（`marketplace`、`cursor-marketplace`）。GitHub release PRs 和 GitHub Releases 是新 releases 的 canonical release-notes surface；根 `CHANGELOG.md` 只是指向该历史的指针。使用 `feat:`、`fix:` 等 conventional titles，让 release automation 能分类 change intent；但 routine PRs 不要手工 bump release-owned versions，也不要手写 release notes。
-- **Linked versions (cli + compound-engineering):** `linked-versions` release-please plugin 会让 `cli` 和 `compound-engineering` 保持同一 version。这是有意的，用于简化 CLI 与其随附 plugin 的 version tracking。结果是：只有 plugin changes 的 release 仍会 bump CLI version（反之亦然）。CLI changelog 也可能包含 `exclude-paths` 通常会过滤的 commits，因为 `linked-versions` 在强制 synced bump 时会覆盖 exclusion logic。这是已知 upstream release-please limitation，不是 misconfiguration。不要把 linked-version bumps 标记为 unnecessary。
-- **Output Paths:** OpenCode output 保持在 `opencode.json` 和 `.opencode/{agents,skills,plugins}`。对 OpenCode，commands 写到 `~/.config/opencode/commands/<name>.md`；`opencode.json` 做 deep-merge（绝不 wholesale overwrite）。
-- **Scratch Space:** 默认使用 OS temp。只有在下面规则明确 justified 时才使用 `.context/`。
-  - **Default: OS temp**：覆盖大多数 scratch，包括 per-run throwaway 和 cross-invocation reusable，不管是否存在 repo、其他 skills 是否会读取这些文件。Stable OS-temp prefix 对 cross-skill 和 cross-invocation coordination 的支持与 in-repo path 一样好；repo-adjacency 很少是真正相关的属性。
-    - **Per-run throwaway**: `mktemp -d -t <prefix>-XXXXXX`（OS 负责 cleanup）。用于只消费一次并丢弃的文件，例如 captured screenshots、stitched GIFs、intermediate build outputs、recordings、delegation prompts/results、single-run checkpoints。生成的 path 是 opaque 的（macOS 上会落到 `$TMPDIR`/`/var/folders/...` 下），这适合用户不需要访问的 throwaway files。
-    - **Cross-invocation reusable**: stable path `/tmp/compound-engineering/<skill-name>/<run-id>/`，**不要**用 `mktemp -d`，这样同一 skill 的后续 invocations 能发现 sibling run-ids。直接使用 `/tmp`，不要使用 `$TMPDIR`，让 paths 保持可访问：macOS 上 `$TMPDIR` 会解析到 `/var/folders/64/.../T/`，对想 inspect checkpoints、grep 或 copy out 的用户很不友好。`$TMPDIR` 的 per-user isolation 对 cross-invocation reusable scratch 没有价值，因为用户本来就是 intended audience。用于按 session key 的 caches、需要在 loose session 内 context compaction 后存活的 checkpoints，或任何同一 skill 后续 runs 需要定位 prior outputs 的 state。
-  - **Exception: `.context/`**：仅当 artifact 真正绑定到 CWD repo，并且至少满足以下之一时使用：
-    - (a) **User-curated**：用户预计会在 skill 外 inspect、manipulate 或手动 curate artifact（例如 per-repo TODO database、在同一 checkout 跨 sessions 存活的 per-spec optimization log）。
-    - (b) **Repo+branch-inseparable**：artifact 的意义与这个特定 repo 或 branch 不可分离（例如用户期望在同一 checkout 恢复的 branch-specific resume state）。
-    - (c) **Path is core UX**：把 artifact path 告诉用户是 skill output 的核心部分，并且 repo-relative location 比 OS-temp path 更容易沟通。
-    放到 `.context/compound-engineering/<workflow-or-skill-name>/` 下；如果可能并发运行，加 per-run subdirectory；按 artifact lifecycle 决定 cleanup behavior（per-run scratch 成功后清理；user-curated state 持久保留）。"Shared between skills" 本身不够充分，OS temp 同样能处理。
-  - **Durable outputs**（plans、specs、learnings、docs、final deliverables）属于 `docs/` 或其他 repo-tracked location，不属于任一 scratch tier。
-  - **Cross-platform note（跨平台说明）:** `/tmp` 在 macOS（symlink 到 `/private/tmp`）、Linux 和 WSL 上可写。`mktemp -d -t <prefix>-XXXXXX` 三者也都可用。这里 authored 的 skills 假设 Unix-like shells；native Windows 不是当前 target。
-- **Character encoding（字符编码）:**
-  - **Identifiers**（file names、agent names、command names）：只用 ASCII，converters 和 regex patterns 依赖它。
-  - **Markdown tables（Markdown 表格）:** 使用 pipe-delimited（`| col | col |`），不要使用 box-drawing characters。
-  - **Prose and skill content（正文与 skill content）:** Unicode 可以使用（emoji、标点等）。Code blocks 和 terminal examples 中优先使用 ASCII arrows（`->`、`<-`），不要用 Unicode arrows。
+- **Branching:** Create a feature branch for any non-trivial change. If already on the correct branch for the task, keep using it; do not create additional branches or worktrees unless explicitly requested.
+- **Merge policy:** All changes to `main` go through pull requests. Direct pushes and direct merges are not allowed; branch protection on `main` enforces this by requiring the `test` status check to pass. The direct path bypasses `release:validate`, the test suite, and PR title validation — past direct merges have caused version drift requiring multi-PR recovery (see `docs/solutions/workflow/release-please-version-drift-recovery.md`).
+- **Safety:** Do not delete or overwrite user data. Avoid destructive commands.
+- **Testing:** Run `bun test` after changes that affect parsing, conversion, or output.
+- **Release versioning:** Releases are prepared by release automation, not normal feature PRs. The repo has one root plugin/package release component (`compound-engineering`) plus marketplace components (`marketplace`, `cursor-marketplace`). GitHub release PRs and GitHub Releases are the canonical release-notes surface for new releases; root `CHANGELOG.md` is only a pointer to that history. Use conventional titles such as `feat:` and `fix:` so release automation can classify change intent, but do not hand-bump release-owned versions or hand-author release notes in routine PRs.
+- **Output Paths:** Keep OpenCode output at `opencode.json` and `.opencode/{agents,skills,plugins}`. For OpenCode, command go to `~/.config/opencode/commands/<name>.md`; `opencode.json` is deep-merged (never overwritten wholesale).
+- **Scratch Space:** Default to OS temp. Use `.context/` only when explicitly justified by the rules below.
+  - **Default: OS temp** — covers most scratch, including per-run throwaway AND cross-invocation reusable, regardless of whether a repo is present or whether other skills may read the files. A stable OS-temp prefix handles cross-skill and cross-invocation coordination equally well as an in-repo path; repo-adjacency is rarely the relevant property.
+    - **Per-run throwaway**: `mktemp -d -t <prefix>-XXXXXX` (OS handles cleanup). Use for files consumed once and discarded — captured screenshots, stitched GIFs, intermediate build outputs, recordings, delegation prompts/results, single-run checkpoints. The resulting path is opaque (on macOS it resolves under `$TMPDIR`/`/var/folders/...`) — that is appropriate for throwaway files users are not meant to access.
+    - **Cross-invocation reusable**: stable path `/tmp/compound-engineering/<skill-name>/<run-id>/` — **not** `mktemp -d` — so later invocations of the same skill can discover sibling run-ids. Use `/tmp` directly rather than `$TMPDIR` so paths stay accessible: `$TMPDIR` on macOS resolves to `/var/folders/64/.../T/`, which is hostile for users who want to inspect checkpoints, grep them, or copy them out. The per-user isolation `$TMPDIR` provides is not valuable for cross-invocation reusable scratch where users are the intended audience. Use for caches keyed by session, checkpoints meant to survive context compaction within a loose session, or any state where later runs of the same skill need to locate prior outputs.
+  - **Exception: `.context/`** — use only when the artifact is genuinely bound to the CWD repo AND meets at least one of:
+    - (a) **User-curated**: the user is expected to inspect, manipulate, or manually curate the artifact outside the skill (e.g., a per-repo TODO database, a per-spec optimization log that survives across sessions on the same checkout).
+    - (b) **Repo+branch-inseparable**: the artifact's meaning is inseparable from this specific repo or branch (e.g., branch-specific resume state that a user expects to pick up again in the same checkout).
+    - (c) **Path is core UX**: surfacing the artifact path back to the user is a core part of the skill's output and that path is easier to communicate as a repo-relative location than an OS-temp one.
+    Namespace under `.context/compound-engineering/<workflow-or-skill-name>/`, add a per-run subdirectory when concurrent runs are plausible, and decide cleanup behavior per the artifact's lifecycle (per-run scratch clears on success; user-curated state persists). "Shared between skills" is not by itself sufficient — OS temp handles that equally well.
+  - **Durable outputs** (plans, specs, learnings, docs, final deliverables) belong in `docs/` or another repo-tracked location, not in either scratch tier.
+  - **Cross-platform note:** `/tmp` is writable on macOS (symlink to `/private/tmp`), Linux, and WSL. `mktemp -d -t <prefix>-XXXXXX` also works on all three. Skills authored here assume Unix-like shells; native Windows is not a current target.
+- **Character encoding:**
+  - **Identifiers** (file names, agent names, command names): ASCII only -- converters and regex patterns depend on it.
+  - **Markdown tables:** Use pipe-delimited (`| col | col |`), never box-drawing characters.
+  - **Prose and skill content:** Unicode is fine (emoji, punctuation, etc.). Prefer ASCII arrows (`->`, `<-`) over Unicode arrows in code blocks and terminal examples.
 
-## Directory Layout（目录结构）
+## Directory Layout
 
-```text
+```
 src/              CLI entry point, parsers, converters, target writers
 skills/           Compound Engineering plugin skills
 .claude-plugin/   Claude plugin manifest and marketplace catalog metadata
@@ -57,29 +55,29 @@ docs/             Requirements, plans, solutions, and target specs
 CONCEPTS.md       Shared domain vocabulary (glossary of project-specific terms)
 ```
 
-## Repo Surfaces（仓库影响面）
+## Repo Surfaces
 
-本 repo 的 changes 可能影响以下一个或多个 surfaces：
+Changes in this repo may affect one or more of these surfaces:
 
-- `skills/`、`AGENTS.md`、`README.md` 和 platform manifests 下的 root plugin content
-- `.claude-plugin/`、`.cursor-plugin/` 和 `.agents/plugins/` 下的 marketplace catalogs
-- `src/` 和 `package.json` 中的 converter/install CLI
+- root plugin content under `skills/`, `AGENTS.md`, `README.md`, and platform manifests
+- marketplace catalogs under `.claude-plugin/`, `.cursor-plugin/`, and `.agents/plugins/`
+- the converter/install CLI in `src/` and `package.json`
 
-不要在未检查 affected files 归属的情况下，假设某个 repo change "just CLI" 或 "just plugin"。
+Do not assume a repo change is "just CLI" or "just plugin" without checking which surface owns the affected files.
 
-## Plugin Maintenance（Plugin 维护）
+## Plugin Maintenance
 
-修改 plugin content 时：
+When changing plugin content:
 
-- 如果 plugin behavior、inventory 或 usage 发生变化，更新 `README.md` 等 substantive docs。
-- 不要在 plugin 或 marketplace manifests 中手工 bump release-owned versions。
-- 不要手工向 `CHANGELOG.md` 添加 release entries，也不要把它当作 new releases 的 canonical source。
-- 如果 agents、commands、skills、MCP servers 或 release-owned descriptions/counts 可能改变，运行 `bun run release:validate`。
-- 删除 skill、agent 或 command 时，把它的 name 加到两个 cleanup registries 中，以便 upgrade 时清扫 stale flat-install artifacts：
-  - `src/utils/legacy-cleanup.ts` 中的 `STALE_SKILL_DIRS` / `STALE_AGENT_NAMES` / `STALE_PROMPT_FILES`
-  - `src/data/plugin-legacy-artifacts.ts` 中的 `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"]`
+- Update substantive docs like `README.md` when the plugin behavior, inventory, or usage changes.
+- Do not hand-bump release-owned versions in plugin or marketplace manifests.
+- Do not hand-add release entries to `CHANGELOG.md` or treat it as the canonical source for new releases.
+- Run `bun run release:validate` if agents, commands, skills, MCP servers, or release-owned descriptions/counts may have changed.
+- When removing a skill, agent, or command, add its name to both cleanup registries so stale flat-install artifacts are swept on upgrade:
+  - `STALE_SKILL_DIRS` / `STALE_AGENT_NAMES` / `STALE_PROMPT_FILES` in `src/utils/legacy-cleanup.ts`
+  - `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN["compound-engineering"]` in `src/data/plugin-legacy-artifacts.ts`
 
-Useful validation commands（常用验证命令）：
+Useful validation commands:
 
 ```bash
 bun run release:validate
@@ -87,122 +85,132 @@ cat .claude-plugin/marketplace.json | jq .
 cat .claude-plugin/plugin.json | jq .
 ```
 
-## Runtime vs Authoring Context（运行时与创作上下文）
+## Runtime vs Authoring Context
 
-`AGENTS.md`、`CLAUDE.md` 和 `GEMINI.md` 是本 source repository 的 authoring context。Skills 会被安装到 end-user environments，并在用户本地 instruction files 下运行，而不是在本 repo 的 instructions 下运行。必须在 skill runtime 生效的 behavioral rules，应放在该 skill 的 `SKILL.md` 或其自身 `references/` directory 下的文件中。
+`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` are authoring context for this source repository. Skills are installed into end-user environments, where they run against the user's local instruction files, not this repo's. Behavioral rules that must affect a skill at runtime belong in that skill's `SKILL.md` or files under its own `references/` directory.
 
+## Referencing Project Conventions in Skills
 
-## Referencing Project Conventions in Skills（在 Skills 中引用项目约定）
+When a skill needs to discover a project convention at runtime — the issue tracker, coding standards, commit format, lint command, scope constraints, etc. — describe **what to look for in the agent's existing context**, not **which file to open**.
 
-当某个 skill 需要在运行时发现项目约定（issue tracker、coding standards、commit format、lint command、scope constraints 等）时，描述 **agent 已有 context 中应该寻找什么**，而不是 **要打开哪个文件**。
+**On the read path, do not name instruction files (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.cursor/rules`).** Phrase it as "the project's active instructions and conventions already in your context." Three reasons:
 
-**在 read path 上，不要点名 instruction files（`AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.cursor/rules`）。** 应表述为“项目 active instructions 和 conventions 已在你的 context 中”。原因有三点：
+- **Redundant.** Every major harness auto-injects the project's root instruction file into context at session start (Claude Code loads `CLAUDE.md`, Codex `AGENTS.md`, Gemini `GEMINI.md`). Telling the agent to "read `AGENTS.md`" asks it to re-open content it already has.
+- **Brittle / not portable.** The filename differs per harness, and this plugin is authored once and converted to all of them. A hardcoded "read `AGENTS.md` (or `CLAUDE.md`)" silently finds nothing on a harness that uses a different name.
+- **Security smell.** Instructing an agent to go *read named instruction dotfiles* is the exact shape that prompt-injection defenses in some agent frameworks (e.g., Hermes) flag. Referencing context rather than filenames avoids tripping those guards.
 
-- **Redundant。** 主流 harness 会在 session start 时自动注入项目 root instruction file（Claude Code 加载 `CLAUDE.md`，Codex 加载 `AGENTS.md`，Antigravity 加载 `GEMINI.md`）。让 agent “read `AGENTS.md`” 等于要求它重新打开已在 context 中的内容。
-- **Brittle / not portable。** 文件名因 harness 而异，而本 plugin 一次 author 后会转换到所有平台。硬编码“read `AGENTS.md`（或 `CLAUDE.md`）”会在使用不同名称的 harness 上静默失效。
-- **Security smell。** 指示 agent 去“read named instruction dotfiles”正是某些 agent framework（例如 Hermes）的 prompt-injection 防御会标记的形状。引用 context 而不是文件名可以避免触发这些 guard。
+**Name a concrete file only where the skill must do something a context reference can't express:**
 
-**只有当 skill 必须做 context reference 无法表达的事情时，才点名具体文件：**
+- **Writing a convention back** (e.g., persisting `project_tracker: linear`) needs a target — name it minimally and as an example ("the project's root agent-instructions file, e.g., `AGENTS.md`; if it `@`-includes another, write to the substantive one").
+- **Reading content that is genuinely not auto-loaded** — a subdirectory-scoped instruction file governing the area being changed, an optional project doc like `STRATEGY.md` / `CONCEPTS.md` / `README.md`, or any file a *fresh subagent* (which does not inherit the parent's loaded instructions) must open to do its job. Auditing tools that must enumerate every standards file (e.g., `ce-code-review`'s project-standards reviewer globbing all `CLAUDE.md`/`AGENTS.md`) are a legitimate exception — they review the files, they don't re-read them for context.
 
-- **写回 convention**（例如持久化 `project_tracker: linear`）需要目标；用最小化示例命名（“项目 root agent-instructions file，例如 `AGENTS.md`；如果它通过 `@` include 另一个文件，则写入 substantive one”）。
-- **读取确实没有自动加载的内容**：负责当前区域的 subdirectory-scoped instruction file、可选项目文档如 `STRATEGY.md` / `CONCEPTS.md` / `README.md`，或 fresh subagent（没有继承 parent loaded instructions）必须打开的文件。必须枚举所有 standards files 的 audit tools（例如 `ce-code-review` 的 project-standards reviewer glob 所有 `CLAUDE.md`/`AGENTS.md`）是合理例外；它们是在 review 这些文件，而不是重新读取它们作为 context。
+**Describe the capability, not the tool.** Pair this with naming the *category* of thing rather than a closed set: "the project's issue tracker (e.g., GitHub Issues, Linear, Jira)" and "whatever interface that tracker exposes (connector/MCP, documented API, or a documented CLI)" — never assume a specific CLI exists, and never treat a missing binary / env var / MCP server as proof the capability is unavailable.
 
-**描述 capability，而不是 tool。** 同时用类别而不是封闭集合来命名：“项目 issue tracker（例如 GitHub Issues、Linear、Jira）”和“tracker 暴露的任意 interface（connector/MCP、documented API 或 documented CLI）”；永远不要假定某个具体 CLI 存在，也不要把 missing binary / env var / MCP server 当成 capability 不可用的证明。
+## Validating Agent and Skill Changes
 
-## Validating Agent and Skill Changes（验证 Agent 和 Skill 变更）
+Behavioral changes to a plugin skill or skill-local persona (anything under `skills/`) need a different validation path than mechanical code changes, because of how Claude Code loads plugins.
 
-由于 Claude Code 加载 plugins 的方式，对 plugin skill 或 skill-local persona 的 behavioral changes（`skills/` 下任何内容）需要不同于 mechanical code changes 的 validation path。
+- **Use the `skill-creator` skill to test changes.** Skill-creator is purpose-built for this: it spawns a generic subagent and injects the agent or skill content into the subagent's prompt at dispatch time, so each run reads the current source from disk. Invoke `/skill-creator` and use its eval workflow rather than reaching for ad-hoc workarounds.
 
-- **使用 `skill-creator` skill 测试 changes。** Skill-creator 专门为此设计：它会 spawn 一个 generic subagent，并在 dispatch 时把 agent 或 skill content 注入 subagent prompt，所以每次 run 都会从磁盘读取当前 source。调用 `/skill-creator` 并使用它的 eval workflow，而不是临时 workaround。
+- **Plugin agent and skill definitions both cache at session start.** Once a Claude Code session is open, dispatching a typed plugin agent runs the in-memory copy that was loaded when the session began. The same applies to skills: invoking a skill goes through the cached skill loader, so edits to skill scripts are also not tested via that path. File edits to either layer after session start do not propagate within the same session. Any iteration loop built around typed-agent dispatch or Skill-tool invocation in the same session is testing pre-edit content, not your changes.
 
-- **Plugin agent 和 skill definitions 都会在 session start 时缓存。** 一旦 Claude Code session 打开，dispatch typed plugin agent 会运行 session 开始时加载到 memory 中的 copy。Skills 也一样：调用 skill 会经过 cached skill loader，所以同一 session start 后的 skill script edits 也不能用这条路径测试。Session start 之后对任一层的 file edits 都不会在同一 session 中传播。任何围绕同一 session 中 typed-agent dispatch 或 Skill-tool invocation 建立的 iteration loop，测试的都是 pre-edit content，不是你的 changes。
+- **Do NOT edit `~/.claude/plugins/cache/` or `~/.claude/plugins/marketplaces/` to try to force a reload.** Those paths are user machine state, not repo-managed. Modifying them does not reliably bypass the in-session cache (it didn't, in observed behavior), risks being silently overwritten by plugin updates, and is the wrong layer to test from. The skill-creator pattern is the proper approach; if you genuinely need fresh-loaded behavior of the typed-agent dispatch path, restart the Claude Code session — but skill-creator is preferred for fast iteration.
 
-- **不要编辑 `~/.claude/plugins/cache/` 或 `~/.claude/plugins/marketplaces/` 来试图强制 reload。** 这些 paths 是 user machine state，不是 repo-managed。修改它们不能可靠绕过 in-session cache（已观察到不行），还有被 plugin updates 静默覆盖的风险，而且测试层级也不对。Skill-creator pattern 才是正确路径；如果确实需要 typed-agent dispatch path 的 freshly-loaded behavior，请重启 Claude Code session，但快速 iteration 优先用 skill-creator。
+- **Mechanical changes do not have this restriction.** Skill scripts (e.g., `extract-metadata.py`), parser logic, conversion code, and anything `bun test` exercises always run the current source. The caching issue only affects LLM-driven skill prose behavior dispatched through the plugin loader.
 
-- **Mechanical changes 不受此限制。** Skill scripts（例如 `extract-metadata.py`）、parser logic、conversion code，以及任何 `bun test` 覆盖的内容，始终运行当前 source。Caching issue 只影响通过 plugin loader dispatch 的 LLM-driven agent 或 skill prose behavior。
+## Writing Skill Instructions
 
-## Coding Conventions（编码约定）
+Every line of skill prose must change agent behavior. Before keeping a line, apply the deletion test: if removing it would not change the output, it is a no-op — delete it. Agents already write detailed commit messages, try to be thorough, and aim for readable code by default, so generic exhortations to do those things ("be thorough", "be comprehensive", "write clean/readable code", "think carefully", "world-class", "high quality") are no-ops that only add tokens and noise.
 
-- 在 platform 之间转换时，优先 explicit mappings，而不是 implicit magic。
-- 把 target-specific behavior 放在 dedicated converters/writers 中，不要把 conditionals 散落到无关文件。
-- 保留 installed targets 的 stable output paths 和 merge semantics；不要随意改变 generated file locations。
-- 添加或修改 target 时，同步更新 fixtures/tests，不要把 docs 或 examples 当作足够 proof。
+A line earns its place when it does one of these:
 
-## Commit Conventions（提交约定）
+- States a falsifiable constraint: a threshold, format, path, schema, or ordering.
+- Counters a known default tendency: a negative constraint ("do NOT add comments", "never push to main", "stop after X") or a guard against a shortcut the model would otherwise take.
+- Supplies domain knowledge the agent would not otherwise have.
 
-- **Prefix 基于 intent，而不是 file type。** 使用 conventional prefixes（`feat:`、`fix:`、`docs:`、`refactor:` 等），但按 change 做什么来分类，不按文件扩展名分类。`skills/`、`skills/*/references/agents/` 和 `.claude-plugin/` 下的文件即使是 Markdown 或 JSON，也是 product code。只有纯文档用途的文件（`README.md`、`docs/`、`CHANGELOG.md`）才保留 `docs:`。
-- **Type selection：按 intent 分类，不按 diff shape。** 当 `fix:` 和 `feat:` 都看似合适时，默认用 `fix:`：修复 broken 或 missing behavior 的 change 是 `fix:`，即使通过新增代码实现；净增行数不会把 fix 变成 `feat:`。`feat:` 只用于用户此前无法完成、且不是修复 broken behavior 的能力。其他 conventional types（`chore:`、`refactor:`、`docs:`、`perf:`、`test:`、`ci:`、`build:`、`style:`）在比二者更精确时仍为首选。Heuristic：如果今天写的 regression test 在 change 前会失败，它就是 `fix:`。用户可以针对某个 change 覆盖此默认值。
-- **包含 component scope。** Scope 会原样出现在 changelog 中。选择最窄且有用的 label：skill/agent name（`document-review`、`learnings-researcher`）、CLI 或 marketplace area（`cli`、`marketplace`），或跨域 shared area（`review`、`research`、`converters`）。不要使用 `compound-engineering`，它代表整个 plugin，对读者没有帮助。只有在没有任何单一 label 能增加 clarity 时才省略 scope。
-- **没有用户明确确认，不要使用 `!` 或 `BREAKING CHANGE:` footer。** 这些 markers 会触发 release-please 自动 major version bump；即使 change 技术上 breaking，用户也可能不想做这个决定。如果 change 看起来 breaking，告知用户并让他们决定是否应用 marker。
+An adjective is fine **only** when immediately operationalized by a concrete rule (e.g., "keep outputs concise — only enough detail to support the next decision"). The adjective alone is framing; the operationalization is the instruction. Do not append motivational rationale ("the quality of everything depends on this") to a directive that already stands on its own, and do not restate an instruction the same file already gives unless it is deliberate spaced repetition placed where drift occurs.
 
-## Adding a New Target Provider（添加新的 Target Provider）
+## Coding Conventions
 
-只有当 target format 稳定、有文档、且对 tools/permissions/hooks 有清晰 mapping 时才添加 provider。使用此 checklist：
+- Prefer explicit mappings over implicit magic when converting between platforms.
+- Keep target-specific behavior in dedicated converters/writers instead of scattering conditionals across unrelated files.
+- Preserve stable output paths and merge semantics for installed targets; do not casually change generated file locations.
+- When adding or changing a target, update fixtures/tests alongside implementation rather than treating docs or examples as sufficient proof.
 
-1. **Define the target entry（定义 target entry）**
-   - 在 `src/targets/index.ts` 中添加新 handler，直到完整实现前设为 `implemented: false`。
-   - 使用 dedicated writer module（例如 `src/targets/codex.ts`）。
+## Commit Conventions
 
-2. **Define types and mapping（定义 types 和 mapping）**
-   - 在 `src/types/` 下添加 provider-specific types。
-   - 在 `src/converters/` 中实现 conversion logic（Claude -> provider）。
-   - 保持 mappings explicit：tools、permissions、hooks/events、model naming。
+- **Prefix is based on intent, not file type.** Use conventional prefixes (`feat:`, `fix:`, `docs:`, `refactor:`, etc.) but classify by what the change does, not the file extension. Files under `skills/` and plugin manifests are product code even though they are Markdown or JSON. Reserve `docs:` for files whose sole purpose is documentation (`README.md`, `docs/`, `CHANGELOG.md`).
+- **Type selection — classify by intent, not diff shape.** Where `fix:` and `feat:` could both seem to fit, default to `fix:`: a change that remedies broken or missing behavior is `fix:` even when implemented by adding code, and net additions do not turn a fix into a `feat:`. Reserve `feat:` for capabilities the user could not previously accomplish where nothing was broken. Other conventional types (`chore:`, `refactor:`, `docs:`, `perf:`, `test:`, `ci:`, `build:`, `style:`) remain primary when they describe the change more precisely than either. Heuristic: if a regression test you could write today would have failed *before* the change, it's `fix:`. The user may override this default for a specific change.
+- **Include a component scope.** The scope appears verbatim in the changelog. Pick the narrowest useful label: skill/agent name (`document-review`, `learnings-researcher`), CLI or marketplace area (`cli`, `marketplace`), or shared area when cross-cutting (`review`, `research`, `converters`). Never use `compound-engineering` — it's the entire plugin and tells the reader nothing. Omit scope only when no single label adds clarity.
+- **Never use `!` or a `BREAKING CHANGE:` footer without explicit user confirmation.** These markers trigger release-please's automatic major version bump — a decision the user may not want even when a change is technically breaking. If a change appears breaking, surface that to the user and let them decide whether to apply the marker.
 
-3. **Wire the CLI（接入 CLI）**
-   - 确保 `convert` 和 `install` 支持 `--to <provider>` 和 `--also`。
-   - 保持 behavior 与 OpenCode 一致（写入 clean provider root）。
+## Adding a New Target Provider
 
-4. **Tests (required，必需测试)**
-   - 扩展 `tests/fixtures/sample-plugin` 中的 fixtures。
-   - 在 `tests/converter.test.ts` 中添加 mapping coverage。
-   - 为新 provider output tree 添加 writer test。
-   - 为 provider 添加 CLI test（类似 `tests/cli.test.ts`）。
+Only add a provider when the target format is stable, documented, and has a clear mapping for tools/permissions/hooks. Use this checklist:
 
-5. **Docs（文档）**
-   - 更新 README，加入新的 `--to` option 和 output locations。
+1. **Define the target entry**
+   - Add a new handler in `src/targets/index.ts` with `implemented: false` until complete.
+   - Use a dedicated writer module (e.g., `src/targets/codex.ts`).
 
-## Specialist Prompt Assets in Skills（Skills 中的专家 Prompt 资产）
+2. **Define types and mapping**
+   - Add provider-specific types under `src/types/`.
+   - Implement conversion logic in `src/converters/` (from Claude → provider).
+   - Keep mappings explicit: tools, permissions, hooks/events, model naming.
 
-`compound-engineering` plugin 不再在 `agents/` 下发布 standalone agent definitions。当某个 skill 需要 specialist persona 时，把它存放在该 skill directory 内，通常位于 `references/agents/` 或 `references/personas/`，并让调用方 skill 在 prompt 中注入该文件内容来 dispatch generic subagent。
+3. **Wire the CLI**
+   - Ensure `convert` and `install` support `--to <provider>` and `--also`.
+   - Keep behavior consistent with OpenCode (write to a clean provider root).
 
-Internal prompt asset filenames 应使用 descriptive、unprefixed names，因为它们不是 externally exposed agent names。
+4. **Tests (required)**
+   - Extend fixtures in `tests/fixtures/sample-plugin`.
+   - Add spec coverage for mappings in `tests/converter.test.ts`.
+   - Add a writer test for the new provider output tree.
+   - Add a CLI test for the provider (similar to `tests/cli.test.ts`).
 
-Example（示例）：
+5. **Docs**
+   - Update README with the new `--to` option and output locations.
 
-- `references/agents/learnings-researcher.md`（正确）
-- `references/agents/ce-learnings-researcher.md`（错误，作为 internal prompt asset 不应带 prefix）
+## Specialist Prompt Assets in Skills
 
-这些 prompt assets 不得包含 YAML frontmatter。Model selection、tool constraints 和 dispatch policy 属于调用方 skill 的 `SKILL.md`，不属于 prompt asset。
+The compound-engineering plugin no longer ships standalone agent definitions under `agents/`. When a skill needs a specialist persona, store it inside that skill directory, usually under `references/agents/` or `references/personas/`, and have the calling skill dispatch a generic subagent with that file's contents in the prompt.
 
-## File References in Skills（Skills 中的文件引用）
+Internal prompt asset file names should be descriptive and unprefixed because they are not externally exposed agent names.
 
-每个 skill directory 都是 self-contained unit。SKILL.md 只能使用从 skill root 出发的 relative paths 引用其自身 directory tree 内的 files（例如 `references/`、`assets/`、`scripts/`）。绝不要引用 skill directory 外的 files，不管是 relative traversal 还是 absolute path。
+Example:
+- `references/agents/learnings-researcher.md` (correct)
+- `references/agents/ce-learnings-researcher.md` (wrong for an internal prompt asset)
 
-Broken patterns（错误模式）：
+These prompt assets must not include YAML frontmatter. Model selection, tool constraints, and dispatch policy belong in the calling skill's `SKILL.md`, not in the prompt asset.
 
-- `../other-skill/references/schema.yaml`：relative traversal 到 sibling skill
-- `/home/user/compound-engineering-plugin/skills/other-skill/file.md`：指向另一个 skill 的 absolute path
-- `~/.claude/plugins/cache/marketplace/compound-engineering/1.0.0/skills/other-skill/file.md`：指向 installed plugin location 的 absolute path
+## File References in Skills
 
-为什么这很重要：
+Each skill directory is a self-contained unit. A SKILL.md file must only reference files within its own directory tree (e.g., `references/`, `assets/`, `scripts/`) using relative paths from the skill root. Never reference files outside the skill directory — whether by relative traversal or absolute path.
 
-- **Runtime resolution:** Skills 从用户 working directory 执行，不是从 skill directory 执行。Cross-directory paths 和 absolute paths 不会按预期 resolve。
-- **Unpredictable install paths:** 从 marketplace 安装的 plugins 会 cache 在 versioned paths 下。Source repo 中能工作的 absolute paths 不会匹配 installed layout，且 version segment 每次 release 都会变化。
-- **Converter portability:** CLI 在转换到其他 agent platforms 时，会把每个 skill directory 作为 isolated unit 复制。Cross-directory references 会断，因为 sibling directories 不包含在 copy 内。
+Broken patterns:
 
-如果两个 skills 需要同一个 supporting file，请复制到每个 skill 的 directory。优先使用小型、self-contained reference files，而不是 shared dependencies。
+- `../other-skill/references/schema.yaml` — relative traversal into a sibling skill
+- `/home/user/compound-engineering-plugin/skills/other-skill/file.md` — absolute path to another skill
+- `~/.claude/plugins/cache/marketplace/compound-engineering/1.0.0/skills/other-skill/file.md` — absolute path to an installed plugin location
 
-> **Note (March 2026):** 该限制反映当前 Claude Code skill resolution behavior 和已知 path-resolution bugs（[#11011](https://github.com/anthropics/claude-code/issues/11011)、[#17741](https://github.com/anthropics/claude-code/issues/17741)、[#12541](https://github.com/anthropics/claude-code/issues/12541)）。如果 Anthropic 未来引入 shared-files mechanism 或 cross-skill imports，应基于 supporting documentation 重新审视此 guidance。
+Why this matters:
 
-## Platform-Specific Variables in Skills（Skills 中的特定平台变量）
+- **Runtime resolution:** Skills execute from the user's working directory, not the skill directory. Cross-directory paths and absolute paths will not resolve as expected.
+- **Unpredictable install paths:** Plugins installed from the marketplace are cached at versioned paths. Absolute paths that worked in the source repo will not match the installed layout, and the version segment changes on every release.
+- **Converter portability:** The CLI copies each skill directory as an isolated unit when converting to other agent platforms. Cross-directory references break because sibling directories are not included in the copy.
 
-这个 plugin 会 author 一次，然后转换到多个 agent platforms（Claude Code、Codex、Antigravity CLI 等）。不要在 skill content 中使用 platform-specific environment variables 或 string substitutions（例如 `${CLAUDE_PLUGIN_ROOT}`、`${CLAUDE_SKILL_DIR}`、`${CLAUDE_SESSION_ID}`、`CODEX_SANDBOX`、`CODEX_SESSION_ID`），除非提供在变量 unavailable 或 unresolved 时仍能工作的 graceful fallback。
+If two skills need the same supporting file, duplicate it into each skill's directory. Prefer small, self-contained reference files over shared dependencies.
 
-Relative path 是否按 skill directory resolve，取决于由谁来 resolve，因此下面两种情况必须分开处理。不要假设裸 `scripts/...` path 在两种情况下都可用。
+> **Note (March 2026):** This constraint reflects current Claude Code skill resolution behavior and known path-resolution bugs ([#11011](https://github.com/anthropics/claude-code/issues/11011), [#17741](https://github.com/anthropics/claude-code/issues/17741), [#12541](https://github.com/anthropics/claude-code/issues/12541)). If Anthropic introduces a shared-files mechanism or cross-skill imports in the future, this guidance should be revisited with supporting documentation.
 
-**Read-time file references — resolve against the skill directory（读取时文件引用按 skill directory resolve）：** 当 skill *content* 指示 agent 读取 co-located file（例如 "read `references/schema.yaml`"）时，使用从 skill root 出发的 relative path。Skill loader 会在所有主要 platforms 上按 skill 自身 directory resolve 这些路径；不需要 variable prefix。这就是上方 *File References in Skills* 的规则。
+## Platform-Specific Variables in Skills
 
-**Runtime script invocations via the Bash tool — resolve against the project CWD（通过 Bash tool 运行脚本时按项目 CWD resolve）：** 当 skill content 指示 agent 通过 Bash tool *执行* bundled script 时，裸 relative path 在 Claude Code 上**不可用**。Bash tool 的 working directory 是用户 project，不是 skill directory，所以 `bash scripts/my-script.sh` 会 resolve 到 `<project>/scripts/...`，找不到文件，并让该步骤被静默跳过。这是 recurring bug class，见 #764（`ce-worktree`）、#811（`ce-code-review`）和 #898（`ce-compound`）。用 `${CLAUDE_SKILL_DIR}` 上的 file-existence guard 包住 invocation，让它在 Claude Code 上运行，并在其他地方**可见地降级**：
+This plugin is authored once and converted for multiple agent platforms (Claude Code, Codex, Gemini CLI, etc.). Do not use platform-specific environment variables or string substitutions (e.g., `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_SKILL_DIR}`, `${CLAUDE_SESSION_ID}`, `CODEX_SANDBOX`, `CODEX_SESSION_ID`) in skill content without a graceful fallback that works when the variable is unavailable or unresolved.
+
+Whether a relative path resolves against the skill directory depends on *who* resolves it, so the two cases below must be handled differently. Do not assume a bare `scripts/…` path works in both.
+
+**Read-time file references — resolve against the skill directory:** When skill *content* points the agent at a co-located file to read (e.g., "read `references/schema.yaml`"), use a relative path from the skill root. The skill loader resolves these against the skill's own directory on all major platforms — no variable prefix needed. This is the rule in *File References in Skills* above.
+
+**Runtime script invocations via the Bash tool — resolve against the project CWD:** When skill content tells the agent to *execute* a bundled script through the Bash tool, a bare relative path does **not** work on Claude Code. The Bash tool's working directory is the user's project, not the skill directory, so `bash scripts/my-script.sh` resolves to `<project>/scripts/…`, finds nothing, and the step is silently skipped. This is a recurring bug class — see #764 (`ce-worktree`), #811 (`ce-code-review`), and #898 (`ce-compound`). Wrap the invocation in a file-existence guard on `${CLAUDE_SKILL_DIR}` so it runs on Claude Code and degrades **visibly** elsewhere:
 
 ```
 if [ -n "${CLAUDE_SKILL_DIR}" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/my-script.sh" ]; then
@@ -212,22 +220,22 @@ else
 fi
 ```
 
-（`[ -n "${CLAUDE_SKILL_DIR}" ]` guard 可避免 unset variable 去探测 root-level `/scripts/...` path。）
+(The `[ -n "${CLAUDE_SKILL_DIR}" ]` guard keeps an unset variable from probing a root-level `/scripts/…` path.)
 
-`${CLAUDE_SKILL_DIR}` 由 Claude Code 替换进 SKILL.md content，覆盖 marketplace-cached installs 和 `claude --plugin-dir` local dev；它 resolve 到 skill 自身 directory，因此 `then` branch 会在那里运行。注意 `${CLAUDE_SKILL_DIR}` 是 SKILL.md *content* substitution，不是 executed process 内可用的 environment variable；脚本如果需要自己的 directory，应从 `BASH_SOURCE` derive，而不是读取 `$CLAUDE_SKILL_DIR`（见 `ce-update/scripts/`）。`ce-compound` 的 `validate-frontmatter.py` invocation 是这个 guard pattern 的 canonical example。
+`${CLAUDE_SKILL_DIR}` is substituted into SKILL.md content by Claude Code, covering both marketplace-cached installs and `claude --plugin-dir` local dev; it resolves to the skill's own directory, so the `then` branch runs there. Note `${CLAUDE_SKILL_DIR}` is a SKILL.md *content* substitution, not an environment variable available inside the executed process — a script that needs its own directory should derive it from `BASH_SOURCE` rather than reading `$CLAUDE_SKILL_DIR`. `ce-compound`'s `validate-frontmatter.py` invocation is the canonical example of this guard pattern.
 
-**为什么用 guard，而不是旧的 `${CLAUDE_SKILL_DIR:-.}` shell default（issue #943）。** 在其他 targets（Codex、Antigravity CLI 等）上，`${CLAUDE_SKILL_DIR}` 是 unset。早先的 `:-.` 形式会降级为 project-CWD-relative `./scripts/...`，语法上有效，但 resolve 到不存在的 path：bundled script 位于该 runtime 自己的 skill store（例如 `~/.codex/skills/<plugin>/<skill>/scripts/...`），因此调用会静默 miss。Existence guard 会把这种情况显式化：`then` branch 永不触发，`else` branch 告诉 agent 应该怎么做，而不是运行 broken path 或声称成功。两个事实说明这是真实 product gap，而不是 converter bug：
+**Why the guard, and why not the old `${CLAUDE_SKILL_DIR:-.}` shell default (issue #943).** On other targets (Codex, Gemini CLI, etc.) `${CLAUDE_SKILL_DIR}` is unset. The earlier `:-.` form degraded to a project-CWD-relative `./scripts/…` — *syntactically* valid, but resolving to a path that does not exist: the bundled script lives in that runtime's own skill store (e.g. `~/.codex/skills/<plugin>/<skill>/scripts/…`), so the call silently missed. The existence guard makes that case explicit — the `then` branch never fires, and the `else` branch tells the agent what to do instead of running a broken path or claiming success. Two facts make this a real product gap, not a converter bug:
 
-- Converter 不会 rewrite 这些 paths（`src/utils/codex-content.ts` 没有 `CLAUDE_SKILL_DIR` case），而且默认 `--to codex` mode 根本不会由 converter emit skills。
-- **这个 plugin 也会作为 *native* Codex plugin 发布**（通过 Codex 的 `/plugins` TUI marketplace 安装）。这条路径不会运行 converter；Codex 会原样加载 raw `SKILL.md`。`ce_platforms` frontmatter 只被 converter 的 `filterSkillsByPlatform` 尊重，因此它**不会**把 Claude-only skill 排除在 native Codex install 之外。两条 install paths 都尊重的唯一保护是 SKILL.md content 本身。
+- The converter does not rewrite these paths (`src/utils/codex-content.ts` has no `CLAUDE_SKILL_DIR` case), and in the default `--to codex` mode skills are not emitted by the converter at all.
+- **This plugin also ships as a *native* Codex plugin** (installed via Codex's `/plugins` TUI marketplace). That path never runs the converter — Codex loads the raw `SKILL.md` verbatim. The `ce_platforms` frontmatter is honored only by the converter's `filterSkillsByPlatform`, so it does **not** keep a Claude-only skill out of a native Codex install. The only protection both install paths respect is the SKILL.md content itself.
 
-因此：当 portability matters 时，不要让 skill 的 *core* behavior 依赖 runtime bundled-script call。上面的 existence guard 适合 **optional** guard script（例如 `ce-compound` 的 `validate-frontmatter.py`），其 `else` branch 会运行等价 inline check，让保护在 off-Claude 时仍然触发，而不是静默跳过。对于 *entire* behavior 都是 bundled script 的 skill，guard 并不会让它在 off-Claude 上工作；优先使用 agent 可 inline 执行的逻辑，或 agent 读取的 content（read-time references 在所有 targets 上都按 skill dir resolve）。
+So: do not gate a skill's *core* behavior on a runtime bundled-script call when portability matters. The existence guard above suits an **optional** guard script (e.g. `ce-compound`'s `validate-frontmatter.py`), where the `else` branch runs an equivalent inline check so the protection still fires off-Claude instead of silently skipping. For a skill whose *entire* behavior is a bundled script, a guard does not make it work off-Claude — prefer logic the agent can perform inline, or content the agent reads (read-time references resolve against the skill dir on all targets).
 
-**Permission caveat (Claude Code)：** Claude Code 的 permission checker 会评估 compound command 的每个 subcommand，而裸 `[ -f ... ]` test 不会被 pre-approved。因此把 pinned `bash "...sh"` call 包在 `if ... then ... fi` guard 中，会让 narrow `Bash(bash *...sh)` allow-rule 失效，并导致每次运行都 prompt。如果 bundled-script call 必须通过这种 pin 保持 auto-approved，请保留为单个 pinned command，而不是 inline guard。
+**Permission caveat (Claude Code).** Claude Code's permission checker evaluates every subcommand of a compound command, and a bare `[ -f … ]` test is not pre-approved — so wrapping a pinned `bash "…sh"` call in an `if … then … fi` guard defeats a narrow `Bash(bash *…sh)` allow-rule and prompts on every run. If a bundled-script call must stay auto-approved via such a pin, keep it a single pinned command rather than guarding it inline.
 
-**When a platform variable is unavoidable:** 使用 pre-resolution pattern（`!` backtick syntax），并在 skill content 中包含 explicit fallback instructions，让 agent 知道 value 为空、literal 或 error 时该怎么做：
+**When a platform variable is unavoidable:** Use the pre-resolution pattern (`!` backtick syntax) and include explicit fallback instructions in the skill content, so the agent knows what to do if the value is empty, literal, or an error:
 
-```text
+```
 **Plugin version (pre-resolved):** !`jq -r .version "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json"`
 
 If the line above resolved to a semantic version (e.g., `2.42.0`), use it.
@@ -235,31 +243,21 @@ Otherwise (empty, a literal command string, or an error), use the versionless fa
 Do not attempt to resolve the version at runtime.
 ```
 
-这同样适用于任何 platform 的 variables：从 Codex、Antigravity 或其他 platform 转换来的 skill，如果假设 platform-only variables 存在且没有 fallback，也会遇到同样问题。
+This applies equally to any platform's variables — a skill converted from Codex, Gemini, or any other platform will have the same problem if it assumes platform-only variables exist without a fallback.
 
-## Repository Docs Convention（仓库文档约定）
+## Repository Docs Convention
 
-- **Requirements** 位于 `docs/brainstorms/`：requirements exploration 和 ideation。
-- **Plans** 位于 `docs/plans/`：implementation plans 和 progress tracking。
-- **Solutions** 位于 `docs/solutions/`：过去问题的 documented solutions（bugs、best practices、workflow patterns），按 category 组织，并带 YAML frontmatter（`module`、`tags`、`problem_type`）。在相关 areas implementation 或 debugging 时有用。
-- **Specs** 位于 `docs/specs/`：target platform format specifications。
+- **Requirements** live in `docs/brainstorms/` — requirements exploration and ideation.
+- **Plans** live in `docs/plans/` — implementation plans and progress tracking.
+- **Solutions** live in `docs/solutions/` — documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
+- **Specs** live in `docs/specs/` — target platform format specifications.
 
-### Solution categories（`docs/solutions/`）
+### Solution categories (`docs/solutions/`)
 
-本 repo 构建的是面向 developers 的 plugin。Solution 分类应从 end user（使用 plugin 的 developer）视角出发，而不是从本 repo contributor 视角出发。
+This repo builds a plugin *for* developers. Categorize solutions from the perspective of the end user (a developer using the plugin), not a contributor to this repo.
 
-- **`developer-experience/`**：贡献本 repo 时的问题：local dev setup、shell aliases、test ergonomics、CI friction。如果 fix 只对 checkout 本 repo 的人有意义，就放在这里。
-- **`integrations/`**：plugin output 在某个 target platform 或 OS 上不能正确工作的问题。Cross-platform bugs、target writer output problems 和 converter compatibility issues 都放在这里。
-- **`workflow/`**、**`skill-design/`**：Plugin skill 和 agent design patterns、workflow improvements。
+- **`developer-experience/`** — Issues with contributing to *this repo*: local dev setup, shell aliases, test ergonomics, CI friction. If the fix only matters to someone with a checkout of this repo, it belongs here.
+- **`integrations/`** — Issues where plugin output doesn't work correctly on a target platform or OS. Cross-platform bugs, target writer output problems, and converter compatibility issues go here.
+- **`workflow/`**, **`skill-design/`** — Plugin skill and agent design patterns, workflow improvements.
 
-如果拿不准：如果 bug 影响的是运行 `bun install compound-engineering` 或 `bun convert` 的用户，它就是 integration 或 product issue，而不是 developer-experience。
-
-### Solution categories (`docs/solutions/`，solution 分类)
-
-这个 repo 构建的是给 developers 使用的 plugin。请从最终用户（一位使用该 plugin 的 developer）视角分类 solutions，而不是从本 repo contributor 视角分类。
-
-- **`developer-experience/`**：为 *this repo* 做贡献时的问题：local dev setup、shell aliases、test ergonomics、CI friction。如果 fix 只影响持有本 repo checkout 的人，就放这里。
-- **`integrations/`**：Plugin output 在某个 target platform 或 OS 上无法正确工作的问题。Cross-platform bugs、target writer output problems 和 converter compatibility issues 放这里。
-- **`workflow/`**, **`skill-design/`**：Plugin skill 和 agent design patterns、workflow improvements。
-
-拿不准时：如果 bug 影响运行 `bun install compound-engineering` 或 `bun convert` 的人，它就是 integration 或 product issue，而不是 developer-experience。
+When in doubt: if the bug affects someone running `bun install compound-engineering` or `bun convert`, it's an integration or product issue, not developer-experience.

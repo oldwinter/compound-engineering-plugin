@@ -10,7 +10,7 @@ import {
 
 const tempRoots: string[] = []
 const COMPOUND_DESCRIPTION =
-  "用于 code review、research、design 和 workflow automation 的 AI-powered development tools。"
+  "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具"
 
 afterEach(async () => {
   for (const root of tempRoots.splice(0, tempRoots.length)) {
@@ -27,6 +27,7 @@ async function makeFixtureRoot(): Promise<string> {
   await mkdir(path.join(root, ".claude-plugin"), { recursive: true })
   await mkdir(path.join(root, ".cursor-plugin"), { recursive: true })
   await mkdir(path.join(root, ".codex-plugin"), { recursive: true })
+  await mkdir(path.join(root, ".kimi-plugin"), { recursive: true })
   await mkdir(path.join(root, ".agents", "plugins"), { recursive: true })
 
   await writeFile(
@@ -66,6 +67,19 @@ async function makeFixtureRoot(): Promise<string> {
       2,
     ),
   )
+  await writeFile(
+    path.join(root, ".kimi-plugin", "plugin.json"),
+    JSON.stringify(
+      {
+        name: "compound-engineering",
+        version: "2.42.0",
+        description: "old",
+        skills: "./skills/",
+      },
+      null,
+      2,
+    ),
+  )
   await mkdir(path.join(root, ".agy"), { recursive: true })
   await writeFile(
     path.join(root, ".agy", "plugin.json"),
@@ -77,6 +91,23 @@ async function makeFixtureRoot(): Promise<string> {
       {
         name: "compound-engineering-plugin",
         plugins: [{ name: "compound-engineering" }],
+      },
+      null,
+      2,
+    ),
+  )
+  await writeFile(
+    path.join(root, ".kimi-plugin", "marketplace.json"),
+    JSON.stringify(
+      {
+        version: "2",
+        plugins: [
+          {
+            id: "compound-engineering",
+            displayName: "Compound Engineering",
+            source: "https://github.com/EveryInc/compound-engineering-plugin",
+          },
+        ],
       },
       null,
       2,
@@ -160,6 +191,27 @@ describe("release metadata", () => {
     // Crucially: write: true did NOT bump the Codex version to match Claude.
     // release-please owns version writes via extra-files; syncReleaseMetadata detects but does not correct.
     const afterContents = JSON.parse(await Bun.file(codexPath).text())
+    expect(afterContents.version).toBe("2.41.0")
+  })
+
+  test("reports Kimi plugin.json version drift without auto-correcting", async () => {
+    const root = await makeFixtureRoot()
+    await writeFile(
+      path.join(root, ".kimi-plugin", "plugin.json"),
+      JSON.stringify(
+        { name: "compound-engineering", version: "2.41.0", skills: "./skills/" },
+        null,
+        2,
+      ),
+    )
+    const result = await syncReleaseMetadata({ root, write: true })
+    const kimiPath = path.join(root, ".kimi-plugin", "plugin.json")
+    const kimiUpdate = result.updates.find((u) => u.path === kimiPath)
+
+    expect(kimiUpdate).toBeDefined()
+    expect(kimiUpdate!.changed).toBe(true)
+
+    const afterContents = JSON.parse(await Bun.file(kimiPath).text())
     expect(afterContents.version).toBe("2.41.0")
   })
 
@@ -251,6 +303,15 @@ describe("release metadata", () => {
     expect(result.errors.some((err) => err.includes(".codex-plugin/plugin.json is missing"))).toBe(true)
   })
 
+  test("reports missing Kimi manifest as a structural error", async () => {
+    const root = await makeFixtureRoot()
+    await Bun.$`rm ${path.join(root, ".kimi-plugin", "plugin.json")}`.quiet()
+
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(result.errors.some((err) => err.includes(".kimi-plugin/plugin.json is missing"))).toBe(true)
+  })
+
   test("reports Codex plugin.json name mismatch as structural error", async () => {
     const root = await makeFixtureRoot()
     await writeFile(
@@ -283,6 +344,24 @@ describe("release metadata", () => {
       result.errors.some(
         (err) =>
           err.includes("compound-engineering") &&
+          err.includes("missing required field") &&
+          err.includes("skills"),
+      ),
+    ).toBe(true)
+  })
+
+  test("reports missing skills field on Kimi manifest as structural error", async () => {
+    const root = await makeFixtureRoot()
+    await writeFile(
+      path.join(root, ".kimi-plugin", "plugin.json"),
+      JSON.stringify({ name: "compound-engineering", version: "2.42.0" }, null, 2),
+    )
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(
+      result.errors.some(
+        (err) =>
+          err.includes(".kimi-plugin/plugin.json") &&
           err.includes("missing required field") &&
           err.includes("skills"),
       ),
@@ -384,7 +463,102 @@ describe("release metadata", () => {
     ).toBe(true)
   })
 
-  test("happy path: fixture with matching Codex manifests produces no Codex errors", async () => {
+  test("reports Kimi marketplace plugin-list mismatch as structural error", async () => {
+    const root = await makeFixtureRoot()
+    await writeFile(
+      path.join(root, ".kimi-plugin", "marketplace.json"),
+      JSON.stringify(
+        {
+          version: "2",
+          plugins: [],
+        },
+        null,
+        2,
+      ),
+    )
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(
+      result.errors.some(
+        (err) => err.includes(".kimi-plugin/marketplace.json") && err.includes("does not match"),
+      ),
+    ).toBe(true)
+  })
+
+  test("reports Kimi marketplace schema version mismatch as structural error", async () => {
+    const root = await makeFixtureRoot()
+    await writeFile(
+      path.join(root, ".kimi-plugin", "marketplace.json"),
+      JSON.stringify(
+        {
+          version: "1",
+          plugins: [{ id: "compound-engineering" }],
+        },
+        null,
+        2,
+      ),
+    )
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(
+      result.errors.some(
+        (err) => err.includes(".kimi-plugin/marketplace.json") && err.includes('schema version "2"'),
+      ),
+    ).toBe(true)
+  })
+
+  test("reports Kimi marketplace root-local plugin source as structural error", async () => {
+    const root = await makeFixtureRoot()
+    await writeFile(
+      path.join(root, ".kimi-plugin", "marketplace.json"),
+      JSON.stringify(
+        {
+          version: "2",
+          plugins: [{ id: "compound-engineering", source: "./" }],
+        },
+        null,
+        2,
+      ),
+    )
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(
+      result.errors.some(
+        (err) =>
+          err.includes(".kimi-plugin/marketplace.json") &&
+          err.includes("compound-engineering") &&
+          err.includes('source "./"'),
+      ),
+    ).toBe(true)
+  })
+
+  test("reports Kimi marketplace missing plugin source as structural error", async () => {
+    const root = await makeFixtureRoot()
+    await writeFile(
+      path.join(root, ".kimi-plugin", "marketplace.json"),
+      JSON.stringify(
+        {
+          version: "2",
+          plugins: [{ id: "compound-engineering" }],
+        },
+        null,
+        2,
+      ),
+    )
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(
+      result.errors.some(
+        (err) =>
+          err.includes(".kimi-plugin/marketplace.json") &&
+          err.includes("compound-engineering") &&
+          err.includes("missing required field") &&
+          err.includes("source"),
+      ),
+    ).toBe(true)
+  })
+
+  test("happy path: fixture with matching native manifests produces no native plugin errors", async () => {
     const root = await makeFixtureRoot()
     // Align Claude <-> Codex versions and descriptions so there's no drift.
     await writeFile(
@@ -406,9 +580,12 @@ describe("release metadata", () => {
     )
 
     const result = await syncReleaseMetadata({ root, write: false })
-    const codexErrors = result.errors.filter(
-      (err) => err.includes(".codex-plugin") || err.includes(".agents/plugins"),
+    const nativePluginErrors = result.errors.filter(
+      (err) =>
+        err.includes(".codex-plugin") ||
+        err.includes(".agents/plugins") ||
+        err.includes(".kimi-plugin"),
     )
-    expect(codexErrors).toEqual([])
+    expect(nativePluginErrors).toEqual([])
   })
 })

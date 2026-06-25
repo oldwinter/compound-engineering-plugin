@@ -1,97 +1,97 @@
 ---
 name: ce-strategy
-description: "创建或维护 STRATEGY.md：product 的 target problem、approach、users、key metrics 和 tracks of work。用于开始 new product、更新 direction，或出现 'write our strategy'、'update the roadmap'、'what are we working on'、'set up the strategy doc' 这类 prompts 时。也会在 ce-ideate、ce-brainstorm 或 ce-plan 需要 upstream grounding 且尚无 strategy doc 时触发。"
-argument-hint: "[可选：要 revisit 的 section，例如 'metrics' 或 'approach']"
+description: "Create or update STRATEGY.md. Use when starting a product, changing direction or roadmap, or when ce-ideate, ce-brainstorm, or ce-plan need upstream product grounding."
+argument-hint: "[optional: section to revisit, e.g. 'metrics' or 'approach']"
 ---
 
-# Product Strategy（产品策略）
+# Product Strategy
 
-**Note（注意）: The current year is 2026.** 给 strategy document 标日期时使用这一点。
+**Note: The current year is 2026.** Use this when dating the strategy document.
 
-`ce-strategy` 产出并维护 `STRATEGY.md`：一份短小、durable anchor document，记录 product 是什么、服务谁、如何成功，以及 team 正在投资哪里。它位于 repo root，是 canonical、well-known file（与 `README.md` 同级）。Downstream skills（`ce-ideate`、`ce-brainstorm`、`ce-plan`）在它存在时读取它作为 grounding。
+`ce-strategy` produces and maintains `STRATEGY.md` - a short, durable anchor document that captures what the product is, who it serves, how it succeeds, and where the team is investing. It lives at the repo root as a canonical, well-known file (peer of `README.md`). Downstream skills (`ce-ideate`, `ce-brainstorm`, `ce-plan`) read it as grounding when it exists.
 
-Document 刻意短而 structured。几个 sharp questions 的好答案，比大量 prose 更能形成 strategy。此 skill 会提出这些问题，对 weak answers push back，并写出 doc。
+The document is short and structured on purpose. Good answers to a handful of sharp questions produce a better strategy than any amount of prose. This skill asks those questions, pushes back on weak answers, and writes the doc.
 
-## Interaction Method（交互方式）
+## Interaction Method
 
-默认使用平台的 blocking question tool：Claude Code 中用 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 搭配 `select:AskUserQuestion`）、Codex 中用 `request_user_input`、Antigravity 中用 `ask_question`、Pi 中用 `ask_user`（需要 `pi-ask-user` extension）。只有当 harness 中没有 blocking tool 或调用报错（例如 Codex edit modes）时，才 fallback 到 chat 中的 numbered options；不要因为需要 schema load 就 fallback。绝不要 silently skip 该问题。
+Default to the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
 
-一次只问一个问题。Substantive sections（problem、approach、persona）优先使用 free-form responses；single-select 只用于 routing decisions（revisit 哪个 section）。每个 option label 必须 self-contained。
+Ask one question at a time. Prefer free-form responses for the substantive sections (problem, approach, persona); reserve single-select for routing decisions (which section to revisit). Each option label must be self-contained.
 
-## Focus Hint（Focus 提示）
+## Focus Hint
 
 <focus_hint> #$ARGUMENTS </focus_hint>
 
-将任何 argument 解释为 optional focus：要 revisit 的 section name（`metrics`、`approach`、`tracks`）或 scope hint。没有 argument 时，open-ended 继续，并让 file state 决定 path。
+Interpret any argument as an optional focus: a section name to revisit (`metrics`, `approach`, `tracks`) or a scope hint. With no argument, proceed open-ended and let the file state decide the path.
 
-## Core Principles（核心原则）
+## Core Principles
 
-1. **Anchor, not plan.** Strategy 是 product 是什么以及为什么。Features 属于 `ce-brainstorm`；schedules 属于 issue tracker。不要让二者 creep into doc。
-2. **Rigor in the questions, not the headings.** Section headers 使用 plain English。Interview questions enforce strategy discipline。
-3. **Short is a feature.** Template 有约束。添加 sections 的成本比看起来高。对 expansion push back。
-4. **Durable across runs.** 此 skill 可 rerun。第二次运行时 in place update，保留有效内容，只 challenge 看起来 stale 或 weak 的 sections。
+1. **Anchor, not plan.** Strategy is what the product is and why. Features belong in `ce-brainstorm`; schedules belong in the issue tracker. Do not let either creep into the doc.
+2. **Rigor in the questions, not the headings.** The section headers are plain English. The interview questions enforce strategy discipline.
+3. **Short is a feature.** The template is constrained. Adding sections costs more than it looks like. Push back on expansion.
+4. **Durable across runs.** This skill is rerunnable. On a second run it updates in place, preserves what is working, and only challenges sections that look stale or weak.
 
-## Execution Flow（执行流程）
+## Execution Flow
 
-### Phase 0：Route by File State（按文件状态路由）
+### Phase 0: Route by File State
 
-使用 native file-read tool 读取 `STRATEGY.md`。
+Read `STRATEGY.md` using the native file-read tool.
 
-- **File does not exist** -> First run。进入 Phase 1。
-- **File exists and argument names a specific section** -> Targeted update。进入 Phase 2。
-- **File exists, no argument** -> 询问要 revisit 哪些 section(s)，然后进入 Phase 2。
+- **File does not exist** -> First run. Go to Phase 1.
+- **File exists and argument names a specific section** -> Targeted update. Go to Phase 2.
+- **File exists, no argument** -> Ask which section(s) to revisit, then Phase 2.
 
-用一行 announce path："Strategy doc not found - let's write it." 或 "Found existing strategy - let's review and update."
+Announce the path in one line: "Strategy doc not found - let's write it." or "Found existing strategy - let's review and update."
 
-### Phase 1：First-Run Interview（首次 Interview）
+### Phase 1: First-Run Interview
 
-读取 `references/interview.md`。此加载 non-optional：每个 section 的 pushback rules、anti-pattern examples 和 quality bar 都在那里。凭记忆 improvising 会产出 passive transcription，而不是 strategy doc。
+Read `references/interview.md`. This load is non-optional - the pushback rules, anti-pattern examples, and quality bar for each section live there. Improvising from memory produces a passive transcription instead of a strategy doc.
 
-按 final document 的 section order 运行 interview：
+Run the interview in the section order of the final document:
 
-1. Target problem（目标问题）
-2. Our approach（我们的方法）
-3. Who it's for（服务对象）
-4. Key metrics（关键指标）
-5. Tracks（轨道）
-6. Milestones（里程碑，可选）
-7. Not working on（不做什么，可选）
-8. Marketing（营销，可选）
+1. Target problem
+2. Our approach
+3. Who it's for
+4. Key metrics
+5. Tracks
+6. Milestones (optional)
+7. Not working on (optional)
+8. Marketing (optional)
 
-对每个 section，询问 opening question，应用 pushback rules，并用用户自己的语言 capture final answer。不要跳过 pushback step；这是 skill 核心。每个 section 最多两轮 pushback；之后 capture 用户已给出的内容，并 note 该 section 值得下次 revisiting。
+For each section, ask the opening question, apply the pushback rules, and capture the final answer in the user's own language. Do not skip the pushback step - it is the core of the skill. Two rounds of pushback per section maximum; capture what the user has given after that and note the section is worth revisiting on the next run.
 
-当所有 required sections（1-5）都 capture 后，读取 `references/strategy-template.md`，填充，并在写入前把 full draft 展示在 chat 中。提供一轮 edits。然后写入 `STRATEGY.md`。
+When all required sections (1-5) are captured, read `references/strategy-template.md`, fill it in, and present the full draft in chat before writing. Offer one round of edits. Then write to `STRATEGY.md`.
 
-### Phase 2：Update Run（更新运行）
+### Phase 2: Update Run
 
-彻底读取 existing `STRATEGY.md`。用 3-5 行 summarize current state，让用户看到已记录内容。
+Read the existing `STRATEGY.md` thoroughly. Summarize current state in 3-5 lines so the user sees what is on file.
 
-如果 argument named a specific section，跳到 `references/interview.md` 中该 section。其他所有 sections 完全 preserve。像 first run 一样应用 pushback；不要仅因 weak content 已经写下就 rubber-stamp。
+If the argument named a specific section, jump to that section in `references/interview.md`. Preserve all other sections exactly. Apply pushback as if this were a first run - do not rubber-stamp existing weak content just because it is already written.
 
-如果没有 specific target，使用 blocking question tool 询问用户要 revisit 哪个 section。Options（选项）：
+If no specific target, ask the user which section to revisit using the blocking question tool. Options:
 
-- "Target problem"（目标问题）
-- "Our approach"（我们的方法）
-- "Who it's for"（服务对象）
-- "Metrics, tracks, or other"（指标、tracks 或其他）
+- "Target problem"
+- "Our approach"
+- "Who it's for"
+- "Metrics, tracks, or other"
 
-对每个 revisited section，带 full pushback 重新 interview。用户确认仍准确的 sections 保持 untouched。将 YAML frontmatter 中的 `last_updated` value 更新为今天的 ISO date。
+For each revisited section, re-interview with full pushback. For sections the user confirms are still accurate, leave them untouched. Update the `last_updated` value in the YAML frontmatter to today's ISO date.
 
-将 updated doc 写回 `STRATEGY.md`。
+Write the updated doc back to `STRATEGY.md`.
 
-### Phase 3：Downstream Handoff（下游交接）
+### Phase 3: Downstream Handoff
 
-写入后，用一行说明 file 所在位置，以及 `ce-ideate`、`ce-brainstorm` 和 `ce-plan` 会在下次运行时将它作为 grounding 读取。
+After writing, note in one line where the file lives and that `ce-ideate`, `ce-brainstorm`, and `ce-plan` will pick it up as grounding on their next run.
 
-如果此 repo 尚未运行 downstream skill，建议下一步使用 `ce-ideate` 或 `ce-brainstorm`。
+If no downstream skill has run yet on this repo, suggest `ce-ideate` or `ce-brainstorm` skills as a next step.
 
-## What This Skill Does Not Do（此 Skill 不做什么）
+## What This Skill Does Not Do
 
-- 不更新 issue tracker，也不 reconcile in-flight work。Strategy 是 doc；execution 在别处。
-- 不 prioritize backlog。Prioritization 是 separate workflow。
-- 不写 product requirements 或 implementation plans；那些属于 `ce-brainstorm` 和 `ce-plan`。
-- 不计算 metric values。它记录哪些 metrics 重要、在哪里，而不是今天读数是多少。
+- Does not update the issue tracker or reconcile in-flight work. Strategy is the doc; execution lives elsewhere.
+- Does not prioritize the backlog. Prioritization is a separate workflow.
+- Does not write product requirements or implementation plans - those are `ce-brainstorm` and `ce-plan`.
+- Does not compute metric values. It records which metrics matter and where they live, not what they read today.
 
-## Learn More（延伸阅读）
+## Learn More
 
-"Target problem / Our approach / Tracks" structure 受 Richard Rumelt 的 *Good Strategy Bad Strategy* 启发，尤其是他的 diagnosis、guiding policy 和 coherent action kernel。`references/interview.md` 中的 interview questions 旨在越过他称为 "bad strategy" 的 patterns：fluff、伪装成 strategy 的 goals，以及代替 guiding choice 的 feature lists。如果 slogan 和 strategy 的区别还不够 sharp，这本书是推荐 follow-up reading。
+The "Target problem / Our approach / Tracks" structure is informed by Richard Rumelt's *Good Strategy Bad Strategy* - specifically his kernel of diagnosis, guiding policy, and coherent action. The interview questions in `references/interview.md` are designed to push past the patterns he calls "bad strategy": fluff, goals dressed up as strategy, and feature lists in place of a guiding choice. The book is the recommended follow-up reading if the distinction between a slogan and a strategy is not yet sharp.

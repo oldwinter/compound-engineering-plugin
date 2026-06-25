@@ -1,68 +1,68 @@
 ---
 name: ce-work
-description: 在保持质量并完成 features 的同时高效执行 work
-argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 plan doc]"
+description: Execute a plan or concrete work prompt end-to-end. Use when implementing from docs/plans, a spec path, or a clear build request; use ce-debug for open-ended bugs.
+argument-hint: "[Plan doc path or description of work. Blank to auto use latest plan doc]"
 ---
 
-# Work Execution Command（工作执行命令）
+# Work Execution Command
 
-在保持质量并完成 features 的同时高效执行 work。
+Execute work efficiently while maintaining quality and finishing features.
 
-## Introduction（简介）
+## Introduction
 
-此 command 接收 work document（plan 或 specification）或描述 work 的 bare prompt，并系统性执行。重点是通过快速理解 requirements、遵循 existing patterns，并全程保持质量来 **shipping complete features**。
+This command takes a work document (plan or specification) or a bare prompt describing the work, and executes it systematically. The focus is on **shipping complete features** by understanding requirements quickly, following existing patterns, and maintaining quality throughout.
 
-## Input Document（输入文档）
+## Input Document
 
 <input_document> #$ARGUMENTS </input_document>
 
-## Execution Workflow（执行流程）
+## Execution Workflow
 
-### Phase 0: Input Triage（输入分诊）
+### Phase 0: Input Triage
 
-根据 `<input_document>` 中提供的内容决定如何继续。
+Determine how to proceed based on what was provided in `<input_document>`.
 
-**Plan document**（input 是 existing plan 或 specification 的 file path）：先读取 plan metadata，markdown plan 读取 YAML frontmatter，HTML plan 读取 visible header text（两种格式携带同一组 fields）。如果它带有 `execution: knowledge-work`，这是 **non-code plan**：读取 `references/non-code-execution.md` 并遵循该 carve-out，而不是继续本 workflow 的其余部分。否则（field 缺省或为 `execution: code`）→ 跳到 Phase 1 并运行正常 code lifecycle。（marker check 放在 plan-document handling 内部，因为检测 marker 必须先有文件；下方 "Bare prompt" 不受影响。）
+**Plan document** (input is a file path to an existing plan or specification): read the plan's metadata first — YAML frontmatter for a markdown plan, or the visible header text for an HTML plan (both formats carry the same fields). If it carries `execution: knowledge-work`, this is a **non-code plan** — read `references/non-code-execution.md` and follow that carve-out instead of the rest of this workflow. Otherwise (the field is absent or `execution: code`) → skip to Phase 1 and run the normal code lifecycle. (The marker check lives here, inside plan-document handling, because detecting the marker requires already having a file; "Bare prompt" below is unaffected.)
 
-**Bare prompt**（input 是 work 描述，而不是 file path）：
+**Bare prompt** (input is a description of work, not a file path):
 
-1. **Scan the work area（扫描工作区域）**
+1. **Scan the work area**
 
-   - 基于 prompt 识别 likely to change 的 files
-   - 查找这些 areas 的 existing test files（搜索 import、reference 或与 implementation files 共享名称的 test/spec files）
-   - 记录 affected areas 中的 local patterns 和 conventions
+   - Identify files likely to change based on the prompt
+   - Find existing test files for those areas (search for test/spec files that import, reference, or share names with the implementation files)
+   - Note local patterns and conventions in the affected areas
 
-2. **Assess complexity and route（评估复杂度并路由）**
+2. **Assess complexity and route**
 
-   | Complexity（复杂度） | Signals（信号） | Action（动作） |
+   | Complexity | Signals | Action |
    |-----------|---------|--------|
-   | **Trivial** | 1-2 files，无 behavioral change（typo、config、rename） | 进入 Phase 1 step 2（environment setup），然后直接实现：不建 task list，不进 execution loop。如果 change 触及 behavior-bearing code，应用 Test Discovery |
-   | **Small / Medium** | Clear scope，少于约 10 个 files | 从 discovery 构建 task list。进入 Phase 1 step 2 |
-   | **Large** | Cross-cutting、architectural decisions、10+ files、触及 auth/payments/migrations | 告知用户这会受益于 `/ce-brainstorm` 或 `/ce-plan`，用于浮现 edge cases 和 scope boundaries。尊重用户选择。如果继续，构建 task list 并进入 Phase 1 step 2 |
+   | **Trivial** | 1-2 files, no behavioral change (typo, config, rename) | Proceed to Phase 1 step 2 (environment setup), then implement directly — no task list, no execution loop. Apply Test Discovery if the change touches behavior-bearing code |
+   | **Small / Medium** | Clear scope, under ~10 files | Build a task list from discovery. Proceed to Phase 1 step 2 |
+   | **Large** | Cross-cutting, architectural decisions, 10+ files, touches auth/payments/migrations | Inform the user this would benefit from `/ce-brainstorm` or `/ce-plan` to surface edge cases and scope boundaries. Honor their choice. If proceeding, build a task list and continue to Phase 1 step 2 |
 
 ---
 
-### Phase 1: Quick Start（快速开始）
+### Phase 1: Quick Start
 
-1. **Read Plan and Clarify（读取 Plan 并澄清）**（如果从 Phase 0 带 bare prompt 到达，则跳过）
+1. **Read Plan and Clarify** _(skip if arriving from Phase 0 with a bare prompt)_
 
-   - 完整读取 work document。Plans 可以是 markdown（`.md`）或 HTML（`.html`）：两种格式都按线性文本读取。HTML plans 携带与 markdown plans 相同的 section names 和 IDs，只是被 semantic HTML elements（`<section>`、`<article>` 等）包裹；section-finding 方式相同（对 section names 做 substring match，忽略 HTML wrapper noise）。
-   - 当 auto-detect latest plan（blank invocation）时，同时 glob `docs/plans/*.md` 和 `docs/plans/*.html`，并不考虑 extension 选择最新文件。
-   - 将 plan 视为 decision artifact，而不是 execution script。
-   - 如果 plan 包含 `Implementation Units`、`Work Breakdown`、`Requirements`（或 legacy `Requirements Trace`）、`Files`、`Test Scenarios` 或 `Verification` 等 sections，将它们作为 execution 的 primary source material。
-   - 检查每个 implementation unit 上的 `Execution note`：它们携带该 unit 的 execution posture signal（例如 test-first 或 characterization-first）。创建 tasks 时记录它们。
-   - 检查 `Deferred to Implementation` 或 `Implementation-Time Unknowns` section：这些是 planner 有意留给你在 execution 期间解决的问题。开始前记录它们，让它们影响你的 approach，而不是在 mid-task 才 surprise 你。
-   - 检查 `Scope Boundaries` section：这些是 explicit non-goals。如果 implementation 开始把你拉向 adjacent work，回头参考它们。
-   - Review plan 中提供的任何 references 或 links。
-   - 如果用户在本 session 中明确要求 TDD、test-first 或 characterization-first execution，即使 plan 没有 `Execution note`，也要遵守。
-   - 如果任何内容 unclear 或 ambiguous，现在询问 clarifying questions。
-   - 如果上方需要 clarifying questions，就让用户 approval resolved answers。如果不需要 clarifications，不做单独 approval step，直接继续：plan scope 是 plan 的 authority，不是要重新谈判的东西。
-   - **不要跳过这一步**：现在提问比构建错误内容更好。
-   - **execution 期间不要编辑 plan body。** plan 是 decision artifact；progress 存在于 git commits 和 task tracker 中，不存在于 plan 中。`ce-work` 不 mutate plan；是否 shipped 由 git 推导，不记录在 doc 中。Legacy plans 可能在 unit headings 上包含 `- [ ]` / `- [x]` marks 或 `status:` field：将它们作为 state 忽略；per-unit completion 通过读取当前 file state 在 execution 期间确定。
+   - Read the work document completely. Plans may be markdown (`.md`) or HTML (`.html`) — both formats are read as text linearly. HTML plans carry the same section names and IDs as markdown plans, just wrapped in semantic HTML elements (`<section>`, `<article>`, etc.); section-finding works the same way (substring match on section names, ignoring HTML wrapper noise).
+   - When auto-detecting the latest plan (blank invocation), glob `docs/plans/*.md` AND `docs/plans/*.html` and pick the most recent regardless of extension.
+   - Treat the plan as a decision artifact, not an execution script
+   - If the plan includes sections such as `Implementation Units`, `Work Breakdown`, `Requirements` (or legacy `Requirements Trace`), `Files`, `Test Scenarios`, or `Verification`, use those as the primary source material for execution
+   - Check for `Execution note` on each implementation unit — these carry the plan's execution posture signal for that unit (for example, test-first or characterization-first). Note them when creating tasks.
+   - Check for a `Deferred to Implementation` or `Implementation-Time Unknowns` section — these are questions the planner intentionally left for you to resolve during execution. Note them before starting so they inform your approach rather than surprising you mid-task
+   - Check for a `Scope Boundaries` section — these are explicit non-goals. Refer back to them if implementation starts pulling you toward adjacent work
+   - Review any references or links provided in the plan
+   - If the user explicitly asks for TDD, test-first, or characterization-first execution in this session, honor that request even if the plan has no `Execution note`
+   - If anything is unclear or ambiguous, ask clarifying questions now
+   - If clarifying questions were needed above, get user approval on the resolved answers. If no clarifications were needed, proceed without a separate approval step — plan scope is the plan's authority, not something to renegotiate
+   - **Do not skip this** - better to ask questions now than build the wrong thing
+   - **Do not edit the plan body during execution.** The plan is a decision artifact; progress lives in git commits and the task tracker, not the plan. `ce-work` does not mutate the plan — whether it shipped is derived from git, not recorded in the doc. Legacy plans may contain `- [ ]` / `- [x]` marks on unit headings or a `status:` field — ignore them as state; per-unit completion is determined during execution by reading the current file state.
 
-2. **Setup Environment（设置环境）**
+2. **Setup Environment**
 
-   首先检查 current branch：
+   First, check the current branch:
 
    ```bash
    current_branch=$(git branch --show-current)
@@ -74,194 +74,194 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
    fi
    ```
 
-   **如果已经在 feature branch 上**（不是 default branch）：
+   **If already on a feature branch** (not the default branch):
 
-   首先，检查 branch name 是否 **meaningful**：像 `feat/crowd-sniff` 或 `fix/email-validation` 这样的名称会告诉未来读者 work 是什么。Auto-generated worktree names（例如 `worktree-jolly-beaming-raven`）或其他 opaque names 则不会。
+   First, check whether the branch name is **meaningful** — a name like `feat/crowd-sniff` or `fix/email-validation` tells future readers what the work is about. Auto-generated worktree names (e.g., `worktree-jolly-beaming-raven`) or other opaque names do not.
 
-   如果 branch name meaningless 或 auto-generated，继续前建议重命名：
+   If the branch name is meaningless or auto-generated, suggest renaming it before continuing:
    ```bash
    git branch -m <meaningful-name>
    ```
-   从 plan title 或 work description 派生新名称（例如 `feat/crowd-sniff`）。将 rename 作为 recommended option，与 continuing as-is 一起呈现。
+   Derive the new name from the plan title or work description (e.g., `feat/crowd-sniff`). Present the rename as a recommended option alongside continuing as-is.
 
-   然后询问："继续在 `[current_branch]` 上工作，还是创建新 branch？"
-   - 如果继续（无论是否 rename），进入 step 3
-   - 如果创建新 branch，遵循下方 Option A 或 B
+   Then ask: "Continue working on `[current_branch]`, or create a new branch?"
+   - If continuing (with or without rename), proceed to step 3
+   - If creating new, follow Option A or B below
 
-   **如果在 default branch 上**，选择如何继续：
+   **If on the default branch**, choose how to proceed:
 
-   **Option A：Create a new branch（创建新 branch）**
+   **Option A: Create a new branch**
    ```bash
    git pull origin [default_branch]
    git checkout -b feature-branch-name
    ```
-   使用基于 work 的 meaningful name（例如 `feat/user-authentication`、`fix/email-validation`）。
+   Use a meaningful name based on the work (e.g., `feat/user-authentication`, `fix/email-validation`).
 
-   **Option B：Use a worktree（使用 worktree，推荐用于 parallel development）**
+   **Option B: Use a worktree (recommended for parallel development)**
    ```bash
    skill: ce-worktree
    # Ensures isolation: detects an existing worktree, prefers the harness's
    # native worktree tool, else creates one from the default branch
    ```
 
-   **Option C：Continue on the default branch（继续在 default branch 上）**
-   - 需要 explicit user confirmation
-   - 只有在用户明确说 "yes, commit to [default_branch]" 后才继续
-   - 没有 explicit permission 时，绝不要直接 commit 到 default branch
+   **Option C: Continue on the default branch**
+   - Requires explicit user confirmation
+   - Only proceed after user explicitly says "yes, commit to [default_branch]"
+   - Never commit directly to the default branch without explicit permission
 
-   **Recommendation（建议）**：以下情况使用 worktree：
-   - 你想同时处理多个 features
-   - 你想在 experimenting 时保持 default branch clean
-   - 你计划频繁切换 branches
+   **Recommendation**: Use worktree if:
+   - You want to work on multiple features simultaneously
+   - You want to keep the default branch clean while experimenting
+   - You plan to switch between branches frequently
 
-3. **Create Task List（创建 Task List）**（如果 Phase 0 已构建，或 Phase 0 路由为 Trivial，则跳过）
-   - 使用平台 task tracking tool（Claude Code 中的 `TaskCreate`/`TaskUpdate`/`TaskList`、Codex 中的 `update_plan`，或其他 harness 的等价工具）将 plan 拆成 actionable tasks
-   - 从 plan 的 implementation units、dependencies、files、test targets 和 verification criteria 派生 tasks
-   - 当 plan 为 Implementation Units 定义 U-IDs 时，将 unit 的 U-ID 作为 task subject 前缀保留（例如 "U3: Add parser coverage"）。这让 blocker references、deferred-work notes 和 final summaries 锚定到 plan 使用的同一 identifier，因此跨 plan edits 的 progress 和 traceability 保持清晰
-   - 当存在时，将每个 unit 的 `Execution note` 带入 task
-   - 对每个 unit，实现前读取 `Patterns to follow` field：这些指向要 mirror 的 specific files 或 conventions
-   - 使用每个 unit 的 `Verification` field 作为该 task 的 primary "done" signal
-   - 不要期待 plan 包含 implementation code、micro-step TDD instructions 或 exact shell commands
-   - 包含 tasks 之间的 dependencies
-   - 基于需要先做什么排序
-   - 包含 testing 和 quality check tasks
-   - 保持 tasks specific 且 completable
+3. **Create Task List** _(skip if Phase 0 already built one, or if Phase 0 routed as Trivial)_
+   - Use the platform's task tracking tool (`TaskCreate`/`TaskUpdate`/`TaskList` in Claude Code, `update_plan` in Codex, or the equivalent on other harnesses) to break the plan into actionable tasks
+   - Derive tasks from the plan's implementation units, dependencies, files, test targets, and verification criteria
+   - When the plan defines U-IDs for Implementation Units, preserve the unit's U-ID as a prefix in the task subject (e.g., "U3: Add parser coverage"). This keeps blocker references, deferred-work notes, and final summaries anchored to the same identifier the plan uses, so progress and traceability remain unambiguous across plan edits
+   - Carry each unit's `Execution note` into the task when present
+   - For each unit, read the `Patterns to follow` field before implementing — these point to specific files or conventions to mirror
+   - Use each unit's `Verification` field as the primary "done" signal for that task
+   - Do not expect the plan to contain implementation code, micro-step TDD instructions, or exact shell commands
+   - Include dependencies between tasks
+   - Prioritize based on what needs to be done first
+   - Include testing and quality check tasks
+   - Keep tasks specific and completable
 
-4. **Choose Execution Strategy（选择执行策略）**
+4. **Choose Execution Strategy**
 
-   创建 task list 后，基于 plan 的 size 和 dependency structure 决定如何 execute：
+   After creating the task list, decide how to execute based on the plan's size and dependency structure:
 
-   | Strategy（策略） | When to use（何时使用） |
+   | Strategy | When to use |
    |----------|-------------|
-| **Inline** | 1-2 个 small tasks，或需要 mid-flight user interaction 的 tasks。**bare-prompt work 的默认项**：bare prompts 很少产出足够 structured context 来 justify subagent dispatch |
-| **Serial subagents** | 3+ tasks 且彼此有 dependencies。每个 subagent 获得聚焦一个 unit 的 fresh context window：防止许多 tasks 中的 context degradation。需要 plan-unit metadata（Goal、Files、Approach、Test scenarios） |
-| **Parallel subagents** | 3+ tasks 且通过 Parallel Safety Check（下方）。同时 dispatch independent units，在 prerequisites 完成后运行 dependent units。需要 plan-unit metadata |
+   | **Inline** | 1-2 small tasks, or tasks needing user interaction mid-flight. **Default for bare-prompt work** — bare prompts rarely produce enough structured context to justify subagent dispatch |
+   | **Serial subagents** | 3+ tasks with dependencies between them. Each subagent gets a fresh context window focused on one unit — prevents context degradation across many tasks. Requires plan-unit metadata (Goal, Files, Approach, Test scenarios) |
+   | **Parallel subagents** | 3+ tasks that pass the Parallel Safety Check (below). Dispatch independent units simultaneously, run dependent units after their prerequisites complete. Requires plan-unit metadata |
 
-   **Parallel Safety Check**：选择 parallel dispatch 前必需：
+   **Parallel Safety Check** — required before choosing parallel dispatch:
 
-   1. 从每个 candidate unit 的 `Files:` section（Create、Modify 和 Test paths）构建 file-to-unit mapping
-   2. 检查 intersection：任何 file path 出现在 2+ units 中就表示 overlap
-   3. **如果发现 overlap 且 worktree isolation 不可用**：downgrade 到 serial subagents。记录原因（例如 "Units 2 and 4 share `config/routes.rb` — using serial dispatch"）。Serial subagents 仍提供 context-window isolation，且没有 shared-directory write races。
-   4. **如果发现 overlap 且 worktree isolation 可用**：parallel dispatch 仍安全：subagents 在 isolation 中工作，overlap 会作为 predictable merge conflict 浮现，由 orchestrator 通过下方 post-batch flow 处理。记录 predicted overlap，让 post-batch flow 知道哪些 merges 可能发生 conflicts。
+   1. Build a file-to-unit mapping from every candidate unit's `Files:` section (Create, Modify, and Test paths)
+   2. Check for intersection — any file path appearing in 2+ units means overlap
+   3. **If overlap is found AND worktree isolation is unavailable**: downgrade to serial subagents. Log the reason (e.g., "Units 2 and 4 share `config/routes.rb` — using serial dispatch"). Serial subagents still provide context-window isolation without shared-directory write races.
+   4. **If overlap is found AND worktree isolation is available**: parallel dispatch is still safe — subagents work in isolation, and the overlap surfaces as a predictable merge conflict the orchestrator handles via the post-batch flow below. Log the predicted overlap so the post-batch flow knows which merges to expect conflicts on.
 
-   即使没有 file overlap，共享 orchestrator working directory 的 parallel subagents 也会面临 git index contention（concurrent staging/committing 会 corrupt index）和 test interference（concurrent test runs 会拾取彼此的 in-progress changes）。Worktree isolation 消除两者；下方 shared-directory fallback constraints 用于缓解它们。
+   Even with no file overlap, parallel subagents sharing the orchestrator's working directory face git index contention (concurrent staging/committing corrupts the index) and test interference (concurrent test runs pick up each other's in-progress changes). Worktree isolation eliminates both; the shared-directory fallback constraints below mitigate them.
 
-   **Subagent isolation**：给每个 parallel subagent 自己的 working tree：
-   - **Claude Code（`Agent` tool）：** 传入 `isolation: "worktree"` 和 `run_in_background: true`。harness 会在 `.claude/worktrees/agent-<id>` 下创建 per-subagent worktree，并位于自己的 branch。依赖它前，验证 `.claude/worktrees/` 已 gitignored。
-   - **没有 built-in worktree isolation 的其他平台**（例如 Codex `spawn_agent`、Pi `subagent`）：subagents 共享 orchestrator 的 directory。
+   **Subagent isolation** — give each parallel subagent its own working tree:
+   - **Claude Code (`Agent` tool):** pass `isolation: "worktree"` and `run_in_background: true`. The harness creates a per-subagent worktree under `.claude/worktrees/agent-<id>` on its own branch. Verify `.claude/worktrees/` is gitignored before relying on this.
+   - **Other platforms** without built-in worktree isolation: subagents share the orchestrator's directory.
 
-   **Subagent dispatch** 使用可用的 subagent 或 task spawning mechanism。对每个 unit，给 subagent：
-   - 完整 plan file path（用于 overall context）
-   - 该 specific unit 的 Goal、Files、Approach、Execution note、Patterns、Test scenarios 和 Verification
-   - 与该 unit 相关的任何 resolved deferred questions
-   - 指令：检查该 unit 的 test scenarios 是否覆盖所有 applicable categories（happy paths、edge cases、error paths、integration），并在写 tests 前补足 gaps
+   **Subagent dispatch** uses your available subagent or task spawning mechanism. For each unit, give the subagent:
+   - The full plan file path (for overall context)
+   - The specific unit's Goal, Files, Approach, Execution note, Patterns, Test scenarios, and Verification
+   - Any resolved deferred questions relevant to that unit
+   - Instruction to check whether the unit's test scenarios cover all applicable categories (happy paths, edge cases, error paths, integration) and supplement gaps before writing tests
 
-   **Shared-directory fallback constraints**：仅当 worktree isolation 不可用时应用：
-   - 指示每个 subagent："Do not stage files (`git add`), create commits, or run the project test suite. The orchestrator handles testing, staging, and committing after all parallel units complete."
-   - 这些 constraints 防止 concurrent subagents 之间的 git index contention 和 test interference。
-   - worktree isolation active 时，省略这些 constraints：subagents 可以在自己的 worktree branch 内 stage、commit 并运行其 unit tests。
+   **Shared-directory fallback constraints** — apply only when worktree isolation is unavailable:
+   - Instruct each subagent: "Do not stage files (`git add`), create commits, or run the project test suite. The orchestrator handles testing, staging, and committing after all parallel units complete."
+   - These constraints prevent git index contention and test interference between concurrent subagents.
+   - With worktree isolation active, omit these constraints — subagents may stage, commit, and run their unit's tests within their own worktree branch.
 
-   **Permission mode：** dispatching subagents 时省略 `mode` 参数，让用户配置的 permission settings 生效。不要传 `mode: "auto"`：它会 override `bypassPermissions` 等 user-level settings。
+   **Permission mode:** Omit the `mode` parameter when dispatching subagents so the user's configured permission settings apply. Do not pass `mode: "auto"` — it overrides user-level settings like `bypassPermissions`.
 
-   **每个 subagent 完成后（serial mode）：**
-   1. Review subagent 的 diff：确认 changes 符合该 unit 的 scope 和 `Files:` list
-   2. 运行相关 test suite，确认 tree healthy
-   3. 如果 tests 失败，先 diagnose 并修复，再继续：不要在 broken tree 上 dispatch dependent units
-   4. 更新 task list（不要编辑 plan body：progress 由 commit 承载）
-   5. Dispatch 下一个 unit
+   **After each subagent completes (serial mode):**
+   1. Review the subagent's diff — verify changes match the unit's scope and `Files:` list
+   2. Run the relevant test suite to confirm the tree is healthy
+   3. If tests fail, diagnose and fix before proceeding — do not dispatch dependent units on a broken tree
+   4. Update the task list (do not edit the plan body — progress is carried by the commit)
+   5. Dispatch the next unit
 
-   **一个 parallel subagent batch 全部完成后（worktree-isolated mode）：**
-   1. 等待当前 parallel batch 中所有 subagent 完成。
-   2. 对每个已完成 subagent，按 dependency order：review 该 worktree 相对 orchestrator branch 的 diff。如果 subagent 没有 commit 自己的 work，就在该 worktree 内 stage 并 commit。
-   3. 按 dependency order 依次将每个 subagent branch merge 到 orchestrator branch。**如果出现 merge conflict，abort merge（`git merge --abort`），并针对 now-merged tree 以 serial 方式重新 dispatch 冲突 unit**：静默手动 resolve 等于选择一边并丢掉另一个 unit 的 intent。（Parallel Safety Check 中预测的 overlap 会在这里以 conflict 形式浮现，而不是在 shared-directory mode 中变成静默数据丢失。）
-   4. 每次 merge 后运行相关 test suite。如果 tests 失败，先 diagnose 并修复，再 merge 下一个 branch。
-   5. 更新 task list（progress 由 merge commits 承载）。
-   6. Merge 后移除每个 subagent 的 worktree 并删除其 branch。使用 subagent result 返回的 absolute path 和 branch name。
-      - 先 unlock worktree：harness 会锁定 per-subagent worktrees：`git worktree unlock <absolute-path>`
-      - 移除 worktree：`git worktree remove <absolute-path>`
-      - 删除 branch：`git branch -d <branch-name>`（branch 默认会比 worktree 活得更久；不清理会累积 orphan branch。小写 `-d` 会拒绝删除 unmerged branch，这正是需要的安全性；如果失败，先调查再考虑 force）
-   7. Dispatch 下一批 independent units，或下一个 dependent unit。
+   **After all parallel subagents in a batch complete (worktree-isolated mode):**
+   1. Wait for every subagent in the current parallel batch to finish.
+   2. For each completed subagent, in dependency order: review the worktree's diff against the orchestrator's branch. If the subagent did not commit its own work, stage and commit it inside that worktree.
+   3. Merge each subagent's branch into the orchestrator's branch sequentially in dependency order. **If a merge conflict surfaces, abort the merge (`git merge --abort`) and re-dispatch the conflicting unit serially against the now-merged tree** — hand-resolving silently picks a side and discards one unit's intent. (Predicted overlap from the Parallel Safety Check surfaces here as a conflict, not as silent data loss in shared-directory mode.)
+   4. After each merge, run the relevant test suite. If tests fail, diagnose and fix before merging the next branch.
+   5. Update the task list (progress is carried by the merge commits).
+   6. After merging, remove each subagent's worktree and delete its branch. Use the absolute path and branch name returned in the subagent's result.
+      - Unlock the worktree first — the harness locks per-subagent worktrees: `git worktree unlock <absolute-path>`
+      - Remove the worktree: `git worktree remove <absolute-path>`
+      - Delete the branch: `git branch -d <branch-name>` (the branch outlives the worktree by default and accumulates as orphans if not cleaned up; `-d` lowercase refuses to delete unmerged branches, which is the safety we want — if it fails, investigate before forcing)
+   7. Dispatch the next batch of independent units, or the next dependent unit.
 
-   **一个 parallel subagent batch 全部完成后（shared-directory fallback）：**
-   1. 等待当前 parallel batch 中所有 subagent 完成后，再处理任何 result
-   2. Cross-check discovered file collisions：比较 batch 中所有 subagent 实际修改的 files（不只看它们声明的 `Files:` lists）。Subagents 可能创建或修改 plan 阶段未预期的 files：这是正常的，因为 plans 描述 *what* 而不是 *how*。只有同一 batch 中 2+ subagents 修改了同一个 file，collision 才重要。在 shared working directory 中，只有最后写入者的版本会保留，另一个 unit 对该 file 的 changes 会丢失。如果发现 collision：先 commit 所有 units 中没有冲突的 files，再针对 shared file serial 重新运行 affected units，让每个 unit 基于彼此已 committed work 继续
-   3. 对每个完成的 unit，按 dependency order：review diff、运行相关 test suite、只 stage 该 unit 的 files，并用从该 unit 的 Goal 派生的 conventional message commit
-   4. 如果 commit 一个 unit 的 changes 后 tests 失败，先 diagnose 并修复，再 commit 下一个 unit
-   5. 更新 task list（不要编辑 plan body：progress 由刚创建的 commits 承载）
-   6. Dispatch 下一批 independent units，或下一个 dependent unit
+   **After all parallel subagents in a batch complete (shared-directory fallback):**
+   1. Wait for every subagent in the current parallel batch to finish before acting on any of their results
+   2. Cross-check for discovered file collisions: compare the actual files modified by all subagents in the batch (not just their declared `Files:` lists). Subagents may create or modify files not anticipated during planning — this is expected, since plans describe *what* not *how*. A collision only matters when 2+ subagents in the same batch modified the same file. In a shared working directory, only the last writer's version survives — the other unit's changes to that file are lost. If a collision is detected: commit all non-colliding files from all units first, then re-run the affected units serially for the shared file so each builds on the other's committed work
+   3. For each completed unit, in dependency order: review the diff, run the relevant test suite, stage only that unit's files, and commit with a conventional message derived from the unit's Goal
+   4. If tests fail after committing a unit's changes, diagnose and fix before committing the next unit
+   5. Update the task list (do not edit the plan body — progress is carried by the commits just made)
+   6. Dispatch the next batch of independent units, or the next dependent unit
 
-### Phase 2: Execute（执行）
+### Phase 2: Execute
 
-1. **Task Execution Loop（Task 执行循环）**
+1. **Task Execution Loop**
 
-   按 priority order 处理每个 task：
+   For each task in priority order:
 
    ```
    while (tasks remain):
-     - 将 task 标记为 in-progress
-     - 读取 plan 引用的 files，或 Phase 0 中发现的 files
-     - **如果 unit 的 work 已经存在且符合 plan intent**（files 已具备预期 capability，或当前 code 已满足该 unit 的 `Verification` criteria），说明 work 很可能已经在先前 branch 或 session 中 shipped。验证匹配后，将 task 标记完成并继续。不要静默重新实现。
-     - 在 codebase 中查找 similar patterns
-     - 为正在修改的 implementation files 找到 existing test files（Test Discovery，见下方）
-     - 按 existing conventions 实现
-     - 添加、更新或移除 tests，使其匹配 implementation changes（见下方 Test Discovery）
-     - 运行 System-Wide Test Check（见下方）
-     - Run tests after changes（changes 后运行 tests）
-     - Assess testing coverage（评估 testing coverage）：这个 task 是否改变 behavior？如果是，是否写入或更新了 tests？如果没有添加 tests，理由是否明确且有意（例如 pure config、无 behavioral change）？
-     - Mark task as completed（将 task 标记为 completed）
-     - 评估是否 incremental commit（见下方）
+     - Mark task as in-progress
+     - Read any referenced files from the plan or discovered during Phase 0
+     - **If the unit's work is already present and matches the plan's intent** (files exist with the expected capability, or the unit's `Verification` criteria are already satisfied by the current code), the work has likely shipped on a prior branch or session. Verify it matches, mark the task complete, and move on. Do not silently reimplement.
+     - Look for similar patterns in codebase
+     - Find existing test files for implementation files being changed (Test Discovery — see below)
+     - Implement following existing conventions
+     - Add, update, or remove tests to match implementation changes (see Test Discovery below)
+     - Run System-Wide Test Check (see below)
+     - Run tests after changes
+     - Assess testing coverage: did this task change behavior? If yes, were tests written or updated? If no tests were added, is the justification deliberate (e.g., pure config, no behavioral change)?
+     - Mark task as completed
+     - Evaluate for incremental commit (see below)
    ```
 
-   当 unit 携带 `Execution note` 时，遵守它。对于 test-first units，先为该 unit 写 failing test，再实现。对于 characterization-first units，先捕获 existing behavior，再修改。没有 `Execution note` 的 units，务实推进。
+   When a unit carries an `Execution note`, honor it. For test-first units, write the failing test before implementation for that unit. For characterization-first units, capture existing behavior before changing it. For units without an `Execution note`, proceed pragmatically.
 
-   Execution posture 的 guardrails：
-   - test-first 时，不要在同一步里同时写 test 和 implementation
-   - 实现 fix 或 feature 前，不要跳过验证 new test 会失败
-   - test-first 时，不要超出当前 behavior slice 过度实现
-   - trivial renames、pure configuration 和 pure styling work 可以跳过 test-first discipline
+   Guardrails for execution posture:
+   - Do not write the test and implementation in the same step when working test-first
+   - Do not skip verifying that a new test fails before implementing the fix or feature
+   - Do not over-implement beyond the current behavior slice when working test-first
+   - Skip test-first discipline for trivial renames, pure configuration, and pure styling work
 
-   **Test Discovery**：实现某个 file 的 changes 前，先找到它的 existing test files（搜索 import、reference 该 implementation file，或与其共享 naming patterns 的 test/spec files）。如果 plan 指定了 test scenarios 或 test files，从那里开始，再检查 plan 可能未列出的额外 test coverage。Implementation files 的 changes 应配套对应 test updates：new behavior 写 new tests，changed behavior 修改 tests，deleted behavior 移除或更新 tests。
+   **Test Discovery** — Before implementing changes to a file, find its existing test files (search for test/spec files that import, reference, or share naming patterns with the implementation file). When a plan specifies test scenarios or test files, start there, then check for additional test coverage the plan may not have enumerated. Changes to implementation files should be accompanied by corresponding test updates — new tests for new behavior, modified tests for changed behavior, removed or updated tests for deleted behavior.
 
-   **Test Scenario Completeness**：为 feature-bearing unit 写 tests 前，检查 plan 的 `Test scenarios` 是否覆盖该 unit 适用的所有 categories。如果某类缺失，或 scenarios 很模糊（例如只写 "validates correctly"，没有说明 inputs 和 expected outcomes），先基于该 unit 自身 context 补足，再写 tests：
+   **Test Scenario Completeness** — Before writing tests for a feature-bearing unit, check whether the plan's `Test scenarios` cover all categories that apply to this unit. If a category is missing or scenarios are vague (e.g., "validates correctly" without naming inputs and expected outcomes), supplement from the unit's own context before writing tests:
 
-   | Category（类别） | When it applies（适用时机） | How to derive if missing（缺失时如何推导） |
+   | Category | When it applies | How to derive if missing |
    |----------|----------------|------------------------|
-   | **Happy path** | 对 feature-bearing units 始终适用 | 读取 unit 的 Goal 和 Approach，找出 core input/output pairs |
-   | **Edge cases** | 当 unit 有 meaningful boundaries（inputs、state、concurrency）时 | 识别 boundary values、empty/nil inputs 和 concurrent access patterns |
-   | **Error/failure paths** | 当 unit 有 failure modes（validation、external calls、permissions）时 | 枚举该 unit 应 reject 的 invalid inputs、应 enforce 的 permission/auth denials，以及应处理的 downstream failures |
-   | **Integration** | 当 unit 跨 layers（callbacks、middleware、multi-service）时 | 识别 cross-layer chain，并写一个不使用 mocks 的 scenario 来 exercise 它 |
+   | **Happy path** | Always for feature-bearing units | Read the unit's Goal and Approach for core input/output pairs |
+   | **Edge cases** | When the unit has meaningful boundaries (inputs, state, concurrency) | Identify boundary values, empty/nil inputs, and concurrent access patterns |
+   | **Error/failure paths** | When the unit has failure modes (validation, external calls, permissions) | Enumerate invalid inputs the unit should reject, permission/auth denials it should enforce, and downstream failures it should handle |
+   | **Integration** | When the unit crosses layers (callbacks, middleware, multi-service) | Identify the cross-layer chain and write a scenario that exercises it without mocks |
 
-   **System-Wide Test Check**：将 task 标记 done 前，暂停并询问：
+   **System-Wide Test Check** — Before marking a task done, pause and ask:
 
-   | Question（问题） | What to do（处理方式） |
+   | Question | What to do |
    |----------|------------|
-   | **运行时会触发什么？** Callbacks、middleware、observers、event handlers：从你的 change 向外 trace 两层。 | 阅读实际 code（不是 docs）：你触及的 models 上的 callbacks、request chain 中的 middleware、`after_*` hooks。 |
-   | **我的 tests 是否 exercise 真实链路？** 如果每个 dependency 都被 mock，test 只能证明你的 logic *in isolation* 工作，不能证明 interaction 正确。 | 至少写一个 integration test，使用 real objects 穿过完整 callback/middleware chain。对会相互作用的 layers 不使用 mocks。 |
-   | **Failure 是否会留下 orphaned state？** 如果 code 在调用 external service 前持久化 state（DB row、cache、file），service 失败时会怎样？Retry 会不会创建 duplicates？ | 用 real objects trace failure path。如果 risky call 前创建了 state，测试 failure 会 clean up，或 retry 是 idempotent。 |
-   | **还有哪些 interfaces 暴露这个行为？** Mixins、DSLs、alternative entry points（Agent vs Chat vs ChatMethods）。 | Grep related classes 中的 method/behavior。如果需要 parity，现在补上，不要当作 follow-up。 |
-   | **Error strategies 在各 layer 间是否一致？** Retry middleware + application fallback + framework error handling：是否冲突或造成 double execution？ | 列出每个 layer 的 specific error classes。验证你的 rescue list 匹配 lower layer 实际 raise 的内容。 |
+   | **What fires when this runs?** Callbacks, middleware, observers, event handlers — trace two levels out from your change. | Read the actual code (not docs) for callbacks on models you touch, middleware in the request chain, `after_*` hooks. |
+   | **Do my tests exercise the real chain?** If every dependency is mocked, the test proves your logic works *in isolation* — it says nothing about the interaction. | Write at least one integration test that uses real objects through the full callback/middleware chain. No mocks for the layers that interact. |
+   | **Can failure leave orphaned state?** If your code persists state (DB row, cache, file) before calling an external service, what happens when the service fails? Does retry create duplicates? | Trace the failure path with real objects. If state is created before the risky call, test that failure cleans up or that retry is idempotent. |
+   | **What other interfaces expose this?** Mixins, DSLs, alternative entry points (Agent vs Chat vs ChatMethods). | Grep for the method/behavior in related classes. If parity is needed, add it now — not as a follow-up. |
+   | **Do error strategies align across layers?** Retry middleware + application fallback + framework error handling — do they conflict or create double execution? | List the specific error classes at each layer. Verify your rescue list matches what the lower layer actually raises. |
 
-   **何时跳过：** 没有 callbacks、没有 state persistence、没有 parallel interfaces 的 leaf-node changes。如果 change 是 purely additive（new helper method、new view partial），这个 check 只需 10 秒，答案通常是 "nothing fires, skip."
+   **When to skip:** Leaf-node changes with no callbacks, no state persistence, no parallel interfaces. If the change is purely additive (new helper method, new view partial), the check takes 10 seconds and the answer is "nothing fires, skip."
 
-   **何时最重要：** 任何触及带 callbacks 的 models、带 fallback/retry 的 error handling，或通过 multiple interfaces 暴露的 functionality 的 change。
+   **When this matters most:** Any change that touches models with callbacks, error handling with fallback/retry, or functionality exposed through multiple interfaces.
 
 
-2. **Incremental Commits（增量提交）**
+2. **Incremental Commits**
 
-   完成每个 task 后，评估是否创建 incremental commit：
+   After completing each task, evaluate whether to create an incremental commit:
 
-   | 何时 commit... | 何时不要 commit... |
+   | Commit when... | Don't commit when... |
    |----------------|---------------------|
-   | Logical unit complete（model、service、component） | 只是 larger unit 的 small part |
+   | Logical unit complete (model, service, component) | Small part of a larger unit |
    | Tests pass + meaningful progress | Tests failing |
-   | 即将切换 contexts（backend → frontend） | Purely scaffolding，且无 behavior |
-   | 即将尝试 risky/uncertain changes | Commit message 只能写 "WIP" |
+   | About to switch contexts (backend → frontend) | Purely scaffolding with no behavior |
+   | About to attempt risky/uncertain changes | Would need a "WIP" commit message |
 
-   **Heuristic：** "Can I write a commit message that describes a complete, valuable change?" 如果可以，就 commit。如果 message 会变成 "WIP" 或 "partial X"，就等待。
+   **Heuristic:** "Can I write a commit message that describes a complete, valuable change? If yes, commit. If the message would be 'WIP' or 'partial X', wait."
 
-   如果 plan 有 Implementation Units，将它们作为 commit boundaries 的初始 guide，但要根据 implementation 期间的发现调整。如果 unit 比预期更大，可能需要多个 commits；small related units 也可能一起 land。使用每个 unit 的 Goal 来帮助确定 commit message。
+   If the plan has Implementation Units, use them as a starting guide for commit boundaries — but adapt based on what you find during implementation. A unit might need multiple commits if it's larger than expected, or small related units might land together. Use each unit's Goal to inform the commit message.
 
-   **Commit workflow（提交 workflow）：**
+   **Commit workflow:**
    ```bash
    # 1. Verify tests pass (use project's test command)
    # Examples: bin/rails test, npm test, pytest, go test, etc.
@@ -273,118 +273,115 @@ argument-hint: "[Plan doc path 或 work 描述。留空则自动使用最新 pla
    git commit -m "feat(scope): description of this unit"
    ```
 
-   **Handling merge conflicts（处理 merge conflicts）：** 如果 rebasing 或 merging 期间出现 conflicts，立即 resolve。Incremental commits 会让 conflict resolution 更容易，因为每个 commit 都小而聚焦。
+   **Handling merge conflicts:** If conflicts arise during rebasing or merging, resolve them immediately. Incremental commits make conflict resolution easier since each commit is small and focused.
 
-   **Note（备注）：** Incremental commits 使用干净的 conventional messages，不带 attribution footers。最终 Phase 4 commit/PR 包含完整 attribution。
+   **Note:** Incremental commits use clean conventional messages without attribution footers. The final Phase 4 commit/PR includes the full attribution.
 
-   **Parallel subagent mode（并行 subagent 模式）：** Commit ownership 按 isolation mode 拆分（见 Phase 1 Step 4）：
-   - **Worktree-isolated：** subagents 可以在自己的 worktree branch 内 stage 和 commit；orchestrator 在 batch 后按 dependency order merge 这些 branches。
-   - **Shared-directory fallback：** subagents 不 commit；orchestrator 在整个 parallel batch 完成后 stage 并 commit 每个 unit。
+   **Parallel subagent mode:** Commit ownership is split by isolation mode (see Phase 1 Step 4):
+   - **Worktree-isolated:** subagents may stage and commit inside their own worktree branch; the orchestrator merges those branches in dependency order after the batch.
+   - **Shared-directory fallback:** subagents do not commit; the orchestrator stages and commits each unit after the entire parallel batch completes.
 
-3. **Follow Existing Patterns（遵循现有模式）**
+3. **Follow Existing Patterns**
 
-   - Plan 应引用 similar code：先读这些 files
-   - 精确匹配 naming conventions
-   - 尽可能复用 existing components
-   - 遵循 project coding standards（见 AGENTS.md；只有 repo 仍保留 compatibility shim 时才使用 CLAUDE.md）
-   - 拿不准时，grep similar implementations
+   - The plan should reference similar code - read those files first
+   - Match naming conventions exactly
+   - Reuse existing components where possible
+   - Follow the project's coding standards already in your context
+   - When in doubt, grep for similar implementations
 
-4. **Test Continuously（持续测试）**
+4. **Test Continuously**
 
-   - 每个 significant change 后运行 relevant tests
-   - 不要等到最后才 test
-   - 立即修复 failures
-   - 为 new behavior 添加 new tests，为 changed behavior 更新 tests，为 deleted behavior 移除 tests
-   - **带 mocks 的 unit tests 证明 logic in isolation。使用 real objects 的 integration tests 证明 layers 能协同工作。** 如果 change 触及 callbacks、middleware 或 error handling，两者都需要。
+   - Run relevant tests after each significant change
+   - Don't wait until the end to test
+   - Fix failures immediately
+   - Add new tests for new behavior, update tests for changed behavior, remove tests for deleted behavior
+   - **Unit tests with mocks prove logic in isolation. Integration tests with real objects prove the layers work together.** If your change touches callbacks, middleware, or error handling — you need both.
 
-5. **Simplify as You Go（边做边简化）**
+5. **Simplify as You Go**
 
-   完成一组 related implementation units 后（或每 2-3 个 units），review 最近 changed files，寻找 simplification opportunities：合并 duplicated patterns、提取 shared helpers、提升 code reuse 和效率。使用 subagents 时这尤其有价值，因为每个 agent 都在 isolated context 中工作，看不到跨 units 逐渐浮现的 patterns。
+   After completing a cluster of related implementation units (or every 2-3 units), review recently changed files for simplification opportunities — consolidate duplicated patterns, extract shared helpers, and improve code reuse and efficiency. This is especially valuable when using subagents, since each agent works with isolated context and can't see patterns emerging across units.
 
-   不要每完成一个 unit 就 simplify：早期 patterns 可能看起来重复，但在后续 units 中会有意分化。等到自然 phase boundary，或注意到 accumulated complexity 后再做。
+   Don't simplify after every single unit — early patterns may look duplicated but diverge intentionally in later units. Wait for a natural phase boundary or when you notice accumulated complexity.
 
-   如果 **`ce-simplify-code`** 可用，在 phase boundaries 调用它（尤其是进入 Phase 3 前且 diff >=30 lines 时）。否则，自己 review changed files，寻找 reuse 和 consolidation opportunities。
+   If **`ce-simplify-code`** is available, invoke it at phase boundaries (especially before Phase 3 when the diff is >=30 lines). Otherwise, review the changed files yourself for reuse and consolidation opportunities.
 
-6. **Figma Design Sync（Figma 设计同步，适用时）**
+6. **Figma Design Sync** (if applicable)
 
-   对于带 Figma designs 的 UI work：
+   For UI work with Figma designs:
 
-   - 按 design specs 实现 components
-   - Read `references/agents/figma-design-sync.md`，并 dispatch 一个由该 local prompt seed 的 generic subagent，对比 implementation 和 Figma design。不要按 type/name dispatch standalone agent。
-   - 修复识别出的 visual differences
-   - 重复直到 implementation 匹配 design
+   - Implement components following design specs
+   - Read `references/agents/figma-design-sync.md` and dispatch a generic subagent seeded with that local prompt to compare implementation against the Figma design. Do not dispatch a standalone agent by type/name.
+   - Fix visual differences identified
+   - Repeat until implementation matches design
 
-7. **Frontend Design Guidance（前端设计指导，适用时）**
+7. **Frontend Design Guidance** (if applicable)
 
-   对于没有 Figma design 的 UI tasks——即 implementation 触及 view、template、component、layout 或 page files，创建 user-visible routes，或 plan 明确包含 UI/frontend/design language：
+   For UI tasks without a Figma design -- where the implementation touches view, template, component, layout, or page files, creates user-visible routes, or the plan contains explicit UI/frontend/design language:
 
-   - 应用本 skill 和 active repo instructions 中的 frontend guidance：保留 existing design-system conventions，使用真实 UI controls 和 states，保持 layouts responsive，并验证 text 不会 overflow 或 overlap。
-   - 当 browser tooling 可用时，在 final validation 前以 desktop 和 mobile widths inspect changed UI。没有 browser access 时，做 code-level responsive/layout review，并记录 browser verification unavailable。
-   - Change user-visible 时，Phase 4 的 screenshot capture 仍适用。
+   - Apply the frontend guidance embedded in this skill and the active repo instructions: preserve existing design-system conventions, use real UI controls and states, keep layouts responsive, and verify text does not overflow or overlap.
+   - When browser tooling is available, inspect the changed UI at desktop and mobile widths before final validation. If no browser access is available, do a code-level responsive/layout review and record that browser verification was unavailable.
+   - Phase 4's screenshot capture still applies when the change is user-visible.
 
-8. **Track Progress（跟踪进度）**
-   - 完成 tasks 时保持 task list updated
-   - 记录 blockers 或 unexpected discoveries
-   - 如果 scope expands，创建 new tasks
-   - 向用户同步 major milestones
-   - 当 plan 为 Implementation Units 定义 U-IDs，或 plan/origin document 携带 stable R-IDs（以及可选 A/F/AE IDs）时，在 blockers、deferred-work notes、task summaries 和 final verification 中引用它们，而不是在 routine status updates 中引用。U-IDs 将 units 锚定在 plan edits 之间；R/A/F/AE 在 brainstorm-plan handoff 之间锚定 product intent。使用 plan 提供的 IDs，不要自行发明。这能保留 traceability，同时避免 signal 被 noise 淹没。
+8. **Track Progress**
+   - Keep the task list updated as you complete tasks
+   - Note any blockers or unexpected discoveries
+   - Create new tasks if scope expands
+   - Keep user informed of major milestones
+   - When the plan defines U-IDs for Implementation Units, or the plan or origin document carries stable R-IDs (and optionally A/F/AE IDs), reference them in blockers, deferred-work notes, task summaries, and final verification — not routine status updates. U-IDs anchor units across plan edits; R/A/F/AE anchor product intent across the brainstorm-plan handoff. Use the IDs the plan supplies and do not invent ones it does not. This preserves traceability without burying signal under noise.
 
-### Phase 3-4：Quality Check and Finishing Work（质量检查和收尾）
+### Phase 3-4: Quality Check and Finishing Work
 
-当所有 Phase 2 tasks 完成并转入 quality check 时，必须读取 `references/shipping-workflow.md` 获取完整 shipping workflow。不要跳过。
+When all Phase 2 tasks are complete and execution transitions to quality check, you must read `references/shipping-workflow.md` for the full shipping workflow. Do not skip this.
 
-**Code review tiers：** harness 有 built-in review 时使用 Tier 1。只有匹配 `shipping-workflow.md` 中的 escalation criteria 时才使用 Tier 2，不能因为 Tier 1 缺失就升级。
+**Code review tiers:** Tier 1 when the harness has built-in review. Tier 2 only when escalation criteria in `shipping-workflow.md` match — not because Tier 1 is missing.
 
-**Tier 2 分两步：先 review，再 fix。** `ce-code-review` 只做 review。它返回 findings（markdown 或 `mode:agent` JSON）；绝不编辑 checkout、commit 或 apply fixes。
+**Tier 2 is two steps — review, then fix.** `ce-code-review` is review-only. It returns findings (markdown or `mode:agent` JSON); it never edits the checkout, commits, or applies fixes.
 
-当 Tier 2 适用时：
+When Tier 2 applies:
 
-1. **Review**：调用 `ce-code-review` skill（invocation command 见 `references/review-findings-followup.md` § Fallback），作为 review-only `ce-code-review` pass。在 orchestrated workflows 中使用 `mode:agent`；有 plan 时传 `plan:<path>`，merge base 已知时传 `base:<ref>`。
-2. **Apply fixes**：加载 `references/review-findings-followup.md`。只基于 JSON 过滤 eligibility，**batch applicable findings by file**，dispatch fix subagents（file sets disjoint 时 parallel）。Orchestrator merge diffs、运行 tests 并 commit；它不预先调查 findings。
-3. **Residual Work Gate**：只在 followup 后进行；未解决的 actionable findings 进入 `shipping-workflow.md` 中的 gate。
+1. **Review** — Invoke the `ce-code-review` skill (invocation command in `references/review-findings-followup.md` § Fallback). Use `mode:agent` in orchestrated workflows; pass `plan:<path>` when you have a plan and `base:<ref>` when the merge base is already known.
+2. **Apply fixes** — Load `references/review-findings-followup.md`. Filter eligibility on JSON only, **batch applicable findings by file**, dispatch fix subagents (parallel when file sets are disjoint). The orchestrator merges diffs, runs tests, and commits — it does not pre-investigate findings.
+3. **Residual Work Gate** — Only after followup; unresolved actionable findings go through the gate in `shipping-workflow.md`.
 
-Tier 1 harness-native review 仍可能 inline fix；Tier 2 始终将 review 与 apply 分离。
+Tier 1 harness-native review may still fix inline; Tier 2 always separates review from apply.
 
-## Key Principles（关键原则）
+## Key Principles
 
-### Start Fast, Execute Faster（快速开始，更快执行）
+### Start Fast, Execute Faster
 
-- 开始时一次性澄清，然后 execute
-- 不要等待 perfect understanding：提问，然后行动
-- 目标是 **finish the feature**，不是创建完美流程
+- Get clarification once at the start, then execute
+- Don't wait for perfect understanding - ask questions and move
+- The goal is to **finish the feature**, not create perfect process
 
-### The Plan is Your Guide（Plan 是指南）
+### The Plan is Your Guide
 
-- Work documents 应引用 similar code 和 patterns
-- 加载这些 references 并遵循它们
-- 不要 reinvent：匹配 existing patterns
+- Work documents should reference similar code and patterns
+- Load those references and follow them
+- Don't reinvent - match what exists
 
-### Test As You Go（边做边测）
+### Test As You Go
 
-- 每次 change 后运行 tests，不要等到最后
-- 立即修复 failures
-- Continuous testing 可避免大 surprise
+- Run tests after each change, not at the end
+- Fix failures immediately
+- Continuous testing prevents big surprises
 
-### Quality is Built In（质量内建）
+### Quality is Built In
 
-- 遵循 existing patterns
-- 为 new code 写 tests
-- Push 前运行 linting
-- Tier 1 可用或匹配 Tier 2 criteria 时 review（见 `shipping-workflow.md`）
+- Review when Tier 1 is available or Tier 2 criteria match (see `shipping-workflow.md`)
 
-### Ship Complete Features（交付完整功能）
+### Ship Complete Features
 
-- 继续前标记所有 tasks completed
-- 不要留下 80% done 的 features
-- 能 ship 的 finished feature 胜过不能 ship 的 perfect feature
+- Mark all tasks completed before moving on
+- Don't leave features 80% done
+- A finished feature that ships beats a perfect feature that doesn't
 
-## Common Pitfalls to Avoid（常见陷阱）
+## Common Pitfalls to Avoid
 
-- **Analysis paralysis**：不要过度思考，读取 plan 并 execute
-- **Skipping clarifying questions**：现在问，不要等 build 错后再问
-- **Ignoring plan references**：plan 中的 links 都有原因
-- **Testing at the end**：持续 test，否则后面会付出代价
-- **Forgetting to track progress**：边做边更新 task status，否则会丢失已完成内容的 track
-- **80% done syndrome**：finish the feature，不要过早转向
-- **Skipping review without reason**：Tier 1 可用时使用；只有满足 `shipping-workflow.md` 中 criteria 时才升级到 Tier 2；两者都跳过时记录原因
-- **Re-scoping the plan into human-time phases**：plan 的 Implementation Units 定义 execution scope。不要估算每个 unit 的 human-hours、提出 multi-day breakdowns，或要求用户为 "this session" 选择 subset of units。Agents 以 agent speed 执行，context-window pressure 通过 subagent dispatch（Phase 1 Step 4）处理，而不是靠 phased sessions。如果 plan-file input 确实大到无法单次 execution，明确说明，并建议用户回到 `/ce-plan` 缩小 scope，不要编造 session phases 作为 workaround。对于 bare-prompt input，Phase 0 的 Large routing 已处理 oversized work
+- **Analysis paralysis** - Don't overthink, read the plan and execute
+- **Skipping clarifying questions** - Ask now, not after building wrong thing
+- **Ignoring plan references** - The plan has links for a reason
+- **Testing at the end** - Test continuously or suffer later
+- **Forgetting to track progress** - Update task status as you go or lose track of what's done
+- **80% done syndrome** - Finish the feature, don't move on early
+- **Skipping review without reason** — Use Tier 1 when available; escalate to Tier 2 only on criteria in `shipping-workflow.md`; document when both are skipped
+- **Re-scoping the plan into human-time phases** - The plan's Implementation Units define the scope of execution. Do not estimate human-hours per unit, propose multi-day breakdowns, or ask the user to pick a subset of units for "this session". Agents execute at agent speed, and context-window pressure is addressed by subagent dispatch (Phase 1 Step 4), not by phased sessions. If a plan-file input is genuinely too large for a single execution, say so plainly and suggest the user return to `/ce-plan` to reduce scope — don't invent session phases as a workaround. For bare-prompt input, Phase 0's Large routing already handles oversized work

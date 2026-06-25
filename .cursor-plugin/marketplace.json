@@ -7,13 +7,13 @@
   },
   "metadata": {
     "description": "Cursor plugin marketplace for Every Inc plugins",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "plugins": [
     {
       "name": "compound-engineering",
       "source": ".",
-      "description": "每次使用都会变得更聪明的 AI-powered development tools。让每个工程工作单元都比上一个更容易。"
+      "description": "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具"
     }
   ]
 }

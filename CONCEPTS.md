@@ -1,97 +1,83 @@
-# Concepts（概念）
+# Concepts
 
-本项目的共享领域词汇表，记录具有项目特定含义的实体、命名流程和状态概念。它以核心领域词汇为种子，随后随着 `ce-compound` 和 `ce-compound-refresh` 处理 learnings 而持续累积；可以直接编辑。本文件只做 glossary，不是 spec，也不是包罗万象的说明书。
+Shared domain vocabulary for this project — entities, named processes, and status concepts with project-specific meaning. Seeded with core domain vocabulary, then accretes as ce-compound and ce-compound-refresh process learnings; direct edits are fine. Glossary only, not a spec or catch-all.
 
-## The plugin and its parts（plugin 及其组成）
+## The plugin and its parts
 
-### Plugin（插件）
+### Plugin
+A distributable bundle of Skills, Agents, Commands, and Hooks (optionally MCP servers) described by a single manifest and installed into a coding-agent platform as one unit — the artifact the Converter translates for non-Claude Targets and the Marketplace distributes.
 
-一个可分发的 bundle，由 Skills、Agents、Commands 和 Hooks（可选 MCP servers）组成，通过单个 manifest 描述，并作为一个整体安装到 coding-agent platform 中。它是 Converter 为非 Claude Targets 转换的 artifact，也是 Marketplace 分发的对象。
+### Skill
+A user-invoked capability defined in its own directory, and the primary entry point a user reaches for. A Skill orchestrates: it can progressively pull in its own reference files as needed and dispatch generic subagents seeded with Specialist prompt assets. Distinct from an Agent in that a Skill is user-invoked and coordinates, whereas an Agent or subagent is dispatched to perform scoped work.
 
-### Skill（skill）
+### Agent
+A specialized, single-purpose worker running in its own isolated context and returning a result, rather than conversing with the user. Also called a subagent. In the current plugin design, most CE specialist behavior is not exposed as standalone Agent definitions; Skills seed generic subagents with Skill-local prompt material instead.
 
-由 slash 调用、在自身目录中定义的能力，也是用户最常触达的主入口。Skill 负责 orchestration：它可以按需渐进加载自己的 reference files，并 dispatch Agents 执行有边界的工作。它不同于 Agent：Skill 由用户调用并负责协调，而 Agent 由 Skill dispatch。
+### Specialist prompt asset
+An internal prompt file owned by one Skill that defines a specialist persona or research/review role for a generic subagent. It is not an externally exposed plugin component: the owning Skill controls when it is loaded, which model or tool policy applies, and how its output is merged.
 
-### Agent（agent）
+## Conversion
 
-Skill dispatch 的专用、单一目标 worker，在隔离 context 中运行并返回结果，而不是与用户对话。也称为 subagent。用户不会直接调用 Agents；Skill 决定何时以及 dispatch 多少个 Agents。
+### Target
+A destination coding-agent platform other than Claude Code (OpenCode, Codex, Pi, Antigravity, Kimi Code, and others) that the repo supports through native plugin metadata or a Converter/Writer pair. Also called a target provider when it uses the conversion path.
 
-## Conversion（转换）
+A Plugin is installed to a Target at one of two scopes: global (user-wide) or per-workspace.
 
-### Target（目标平台）
+### Native plugin surface
+A platform-provided install contract that can consume this repo's committed plugin manifest or marketplace metadata directly, without generating a converted Bundle. When a Target has a native plugin surface, user-facing support usually belongs in platform metadata, release validation, and docs instead of a new Converter and Writer.
 
-Claude Code 之外的目标 coding-agent platform（OpenCode、Codex、Antigravity 等），Plugin 会被转换并安装到其中；每个 Target 都有自己的文件布局和 capability mapping。也称为 target provider。
+### Converter
+The step that transforms a parsed Plugin into one Target's in-memory form, mapping tools, permissions, hooks, and model names explicitly rather than by convention.
 
-Plugin 会以两种 scope 之一安装到 Target：global（user-wide）或 per-workspace。
+### Writer
+The step that emits a Target's converted Bundle onto disk, in that Target's expected paths and merge semantics. Paired with a Converter, one per Target.
 
-### Converter（转换器）
+### Bundle
+The in-memory converted form of a Plugin for a single Target — the handoff a Converter produces and a Writer consumes.
 
-把已解析 Plugin 转换为某个 Target 的 in-memory form 的步骤。它会显式映射 tools、permissions、hooks 和 model names，而不是依赖约定。
+### Marketplace
+The catalog metadata listing installable plugins and their versions for distribution, kept consistent with each Plugin's manifest by release validation.
 
-### Writer（写入器）
+## Compound engineering
 
-把 Target 的 converted Bundle 写到磁盘的步骤，遵循该 Target 期望的路径和 merge semantics。Writer 与 Converter 配对，每个 Target 一个。
+### Compound engineering
+The methodology this project embodies: structure engineering work so each unit makes the next one easier, capturing reusable knowledge as you go so the toolset gets smarter with every use.
 
-### Bundle（bundle）
+### Pipeline
+The chained progression of Skills that carries a piece of work from strategy and ideation through brainstorm, plan, execution, and review, and closes by capturing what was learned. Each stage hands a durable artifact to the next, and research is gathered at the stage that needs it rather than re-gathered downstream.
 
-Plugin 针对单个 Target 的 in-memory converted form，即 Converter 产出、Writer 消费的 handoff。
+### Learning
+A documented solution to a past problem — a bug fix, a convention, or a workflow pattern — stored as the unit of compounded knowledge so future work can find and reuse it. Also called a solution doc. Carries structured metadata (category, tags, problem type) for retrieval; its creation date lives in the entry, not the filename.
 
-## Skill orchestration（skill 编排）
+### Pattern doc
+Guidance generalized from several Learnings into a broader rule. Higher-leverage than any single incident-level Learning, and higher-risk when stale, because future work treats it as broadly applicable.
 
-### Model tier（模型层级）
+## Skill orchestration
 
-Dispatched sub-agent 的语义 cost class：extraction（最便宜且能胜任，用于 retrieval 和 quoting）、generation（中档，用于 evidence-driven work 和 mechanical verification），或 ceiling（orchestrator 自己的模型，通过省略 model selection 继承）。Skill 只声明 tier 名称并按 tier 引用，避免在 skill content 中 hardcode model names。
+### Model tier
+A semantic cost class for a dispatched sub-agent — extraction (cheapest capable, for retrieval and quoting), generation (mid-tier, for evidence-driven work and mechanical verification), or ceiling (the orchestrator's own model, inherited by omitting any model selection) — declared once per Skill and referenced by tier name so model names never hardcode into skill content.
 
-当平台无法为每个 agent 单独选择模型时，所有 roles 都运行在 inherited model 上，cost control 退化为结构控制：read budgets 和 output caps。
+When a platform cannot select models per agent, every role runs on the inherited model and cost control falls back to structure: read budgets and output caps.
 
-### Evidence dossier（证据档案）
+### Evidence dossier
+A bulk evidence artifact — verbatim quotes with source pointers, gathered by a cheap scout agent — written to scratch storage instead of returned inline, so the orchestrator carries only a short gist and downstream agents read the full dossier themselves.
 
-一种 bulk evidence artifact：cheap scout agent 收集的逐字 quotes 和 source pointers。它写入 scratch storage，而不是 inline 返回；orchestrator 只携带短 gist，下游 agents 自己读取完整 dossier。
+### Load stub
+The inline remnant left in a Skill when load-bearing content moves to a reference file: a load instruction that names what the reference contains and the failure mode of skipping it, while keeping no detail an agent could improvise from — making the load structurally necessary rather than advisory.
 
-### Load stub（加载桩）
+## Review and workflow vocabulary
 
-当 load-bearing content 移入 reference file 后，Skill 中留下的 inline remnant：一条 load instruction，说明 reference 包含什么，以及跳过会导致什么 failure mode；同时不保留 agent 可凭空 improvises 的细节，让加载在结构上必要，而不是 advisory。
+### Reviewer persona
+A single-lens reviewer role that evaluates work from one specific perspective — security, correctness, scope, design, and so on. Review Skills dispatch a panel of personas as subagents and merge their findings.
 
-### Marketplace（marketplace）
+### Confidence anchor
+A discrete, self-scored confidence value on a fixed small scale, each level tied to a behavioral criterion the model can honestly apply, used to gate and rank review findings instead of a continuous score that invites false precision. Each review Skill sets its own actionable threshold; corroboration across personas promotes a finding by one level.
 
-用于分发的 catalog metadata，列出可安装 plugins 及其版本；release validation 会让它与每个 Plugin 的 manifest 保持一致。
+### Autofix class
+The classification of a review finding by how safely its proposed fix can be applied: applied silently, applied only after user confirmation, left for a human to resolve, or recorded as advisory with no action.
 
-## Compound engineering（compound engineering 方法）
+### Headless mode
+An explicit opt-in mode that runs a Skill unattended, with no user prompts — it produces a written report as its deliverable and conservatively defers genuinely ambiguous decisions rather than guessing.
 
-### Compound engineering（compound engineering 方法）
-
-本项目体现的方法论：组织工程工作，让每个工作单元都让下一个单元更容易；在过程中捕获可复用知识，让 toolset 随着每次使用变得更聪明。
-
-### Pipeline（pipeline）
-
-由 Skills 串联起来的进程，带着一项工作从 strategy 和 ideation 经过 brainstorm、plan、execution、review，最后通过捕获 learning 收尾。每个阶段把 durable artifact 交给下一个阶段；research 在真正需要它的阶段收集，而不是在后游重复收集。
-
-### Learning（learning）
-
-对过去问题的 documented solution，可以是 bug fix、convention 或 workflow pattern。它是 compounded knowledge 的单位，未来工作可以查找并复用。也称为 solution doc。它带有结构化 metadata（category、tags、problem type）以便检索；creation date 写在条目中，而不是文件名里。
-
-### Pattern doc（pattern doc）
-
-从多条 Learnings 中泛化出的更广义规则。它比单个 incident-level Learning 杠杆更高；过期时风险也更高，因为未来工作会把它当作广泛适用的指导。
-
-## Review and workflow vocabulary（review 与 workflow 词汇）
-
-### Reviewer persona（reviewer persona，reviewer 视角）
-
-单一视角的 reviewer Agent，从一个特定角度评估工作，例如 security、correctness、scope、design 等。Review Skills 会 dispatch 一组 personas，并合并它们的 findings。
-
-### Confidence anchor（confidence anchor，confidence 锚点）
-
-固定小尺度上的离散、自评分 confidence value；每一级都绑定模型可以诚实应用的行为标准。它用于 gate 和 rank review findings，避免连续分数带来的虚假精度。每个 review Skill 设置自己的 actionable threshold；多个 personas 互相 corroborate 时，finding 会提升一级。
-
-### Autofix class（autofix class，自动修复分类）
-
-对 review finding 的分类，描述其 proposed fix 可以多安全地应用：静默应用、仅在用户确认后应用、留给人类处理，或记录为 advisory 且不采取 action。
-
-### Headless mode（headless mode，无人值守模式）
-
-一种显式 opt-in mode，让 Skill 无人值守运行、无用户 prompts；它以 written report 作为 deliverable，并保守地 defer 真正模糊的决策，而不是猜测。
-
-### Beta skill（beta skill，beta skill）
-
-Stable Skill 的并行副本，后缀为 `-beta`，用于在不干扰用户的情况下试行新版本。它需要手动调用（model auto-invocation 被禁用）；把它 promote 到 stable 是 orchestration change，不只是重命名，所有 caller 都必须在同一次 change 中迁移，避免静默继承 stale defaults。
+### Beta skill
+A parallel copy of a stable Skill, suffixed `-beta`, used to trial a new version alongside the stable one without disrupting users. Invoked manually (model auto-invocation is disabled); promoting it to stable is an orchestration change, not just a rename — every caller must move in the same change so none silently inherits stale defaults.
