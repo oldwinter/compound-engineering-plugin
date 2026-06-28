@@ -105,7 +105,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 安装后，在任意 project 中运行 `/ce-setup`。它会检查 repo-local config、报告 optional tool capabilities，并帮助把 machine-local CE settings 安全地放进 gitignore。
 
-`compound-engineering` plugin 当前包含 27 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
+`compound-engineering` plugin 当前包含 26 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
 
 ### Full Skill Inventory（完整 Skill 清单）
 
@@ -136,7 +136,6 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | `/ce-polish` | 启动 dev server 并迭代 UX polish |
 | `/ce-proof` | 创建、编辑和分享 Proof documents |
 | `/ce-dogfood-beta` | 对 active branch 做 diff-scoped browser QA |
-| `/ce-work-beta` | 带 Codex delegation mode 的 experimental execution workflow |
 | `/lfg` | 完整 autonomous engineering workflow |
 
 ---

@@ -1,138 +1,405 @@
-# Plan Sections（计划章节）
+# Plan Sections
 
-本 reference 描述什么构成优秀的 implementation plan。它**不**规定 plan 在页面上的视觉呈现；rendering 由 format-specific references（`markdown-rendering.md`、`html-rendering.md`）处理。
+This reference describes what makes a great implementation plan. It does NOT
+prescribe how the plan looks on the page — rendering is handled by the
+format-specific references (`markdown-rendering.md`, `html-rendering.md`).
 
-## The outcome（目标结果）
+## The outcome
 
-优秀 plan 让三类受众能够行动：
+A great plan enables three audiences to act:
 
-- **implementing agent**（`ce-work` 或人类）从 informed baseline 开始：load-bearing decisions 已命名，research breadcrumbs 能引导他们自己的调查，unit boundaries 清晰。plan 给 implementer 一个起点，不替代他们自己的调查。
-- **reviewer** 能一次性识别 load-bearing decisions 以及正在变更内容的 boundaries。
-- **future reader**（几个月后返回阅读的人）能追溯为什么做这项工作、它受什么塑造，以及 artifacts 位于何处。
+- **The implementing agent** (`ce-work` or a human) starts from an informed
+  baseline — load-bearing decisions are named, research breadcrumbs orient
+  their own investigation, unit boundaries are clear. The plan gives the
+  implementer a starting point, not a substitute for their own investigation.
+- **The reviewer** identifies the load-bearing decisions and the boundaries
+  of what's being changed in one pass.
+- **The future reader** (anyone returning months later) traces why the work
+  was done, what shaped it, and where the artifacts live.
 
-sections 必须服务上述某类受众才值得存在。省略 padding。
+Sections earn their place by serving one of these audiences. Omit padding.
 
-## Decide whether a plan doc is warranted at all（判断是否需要计划文档）
+## Unified plan artifact contract
 
-并非每次调用 `ce-plan` 都应产出 plan document。对真正 atomic 的工作，doc 是 ceremony；implementer（无论是 `ce-work` 还是人类）可直接行动，不需要带 ID 的 units、KTDs 或作为 checklist 的 Requirements。
+`ce-plan` writes the canonical compound-engineering plan artifact. The same
+artifact may begin as a requirements-only skeleton from `ce-brainstorm` and
+later be enriched by `ce-plan`; it is still one plan file moving through
+readiness states, not a requirements doc plus a separate implementation doc.
 
-**Bias toward producing a plan（默认倾向于产出计划）。** 风险不对称倾向于写 plan：小工作上的 thin plan doc 只是轻微 ceremony，但在需要 plan 时跳过它，会让 implementer 付出真实时间成本（重新发明 decisions、丢失 unit boundaries、没有带 ID 的 requirements 可验证）。不确定时，写 plan。
+When the artifact is meant to be consumed by implementation agents, use:
 
-**仅当以下条件全部成立时，才跳过 plan creation：**
+- **`artifact_contract: ce-unified-plan/v1`** — declares this contract.
+- **`artifact_readiness`** — document completeness, not work progress. Valid
+  values are:
+  - `requirements-only` — Product Contract exists; planning sections are not
+    complete and the artifact is not executable.
+  - `implementation-ready` — Product Contract, Planning Contract,
+    Implementation Units, Verification Contract, and Definition of Done are
+    complete enough for `ce-work`, `/goal`, or an equivalent executor, **and no
+    launch-blocking open question remains**. A plan that is otherwise complete
+    but still has a blocking product/architecture question stays
+    `requirements-only`, so the next step it routes to is blocker resolution /
+    planning, not implementation. Deferred (non-blocking) questions
+    do not hold readiness back — mark each open question as blocking or deferred
+    so this distinction is explicit.
+- **`product_contract_source`** — where the Product Contract came from:
+  `ce-brainstorm`, `ce-plan-bootstrap`, `legacy-requirements`, or another
+  explicit source string when a repo has a specialized producer.
+- **`execution`** — `code` for implementation plans, `knowledge-work` for
+  non-code deliverables. Absence remains legacy-compatible and means `code`
+  only for older plans without `artifact_contract`.
 
-- 工作是 **atomic**：适合一个 commit，且没有值得独立拆出的 meaningful unit boundaries。
-- **没有约束 implementation 的 design choices**：没有值得记录的 Key Technical Decisions。如果工作需要 implementer 在两种 approaches 之间做选择，这些 approaches 就是 KTDs，plan 就有必要。
-- **没有值得写下来的 scope boundaries**：work scope 从用户请求中已 self-evident。
-- **没有 upstream artifact**（带 R-IDs 的 brainstorm、incident report、prior plan 中的 deferred-follow-up item）需要通过此 plan 保持 traceability。
+Do **not** use progress-like readiness values such as `active`,
+`in_progress`, `completed`, or `done`. Readiness answers "can the artifact be
+executed?", not "has execution happened?" Plans still carry no `status` field
+and no mutable execution lifecycle.
 
-**Stress test the "looks atomic" case（压力测试“看似 atomic”的情况）。** 许多请求乍看是 atomic，但隐藏 design decisions：
+Do **not** use `artifact_readiness: approach-plan`. Approach-plans,
+answer-seeking outputs, and universal-planning outputs are outside this
+software implementation artifact contract unless they include the full Product
+Contract, Planning Contract, Implementation Units, Verification Contract, and
+Definition of Done required for software execution. Route those artifacts by
+their own shape or by `execution: knowledge-work`, not by adding a third
+unified readiness value.
 
-- *"Add caching to this endpoint"* — 听起来 atomic，但 TTL、invalidation、cache key shape 和 backend selection 都是 KTDs。写 plan。
-- *"Migrate from package A to package B"* — 听起来 mechanical，但 packages 之间的 semantic differences 会产生 migration KTDs。写 plan。
-- *"Add rate limiting"* — 听起来小，但 algorithm、scope 和 configurability 都是 KTDs。写 plan。
+## Section ID Registry
 
-对比真正的 skip cases：
+Unified artifacts use these stable logical sections. Markdown uses the
+heading text; HTML uses matching visible headings and anchor IDs. Downstream
+skills grep or anchor-scan for these names before reading large bodies.
 
-- *"Fix typo in README line 47"* — atomic、没有 KTDs，跳过 plan。
-- *"Rename `oldFn` to `newFn` across the repo"* — mechanical、没有 design choices，跳过 plan。
-- *"Bump dependency X to v2.3.1"* — mechanical，跳过 plan（除非 bump 引入 breaking changes，值得 unit-by-unit migration）。
+| Logical section | Markdown heading | HTML id | Reader use |
+|---|---|---|---|
+| Goal Capsule | `## Goal Capsule` | `goal-capsule` | Objective, authority hierarchy, and stop conditions |
+| Product Contract | `## Product Contract` | `product-contract` | Requirements, actors, flows, acceptance examples, product scope |
+| Product Requirements | `### Requirements` under Product Contract | `product-requirements` | Requirement extraction for review and implementation trace |
+| Planning Contract | `## Planning Contract` | `planning-contract` | KTDs, technical design, assumptions, sequencing |
+| Implementation Units | `## Implementation Units` | `implementation-units` | U-ID work packets for execution |
+| Verification Contract | `## Verification Contract` | `verification-contract` | Repo-specific test commands and quality gates |
+| Definition of Done | `## Definition of Done` | `definition-of-done` | Global and per-unit completion criteria |
+| Appendix | `## Appendix` | `appendix` | Long research, raw notes, or supporting detail |
 
-跳过 plan doc 时，工作直接进入 `ce-work` 或 implementation；沿途产生的任何 decisions，如果值得延续，应落到 commit message 或 `docs/solutions/` 中。
+Requirements-only artifacts are kept light: a Goal Capsule and the Product
+Contract. They must not point implementers at absent Planning Contract,
+Implementation Units, Verification Contract, or Definition of Done sections.
+`ce-plan` adds those implementation sections when it enriches to
+implementation-ready. Implementation-ready artifacts include the full registry
+above, except Appendix remains optional.
 
-## Hard floor（最低必备章节）
+### Wayfinding: map before reading (size-aware)
 
-当 plan doc 有必要时，这些 sections 必须存在。它们承载 downstream consumers 依赖的 contracts。
+The document does not carry a reading guide; consuming skills own the reading
+algorithm. A **short** plan — a lightweight or requirements-only artifact that
+fits in a screen or two — can just be read in full; that is cheaper and simpler
+than scanning and ranging. But an implementation-ready unified plan is often
+long, and HTML output (also supported) is more verbose still, so for anything
+beyond short, do **not** load the entire artifact to find your way around.
+Build a section map first, then read only the ranges the task needs:
 
-- **Summary（摘要）** — plan 提议什么，用 1-3 行说明。Forward-looking；在读者投入细节前提供方向。
-- **Problem Frame（问题框架）** — 为什么做这项工作。Backward-looking / situational。对 motivation 只有一句话的 compact plans，可与 Summary 合并。
-- **Requirements（需求，带 stable R-IDs）** — work ships 后必须为真的内容。reviewer 的 checklist；downstream code review 根据它们验证。
-- **Key Technical Decisions（关键技术决策，KTDs）** — 约束 implementation 的 load-bearing choices。每个 entry 是 `<decision>: <rationale>`。没有这些，implementer 无法判断哪些 design choices 仍开放、哪些已固定。
-- **Implementation Units（实现单元，带 stable U-IDs）** — discrete units of work，大小应让每个 unit 可独立 land。`ce-work` 消费它们来执行。对 trivial single-step plans，工作可折叠进 Summary prose，且可省略 U-IDs；这很少见。
+- **Markdown:** scan headings to get the section and unit map — e.g.
+  `rg -n '^#{1,3} ' <plan>` (top-level sections plus `### U<N>.` units).
+- **HTML:** scan the heading elements (`<h1>`–`<h3>`) and their anchor ids;
+  match on the section name and ignore the wrapper tags.
 
-## Include when material（有实质内容时包含）
+In both formats the section **names and anchor ids are the stable contract**
+from the Section ID Registry above (`Goal Capsule`/`goal-capsule`,
+`Verification Contract`/`verification-contract`, `### U<N>.` units, …). Wayfind
+against those registry names, not a brittle tag/format pattern, so the
+instruction survives rendering changes. After mapping, read metadata, then only
+the sections the task needs — e.g. Goal Capsule, the active U-ID plus its cited
+R/F/AE/KTD, Verification Contract, and Definition of Done. Read the Appendix or
+unrelated units only when a section you are already reading cites them.
 
-当这些 sections 承载 elsewhere 未覆盖的信息时才出现。测试标准不是“这是不是 substantial plan？”，而是 *"does this specific plan have content this section would surface?"* 用 placeholder prose 填 section 比省略它更糟。
+## Decide whether a plan doc is warranted at all
 
-- **High-Level Technical Design（高层技术设计）** — 当 technical approach 有 prose alone 不易承载的形状时包含：跨 components 的 architecture、跨 processes 的 sequencing、state machines、branching gates。Visualizations（component topology、sequence、swim lane、flowchart、data-flow）通常位于这里。当 approach 是一段 prose 自身就能表达的 pattern application 时跳过。
+Not every invocation of `ce-plan` should produce a plan document. For
+genuinely atomic work, the doc is ceremony — the implementer (whether
+`ce-work` or a human) can act directly without IDed units, KTDs, or
+Requirements as a checklist.
 
-- **Scope Boundaries（范围边界）** — 当 scope 有争议、存在值得明确命名的 tempting non-goals，或需要区分 "deferred for later" 与 "outside the product's identity" 时包含。当仅凭 Requirements 就能看出 scope 时跳过。
+**Bias toward producing a plan.** The risk asymmetry favors writing one:
+a thin plan doc for small work is mild ceremony, but skipping a plan when
+one was warranted costs the implementer real time (reinvented decisions,
+lost unit boundaries, no IDed requirements to verify against). When unsure,
+write the plan.
 
-- **Open Questions（开放问题）** — 当确有阻塞 planning 或 implementation 的 unresolved items 时包含。当 plan 完整时跳过；空的 "Open Questions: none" section 会传递 false uncertainty。
+**Skip implementation-ready plan creation only when ALL of these hold:**
 
-- **System-Wide Impact（系统级影响）** — 当 change 影响 cross-cutting concerns（data lifecycles、auth boundaries、performance posture、cardinal rules、shared infrastructure）时包含。对局限于单个 component、impact self-evident 的 changes 跳过。
+- The work is **atomic** — fits in one commit, no meaningful unit boundaries
+  to break out independently.
+- There are **no design choices that constrain implementation** — no
+  Key Technical Decisions worth recording. If the work needs the implementer
+  to make a choice between two approaches, those approaches are KTDs and
+  a plan is warranted.
+- There are **no scope boundaries worth pinning** in writing — the work
+  scope is self-evident from the user's request.
+- **No upstream artifact** (a brainstorm with R-IDs, an incident report,
+  a deferred-follow-up item from a prior plan) needs traceability through
+  this plan.
 
-- **Risks & Dependencies（风险与依赖）** — 当存在值得标记的真实 risks（external service changes、version pins under churn、值得强调的 behavioral assumptions）或 material upstream dependencies 时包含。对 low-risk localized work 跳过。
+**Stress test the "looks atomic" case.** Many requests look atomic at first
+glance but hide design decisions:
 
-- **Acceptance Examples（验收示例）** — 当任何 requirement 有 state-dependent 或 conditional shape（"When X, Y"），且 prose alone 会让 edge cases 模糊时包含。当所有 requirements 都 unconditional 且 unambiguous 时跳过。
+- *"Add caching to this endpoint"* — sounds atomic, but TTL, invalidation,
+  cache key shape, and backend selection are all KTDs. Write the plan.
+- *"Migrate from package A to package B"* — sounds mechanical, but
+  semantic differences between the packages create migration KTDs. Write
+  the plan.
+- *"Add rate limiting"* — sounds small, but algorithm, scope, and
+  configurability are all KTDs. Write the plan.
 
-- **Documentation / Operational Notes（文档/运维备注）** — 当 documentation、monitoring、runbooks 或 rollout steps 需要明确 notes 时包含。当工作纯内部且使用未修改的 existing operational scaffolding 时跳过。
+vs. genuine skip cases:
 
-- **Sources / Research（来源/调研）** — surface 能引导 implementer 或证明 load-bearing choices 的 research。测试标准：*"if I were the implementer reading this cold, would this breadcrumb help me make better choices?"* 是 → surface（code locations 如 `services/convex/reports.ts:174-176`、external docs、RFCs、constraints、prior plans；此 category 是 inclusive，不是 enumerated）。Process exhaust（阅读用户 prompt、扫一眼 obvious entry points、复述 prose）→ 省略。可 inline 放在它所证明的 KTD 或 unit 旁，也可作为 dedicated section；两种形态都可以。
+- *"Fix typo in README line 47"* — atomic, no KTDs, skip the plan.
+- *"Rename `oldFn` to `newFn` across the repo"* — mechanical, no design
+  choices, skip the plan.
+- *"Bump dependency X to v2.3.1"* — mechanical, skip the plan (unless the
+  bump introduces breaking changes that warrant unit-by-unit migration).
 
-## Agent agency（Agent 自主权）
+When skipping the plan doc, the work proceeds directly to `ce-work` or to
+implementation, and any decisions made along the way land in the commit
+message or `docs/solutions/` if they're worth carrying forward.
 
-catalog 是 floor，不是 ceiling。当 plan 内容不适合任何 catalog section 时，引入新 section；不要将内容强塞进不属于它的 section。Content drives section choices，而不是反过来。
+## Implementation-ready hard floor
 
-agent 还会按 artifact 选择：
+When an implementation-ready software plan is warranted, these sections are
+present. They carry the contracts downstream consumers depend on.
 
-- Problem Frame 是否合并进 Summary
-- Sub-groupings（子分组：Requirements by capability、KTDs by component、Units phased into milestones）
-- 每个 section 承载多少 detail
-- HTD 是一个 diagram、多个 diagram 还是没有 diagram；以及 visualizations 位于 HTD 还是嵌入其他 sections
+- **Goal Capsule** — objective, authority hierarchy, stop conditions, execution
+  profile, and tail ownership. This is the fastest way for an executor to
+  avoid drifting from the plan.
+- **Product Contract** — product scope and behavior. Contains Summary, Problem
+  Frame, Requirements with stable R-IDs, and any material Actors, Flows,
+  Acceptance Examples, Success Criteria, Scope Boundaries, Dependencies,
+  Outstanding Questions, and Sources. This replaces the separate requirements
+  artifact in new brainstorm-to-plan flows.
+- **Planning Contract** — the implementation-facing decisions: Key Technical
+  Decisions, high-level design, assumptions, implementation constraints,
+  sequencing, and research that shapes how the Product Contract will be built.
+- **Implementation Units** (with stable U-IDs) — discrete work packets sized so
+  each is independently executable. Each unit names Goal, Requirements,
+  Files, Approach, Test Scenarios, and Verification. `ce-work` and goal-mode
+  executors consume these units.
+  - **Unit Index (large plans only, ~10+ units).** When the plan has roughly
+    ten or more units, open the section with a compact navigation table — one
+    row per unit: **U-ID · one-line title · files touched · depends-on**. It
+    lets an executor map units to files and resolve dependency order without
+    scanning every unit body. It is a **navigation aid only**: the unit bodies
+    stay authoritative, it carries nothing beyond those four fields (no
+    approach, tests, or rationale), and `files touched` is the key/primary
+    paths, not an exhaustive restatement. **Omit it below ~10 units** — there
+    the per-unit `Dependencies`/`Files` (and any sequencing or dependency
+    diagram) already suffice, and an index would be ceremony.
+- **Verification Contract** — repo-specific commands and quality gates,
+  including which tests prove the plan, when `release:validate` applies, and
+  what behavioral skill evaluation is required. Avoid generic "run tests"
+  language when the repo has concrete commands. When the goal is
+  optimization-shaped (build time, latency, coverage, bundle size), express a
+  measurable threshold as the exit criterion (e.g., "p95 latency < 200ms",
+  "build time reduced 30%") and consider routing to `ce-optimize` — a metric
+  target is a sharper done signal for a long-running goal than a boolean check.
+- **Definition of Done** — global and per-unit done criteria. This is the
+  completion contract for `/goal` or equivalent long-running workflows. Include
+  a cleanup criterion: a long autonomous run accumulates dead-end and
+  experimental code from approaches that did not pan out; declaring done
+  requires that abandoned-attempt code is removed, not left in the diff.
 
-## Prose economy（文字经济性）
+## Include when material
 
-"Include when material" 决定保留哪些 sections；本节决定保留下来的 prose 应该如何写。一个 section 可以很有实质，但仍写得松散；失败形态是把有实质的 section 填成一堵文字墙，contradictions 藏在里面，implementing agent 丢掉主线。Deep plan 通过 coverage 赢得长度（更多 units、更多 traced requirements、真实 risks），而不是靠这些 coverage 周围的 wordiness。
+These sections are present when they carry information that isn't covered
+elsewhere. The test is not "is this a substantial plan?" — it is
+*"does this specific plan have content this section would surface?"* Filling
+a section with placeholder prose is worse than omitting it.
 
-对每个保留的 section 应用这些约束：
+- **High-Level Technical Design** — include when the technical approach has
+  shape that prose alone doesn't carry well: architecture across components,
+  sequencing across processes, state machines, branching gates.
+  Visualizations (component topology, sequence, swim lane, flowchart,
+  data-flow) typically live here. Skip when the approach is a one-paragraph
+  pattern application that the prose itself conveys.
 
-- **一句话只承载一个 idea。** Summary 应该是几句句子，而不是一个带五个分号和四个括号的长句。KTD 的 rationale 是 load-bearing reason，不是 every reason。
-- **一个 requirement 或 unit 是一句 intent，最多带一个 qualifier。** 当它要指定两个 outcomes（"either A or B, the implementer decides"）时，写清 intent，把 fork 放进 Open Questions；不要在 item 里完整写两条分支。
-- **删掉 hedges 和 intensifiers。** "Critically"、"deliberately"、"explicitly"、"genuinely"、"actually"、"simply" 不承载 implementer 可执行的信息。
-- **优先使用动词，而不是 nominalization。** 写 "Demote the grid"，不要写 "the demotion of the grid is the deliberate change in this plan"。
+- **Scope Boundaries** — include when scope is contested, when there are
+  tempting non-goals worth naming explicitly, or when "deferred for later"
+  needs distinguishing from "outside the product's identity." Skip when scope
+  is obvious from Requirements alone.
 
-Precision 不是 padding：file paths、IDs、conditionals 和 exact thresholds 保持原样。Economy 只针对它们周围的 connective tissue，绝不削弱 precision 本身。
+- **Open Questions** — include when there are genuinely unresolved items that
+  block planning or implementation. Skip when the plan is complete; an empty
+  "Open Questions: none" section signals false uncertainty.
 
-**Resolve in place; don't stratify。** 当 deepening、doc-review pass 或 later decision supersede 了 earlier text，直接 rewrite 或删除 original。不要保留 strikethrough，也不要在上面堆一个 separate "resolutions" layer。Version control 保存 history。堆叠 strata 会让阅读面翻倍，并隐藏哪段 text 仍然 live。
+- **System-Wide Impact** — include when the change affects cross-cutting
+  concerns (data lifecycles, auth boundaries, performance posture, cardinal
+  rules, shared infrastructure, agent/tool parity, prompt context, shared
+  workspaces). Skip for changes localized to one component where the impact is
+  self-evident.
 
-**在宣称 plan written 前运行 named test：** implementer 能否一遍在每个 section 中找到 contradiction？如果一句话有超过一个 parenthetical，或一个 item 指定两个 outcomes，就失败；拆句，或 defer。
+- **Risks & Dependencies** — include when there are real risks worth flagging
+  (external service changes, version pins under churn, behavioral assumptions
+  worth highlighting) or material upstream dependencies. Skip for low-risk
+  localized work.
 
-## Plan metadata fields（计划元数据字段）
+- **Acceptance Examples** — include when any requirement has a state-dependent
+  or conditional shape ("When X, Y") where the prose alone leaves ambiguity
+  about edge cases. Skip when all requirements are unconditional and
+  unambiguous.
 
-每个 plan 都携带一小组 downstream tooling 依赖的 stable metadata fields。该 contract 与格式无关：在 markdown 中，这些 fields 出现在文件顶部的 YAML frontmatter；在 HTML 中，它们作为 visible header text 出现（通常是 `<dt>`/`<dd>` pairs 组成的 `<dl>` 或 stats strip）。两个格式中的 field names 和 semantics 相同，因此 consumers 无需知道 plan 由哪种格式产出，也能定位它们。
+- **Documentation / Operational Notes** — include when documentation,
+  monitoring, runbooks, or rollout steps need explicit notes. Skip when the
+  work is purely internal and uses existing operational scaffolding without
+  modification.
 
-### Required（必填）
+- **Sources / Research** — surface the research that orients the implementer
+  or justifies load-bearing choices. The test: *"if I were the implementer
+  reading this cold, would this breadcrumb help me make better choices?"*
+  Yes → surface (code locations like `services/convex/reports.ts:174-176`,
+  external docs, RFCs, constraints, prior plans — the category is inclusive,
+  not enumerated). Process exhaust (reading the user's prompt, glancing at
+  obvious entry points, restating prose) → omit. Surface inline next to the
+  KTD or unit it justifies, or as a dedicated section — both shapes work.
 
-- **`title`** — verbatim plan title。匹配 H1（markdown）或 document `<h1>`（HTML），避免 file metadata 和 visible heading drift。
-- **`type`** — conventional-commit-prefix-aligned classification（`feat`、`fix`、`refactor`、`chore`、`docs`、`perf`、`test` 等）。承载最终 commit message 应反映的 intent。
-- **`date`** — ISO 8601 (`YYYY-MM-DD`) creation date，仅 ASCII digits。
+## Agent agency
 
-Plans carry **no status field**（不携带 `status` field）：plan 是 decision artifact，不是 tracked work item。`ce-work` 在 ship 时不 mutate plan；是否 shipped 由 git 推导，不存进 doc。不要添加 `status` field 或 `active → completed` lifecycle。
+The catalog is a floor, not a ceiling. When the plan's content doesn't fit
+any catalog section, introduce a new one — don't force the content into a
+section it doesn't belong in. Content drives section choices, not vice
+versa.
 
-### Optional but well-known（可选但约定俗成）
+The agent also picks per artifact:
 
-这些 fields 不是 required，但一旦设置，它们有固定 names 和 semantics，便于 downstream tooling 依赖：
+- Whether Problem Frame merges into Summary
+- Sub-groupings (Requirements by capability, KTDs by component, Units phased
+  into milestones)
+- How much detail each section carries
+- Whether HTD has one diagram, several, or none — and whether visualizations
+  live in HTD or embedded in other sections
 
-- **`origin`** — 指向 upstream brainstorm requirements doc 的 repo-relative path（例如 `docs/brainstorms/2026-05-12-pagination-requirements.md`）。从 upstream brainstorm planning 时设置；用于 traceability，并在 `ce-plan` re-deepens 时重新读取 source context。
-- **`deepened`** — ISO 8601 (`YYYY-MM-DD`) date，表示 plan 已经完成 deepening pass。用于 resume / re-deepening flows 判断是否需要再次加深。
+## Prose economy
 
-Field names 跨 plan revisions 稳定；绝不要 rename field 或 repurpose semantics。编写 new plans 的 agents 必须使用这些精确 names；添加新 fields 可以，但将 `origin` 改名为 `source` 或将 `date` 改名为 `created` 会破坏上方 downstream consumers。
+"Include when material" sizes *which* sections appear; this sizes *how the kept
+prose reads*. A section can be material and still be written loosely — the
+failure mode is a material section padded into a wall of text where
+contradictions hide and the implementing agent loses the thread. A deep plan
+earns length through coverage (more units, more traced requirements, real
+risks), never through wordiness around that coverage.
 
-## ID and content rules（ID 与内容规则）
+Hold every kept section to these:
 
-无论 rendering format 如何，以下规则都适用。
+- **One idea per sentence.** A Summary is a handful of sentences, not one
+  sentence with five semicolons and four parentheticals. A KTD's rationale is
+  the load-bearing reason, not every reason.
+- **A requirement or unit is one sentence of intent plus at most one
+  qualifier.** When it would specify two outcomes ("either A or B, the
+  implementer decides"), state the intent and send the fork to Open Questions —
+  don't write both arms in full inside the item.
+- **Cut hedges and intensifiers.** "Critically", "deliberately", "explicitly",
+  "genuinely", "actually", "simply" carry nothing the implementer acts on.
+- **Prefer the verb to the nominalization.** "Demote the grid", not "the
+  demotion of the grid is the deliberate change in this plan".
 
-- **Stable IDs（稳定 ID）。** R-IDs（Requirements）、U-IDs（Implementation Units）、A-IDs（如果 Actors 触发）、F-IDs（如果 Flows 触发）、AE-IDs（如果 Acceptance Examples 触发）。IDs 跨 plan revisions 稳定；绝不要为了 "clean up gaps" 而 renumber。
-- **Plain prefix（普通前缀）。** 使用 `R1.`、`U1.` 作为 bullet prefixes。不要 bold；prefix 本身已有视觉区分度。
-- **Repo-relative paths（repo 相对路径）。** 始终使用。plan content 中绝不要用 absolute paths；它们会破坏跨 machines、worktrees、teammates 的 portability。
-- **No process exhaust（不记录过程废气）。** 不写 "captured at Phase X" notes，不写指向 next skill 的 `## Next Steps`，不写 italic provenance lines。Engineering process metadata 属于 commit messages 和 tool output，不属于 artifact。
-- **当 Requirements 跨 distinct logical areas 时，按 concern 分组。** 触发条件是 distinct concerns，不是 item count；即使只有四个 requirements，如果覆盖三个不同 topics，也值得分组。只有当所有 requirements 真正关于同一件事时才跳过 grouping；长 flat list 是漏掉 subgroups 的信号。按 capability 分组（例如 "Packaging"、"Migration and compatibility"、"Contributor workflow"），不要按 requirements 被讨论的顺序分组。R-IDs 跨 groups 保持连续（第一组 R1、R2；第二组 R3、R4；绝不要每组从 R1 重新开始）。
+Precision is not padding: keep file paths, IDs, conditionals, and exact
+thresholds verbatim. Economy targets the connective tissue around them, never
+the precision itself.
 
-## Rendering（渲染）
+**Resolve in place; don't stratify.** When deepening, a doc-review pass, or a
+later decision supersedes earlier text, rewrite or remove the original — don't
+leave it standing as strikethrough or stack a separate "resolutions" layer on
+top of it. Version control holds the history. Stacked strata double the reading
+surface and hide which text is live.
 
-format-specific references 描述如何在每种 output format 中渲染这些 sections：
+**Named test, run before the plan is declared written:** could the implementer
+find a contradiction in each section in one pass? A sentence carrying more than
+one parenthetical, or an item specifying two outcomes, fails the test — split it
+or defer it.
 
-- **Markdown rendering（Markdown 渲染）：** `references/markdown-rendering.md`
-- **HTML rendering（HTML 渲染）：** `references/html-rendering.md`
+## Plan metadata fields
 
-本 reference（`plan-sections.md`）说明 plan 包含**什么**；rendering references 说明每种格式**如何**呈现它。plan 基于 resolved output mode 写成一种格式：markdown 或 HTML，绝不两者同时存在。section catalog 与格式无关。
+Every plan carries a small set of stable metadata fields that downstream
+tooling depends on. The contract is format-independent: in markdown these
+fields appear as YAML frontmatter at the top of the file; in HTML they
+appear as visible header text (typically a `<dl>` of `<dt>`/`<dd>` pairs or
+a stats strip). Field names and semantics are the same across both formats
+so consumers can locate them without knowing which format produced the
+plan.
+
+### Required
+
+- **`title`** — the plan's descriptive name with a ` - Plan` suffix
+  (e.g., `Highlighter Tool - Plan`), matching the H1 (markdown) or document
+  `<h1>` (HTML) so file metadata and visible heading don't drift. Stable
+  across readiness states (it is a plan at every stage). Do not put a
+  conventional-commit prefix (`feat:`/`fix:`) in the title — the `type` field
+  carries that classification.
+- **`type`** — conventional-commit-prefix-aligned classification (`feat`,
+  `fix`, `refactor`, `chore`, `docs`, `perf`, `test`, etc.). Carries the
+  intent the eventual commit message should reflect.
+- **`date`** — creation date in ISO 8601 (`YYYY-MM-DD`), ASCII digits only.
+
+Plans carry **no `status` field** — a plan is a decision artifact, not a
+tracked work item. `ce-work` does not mutate the plan at ship time;
+whether a plan shipped is derived from git, not stored in the doc. Do not
+add a `status` field or an `active → completed` lifecycle.
+
+### Optional but well-known
+
+These fields are not required, but when set they have fixed names and
+semantics so downstream tooling can rely on them:
+
+- **`origin`** — repo-relative path to an upstream brainstorm requirements
+  doc (e.g., `docs/brainstorms/2026-05-12-pagination-requirements.md`).
+  Set when planning from an upstream brainstorm; carried for traceability
+  and re-resolved when `ce-plan` re-deepens.
+- **`deepened`** — ISO 8601 date marking the first time the confidence
+  check substantively strengthened the plan. Presence affects Phase 0.1
+  resume fast-path logic (see `references/deepening-workflow.md`).
+- **`execution`** — execution domain for downstream routing: `code`
+  (the default when absent) or `knowledge-work`. `ce-work`'s input triage
+  reads this: a plan marked `execution: knowledge-work` routes to the
+  non-code carve-out (read sources, synthesize, produce a deliverable —
+  skipping the branch/test/commit/CI lifecycle); absent or `code` routes
+  to the normal code path. Written by `ce-plan`'s approach-altitude flow
+  (`references/approach-altitude.md`) when a non-code deliverable is
+  persisted for execution.
+
+Field names are stable across plan revisions — never rename a field or
+repurpose its semantics. Agents composing new plans MUST use these exact
+names; adding new fields is fine, but renaming `origin` to `source` or
+`date` to `created` breaks the downstream consumers above.
+
+## ID and content rules
+
+These apply regardless of rendering format.
+
+- **Stable IDs.** R-IDs (Requirements), U-IDs (Implementation Units), A-IDs
+  (if Actors fire), F-IDs (if Flows fire), AE-IDs (if Acceptance Examples
+  fire). IDs are stable across plan revisions — never renumber to "clean
+  up gaps."
+- **Plain prefix.** `R1.`, `U1.` as bullet prefixes. Do not bold; the prefix
+  is visually distinctive on its own.
+- **Repo-relative paths.** Always. Never absolute paths in plan content;
+  they break portability across machines, worktrees, teammates.
+- **No process exhaust.** No "captured at Phase X" notes, no `## Next Steps`
+  pointing to the next skill, no italic provenance lines. Engineering process
+  metadata belongs in commit messages and tool output, not the artifact.
+- **Group Requirements by concern when they span distinct logical areas.**
+  The trigger is distinct concerns, not item count — even four requirements
+  benefit from grouping if they cover three different topics. Skip grouping
+  only when all requirements are genuinely about the same thing; a long flat
+  list is a smell that subgroups were missed. Group by capability (e.g.,
+  "Packaging", "Migration and compatibility", "Contributor workflow"), not by
+  the order requirements were discussed. R-IDs stay continuous across groups
+  (R1, R2 in the first group; R3, R4 in the second; never restart at R1 per
+  group).
+
+## Rendering
+
+The format-specific references describe how to render these sections in each
+output format:
+
+- **Markdown rendering:** `references/markdown-rendering.md`
+- **HTML rendering:** `references/html-rendering.md`
+
+This reference (`plan-sections.md`) is about WHAT the plan contains;
+rendering references are about HOW each format presents it. The plan is
+written in one format — markdown OR HTML, never both — based on the
+resolved output mode. The section catalog is the same regardless of
+format.

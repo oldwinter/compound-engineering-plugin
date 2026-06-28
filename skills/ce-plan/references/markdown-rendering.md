@@ -1,46 +1,89 @@
-# Markdown Rendering（Markdown 渲染）
+# Markdown Rendering
 
-这是 format-rendering reference：它描述如何将任意 artifact 渲染为 markdown，与产出它的是哪个 skill 无关。
+This is a format-rendering reference — it describes how to render any
+artifact in markdown, independent of which skill is producing it.
 
-它与描述 artifact *包含什么*的 section contract（`plan-sections.md`、`brainstorm-sections.md` 等）配对。本 reference 描述 markdown 具体*如何*呈现它。由不同 skills 渲染的相同内容共享同一套 markdown principles。
+It is paired with a section contract (`plan-sections.md`,
+`brainstorm-sections.md`, etc.) that describes *what* the artifact contains.
+This reference describes *how* markdown specifically presents it. The same
+content rendered by different skills shares the same markdown principles.
 
-## Hard invariants（硬性不变量）
+## Hard invariants
 
-无论 artifact 由哪个 skill 产出，以下规则都成立。
+These hold regardless of which skill produced the artifact.
 
-- **文件顶部有 YAML frontmatter。** 标准 `---` 分隔 block，包含 artifact 的 stable metadata（title、date、type 等；确切 fields 按 skill 而定，定义在 section contract 中）。
-- **anchors 使用 ASCII identifiers。** Markdown headings 会从 heading text 自动生成 anchors。保持 headings 为 ASCII，让 anchors 可预测（`#implementation-units`，不是 `#implementación-units`）。
-- **file references 使用 repo-relative paths。** 始终如此。绝不要使用 absolute paths；它们会破坏跨 machines、worktrees、teammates 的 portability。
-- **不混入 HTML。** 保持 markdown 纯净。不要 `<div>`、不要 `<details>`、不要 inline `<style>`。如果 layout idea 只有 HTML 能实现，将其留给 HTML rendering。Markdown stays markdown。
+- **YAML frontmatter at the top of the file.** Standard `---` delimited block
+  containing the artifact's stable metadata (title, date, type, etc.
+  — exact fields are per-skill, defined in the section contract).
+- **ASCII identifiers in anchors.** Markdown headings auto-generate anchors
+  from the heading text. Keep headings ASCII so anchors are predictable
+  (`#implementation-units`, not `#implementación-units`).
+- **Repo-relative paths for file references.** Always. Never absolute paths
+  — they break portability across machines, worktrees, teammates.
+- **No HTML mixed in.** Keep the markdown pure. No `<div>`, no `<details>`,
+  no inline `<style>`. If a layout idea only works as HTML, defer it to the
+  HTML rendering. Markdown stays markdown.
+- **No fixed-width line wrapping.** Do not hard-wrap prose to a column (e.g.
+  80 chars). Write one sentence per line, or let each paragraph flow as a
+  single line. The artifact is read rendered and shared, where fixed wraps add
+  nothing and only produce noisy mid-sentence diffs; markdown joins soft line
+  breaks within a paragraph, so wrapping never changes the rendered output.
+- **Unified plan sections use stable headings.** For unified plan artifacts,
+  render the required sections with exact ASCII headings so agents can find
+  them by heading scan: `## Goal Capsule`, `## Product Contract`,
+  `## Planning Contract`, `## Implementation Units`, `## Verification Contract`,
+  `## Definition of Done`, and optional `## Appendix`. Requirements-only
+  artifacts omit the plan-only sections rather than emitting empty placeholders.
+  These stable headings are the wayfinding contract: consumers scan them
+  (markdown headings, or `<h1>`–`<h3>` / anchor ids in HTML) instead of reading
+  the whole document.
+- **Goal Capsule is top-loaded.** It appears before Product Contract and long
+  appendices for fast orientation — not a hidden machine copy.
 
-## Format principles（格式原则）
+## Format principles
 
-这些原则塑造“好”markdown 的样子；agent 会根据 content shape 对每个 artifact 应用它们。
+These shape what "good" markdown looks like; the agent applies them per
+artifact based on content shape.
 
-### ID prefix format（ID prefix 格式）
+### ID prefix format
 
-Stable IDs（R、U、A、F、AE、KTD）作为 plain prefixes 出现在 bullet 或 heading 开头；不要 bold prefix。prefix 本身已经有视觉区分度；bold 会增加 visual noise。
+Stable IDs (R, U, A, F, AE, KTD) appear as plain prefixes at the start of
+the bullet or heading — do NOT bold the prefix. The prefix is visually
+distinctive on its own; bolding it inflates visual noise.
 
 ```markdown
 - R1. The plan returns paginated sessions.   ← right
 - **R1.** The plan returns paginated sessions.   ← wrong (bolded prefix)
 ```
 
-unit headings 同理：`### U1. Cloak detection in preflight contract`。
+Same applies to unit headings: `### U1. Cloak detection in preflight contract`.
 
-### Content shape: prose vs bullets vs tables（内容形状：prose / bullets / tables）
+### Content shape: prose vs bullets vs tables
 
-同一内容可用三种方式渲染；agent 按 content shape 选择，而不是按 template default。
+The same content can be rendered three ways; the agent picks per content
+shape, not by template default.
 
-- **Prose**：当内容有 narrative flow（motivation、decision rationale、problem framing）时使用。Bullets 会把叙事切成 disconnected pieces。
-- **Bullets**：当 items 共享 parallel shape，但每项都有足够多 prose、不适合放入 table cell 时使用。
-- **Tables**：当 5+ items 共享 uniform structure（`ID + body`、`name + value`、`decision + rationale`、`risk + mitigation`）时使用。在这个规模下，tables 扫描更快，并可解锁 bullets 无法清晰承载的 additional columns（status、traceability、severity）。
+- **Prose** when the content has narrative flow (motivation, decision
+  rationale, problem framing). Bullets fragment narrative into
+  disconnected pieces.
+- **Bullets** when items share a parallel shape but each carries enough
+  prose to not fit a table cell.
+- **Tables** when 5+ items share uniform structure (`ID + body`,
+  `name + value`, `decision + rationale`, `risk + mitigation`). Tables
+  scan faster at that scale and unlock additional columns (status,
+  traceability, severity) that bullets can't accommodate cleanly.
 
-测试标准：读者用哪种形状最快扫描这段内容？如果 items 有 parallel structure 且有 5+ instances，用 table。如果 items 有 3-5 个且每个有几行 prose，用 bullets。如果内容是单一 narrative thought，用 prose。
+The test: which shape would a reader scan fastest for this content? If
+items have parallel structure and 5+ instances, table. If items are 3-5
+and each has a few lines of prose, bullets. If the content is a single
+narrative thought, prose.
 
-### Bold leader labels within bullets（bullet 内的加粗 leader labels）
+### Bold leader labels within bullets
 
-当 bullet 有 substructure，且 named fields 有帮助时（Key Flows 中的 Trigger / Actors / Steps / Outcome，Acceptance Examples 中的 Covers / Given / When / Then），在 nested bullets 开头使用 bold leader labels；不要使用更深 heading levels。
+When a bullet has substructure that benefits from named fields (Key Flows
+with Trigger / Actors / Steps / Outcome, Acceptance Examples with Covers
+/ Given / When / Then), use bold leader labels at the start of nested
+bullets — not deeper heading levels.
 
 ```markdown
 - F1. Anonymous capture
@@ -50,32 +93,64 @@ unit headings 同理：`### U1. Cloak detection in preflight contract`。
   - **Covered by:** R1, R2, R5
 ```
 
-这能提供 bullet structure，而无需使用会 clutter doc 并破坏 TOC generation 的 H4/H5 headings。
+This gives the bullet structure without needing H4/H5 headings that would
+clutter the doc and break TOC generation.
 
-### Section separators（section 分隔符）
+### Section separators
 
-对 substantial artifacts，在 top-level H2 sections 之间使用 horizontal rules（`---`）。对短文档省略，否则 separators 会喧宾夺主。
+For substantial artifacts, use horizontal rules (`---`) between top-level
+H2 sections. Omit for short docs where separators would dominate.
 
-### Tables for genuinely comparative info only（只为真正比较型信息使用 tables）
+### Tables for genuinely comparative info only
 
-仅对上方 "Content shape" 中的 uniform-shape 情况使用 tables。不要用 tables 渲染本质上是 bullets 的 content lists；markdown tables 在 raw form 中更嘈杂，对 diffs 也更糟。
+Use tables for the uniform-shape case in "Content shape" above. Don't use
+tables to render content lists that are really bullets — markdown tables
+are noisier in raw form and worse for diffs.
 
-## Section anatomy（section 解剖）
+## Section anatomy
 
-section types 在 markdown 中的常见渲染方式。这些是 patterns，不是 contracts；agent 选择适合内容的形状。
+How section types commonly render in markdown. These are patterns, not
+contracts — the agent picks the shape that fits the content.
 
-- **Summary / Problem Frame（摘要 / 问题框架）** — prose paragraphs。
-- **Requirements** — 带 `R<N>.` prefix 的 bullets。当 requirements 跨越多个 concerns 时，默认形状是在 bold inline headers 下分组，而不是 optional polish（按 capability 分组，不按 discussion order）；只有当每个 requirement 都关于同一件事时，才渲染为 flat list。当 requirements 有 status、traceability 或 severity，值得 additional columns 时，升级为 table。
-- **Implementation Units** — 每个 unit 用带 `U<N>.` prefix 的 H3 heading。Fields（Goal、Files、Patterns、Test Scenarios、Verification）渲染为带 bold leader labels 的 bullets；如果 field 有 multi-paragraph content，则可作为 sub-headings。
-- **Key Technical Decisions** — 使用 bold decision name + prose rationale 的 bullets；当 traceability 重要时，使用 numbered KTD-N pattern。
-- **Key Flows / Acceptance Examples** — 使用带 bold leader labels 的 bullets（Trigger / Actors / Steps / Outcome / Covers / Given-When-Then）。
-- **Scope Boundaries** — bullets；当 positioning distinction 重要时，可拆成 "Deferred for later" / "Outside this product's identity" sub-headings。
+- **Goal Capsule** — bullets or a small table for objective, authority,
+  execution profile, stop conditions, and tail ownership.
+- **Product Contract** — H2 section containing Summary, Problem Frame,
+  Requirements, and product-scope subsections. Put Requirements under
+  `### Requirements` so review tools can distinguish Product Requirements
+  from implementation detail.
+- **Planning Contract** — H2 section for KTDs, high-level technical design,
+  assumptions, and sequencing.
+- **Summary / Problem Frame** — prose paragraphs.
+- **Requirements** — bullets with `R<N>.` prefix. When requirements span
+  more than one concern, grouping under bold inline headers is the default
+  shape, not optional polish (group by capability, not by discussion order);
+  render a flat list only when every requirement is about the same thing.
+  When requirements have status, traceability, or severity that warrant
+  additional columns, escalate to a table.
+- **Implementation Units** — H3 heading per unit with `U<N>.` prefix.
+  Fields (Goal, Files, Patterns, Test Scenarios, Verification) render as
+  bullets with bold leader labels, or as sub-headings if the field has
+  multi-paragraph content.
+- **Verification Contract / Definition of Done** — use tables when commands,
+  applicability, unit IDs, and done signals share a uniform shape. Name
+  concrete repo commands such as `bun test` rather than generic "run tests"
+  when the repo has known commands.
+- **Key Technical Decisions** — bullets with bold decision name + prose
+  rationale, or numbered KTD-N pattern when traceability matters.
+- **Key Flows / Acceptance Examples** — bullets with bold leader labels
+  (Trigger / Actors / Steps / Outcome / Covers / Given-When-Then).
+- **Scope Boundaries** — bullets, optionally split into "Deferred for
+  later" / "Outside this product's identity" sub-headings when the
+  positioning distinction matters.
 
-agent 会根据每个 specific artifact 的内容需要，选择更 elaborate 或更 simple 的 shapes。
+The agent picks more elaborate or simpler shapes based on what each
+specific artifact's content needs.
 
-## Diagrams（图表）
+## Diagrams
 
-当 section contract 要求 diagram（architecture、sequence、flowchart、state machine、swim lane、data-flow）时，markdown 将其渲染为 fenced mermaid block：
+When the section contract calls for a diagram (architecture, sequence,
+flowchart, state machine, swim lane, data-flow), markdown renders it as
+a fenced mermaid block:
 
 ```markdown
 ` ``mermaid
@@ -86,14 +161,28 @@ flowchart TB
 ` ``
 ```
 
-（`TB` direction default；让 diagrams 在 source view 和 narrow rendered viewports 中保持较窄。）
+(`TB` direction default — keeps diagrams narrow in source view and in
+narrow rendered viewports.)
 
-Markdown 的 diagram affordances 相比 HTML 有限。对 quantitative comparisons（bar charts、scatter plots），markdown 没有 native equivalent；使用包含数据的 table，并让 prose 或 caption 承载 interpretation。更丰富的 visualization 发生在 HTML rendering 中。
+Markdown's diagram affordances are limited compared to HTML. For
+quantitative comparisons (bar charts, scatter plots) markdown has no
+native equivalent — use a table with the data and let prose or caption
+carry the interpretation. The richer visualization happens in the HTML
+rendering.
 
-## Inline code and code blocks（inline code 与 code blocks）
+For a **UI/layout shape** that would be a wireframe in HTML, markdown has
+no inline-SVG wireframe affordance. Render the region composition as a
+mermaid layout `flowchart` (or describe it in prose) — never hand-draw a
+box-drawing/ASCII wireframe; it violates the no-box-drawing-characters rule
+and reads poorly. The wireframe proper is an HTML-only affordance.
 
-- **Inline code** 用于 identifiers（variable names、function names、flag names、file paths、不是 section anchors 的 IDs）。
-- **Fenced code blocks** 带 language tag，用于 code、shell commands、API request/response samples。始终指定 language，以支持 syntax highlighting 和 accessibility。
+## Inline code and code blocks
+
+- **Inline code** for identifiers (variable names, function names,
+  flag names, file paths, IDs that aren't section anchors).
+- **Fenced code blocks** with language tag for code, shell commands,
+  API request/response samples. Always specify the language for syntax
+  highlighting and accessibility.
 
 ```markdown
 The flag `--cdp-url` accepts a URL.
@@ -103,34 +192,45 @@ browser-use --cdp-url http://localhost:9222
 ` ``
 ```
 
-## No process exhaust（不写流程噪音）
+## No process exhaust
 
-Engineering process metadata 不进入 artifact：
+Engineering process metadata stays out of the artifact:
 
-- 不写 "captured at Phase X" notes
-- 不写指向 next skill 的 `## Next Steps`
-- 不写 italic provenance lines（"*Brainstorm completed 2026-05-13*"）
-- 不写 engineering-flow shepherding（"Now read this file:"、"Next, run that command:"）
+- No "captured at Phase X" notes
+- No `## Next Steps` pointing to the next skill
+- No italic provenance lines ("*Brainstorm completed 2026-05-13*")
+- No engineering-flow shepherding ("Now read this file:", "Next, run that
+  command:")
 
-这些信息属于 commit messages、tool output 和 agent transcripts；不属于读者几周后返回查看的 artifact。
+This information belongs in commit messages, tool output, and agent
+transcripts — not in the artifact a reader returns to weeks later.
 
-## Frontmatter shape（Frontmatter 形状）
+## Frontmatter shape
 
-Per-skill frontmatter fields 定义在各 skill 的 section contract 中（`plan-sections.md` 列出 plan frontmatter；`brainstorm-sections.md` 列出 brainstorm frontmatter）。通用规则：
+Per-skill frontmatter fields are defined in each skill's section contract
+(`plan-sections.md` lists plan frontmatter; `brainstorm-sections.md` lists
+brainstorm frontmatter). Common rules:
 
-- YAML 位于文件顶部，上下用独立一行的 `---` 分隔。
-- Field names 使用 lowercase snake_case（`created_at`、`topic`，不是 `CreatedAt`、`Topic`）。
-- **No status / lifecycle field（无 status / lifecycle 字段）。** Artifacts 是 point-in-time records（decision 或 discovery），不是 tracked work items。不要引入 mutable `status` field 或 `active → completed` lifecycle；work 是否 shipped 由 git 推导，不存进 doc。
-- 跨 artifact revisions 保持稳定；绝不要 rename 或 repurpose field。
+- YAML at the top of the file, delimited by `---` on its own line above
+  and below.
+- Field names in lowercase snake_case (`created_at`, `topic`, not
+  `CreatedAt`, `Topic`).
+- **No status / lifecycle field.** Artifacts are point-in-time records
+  (decision or discovery), not tracked work items. Do not introduce a
+  mutable `status` field or an `active → completed` lifecycle — whether
+  the work shipped is derived from git, not stored in the doc.
+- Stable across artifact revisions — never rename or repurpose a field.
 
-## Post-write audit（写入后审计）
+## Post-write audit
 
-宣称 markdown file 已写入前，扫描这些常见 slips：
+Before declaring the markdown file written, scan it for these common
+slips:
 
-- 所有 stable IDs 都是 plain-prefix format，未 bold。
-- 没有混入 HTML elements。
-- 所有 file paths 都是 repo-relative。
-- H2 之间有 horizontal rule separators（用于 Standard / Deep artifacts）。
-- 没有 process exhaust（Phase X notes、Next Steps pointers、provenance lines）。
-- 只有 5+ uniform-shape items 足以证明需要 table 时才使用 tables。
-- Frontmatter 包含所有 per-skill required fields，且值合理。
+- All stable IDs are plain-prefix format, not bolded.
+- No HTML elements mixed in.
+- All file paths are repo-relative.
+- Horizontal rule separators between H2s (for Standard / Deep artifacts).
+- No process exhaust (Phase X notes, Next Steps pointers, provenance
+  lines).
+- Tables only where 5+ uniform-shape items justify them.
+- Frontmatter has all the per-skill required fields with reasonable values.

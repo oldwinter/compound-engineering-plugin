@@ -1,55 +1,55 @@
 # Approach Altitude
 
-当 SKILL.md Phase 0.1a 需要把请求上提一层回答时加载：产出 grounded **approach-plan**，也就是 *deliverable 将如何被制作* 的 plan，在 checkpoint 停住，然后现在执行或保存到以后。入口可以是 explicit（"plan for a plan"），也可以是用户接受了 proactive offer。它是 domain-general：deliverable 可以是 document、synthesis、study artifact，也可以是 software implementation plan。它维护的边界是 **code vs. knowledge-work**，不是 plan vs. execute。`ce-plan` 永远不写或运行 code；code execution 始终属于 `ce-work`。
+Loaded from SKILL.md Phase 0.1a when a request is answered one level up — produce a grounded **approach-plan** (a plan for *how the deliverable will be made*), hold at a checkpoint, then execute now or save for later. Entered explicitly ("plan for a plan") or via an accepted proactive offer. Domain-general: the deliverable may be a document, a synthesis, a study artifact, or a software implementation plan. The boundary this preserves is **code vs. knowledge-work**, not plan vs. execute — `ce-plan` never writes or runs code (Phase 4 / SKILL.md line 15); code execution always belongs to `ce-work`.
 
-## Stage 1: Light recon（低成本 grounding）
+## Stage 1: Light recon (cheap grounding)
 
-Approach-plan 的意义，是足够具体到值得用户判断。Generic methodology（"read the book, extract themes, synthesize"）不值得 approval。因此在 compose 前，先 skim 用户提供的 inputs，用具体信息 ground approach，但**不要** full read；full read 是 deliverable 本身的工作，延后到 execution。
+The whole point of the approach-plan is to be specific enough to judge. Generic methodology ("read the book, extract themes, synthesize") is not worth approving. So before composing it, skim the provided inputs enough to ground the approach in specifics — **not** the full read; that is the deliverable's work, deferred to execution.
 
-- **按 input type 限定 recon**，让 checkpoint 保持便宜。以下是方向性 guidance，不是硬规则：PDF 看 section headers、first/last pages 和少量 sampled sections；长 transcript 看 sampled spans 和 topic shifts；codebase 看 entry points 和相关 module shape。Skim 到足以定位什么重要、各部分如何关联，然后停止。
-- **Ground in specifics:** 命名 approach 会连接的具体 bridge，例如 "the transcript spends ~40 minutes on pricing, which maps to the book's chapter-3 framework -- I'll connect them there"，不要输出 generic recipe。
-- **Graceful degrade。** 如果 inputs 缺失或稍后才到，根据 request 本身提出 provisional/ungrounded 的 approach-plan；不要阻塞等待 inputs，也不要把 generic methodology 包装成 plan。
-- **No process exhaust。** Approach-plan 应读起来对用户有价值，而不是 recon step audit log（"I skimmed the PDF, then sampled the transcript, then..."）。Surface 结论，不要 surface plumbing。参见 `references/universal-planning.md` 的 Veil of value。
+- **Bound the recon per input type** so the checkpoint stays cheap. Directional guidance, not a rule: for a PDF, section headers + first/last pages + a few sampled sections; for a long transcript, sampled spans plus topic shifts; for a codebase, entry points and the relevant module shape. Skim to locate what matters and how the pieces relate, then stop.
+- **Ground in specifics:** name the concrete bridges the approach will make ("the transcript spends ~40 minutes on pricing, which maps to the book's chapter-3 framework — I'll connect them there"), not a generic recipe.
+- **Degrade gracefully.** If the inputs are absent or arrive later, fall back to proposing from the request alone and flag the approach-plan as provisional/ungrounded — never block waiting for inputs, never emit generic methodology dressed as a plan.
+- **No process exhaust.** The approach-plan reads as value to the user, not as an audit log of recon steps ("I skimmed the PDF, then sampled the transcript, then…"). Surface what you concluded, not the plumbing. (See the Veil of value in `references/universal-planning.md`.)
 
-## Stage 2: Compose the approach-plan（chat-first）
+## Stage 2: Compose the approach-plan (chat-first)
 
-在 chat 中交付 approach-plan。它是 **file-optional**：由用户决定是否持久化。保持可扫读。按请求大小覆盖：
+Deliver the approach-plan in chat. It is **file-optional** — the user decides whether to persist it. Keep it scannable. Cover, right-sized to the request:
 
-- **每个 input 如何处理**：会从中挖什么，且基于 recon grounding。
-- **它们如何组合**：synthesis strategy / sequencing；这通常是最有风险、也最值得确认的部分。
-- **Deliverable 的形状**：执行后会产出什么结构 / outline。
-- **值得确认的 forks**：少数用户 steer 会实质改变结果的 decisions（例如某个 source 权重更高、depth vs. breadth、audience）。
-- **Open questions**：execution 前真正需要用户回答的 unresolved items。
+- **How each input will be handled** — what you'll mine from each, grounded in the recon.
+- **How they combine** — the synthesis strategy / sequencing; this is usually the risky part and the most valuable thing to confirm.
+- **The shape of the deliverable** — structure/outline of what executing this will produce.
+- **The forks worth confirming** — the few decisions where the user's steer materially changes the result (e.g., weighting one source over another, depth vs. breadth, audience).
+- **Open questions** — anything genuinely unresolved that the user should answer before execution.
 
-这不是 software plan template（没有 implementation units / test scenarios），除非 deliverable 本身就是 software implementation plan；那种情况下，"execute now / code" 会进入正常 `ce-plan` flow，而不是在这里 compose deliverable。
+This is not a software plan template (no implementation units / test scenarios) unless the deliverable itself is a software implementation plan — in which case "execute now / code" routes into the normal `ce-plan` flow (below) rather than composing the deliverable here.
 
 ## Stage 3: Checkpoint
 
-停在 approach。使用平台 blocking question tool（Claude Code 中的 `AskUserQuestion`；schema 未加载时先用 `ToolSearch` 且 `select:AskUserQuestion`；Codex 中用 `request_user_input`；Antigravity 中用 `ask_question`，Pi 中用 `ask_user`）。只有在没有 blocking tool 或 tool 调用失败时，才 fallback 到 chat 中的 numbered options。不要 silently skip。
+Hold at the approach. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code — call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded; `request_user_input` in Codex; `ask_question` in Antigravity CLI (`agy`)/Pi). Fall back to numbered options in chat only when no blocking tool exists or the call errors — never silently skip.
 
-**按 orthogonal axes 顺序提问**，不要把它们塞进同一个 menu（遵循 "split orthogonal decisions" rule 和 4-option cap）：
+**Sequence orthogonal axes** rather than cramming them into one menu (per the "split orthogonal decisions" rule and the 4-option cap):
 
-1. **先问：** "现在执行，还是保存到以后？"
-2. **只有当选择现在执行且 domain 仍不明显时：** 确认 code vs. knowledge-work deliverable。作为 "save for later" 的一部分，可以 offer deepen approach-plan。
+1. **First:** "Execute now, or save for later?"
+2. **Then, only if executing now and the domain isn't already obvious:** confirm code vs. knowledge-work deliverable. Offer to deepen the approach-plan as part of "save for later".
 
 ## Stage 4: Route
 
-**Save for later。** 将 approach-plan 持久化到 `docs/plans/`。如果 deliverable 是 non-code，在持久化时写入 marker（`execution: knowledge-work`，见 `references/plan-sections.md`），这样之后 `ce-work` 读取该 plan 会进入 carve-out，而不是 code path。Offer deepen。保持 plan **agent-agnostic**，不要在 body 中写入 `ce-work`-specific choreography，让任何 agent 都能稍后执行。
+**Save for later.** Persist the approach-plan to `docs/plans/` so it survives. If the deliverable is non-code, write the marker (`execution: knowledge-work`, see `references/plan-sections.md`) at persist time — so a later `ce-work` invocation on the saved plan routes to the carve-out, not the code path. Do not label an approach-plan as `artifact_contract: ce-unified-plan/v1` unless it also contains Product Contract, Planning Contract, Implementation Units, Verification Contract, and Definition of Done for a software implementation. A plan-for-a-plan is usually not suitable for `/goal`; its job is to guide a later planning or knowledge-work pass, not to execute code. Offer to deepen it. Keep the plan **agent-agnostic** (no `ce-work`-specific choreography in the body) so any agent can execute it later.
 
-**Execute now -- code deliverable。** Approach-plan 的工作已经结束；继续进入正常 `ce-plan` flow（Phase 0.1b onward）产出 implementation plan，然后 hand off 给 `ce-work` 写 code。`ce-plan` 不自己写 code。
+**Execute now -- code deliverable.** The approach-plan's job is done; continue into the normal `ce-plan` flow (Phase 0.1b onward) to produce the implementation plan, then hand off to `ce-work` for the code. `ce-plan` never writes the code itself.
 
-**Execute now -- non-code deliverable。** 这是 knowledge-work path，没有 `ce-work` 等价的 code lifecycle，因此 route 到 `ce-work` carve-out：
+**Execute now -- non-code deliverable.** This is the knowledge-work path with no `ce-work` equivalent, so it routes to `ce-work`'s carve-out:
 
-1. 在 plan frontmatter 写入 marker `execution: knowledge-work`。
-2. **Persist** marked plan 到 `docs/plans/`（marker 需要文件承载，才能 travel；R7 的 file-optional 只适用于用户保留 chat-only copy，non-code *execution* 必须 persist）。
-3. 通过平台 skill invocation primitive 触发 `ce-work` skill，并传入 plan path（Claude Code 中为 `Skill`）。不要只是告诉用户去运行；要触发它，让本 session 继续执行。
+1. Write the marker `execution: knowledge-work` into the plan frontmatter.
+2. **Persist** the marked plan to `docs/plans/` (the marker needs a file to live in so it can travel — R7's file-optional governs the user keeping a chat-only copy, but non-code *execution* forces a persist).
+3. Fire the `ce-work` skill, passing the plan path, via the platform's skill-invocation primitive (`Skill` in Claude Code). Do not merely tell the user to run it — fire it so execution happens in this session.
 
-`ce-plan` 在任何路径中都不执行 deliverable；它产出 approach-plan 并 hand off。该 portable plan 也能由没有 `ce-work` 的任意其他 agent 执行。
+`ce-plan` itself does not execute the deliverable in any path — it produces the approach-plan and hands off. The portable plan is also runnable by any other agent without `ce-work`.
 
 ## Boundaries: not the other approach surfaces
 
-已有三种 in-chat "approach" mechanics。Approach altitude 是独立但协同的 surface。通过 distinguishing properties 保持 disjoint，不靠 vocabulary 区分：
+Three in-chat "approach" mechanics already exist. Approach altitude is separate but coordinated — keep it disjoint by its distinguishing properties, not by vocabulary:
 
-- **Answer-seeking's plan-of-attack**（`references/universal-planning.md`）：non-blocking（说明 approach 后立即继续）、丢弃 scaffold、产出 chat answer，并且只存在于 non-software answer-seeking branch。Approach altitude 是 domain-general，**停在 checkpoint** 等用户决定，并产出 **persistable、deepenable** 的 approach-plan。没有 approach-language 的 investigative request 属于 answer-seeking，不属于本机制。
-- **Scoping synthesis**（Phase 0.7 / 5.1.5）：对已经 committed 的 deliverable 做 *scope* checkpoint，确认 implementation plan 要瞄准什么。Approach altitude 是 *altitude* checkpoint，决定是否要 commit 到 deliverable；它位于 implementation plan 之上，不在生产 implementation plan 的内部。
-- **Deepening**（Phase 5.3）：作用于已存在的 plan，通过 confidence sub-agents 强化它。Approach altitude 发生在任何 artifact 存在之前。Approach-altitude checkpoint 中的 "deepen" affordance 是用户选择丰富 approach-plan，不是 Phase 5.3 confidence pass。
+- **Answer-seeking's plan-of-attack** (`references/universal-planning.md`): non-blocking (states the approach and proceeds immediately), discards its scaffold, produces a chat answer, and lives only in the non-software answer-seeking branch. Approach altitude is domain-general, **holds at a checkpoint** for a user decision, and produces a **persistable, deepenable** approach-plan. An investigative request with no approach-language is answer-seeking's, not this.
+- **Scoping synthesis** (Phase 0.7 / 5.1.5): a *scope* checkpoint for a deliverable already committed to — it confirms what the implementation plan will target. Approach altitude is an *altitude* checkpoint that decides whether to commit to the deliverable at all; it sits above the implementation plan, not inside producing one.
+- **Deepening** (Phase 5.3): operates on a plan that already exists, strengthening it via confidence sub-agents. Approach altitude operates *before any artifact exists*. The "deepen" affordance offered at the approach-altitude checkpoint is the user optionally enriching the approach-plan — not the Phase 5.3 confidence pass.

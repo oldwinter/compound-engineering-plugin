@@ -125,7 +125,7 @@ Diff 不在 sensitive surface 上，也不大且 diffuse，所以 harness-native
    |
    v
 /ce-brainstorm
-   |  requirements / brief
+   |  requirements-only unified plan
    v
 /ce-plan
    |  guardrails — U-IDs、files、test scenarios、scope、risks

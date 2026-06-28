@@ -18,7 +18,6 @@ tags:
   - batching
   - orchestration-cost
   - prompt-engineering
-  - ce-work-beta
 ---
 
 # Codex Delegation 最佳实践

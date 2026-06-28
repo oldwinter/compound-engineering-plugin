@@ -97,7 +97,7 @@ Requirements 描述从用户视角期待的 **what** behavior。默认不描述 
 
 ### 9. Grounding and verification ride inside your think-time
 
-On Standard and Deep brainstorms, a cheap extraction-tier scout is dispatched in the background while you answer the first question. It writes a grounding dossier — verbatim quotes with `file:line` pointers — to scratch storage and hands back a short gist, so the dialogue stays lean while the evidence stays available on demand. Before the requirements doc is written, a fresh-context verifier (a mid-tier model that never saw the dialogue) checks the doc's repo claims — absence claims, file references — against the codebase, running while you review the synthesis confirmation. Refuted claims are corrected before the doc lands; unverifiable ones become explicit assumptions. The dossier path is handed to `ce-plan` so planning starts from verified quotes instead of re-scanning. On platforms without per-agent model selection, both run on the inherited model with the same read budgets; with no subagent support at all, the skill falls back to inline scanning and verification.
+On Standard and Deep brainstorms, a cheap extraction-tier scout is dispatched in the background while you answer the first question. It writes a grounding dossier — verbatim quotes with `file:line` pointers — to scratch storage and hands back a short gist, so the dialogue stays lean while the evidence stays available on demand. Before the requirements-only unified plan is written, a fresh-context verifier (a mid-tier model that never saw the dialogue) checks the Product Contract's repo claims — absence claims, file references — against the codebase, running while you review the synthesis confirmation. Refuted claims are corrected before the plan lands; unverifiable ones become explicit assumptions. The dossier path is handed to `ce-plan` so planning starts from verified quotes instead of re-scanning. On platforms without per-agent model selection, both run on the inherited model with the same read budgets; with no subagent support at all, the skill falls back to inline scanning and verification.
 
 ---
 
@@ -140,12 +140,12 @@ Right-sized requirements doc 写入，Phase 4 menu 提供 next steps：`/ce-plan
    |  picks one survivor + carries warrant + rationale
    v
 /ce-brainstorm
-   |  produces requirements / brief
+   |  produces requirements-only unified plan
    |  software mode: R-IDs, A-IDs, F-IDs, AE-IDs + scope boundaries
    |  universal mode: a domain-appropriate brief
    v
 /ce-plan
-   |  reads the doc as origin
+   |  enriches the same plan to implementation-ready
    |  R-IDs flow into Requirements; A/F/AE-IDs trace into units and tests
    |  origin scope boundaries are preserved verbatim
    v

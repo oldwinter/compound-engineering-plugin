@@ -1,112 +1,162 @@
-# Handoff（交接）
+# Handoff
 
-本内容在 Phase 4 开始时加载，也就是 requirements document 写入之后。
+This content is loaded when Phase 4 begins — after the requirements-only
+unified plan is written.
 
 ---
 
-#### 4.1 呈现下一步选项
+#### 4.1 Present Next-Step Options
 
-Phase 4 菜单的可见选项数量会随状态变化：没有 requirements doc 时隐藏 review 和 Proof 选项，`OUTPUT_FORMAT=html` 也隐藏 review 选项（ce-doc-review 今天是 markdown-only），未解决的 `Resolve Before Planning` 会隐藏 `Plan implementation` 和 `Build it now`，direct-to-work gate 失败会隐藏 `Build it now`。统计当前状态下的可见选项，并据此选择渲染模式：
+The Phase 4 menu's visible option count varies by state: no unified plan
+artifact hides the review and Proof options, `OUTPUT_FORMAT=html` also hides
+the review option (ce-doc-review is markdown-only today), unresolved `Resolve
+Before Planning` hides both `Create the implementation plan` and `Ship it
+autonomously with lfg`, and the lfg option is also hidden for non-software
+brainstorms (`execution` other than `code`). Count the visible options for the
+current state and choose the rendering mode accordingly:
 
-- **4 个或更少可见选项：** 使用平台 blocking question tool（Claude Code 中的 `AskUserQuestion`；若 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用；Codex 中的 `request_user_input`；Antigravity 中的 `ask_question`；Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。这是默认路径。
-- **5 个或更多可见选项：** 在聊天中渲染为编号列表。这是窄的 option-overflow fallback；删减选项会隐藏合法选择（plan、review、Proof、build、refine、pause 都是不同 destination）。加入接受自由文本输入的提示（"Pick a number or describe what you want."），让编号列表保留 blocking tool 的 open-endedness。
+- **4 or fewer visible:** use the platform's blocking question tool (`AskUserQuestion` in Claude Code — call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded; `request_user_input` in Codex; `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension)). This is the default.
+- **5 or more visible:** render as a numbered list in chat. This is the narrow option-overflow fallback; trimming would hide legitimate choices (plan, ship, review, Proof, refine, pause are all distinct destinations). Include a hint that free-form input is accepted ("Pick a number or describe what you want.") so the numbered list retains the blocking tool's open-endedness.
 
-绝不要静默跳过问题。
+Never silently skip the question.
 
-如果 `Resolve Before Planning` 包含任何 items：
-- 默认现在逐个询问 blocking questions
-- 如果用户明确仍要继续，先将每个剩余 item 转换为明确 decision、assumption，或 `Deferred to Planning` question
-- 如果用户选择暂停，将 handoff 呈现为 paused 或 blocked，而不是 complete
-- 只要 `Resolve Before Planning` 仍非空，就不要提供 `Plan implementation` 或 `Build it now` 选项
+If `Resolve Before Planning` contains any items:
+- Ask the blocking questions now, one at a time, by default
+- If the user explicitly wants to proceed anyway, first convert each remaining item into an explicit decision, assumption, or `Deferred to Planning` question
+- If the user chooses to pause instead, present the handoff as paused or blocked rather than complete
+- Do not offer the `Create the implementation plan` or `Ship it autonomously with lfg` options while `Resolve Before Planning` remains non-empty
 
-下面两个 preamble 中，"Pick a number or describe what you want." 提示仅适用于 numbered-list mode。使用 blocking tool 时，省略该行，并将剩余 stem 作为问题传入。
+In both preambles below, the "Pick a number or describe what you want." hint applies only in numbered-list mode. When using the blocking tool, omit that line and pass the remaining stem as the question.
 
-**Path format（路径格式）：** 聊天输出中的文件引用使用 absolute paths；relative paths 在多数终端中不会自动链接为可点击项。
+**Path format:** Use absolute paths for chat-output file references — relative paths are not auto-linked as clickable in most terminals.
 
-**没有 blocking questions 剩余时的 preamble：**
+**Preamble when no blocking questions remain:**
 
 ```
 Brainstorm complete.
 
-Requirements doc: <absolute path to requirements doc>  # omit line if no doc was created
+Plan artifact: <absolute path to requirements-only unified plan>  # omit line if no artifact was created
 
 What would you like to do next? (Pick a number or describe what you want.)
 ```
 
-**仍有 blocking questions 且用户想暂停时的 preamble：**
+**Preamble when blocking questions remain and user wants to pause:**
 
 ```
 Brainstorm paused. Planning is blocked until the remaining questions are resolved.
 
-Requirements doc: <absolute path to requirements doc>  # omit line if no doc was created
+Plan artifact: <absolute path to requirements-only unified plan>  # omit line if no artifact was created
 
 What would you like to do next? (Pick a number or describe what you want.)
 ```
 
-仅呈现适用选项。重新编号，让可见选项从 1 开始保持连续。
+Present only the options that apply. Renumber so visible options stay contiguous starting at 1.
 
-1. **Plan implementation with `ce-plan` (Recommended)** - 转入 `ce-plan` 进行结构化 implementation planning。仅当 `Resolve Before Planning` 为空时显示。
-2. **Agent review of requirements doc with `ce-doc-review`** - 分派 reviewer agents 检查 requirements doc。
-3. **Publish to Proof — shareable link** - 将 requirements doc 发布到 Proof，得到可阅读、评论或分享的链接。
-4. **Start `/ce-work` directly** - 仅对 lightweight scope 显示。
-5. **Ask more clarifying questions** - 继续 brainstorm。
-6. **Pause** - 停在当前 doc。
+1. **Create the implementation plan** *(recommended)* - Hand off to `ce-plan` and sharpen the requirements into a complete, testable plan. Shown only when `Resolve Before Planning` is empty.
+2. **Ship it autonomously with `lfg`** - Hand the requirements to the full autonomous pipeline: `lfg` plans (`ce-plan`), implements, simplifies, runs independent code review and applies the fixes, opens a PR, and watches CI to green — hands-off, no check-ins. It plans first (unlike a raw `/goal` straight from requirements), so it's the safer autonomous path. Best when you trust the requirements and want it built and shipped without steering. **Opens a PR and pushes a branch.** Shown only for software brainstorms (`execution: code`) with `Resolve Before Planning` empty **and a unified plan artifact was created** — `lfg` hands `ce-plan` that artifact path in pipeline mode and cannot prompt, so with no artifact (e.g. a brief-alignment brainstorm that skipped doc creation per the "Decide whether a doc is warranted" rule) there is nothing to enrich; offer option 1 instead, which can plan interactively from the conversation. For a quicker plan-then-decide flow, or to run a `/goal` yourself, pick option 1 and choose at the `ce-plan` handoff.
+3. **Pressure-test the requirements** - Dispatch reviewer agents with `ce-doc-review` to find gaps, conflicts, weak premises, and scope issues in the requirements; auto-apply safe fixes; route the rest interactively. Shown only when a markdown unified plan exists **and `OUTPUT_FORMAT=md`** — ce-doc-review's walkthrough applies markdown-only mutations (`##`/`###` heading inserts, single-file markdown edits via apply-set) and would corrupt an HTML artifact, so HTML brainstorms skip this option until ce-doc-review gains HTML-aware mutation support. Under HTML mode, surface a one-line note above the menu: `Requirements review unavailable in output:html mode — ce-doc-review is markdown-only today. Switch to output:md if you want a review pass.`
+4. **Publish to Proof — shareable link** - Publish the markdown unified plan to Every's Proof editor and get a shareable link to read, comment on, or share with others. One-way: the local doc stays canonical. Shown only when a markdown unified plan exists. **Render only when `OUTPUT_FORMAT=md`** (Proof operates on markdown and cannot ingest HTML).
+4. **Open in browser** — open the HTML unified plan locally for review and sharing. Shown only when an HTML unified plan exists. **Render only when `OUTPUT_FORMAT=html`.** Replaces "Publish to Proof" at the same slot under exclusive output mode — the artifact is either markdown OR HTML, never both, so exactly one of the two labels applies per run.
+5. **More clarifying questions to sharpen the doc** - Keep refining scope, edge cases, constraints, and preferences through further dialogue. Always shown.
 
-**Post-review nudge（仅后续轮次）：** 如果用户在本 session 已运行 `ce-doc-review`，且 residual P0/P1 findings 仍未处理，在菜单旁添加一行 prose nudge（例如："Document review flagged 2 P1 findings you may want to address — pick \"Agent review of requirements doc\" to run another pass."）。按 label 引用选项，不要按编号：当 `Resolve Before Planning` 隐藏 `Plan implementation` 和 `Build it now` 时，菜单会重新编号，硬编码选项编号可能指向错误动作。不要添加单独菜单选项；复用现有 agent-review 选项。当 `OUTPUT_FORMAT=html` 时抑制该 nudge；agent-review 选项在该模式下隐藏，nudge 会指向不存在的动作。
+There is no "done" / "pause" option — the blocking question already waits, and the user ends by dismissing it (Esc) or saying they're finished. The unified plan artifact is already saved.
 
-#### 4.2 处理所选选项
+**Post-review nudge (subsequent rounds only):** If the user has already run `ce-doc-review` this session and residual P0/P1 findings remain unaddressed, add a one-line prose nudge adjacent to the menu (e.g., "Document review flagged 2 P1 findings you may want to address — pick \"Pressure-test the requirements\" to run another pass."). Reference the option by label, not number: the menu renumbers when `Resolve Before Planning` hides `Create the implementation plan` and the lfg option, so a hardcoded option number can point users at the wrong action. Do not add a separate menu option; reuse the existing `Pressure-test the requirements` option. Suppress this nudge when `OUTPUT_FORMAT=html` — that option is hidden in that mode, so the nudge would point users at a missing action.
 
-选择可以是字面 option label（用户输入 label 或接近的 paraphrase）或选项编号。编号要匹配当前已渲染（post-trim）列表。无法匹配选项、也没有描述替代动作的自由文本输入，应视为 clarification；继续追问，而不是猜测。
+#### 4.2 Handle the Selected Option
 
-**如果用户选择 "Plan implementation with `ce-plan` (Recommended)"：**
+Selections may be the literal option label (when the user types the label or a close paraphrase) or the option number. Match numbers against the currently-rendered (post-trim) list. Free-form input that doesn't match an option or describe an alternative action should be treated as clarification — ask a follow-up rather than guessing.
 
-立即在当前 session 加载 `ce-plan` skill。当存在 requirements document 时传入其 path；否则传入已 finalized brainstorm decisions 的简洁摘要。当 Phase 1.1 grounding scout 产出了 dossier 且文件仍存在时，也传入其 path（`/tmp/compound-engineering/ce-brainstorm/<run-id>/grounding.md`）：它给 planning 提供带 `file:line` pointers 的 verified quotes，可从那里开始而不是重新扫描 repo。不要先打印 closing summary。
+**If user selects "Create the implementation plan":**
 
-**如果用户选择 "Agent review of requirements doc with `ce-doc-review`"：**
+Immediately load the `ce-plan` skill in the current session. Pass the unified
+plan artifact path when one exists; otherwise pass a concise summary of the
+finalized brainstorm decisions. When the Phase 1.1 grounding scout produced a
+dossier and the file still exists, also pass its path
+(`/tmp/compound-engineering/ce-brainstorm/<run-id>/grounding.md`) — it gives
+planning verified quotes with `file:line` pointers to start from instead of
+re-scanning the repo. Do not print the closing summary first.
 
-Load the `ce-doc-review` skill，并将 requirements document path 作为 argument 传入。当 ce-doc-review 返回 "Review complete" 后，回到 Phase 4 options 并重新渲染菜单（doc 可能已变更，因此重新评估 `Resolve Before Planning`、direct-to-work gate 和 residual findings）。如果 residual P0/P1 findings 仍未处理，在菜单上方包含 post-review nudge。不要显示 closing summary。
+**If user selects "Pressure-test the requirements":**
 
-**如果用户选择 "Build it now with `ce-work` (skip planning)"：**
+Load the `ce-doc-review` skill, passing the unified plan path as the argument.
+When ce-doc-review returns "Review complete", return to the Phase 4 options
+and re-render the menu (the requirements may have changed, so re-evaluate
+`Resolve Before Planning`, the lfg software gate, and residual findings). If
+residual P0/P1 findings remain unaddressed, include the post-review nudge
+above the menu. Do not show the closing summary yet.
 
-立即在当前 session 加载 `ce-work` skill，并使用 finalized brainstorm output 作为 context。如果存在 compact requirements document，则传入其 path。不要先打印 closing summary。
+**If user selects "Ship it autonomously with `lfg`":**
 
-**如果用户选择 "More clarifying questions to sharpen the doc"：** 返回 Phase 1.3（Collaborative Dialogue），继续一次一个地向用户提出 clarifying questions，进一步细化 scope、edge cases、constraints 和 preferences。持续到用户满意后，再返回 Phase 4。不要显示 closing summary。
+Immediately invoke the `lfg` skill in the current session via the platform's
+skill-invocation primitive, passing the unified plan artifact path as its
+argument so `lfg`'s `ce-plan` step enriches *this* requirements-only artifact in
+place rather than bootstrapping a new plan. `lfg` then owns the full pipeline
+autonomously — plan, implement (`ce-work` in `return-to-caller` mode), simplify,
+independent code review and applied fixes, commit/push/open PR, and CI watch to
+green. Do not also start a `/goal` or load `ce-work` directly — `lfg`
+orchestrates them. Unlike a goal tool, `lfg` is host-agnostic: it works wherever
+skills run (plus `git`/`gh` for the PR/CI tail, which it guards when absent).
 
-**如果用户选择 "Publish to Proof — shareable link"：** 加载 `ce-proof` skill publish requirements doc。传入：
-- **source file：** `docs/brainstorms/YYYY-MM-DD-<topic>-requirements.md`
-- **doc title：** `Requirements: <topic>`
-- **mode：** publish/shareable link；local markdown file 保持 canonical，不做 sync-back side effect
+Where the host exposes no skill-invocation primitive, print the `lfg <plan-path>`
+invocation for the user to run and note that it will plan, build, review, and
+open a PR from this artifact.
 
-**如果用户选择 "Open in browser"：** 显示 `.html` requirements file 的 absolute path，让用户可本地打开。若平台暴露 browser-opening primitive（例如 macOS 的 `open`、Linux 的 `xdg-open`、Windows 的 `start`），agent 可直接调用；否则打印 absolute path，让用户自行打开。显示路径（或打开浏览器）后，返回 Phase 4 options，让用户选择 follow-up action。
+Do not print the closing summary first.
 
-**如果用户选择 "Done for now"：** 显示 closing summary（见 4.3）并结束本 turn。
+**If user selects "More clarifying questions to sharpen the doc":** Return to Phase 1.3 (Collaborative Dialogue) and continue asking the user clarifying questions one at a time to further refine scope, edge cases, constraints, and preferences. Continue until the user is satisfied, then return to Phase 4. Do not show the closing summary yet.
 
-#### 4.3 Closing Summary（收尾摘要）
+**If user selects "Publish to Proof — shareable link":**
 
-仅当本次 workflow 运行结束或 handoff 时使用 closing summary；返回 Phase 4 options 时不要使用。
+Load the `ce-proof` skill to publish the markdown unified plan. Pass:
 
-在下面两个模板中，将 `<absolute path to requirements doc>` 替换为本次运行实际写入的文件路径：`OUTPUT_FORMAT=md` 时为 `.md`，`OUTPUT_FORMAT=html` 时为 `.html`。当 artifact 是 HTML 时，不要输出硬编码 `.md` path，否则 closing summary 会指向一个从未写入的文件。
+- **source file:** `docs/plans/YYYY-MM-DD-NNN-<type>-<topic>-plan.md`
+- **doc title:** `Plan: <topic title> (requirements-only)`
+- **identity:** `ai:compound-engineering` / `Compound Engineering`
 
-完成且准备 planning 时，显示：
+ce-proof creates a shared Proof doc from the markdown plan file (Create and
+Share workflow), binds the display name, and returns the share URL. Surface
+the URL to the user — they can open it to read, comment, or share with others
+— then return to the Phase 4 options and re-render the menu. This is a one-way
+publish: the local doc stays canonical and nothing syncs back, so option
+eligibility is unchanged (no need to re-evaluate `Resolve Before Planning`,
+the lfg software gate, or residual findings on account of Proof).
+
+If the upload fails (network error, Proof API down), retry once after a short wait. If it still fails, tell the user the upload didn't succeed and briefly explain why, then return to the Phase 4 options — don't leave them wondering why the option did nothing.
+
+**If user selects "Open in browser":** Display the absolute path to the `.html` unified plan so the user can open it locally. Where the platform exposes a browser-opening primitive (e.g., `open` on macOS, `xdg-open` on Linux, `start` on Windows), the agent may invoke it directly; otherwise print the absolute path and let the user open it. After the path is displayed (or the browser is opened), return to the Phase 4 options so the user can pick a follow-up action.
+
+**If the user indicates they're finished** (says "done"/"that's all", or dismisses the menu without picking an option): display the closing summary (see 4.3) and end the turn.
+
+#### 4.3 Closing Summary
+
+Use the closing summary only when this run of the workflow is ending or handing off, not when returning to the Phase 4 options.
+
+In both templates below, substitute `<absolute path to unified plan>` with the
+actual file path written this run — `.md` for `OUTPUT_FORMAT=md`, `.html` for
+`OUTPUT_FORMAT=html`. Do not emit a hardcoded `.md` path when the artifact is
+HTML, or the closing summary will point users at a file that was never written.
+
+When complete and ready for planning, display:
 
 ```text
 Brainstorm complete!
 
-Requirements doc: <absolute path to requirements doc>  # omit line if no doc was created
+Plan artifact: <absolute path to unified plan>  # omit line if no artifact was created
 
 Key decisions:
 - [Decision 1]
 - [Decision 2]
 
-Recommended next step: `ce-plan`
+Recommended next step: `ce-plan <plan artifact path>`
 ```
 
-如果用户在 `Resolve Before Planning` 仍有内容时暂停，显示：
+If the user pauses with `Resolve Before Planning` still populated, display:
 
 ```text
 Brainstorm paused.
 
-Requirements doc: <absolute path to requirements doc>  # omit line if no doc was created
+Plan artifact: <absolute path to unified plan>  # omit line if no artifact was created
 
 Planning is blocked by:
 - [Blocking question 1]

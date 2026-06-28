@@ -1,119 +1,120 @@
-# Extensive analysis path（扩展分析路径）
+# Extensive analysis path
 
-当输入是较长 recording（超过约 60 秒）、包含多个 issues、requirements 或 workflow walkthroughs，或用户明确想要 requirements material 时，使用此路径。目标是生成完整的 Compound Engineering-compatible artifact set，供 `ce-brainstorm` 使用。
+Use this path when the input is a longer recording (over ~60 seconds), contains multiple issues, requirements, or workflow walkthroughs, or the user explicitly wants requirements material. The goal is a full Compound Engineering-compatible artifact set that feeds `ce-brainstorm`.
 
-## Workflow（工作流）
+## Workflow
 
-1. 运行 analyzer：
+1. Run the analyzer (`SKILL_DIR` is the directory containing the `ce-riffrec-feedback-analysis` SKILL.md; set it in the same command — shell state does not persist between Bash calls):
 
    ```bash
-   python scripts/analyze_riffrec_zip.py /path/to/input
+   SKILL_DIR="<absolute path of the directory containing the ce-riffrec-feedback-analysis SKILL.md>"
+   python "$SKILL_DIR/scripts/analyze_riffrec_zip.py" /path/to/input
    ```
 
-   当 artifact 应存放在特定位置时，使用 `--output-dir <dir>`。在有 `docs/brainstorms/` 的 repo 中，默认 output 位于 `docs/brainstorms/riffrec-feedback/` 下。
+   Use `--output-dir <dir>` when the artifact should live somewhere specific. In a repo with `docs/brainstorms/`, the default output goes under `docs/brainstorms/riffrec-feedback/` as an evidence/kickoff-artifact exception, not as the durable brainstorm output convention.
 
-2. 读取生成的 `analysis.md`、`problem-analysis.md`、`review-prompt.md` 和 `requirements-kickoff.md`。
+2. Read the generated `analysis.md`, `problem-analysis.md`, `review-prompt.md`, and `requirements-kickoff.md`.
 
-3. Brainstorm 前读取 `source-materials.md`。它是 original raw feedback location、transcript、local-only frames、chunks、analysis artifacts 和 screenshot paths 的 source-of-truth manifest。用它让 brainstorm 和 planning 可 trace 回 original feedback evidence。
+3. Read `source-materials.md` before brainstorm. It is the source-of-truth manifest for the original raw feedback location, transcript, local-only frames, chunks, analysis artifacts, and screenshot paths. Use it to keep brainstorm and planning traceable to the original feedback evidence.
 
-4. 使用 platform image-view tool 检查 extracted screenshots 中的 high-signal moments。优先查看因 verbal complaints 附近 click events、failed network requests、console errors 或 repeated interaction 而被选中的 screenshots。
+4. Inspect the extracted screenshots for high-signal moments using the platform's image-view tool. Prioritize screenshots selected because of click events near verbal complaints, failed network requests, console errors, or repeated interaction.
 
-5. 使用 `review-prompt.md` 中的 frame review structure 填写或 refine `problem-analysis.md`。最终 problem analysis 必须精确包含这些 top-level categories：
+5. Fill or refine `problem-analysis.md` using the frame review structure from `review-prompt.md`. The final problem analysis must have exactly these top-level categories:
 
-   - **Visual/UI Problems（视觉/UI 问题）**
-   - **Functional Problems（功能问题）**
-   - **Requirements（需求）**
-   - **Usability/UX Problems（可用性/UX 问题）**
+   - **Visual/UI Problems**
+   - **Functional Problems**
+   - **Requirements**
+   - **Usability/UX Problems**
 
-   每个 numbered item 应描述 problem、location、UI element、frame reference，以及可用时的 relevant transcript context。聚焦 WHAT is wrong，而不是 HOW to fix it。
+   Each numbered item should describe the problem, location, UI element, frame reference, and relevant transcript context when available. Focus on WHAT is wrong, not HOW to fix it.
 
-6. 将 evidence 转换为 requirements。保持这些 categories 彼此区分：
+6. Convert evidence into requirements. Keep these categories distinct:
 
-   - **Observed facts（观察事实）:** transcript quotes、click targets、request statuses、screenshot contents。
-   - **Inferences（推断）:** likely user intent、likely broken control、suspected missing state。
-   - **Requirements:** 解决 problem 所需的 product behavior。
+   - **Observed facts:** transcript quotes, click targets, request statuses, screenshot contents.
+   - **Inferences:** likely user intent, likely broken control, suspected missing state.
+   - **Requirements:** product behavior needed to resolve the problem.
 
-7. 当当前 workspace 包含 product source code 时，在 brainstorm 前或期间运行 source-mapping pass。使用 transcript language、visible UI labels、screenshot paths、route names 和 generated requirements，在 codebase 中搜索 likely components、controllers、services、models、tests 和 state stores。对更大的 sessions，按 product area 拆分 mapping，并在可用时使用 sub-agents，让 independent areas 能 parallel inspect。
+7. When the current workspace contains the product source code, run a source-mapping pass before or during brainstorm. Use the transcript language, visible UI labels, screenshot paths, route names, and generated requirements to search the codebase for likely components, controllers, services, models, tests, and state stores. For larger sessions, split this mapping by product area and use sub-agents when available so independent areas can be inspected in parallel.
 
-8. 将 source mapping 作为 suspected implementation surfaces 添加到 brainstorm material；除非 code 清楚证明，否则不要当成 proven root cause。包含 confidence levels 和 short evidence notes，说明每个 file 或 component 为什么 relevant。
+8. Add source mapping to the brainstorm material as suspected implementation surfaces, not as proven root cause unless the code clearly proves it. Include confidence levels and short evidence notes explaining why each file or component is relevant.
 
-9. 始终继续进入 brainstorm。一旦 `analysis.md`、`problem-analysis.md`、`source-materials.md` 和 `requirements-kickoff.md` 存在，说 "Analysis complete. Ready to brainstorm the findings." 然后立即用生成的 `requirements-kickoff.md` 加载 `ce-brainstorm` skill，除非用户明确只要求 extract 或 analyze artifacts。
+9. Always continue into brainstorm. Once `analysis.md`, `problem-analysis.md`, `source-materials.md`, and `requirements-kickoff.md` exist, say "Analysis complete. Ready to brainstorm the findings." Then immediately load the `ce-brainstorm` skill with the generated `requirements-kickoff.md`, unless the user explicitly asked only to extract or analyze artifacts.
 
-10. 在 brainstorm 中，先请用户确认 captured requirements："Did this capture the requirements correctly, and what is missing, wrong, or grouped badly?" 在 brainstorm 已确认或修正 requirements 前，不要进入 planning。
+10. In brainstorm, first ask the user to confirm the captured requirements: "Did this capture the requirements correctly, and what is missing, wrong, or grouped badly?" Do not move to planning until brainstorm has confirmed or corrected the requirements.
 
-## Automatic handoff（自动交接）
+## Automatic handoff
 
-正常使用中，不要在 extraction 后结束 workflow。Intended sequence 是：
+Do not end the workflow after extraction in normal use. The intended sequence is:
 
-1. Run the analyzer（运行 analyzer）。
-2. 读取 `source-materials.md`，让 brainstorm 直接链接到 raw feedback、transcript、frames 和 analysis artifacts。
-3. 当 evidence 需要 human-visible interpretation 时，检查或 refine `problem-analysis.md`。
-4. 用 `requirements-kickoff.md` 加载 `ce-brainstorm` skill。
-5. 请用户 confirm、correct 或 regroup captured requirements。
-6. 让 `ce-brainstorm` 在 `docs/brainstorms/` 下生成 durable requirements doc。
+1. Run the analyzer.
+2. Read `source-materials.md` so brainstorm has direct links to raw feedback, transcript, frames, and analysis artifacts.
+3. Inspect or refine `problem-analysis.md` when the evidence needs human-visible interpretation.
+4. Load the `ce-brainstorm` skill with `requirements-kickoff.md`.
+5. Ask the user to confirm, correct, or regroup the captured requirements.
+6. Let `ce-brainstorm` produce the durable requirements-only unified plan under `docs/plans/`.
 
-只有当用户明确要求 raw artifacts、transcript、screenshots 或不进入 brainstorming 的 analysis 时，才在 step 1 或 2 后停止。
+Only stop after step 1 or 2 when the user asks specifically for raw artifacts, transcript, screenshots, or analysis without brainstorming.
 
-## Capture scale（捕获范围）
+## Capture scale
 
-宁可 over-capture，不要 under-capture。此路径的目的，是把 product feedback 保存为供后续 AI work 使用的 structured data，而不是在 extraction 阶段决定什么值得 implementation。
+Prefer over-capture to under-capture. The purpose of this path is to preserve product feedback as structured data for later AI work, not to decide what is worth implementing during extraction.
 
-分析 feedback source 时：
+When analyzing a feedback source:
 
-- 捕获 transcript 或 frames 中出现的每个 distinct problem、bug、request、expectation、confusion point 和 "note to self"。
-- 可能时为每个 issue 包含来自 source material 的 concrete examples：timestamp、transcript phrase、screenshot path、clicked UI element、email/thread ID 或 observed state。
-- 可能时包含 concrete source-code mapping：likely component/service/controller/model/test files、route 或 API endpoint names、relevant state variables 和 confidence level。该 mapping 应让后续 implementation agent 明显知道从哪里开始看。
-- 如果只有 video 可用，从 visible UI labels、layout、URLs、route names、copied text、screenshots 和 transcript references 推断 likely screens 和 components。明确标记 uncertain mappings，而不是省略。
-- 如果只有 audio 或 notes 可用，且 repo 存在，则从 product terminology 和 workflow descriptions 映射到 likely code areas，并将 mapping 标为 transcript-derived。
-- Analysis 期间不要丢弃 lower-priority items。需要时将它们标为 lower priority 或 secondary，但保留 representation。
-- 将 capture 与 prioritization 分开。Brainstorm 后续可能 regroup、split、defer 或 reject items，但 first requirements pass 应保留 full signal。
-- 如果 feedback session 包含许多 issues，创建 comprehensive capture document，并说明 planning 应将其拆分成更小 plans。
-- 将 source mapping 视为 supporting material，而不是 filter。如果 problem 尚无法映射到 code，保留 problem，并将 source mapping 标为 unknown。
+- Capture every distinct problem, bug, request, expectation, confusion point, and "note to self" that appears in the transcript or frames.
+- Include concrete examples from the source material for each issue when possible: timestamp, transcript phrase, screenshot path, clicked UI element, email/thread ID, or observed state.
+- Include concrete source-code mapping when possible: likely component/service/controller/model/test files, route or API endpoint names, relevant state variables, and confidence level. This mapping should make it obvious where a later implementation agent should start looking.
+- If only video is available, infer likely screens and components from visible UI labels, layout, URLs, route names, copied text, screenshots, and transcript references. Mark uncertain mappings explicitly instead of omitting them.
+- If only audio or notes are available, map from product terminology and workflow descriptions to likely code areas when the repo is present, and label the mapping as transcript-derived.
+- Do not drop lower-priority items during analysis. Mark them as lower priority or secondary if needed, but keep them represented.
+- Separate capture from prioritization. Brainstorm may regroup, split, defer, or reject items later, but the first requirements pass should preserve the full signal.
+- If a feedback session contains many issues, create a comprehensive capture document and state that planning should split it into smaller plans.
+- Treat source mapping as supporting material, not a filter. If a problem cannot yet be mapped to code, keep the problem and mark the source mapping as unknown.
 
-## Source mapping grounding（source mapping 证据锚定）
+## Source mapping grounding
 
-将 feedback 映射到 source code 时，将每个 mapping 分类为：
+When mapping feedback to source code, classify each mapping as one of:
 
-- **Likely buggy surface:** code path 存在，并直接处理 observed behavior。
-- **Missing or incomplete surface:** feedback 命名了某个 behavior，但 repo 中尚无清晰 UI、route、controller action 或 component 实现它。
-- **Indirect surface:** code 与 behavior 相邻，但确切 interaction 可能通过 rendered email content、third-party UI、generated HTML 或其他 layer 发生。
-- **Unknown:** 尚未找到 grounded source mapping。
+- **Likely buggy surface:** the code path exists and directly handles the observed behavior.
+- **Missing or incomplete surface:** the feedback names a behavior, but the repo has no clear UI, route, controller action, or component implementing it yet.
+- **Indirect surface:** the code is adjacent to the behavior, but the exact interaction may happen through rendered email content, third-party UI, generated HTML, or another layer.
+- **Unknown:** no grounded source mapping found yet.
 
-每个 source mapping 应包含：
+Every source mapping should include:
 
-- Requirement/example ids，例如 `R14`、`AE4` 或 `EX17`。
-- 可行时包含带 line numbers 的 file paths。
-- 来自 code 的 short evidence note，而不只是 file guess。
-- Confidence：`High`、`Medium`、`Low` 或 `Unknown`。
+- Requirement/example ids, such as `R14`, `AE4`, or `EX17`.
+- File paths with line numbers when practical.
+- A short evidence note from code, not just a file guess.
+- Confidence: `High`, `Medium`, `Low`, or `Unknown`.
 
-优先说 "I did not find a current inbox implementation for this surface"，而不是强行给 speculative mapping。Missing surfaces 是有用的 product findings，应留在 brainstorm 中。
+Prefer saying "I did not find a current inbox implementation for this surface" over forcing a speculative mapping. Missing surfaces are useful product findings and should stay in the brainstorm.
 
-## Output shape（输出形状）
+## Output shape
 
-Analyzer 会写入：
+The analyzer writes:
 
-- `analysis.md`: session summary、transcript、selected moments、screenshot links、candidate findings 和 review checklist。
-- `problem-analysis.md`: visual、functional、requirement 和 UX findings 的 categorized problem statement scaffold。
-- `review-prompt.md`: 为 deeper visual analysis pass 准备的 filled prompt，包含 screenshot paths 和 transcript。
-- `source-materials.md`: manifest，链接 original source location、local-only raw files、transcript locations、chunks、local-only frames 和 generated artifacts。
-- `requirements-kickoff.md`: CE-friendly requirements starter，包含 Problem Frame、Actors、Key Flows、R-IDs、Acceptance Examples、Success Criteria、Scope Boundaries、Questions 和 Next Steps。
-- `analysis.json`: structured session、event、transcript、moment 和 artifact metadata。
-- `frames/`: 为 selected moments 提取的 PNG screenshots。默认 local-only。
-- `raw/`: extracted zip contents 和 copied source media。默认 local-only。
+- `analysis.md`: session summary, transcript, selected moments, screenshot links, candidate findings, and review checklist.
+- `problem-analysis.md`: a categorized problem statement scaffold for visual, functional, requirement, and UX findings.
+- `review-prompt.md`: a filled prompt containing screenshot paths and transcript for a deeper visual analysis pass.
+- `source-materials.md`: a manifest linking the original source location, local-only raw files, transcript locations, chunks, local-only frames, and generated artifacts.
+- `requirements-kickoff.md`: a CE-friendly requirements starter with Problem Frame, Actors, Key Flows, R-IDs, Acceptance Examples, Success Criteria, Scope Boundaries, Questions, and Next Steps.
+- `analysis.json`: structured session, event, transcript, moment, and artifact metadata.
+- `frames/`: extracted PNG screenshots for selected moments. Local-only by default.
+- `raw/`: extracted zip contents and copied source media. Local-only by default.
 
-当单个 transcription request 过大时，long media 会按 chunks transcription。Chunk transcripts 包含 timestamp prefixes，让 review pass 仍能将 discussion points 连接到 approximate video regions。
+Long media is transcribed in chunks when a single transcription request is too large. Chunk transcripts include timestamp prefixes so the review pass can still connect discussion points to approximate video regions.
 
-对 audio-only 或 notes-only sources，visual sections 会刻意说明没有 frames 可用。在这些情况下，只从 transcript 或 notes 中提取 functional problems、requirements 和 UX friction。
+For audio-only or notes-only sources, the visual sections intentionally say that no frames are available. In those cases, extract functional problems, requirements, and UX friction from transcript or notes only.
 
-## Review heuristics（Review 启发式）
+## Review heuristics
 
-当 moments 包含以下内容时选择：
+Select moments when they contain:
 
-- Verbal complaint cues（口头抱怨线索）："weird"、"doesn't work"、"can't"、"broken"、"bug"、"problem"、"confusing"、"should"。
-- Complaint 前后不久对 controls 的 clicks。
-- 对同一 control 的 repeated clicks。
-- Known development noise 之外的 failed requests。
-- Console errors、uncaught exceptions 或 failed form submissions。
-- Visible toasts、validation errors、disabled controls、empty states 或 surprising navigation。
+- Verbal complaint cues: "weird", "doesn't work", "can't", "broken", "bug", "problem", "confusing", "should".
+- Clicks on controls shortly before or after a complaint.
+- Repeated clicks on the same control.
+- Failed requests outside known development noise.
+- Console errors, uncaught exceptions, or failed form submissions.
+- Visible toasts, validation errors, disabled controls, empty states, or surprising navigation.
 
-Script findings 是刻意 conservative 的。将 candidate finding 转为 requirement 前，要一起查看 screenshots 和 transcript。
+The script's findings are deliberately conservative. Look at screenshots and transcript together before turning a candidate finding into a requirement.

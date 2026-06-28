@@ -1,12 +1,12 @@
-# Shipping Workflow（交付工作流）
+# Shipping Workflow
 
-本文件包含 shipping workflow（Phase 3-4）。当所有 Phase 2 tasks 完成、execution 转入 quality check 时加载。
+This file contains the shipping workflow (Phase 3-4). It is loaded when all Phase 2 tasks are complete and execution transitions to quality check.
 
-## Phase 3: Quality Check（质量检查）
+## Phase 3: Quality Check
 
-1. **Run Core Quality Checks（运行核心质量检查）**
+1. **Run Core Quality Checks**
 
-   提交前始终运行：
+   Always run before submitting:
 
    ```bash
    # Run full test suite (use project's test command)
@@ -16,131 +16,118 @@
    # Use linting-agent before pushing to origin
    ```
 
-2. **Simplify**（conditional — 独立于 code review tiers）
+2. **Simplify** (conditional — separate from code review)
 
-   code review 前，当 diff 非 mechanical 且大到值得受益时调用 **`ce-simplify-code`**（默认：**>=30 changed lines**）。当 diff 纯 mechanical（formatting、dependency bumps、lint-only fixes、generated artifacts）时跳过。
+   Before code review, invoke **`ce-simplify-code`** when the diff is non-mechanical and large enough to benefit (default: **>=30 changed lines**). Skip when the diff is purely mechanical (formatting, dependency bumps, lint-only fixes, generated artifacts).
 
-   本步骤针对**当前 diff**优化 reuse、quality 和 efficiency，让后续 review 看到更干净的代码。它不能替代 Tier 1 或 Tier 2 review。
+   This step refines reuse, quality, and efficiency on the **current diff** so any later review sees cleaner code. It is not a substitute for code review.
 
-   当 plan 或用户收窄了变更范围时，传入 `plan:<path>` 或 scope hint。如果 harness 上没有该 skill，跳过或对明显 duplicate/dead code 做一次简短 manual pass；不要因为 simplify 被跳过就升级到 Tier 2。
+   Pass `plan:<path>` or a scope hint when the plan or user narrowed what changed. If the skill is unavailable on the harness, skip or do a brief manual pass for obvious duplicate/dead code — code review (step 3) still runs regardless.
 
-3. **Code Review**（代码审查）
+3. **Code Review**
 
-   当 harness 提供 built-in review 时使用 **Tier 1**。仅当下面的 escalation criteria 匹配时使用 **Tier 2**；Escalate to Tier 2 by criteria, **not** because Tier 1 is missing。
+   Review the diff with **`ce-code-review`** — the plugin's portable review skill — as the single path. It self-right-sizes (a lite roster for small, low-risk, code-only diffs; the full roster otherwise), so there is no "escalate to a heavier reviewer" decision and **no harness-specific review detection** — it behaves identically on every harness. (This replaces the former Tier 1 harness-native `/review` / Tier 2 escalation split: the size and sensitive-surface judgment that used to live here now lives inside `ce-code-review`'s own reviewer selection and small-diff gate.)
 
-   **Tier 1 -- harness-native review（可用时默认）。** 运行 harness built-in code review（例如 Claude Code 中的 `/review`）。在 Final Validation 前 inline 处理 blocking 和 suggested findings。跳过 Residual Work Gate。
+   **Skip dedicated review only for a purely mechanical diff** — formatting, dependency-version bumps, lint-only fixes, generated artifacts (the same class step 2 skips for simplify). Note in the shipping summary: `Code review: skipped (mechanical diff)`. Everything else gets reviewed.
 
-   **Tier 2 -- `ce-code-review` (escalation only).**（仅升级时）两步：**review is not fix.**
+   **Review is not fix — two steps:**
 
-   **2a. Review（read-only）。** 用 `mode:agent` 调用 `ce-code-review`（已知时加 `plan:<path>`；diff base 已 resolve 时加 `base:<ref>`）。解析 JSON 或 Actionable Findings。不要传 `mode:autofix`。
+   **3a. Review (read-only).** Invoke `ce-code-review` with `mode:agent` (add `plan:<path>` when known; `base:<ref>` when the diff base is resolved). Pass **`depth:full`** when the plan, the task, or the user explicitly asked for a full / deep / thorough review — that is the one escalation signal `ce-code-review` cannot infer from the diff alone. Do not pass `mode:autofix`. Parse the JSON.
 
-   **2b. Apply fixes（caller-owned）。** 加载 `references/review-findings-followup.md`：按 JSON 过滤，按文件批处理，分派 fix subagents。Orchestrator 负责 merge、test、commit。然后进入 Residual Work Gate。
+   **3b. Apply fixes (caller-owned).** Load `references/review-findings-followup.md`: filter on JSON, batch by file, dispatch fix subagents. Orchestrator merges, tests, commits. Then proceed to the Residual Work Gate.
 
-   **当 Tier 1 不可用且 Tier 2 criteria 未满足时：** 跳过 dedicated review step。Phase 2 testing、simplify（如已运行）、lint 和 Final Validation 仍适用。在 shipping summary 中注明：`Code review: skipped (no Tier 1 tool; Tier 2 criteria not met).`
+   **If `ce-code-review` cannot run at all** — subagent dispatch unavailable, unauthenticated, or hard-capped, returning `status: failed`/`degraded` with no coverage even after its own sequential Fallback: in an **interactive** session, run the harness-native review if one exists (e.g. `/review`) and fix inline; in a **non-interactive** session (autonomous pipeline, or no native review available), skip the dedicated step, note `Code review: skipped (ce-code-review unavailable)`, and add an explicit manual diff scan to Final Validation. Never silently ship a non-mechanical change with no review of any kind.
 
-   当以下**任一**条件为真时，升级到 Tier 2：
+4. **Residual Work Gate** (REQUIRED when `ce-code-review` ran and left actionable residuals)
 
-   - **Sensitive surface touched.** diff 修改了以下任一项：authentication 或 authorization、payments 或 billing、data migrations 或 backfills、cryptography 或 secret handling、security-relevant configuration、public API 或 library contracts、dependency manifests。
-   - **Large and diffuse change.** diff 超过 >=400 changed lines，**且**跨越 3 个以上目录或 2 个 distinct subsystems。单独一个只是 soft signal；两者同时出现才是 escalation trigger。
-   - **Very large change.** diff 超过 >=1,000 changed lines，无论是否 diffuse。
-   - **Plan or task explicitly requests it.** plan、originating task 或 scope 内其他指令要求 full / deep / thorough code review。
+   After code review and review-findings followup, inspect the **Actionable Findings** summary (or read the run artifact at `/tmp/compound-engineering/ce-code-review/<run-id>/` if the summary was truncated). If one or more actionable `downstream-resolver` findings were not applied in followup, do not proceed to Final Validation until they are resolved or durably recorded.
 
-   当变更小、集中且不在 sensitive surface list 内时，Tier 1 足够；不要为了 "to be safe" 而升级。
+   **Non-interactive / autonomous sessions (no human can answer — e.g. an `lfg`-style pipeline or a headless run):** do **not** call the blocking tool — that would hang the pipeline. After step 3b auto-applied every mechanically-eligible finding, take the `Accept and proceed` path automatically: record the remaining actionable residuals verbatim to the durable Known Residuals sink (the PR description's Known Residuals section, or `docs/residual-review-findings/<branch-or-head-sha>.md` on the no-PR path) and continue to Final Validation. Residuals are recorded, never dropped — this keeps autonomous shipping unblocked without losing findings.
 
-4. **Residual Work Gate**（剩余工作关口，Tier 2 运行后 REQUIRED）
+   **Interactive sessions:** Ask the user using the platform's blocking question tool (`AskUserQuestion` in Claude Code with `ToolSearch select:AskUserQuestion` pre-loaded if needed, `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension)). Fall back to numbered options in chat only when the harness genuinely lacks a blocking tool. Never silently skip the gate.
 
-   Tier 2 code review 和 review-findings followup 之后，检查 **Actionable Findings** summary（如果 summary 被截断，则读取 `/tmp/compound-engineering/ce-code-review/<run-id>/` 中的 run artifact）。如果一个或多个 actionable `downstream-resolver` findings 未在 followup 中应用，do not proceed to Final Validation，直到用户决定如何处理。
+   Stem: `Code review left N actionable finding(s) not yet fixed. How should the agent proceed?`
 
-   使用平台 blocking question tool 询问用户（Claude Code 中的 `AskUserQuestion`，必要时预加载 `ToolSearch select:AskUserQuestion`；Codex 中的 `request_user_input`；Antigravity 中的 `ask_question`；Pi 中的 `ask_user`（需要 `pi-ask-user` extension））。只有当 harness 真正缺少 blocking tool 时，才回退到聊天中的编号选项。绝不要静默跳过该 gate。
+   Options (four or fewer, self-contained labels):
+   - `Apply/fix now` — load `references/review-findings-followup.md`, dispatch batched fix subagents for remaining eligible findings, run tests, commit if needed; optionally re-run `ce-code-review` only after the diff changed materially.
+   - `File tickets via project tracker` — load `references/tracker-defer.md` in Interactive mode; the agent files tickets in the project's detected tracker (or `gh` fallback, or leaves them in the report if no sink exists) and proceeds to Final Validation.
+   - `Accept and proceed` — record the residual findings verbatim in a durable "Known Residuals" sink before shipping. If a PR will be created or updated in Phase 4, include them in the PR description's "Known Residuals" section (the agent owns this when calling `ce-commit-push-pr`). If the user later chooses the no-PR `ce-commit` path, create `docs/residual-review-findings/<branch-or-head-sha>.md`, include the accepted findings and source review-run context, stage it with the implementation commit, and mention the file path in the final summary. The user has acknowledged the risk, but the findings must not live only in the transient session.
+   - `Stop — do not ship` — abort the shipping workflow. The user will handle findings manually before re-invoking.
 
-   Stem: `Code review 留下 N 个尚未修复的 actionable finding(s)。agent 应如何继续？`
+   Skip this gate entirely when the review reported `Actionable findings: none.` (and followup applied everything mechanical), or when dedicated review was skipped (mechanical diff or `ce-code-review` unavailable). Do not proceed past this gate on an `Accept and proceed` decision (including the autonomous auto-accept above) until the agent has recorded whether the durable sink is `PR Known Residuals` or `docs/residual-review-findings/<branch-or-head-sha>.md`.
 
-   Options（四个或更少，self-contained labels）：
-   - `Apply/fix now` — 加载 `references/review-findings-followup.md`，为剩余 eligible findings 分派 batched fix subagents，运行 tests，必要时 commit；仅当 diff 发生实质变化后，可选择重新运行 `ce-code-review`。
-   - `File tickets via project tracker` — 以 Interactive mode 加载 `references/tracker-defer.md`；agent 在项目检测到的 tracker 中创建 tickets（或使用 `gh` fallback，若无 sink 则留在 report 中），然后进入 Final Validation。
-   - `Accept and proceed` — shipping 前，将 residual findings 原样记录到 durable "Known Residuals" sink。如果 Phase 4 会创建或更新 PR，将它们包含在 PR description 的 "Known Residuals" section（调用 `ce-commit-push-pr` 时由 agent 负责）。If the user later chooses the no-PR `ce-commit` path，创建 `docs/residual-review-findings/<branch-or-head-sha>.md`，包含 accepted findings 和 source review-run context，与 implementation commit 一起 stage，并在最终 summary 中提及 file path。用户已确认风险，但 findings must not live only in the transient session。
-   - `Stop — do not ship` — 中止 shipping workflow。用户会在重新调用前手动处理 findings。
+5. **Final Validation**
+   - All tasks marked completed
+   - Testing addressed -- tests pass and new/changed behavior has corresponding test coverage (or an explicit justification for why tests are not needed)
+   - Linting passes
+   - Code follows existing patterns
+   - Figma designs match (if applicable)
+   - No console errors or warnings
+   - If the plan has a `Requirements` section (or legacy `Requirements Trace`), verify each requirement is satisfied by the completed work
+   - If any `Deferred to Implementation` questions were noted, confirm they were resolved during execution
 
-   当 review 报告 `Actionable findings: none.`（且 followup 已应用所有 mechanical 项）或仅使用 Tier 1 时，完全跳过该 gate。在 `Accept and proceed` 决策下，在 agent 记录 durable sink 是 `PR Known Residuals` 还是 `docs/residual-review-findings/<branch-or-head-sha>.md` 前，不要越过该 gate。
+6. **Prepare Operational Validation Plan** (REQUIRED)
+   - Add a `## Post-Deploy Monitoring & Validation` section to the PR description for every change.
+   - Include concrete:
+     - Log queries/search terms
+     - Metrics or dashboards to watch
+     - Expected healthy signals
+     - Failure signals and rollback/mitigation trigger
+     - Validation window and owner
+   - If there is truly no production/runtime impact, still include the section with: `No additional operational monitoring required` and a one-line reason.
 
-5. **Final Validation（最终验证）**
-   - 所有 tasks 已标记 completed
-   - Testing addressed（测试已处理）：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
-   - Linting passes（lint 通过）
-   - Code 遵循 existing patterns
-   - Figma designs match（如适用）
-   - 没有 console errors 或 warnings
-   - 如果 plan 有 `Requirements` section（或旧版 `Requirements Trace`），验证 completed work 满足每项 requirement
-   - 如果记录了任何 `Deferred to Implementation` questions，确认它们已在 execution 中解决
+## Phase 4: Ship It
 
-6. **Prepare Operational Validation Plan（准备运营验证计划）**（REQUIRED）
-   - 为每个 change 在 PR description 中添加 `## Post-Deploy Monitoring & Validation` section。
-   - 包含具体：
-     - Log queries/search terms（日志查询 / 搜索词）
-     - 需要观察的 metrics 或 dashboards
-     - Expected healthy signals（预期健康信号）
-     - Failure signals 和 rollback/mitigation trigger
-     - Validation window 和 owner
-   - 如果确实没有 production/runtime impact，仍包含该 section，并写入：`No additional operational monitoring required` 和一句理由。
+1. **Prepare Validation Context**
 
-## Phase 4: Ship It（交付）
+   Do not try to launch a dedicated CE evidence-capture workflow. Modern harnesses provide their own browser, screenshot, terminal recording, and artifact capture tools; use those directly only when the user asks or when the artifact already exists.
 
-1. **Prepare Evidence Context（准备 Evidence Context）**
+   Note whether the completed work has observable behavior (UI rendering, CLI output, API/library behavior with a runnable example, generated artifacts, or workflow output), and summarize any manual validation performed. If the user supplied evidence (URL, markdown embed, local artifact path), pass it to `ce-commit-push-pr` as PR-description context.
 
-   本步骤不要直接调用 `ce-demo-reel`。Evidence capture 属于 PR creation 或 PR description update flow，因为那里有最终 PR diff 和 description context。
+2. **Commit and Create Pull Request**
 
-   记录 completed work 是否有 observable behavior（UI rendering、CLI output、带 runnable example 的 API/library behavior、generated artifacts 或 workflow output）。只有当 evidence 可能存在时，`ce-commit-push-pr` skill 才会询问是否 capture evidence。
+   Load the `ce-commit-push-pr` skill to handle committing, pushing, and PR creation. The skill handles convention detection, branch safety, logical commit splitting, adaptive PR descriptions, and attribution badges.
 
-2. **Commit and Create Pull Request（提交并创建 Pull Request）**
+   When providing context for the PR description, include:
+   - The plan's summary and key decisions
+   - Testing notes (tests added/modified, manual testing performed)
+   - Evidence context from step 1, so `ce-commit-push-pr` can decide whether to ask about capturing evidence
+   - Figma design link (if applicable)
+   - The Post-Deploy Monitoring & Validation section (see Phase 3 Step 6)
+   - Any "Known Residuals" accepted in the Phase 3 Residual Work Gate, rendered as a dedicated section in the PR body with severity, file:line, and title per finding
 
-   加载 `ce-commit-push-pr` skill 处理 committing、pushing 和 PR creation。该 skill 负责 convention detection、branch safety、logical commit splitting、adaptive PR descriptions 和 attribution badges。
+   If the user prefers to commit without creating a PR, load the `ce-commit` skill instead.
 
-   为 PR description 提供 context 时，包含：
-   - plan 的 summary 和 key decisions
-   - Testing notes（新增/修改的 tests、执行过的 manual testing）
-   - step 1 中的 evidence context，让 `ce-commit-push-pr` 能决定是否询问 capture evidence
-   - Figma design link（如适用）
-   - Post-Deploy Monitoring & Validation section（见 Phase 3 Step 6）
-   - Phase 3 Residual Work Gate 中接受的任何 "Known Residuals"，在 PR body 中渲染为专门 section，并按 finding 写入 severity、file:line 和 title
+3. **Notify User**
+   - Summarize what was completed
+   - Link to PR (if one was created)
+   - Note any follow-up work needed
+   - Suggest next steps if applicable
 
-   如果用户偏好 commit 但不创建 PR，改为加载 `ce-commit` skill。
+## Quality Checklist
 
-3. **Notify User（通知用户）**
-   - 总结已完成内容
-   - 链接到 PR（如果创建了）
-   - 说明任何需要的 follow-up work
-   - 如适用，建议 next steps
+Before creating PR, verify:
 
-## Quality Checklist（质量检查清单）
+- [ ] All clarifying questions asked and answered
+- [ ] All tasks marked completed
+- [ ] Testing addressed -- tests pass AND new/changed behavior has corresponding test coverage (or an explicit justification for why tests are not needed)
+- [ ] Linting passes (use linting-agent)
+- [ ] Code follows existing patterns
+- [ ] Figma designs match implementation (if applicable)
+- [ ] Validation/evidence context passed to `ce-commit-push-pr` when the change has observable behavior
+- [ ] Commit messages follow conventional format
+- [ ] PR description includes Post-Deploy Monitoring & Validation section (or explicit no-impact rationale)
+- [ ] Simplify: `ce-simplify-code` when diff >=30 lines (or skipped with reason)
+- [ ] Code review: `ce-code-review` ran (self-sized), or skipped (mechanical diff / unavailable — noted in summary); residuals handled via the Residual Work Gate
+- [ ] PR description includes summary, testing notes, and evidence when captured
+- [ ] PR description includes Compound Engineered badge with accurate model and harness
 
-创建 PR 前，验证：
+## Code Review
 
-- [ ] 所有 clarifying questions 已问并已回答
-- [ ] 所有 tasks 已标记 completed
-- [ ] Testing addressed（测试已处理）：tests pass，且 new/changed behavior 有对应 test coverage（或明确说明为何不需要 tests）
-- [ ] Linting passes（使用 linting-agent）
-- [ ] Code 遵循 existing patterns
-- [ ] Figma designs 与 implementation match（如适用）
-- [ ] 当 change 有 observable behavior 时，evidence decision 已由 `ce-commit-push-pr` 处理
-- [ ] Commit messages 遵循 conventional format
-- [ ] PR description 包含 Post-Deploy Monitoring & Validation section（或明确 no-impact rationale）
-- [ ] Simplify：diff >=30 lines 时运行 `ce-simplify-code`（或带 reason 跳过）
-- [ ] Code review: Tier 1 completed, or Tier 2 when escalated；或 skipped（no Tier 1 + Tier 2 criteria not met，并在 summary 中注明）
-- [ ] PR description 包含 summary、testing notes，以及 captured evidence
-- [ ] PR description 包含准确 model 和 harness 的 Compound Engineered badge
+Single portable path: **`ce-code-review`** self-sizes (lite roster for small low-risk code-only diffs, full roster otherwise). No harness-native review detection, no escalation tiers — the size/sensitive-surface judgment lives inside `ce-code-review` now.
 
-## Code Review Tiers（代码审查层级）
+**Skip** only for a purely mechanical diff (formatting, dep-bumps, lint-only, generated). Everything else is reviewed.
 
-当 harness 有 built-in review 时使用 **Tier 1**。仅当 escalation criteria 匹配时使用 **Tier 2**（`ce-code-review` + followup）；缺失 Tier 1 不是升级理由。
+**Two steps — review is not fix.** (3a) Review-only via `mode:agent`; add `depth:full` when the plan/task/user explicitly asked for a deep review. (3b) Batched fix subagents per `references/review-findings-followup.md`; residuals → Residual Work Gate.
 
-**Tier 1 -- harness-native review.** Built-in command 或 skill（例如 `/review`）。inline 修复 findings。
-
-**Tier 2 -- `ce-code-review` (escalation).** (2a) 通过 `mode:agent` 做 review-only。(2b) 按 `references/review-findings-followup.md` 分派 batched fix subagents；residuals → Residual Work Gate。
-
-当没有 Tier 1 且 Tier 2 criteria 未满足时，**跳过 dedicated review**（在 summary 中记录）。
-
-当以下任一条件成立时升级到 Tier 2：
-- Sensitive surface touched（auth/authz、payments/billing、data migrations 或 backfills、cryptography 或 secrets、security-relevant config、public API 或 library contracts、dependency manifests）
-- Large and diffuse change（>=400 changed lines 且 >3 directories 或 2 subsystems）
-- Very large change（超大变更，>=1,000 changed lines）
-- Plan 或 task 明确要求 full / deep / thorough code review
+**If `ce-code-review` can't run** (no subagent dispatch): interactive → harness-native review if present, fix inline; non-interactive → skip-with-note + manual diff scan in Final Validation. Never silently ship a non-mechanical change unreviewed.

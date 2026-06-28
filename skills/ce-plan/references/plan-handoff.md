@@ -1,98 +1,121 @@
-# Plan Handoff（Plan 交接）
+# Plan Handoff
 
-本文件包含 plan 写入后的指令：document review、生成后选项和 issue 创建。仅在 plan 文件已经写入，且 confidence check（5.3.1-5.3.7）完成后加载。
+This file contains post-plan-writing instructions: document review, post-generation options, and issue creation. Load it after the plan file has been written and the confidence check (5.3.1-5.3.7) is complete.
 
-## 5.3.8 Document Review（文档审查）
+## 5.3.8 Document Review
 
-**Format gate（格式门禁）.** 本阶段仅在 `OUTPUT_FORMAT=md` 时运行（在 SKILL.md Phase 0.0 中解析）。`ce-doc-review` 的 mutation 机制是 markdown 专用的：它的 walkthrough 会通过平台 edit tool 将 `gated_auto`/`manual` 修复作为“单文件 markdown 改动”应用，并且 Append-to-Open-Questions flow 会插入 `##`/`###` markdown 标题（见 ce-doc-review skill 中的 walkthrough 和 open-questions-defer references）。如果对 HTML artifact 运行这些 mutator，会产生格式错误的输出。在 ce-doc-review 获得 HTML-aware mutation 前，HTML plans 完全跳过本阶段。
+**Format gate.** This phase runs only when `OUTPUT_FORMAT=md` (resolved in SKILL.md Phase 0.0). `ce-doc-review`'s mutation mechanics are markdown-specific — its walkthrough applies `gated_auto`/`manual` fixes as "single-file markdown changes" via the platform's edit tool, and its Append-to-Open-Questions flow inserts `##`/`###` markdown headings (see the walkthrough and open-questions-defer references inside the ce-doc-review skill). Running those mutators against an HTML artifact would produce malformed output. Until ce-doc-review gains HTML-aware mutation, HTML plans skip this phase entirely.
 
-**当 `OUTPUT_FORMAT=html` 时：** 跳过 ce-doc-review 调用。捕获一个合成的 "skipped" envelope，让 5.4 的菜单摘要行能明确说明限制：
+**When `OUTPUT_FORMAT=html`:** Skip the ce-doc-review invocation. Capture a synthetic "skipped" envelope so the menu summary line in 5.4 can name the limitation explicitly:
 - `fixes_applied = 0`
 - `proposed_fixes_count = 0`, `decisions_count = 0`, `fyi_count = 0`
 - `skipped_reason = "output_format_html"`
 
-然后直接进入 Final Checks（5.3.9）。不要因此阻塞；5.3 的 confidence check 已经强化了 plan。生成后菜单中的自由文本 review 请求，在 HTML 运行中应被拒绝，并提示切换到 `output:md`（见 5.4）；在 ce-doc-review 获得 HTML-aware mutation 前，HTML plans 不提供 review。
+Then proceed directly to Final Checks (5.3.9). Do not block on this — the confidence check at 5.3 already strengthened the plan. Free-form requests for review in the post-generation menu will be declined for HTML runs with a prompt to switch to `output:md` (see 5.4); review is not available for HTML plans until ce-doc-review gains HTML-aware mutation.
 
-**当 `OUTPUT_FORMAT=md` 时：** Run `ce-doc-review` with `mode:headless` on the plan file（对 plan 文件运行带 `mode:headless` 的 `ce-doc-review` skill）。将 `mode:headless <plan-path>` 作为 skill arguments 传入。对于 markdown plan，一旦到达本步骤，它就是强制的；不要因为 confidence check 已经运行就跳过。两个工具捕获的是不同类别的问题。
+**When `OUTPUT_FORMAT=md`:** Run the `ce-doc-review` skill with `mode:headless` on the plan file. Pass `mode:headless <plan-path>` as the skill arguments. When this step is reached for a markdown plan, it is mandatory — do not skip it because the confidence check already ran. The two tools catch different classes of issues.
 
-本阶段默认使用 headless，因为多数用户在 planning 后想开始工作，而不是预先裁定每个 reviewer concern。Headless 会静默应用 `safe_auto` 修复，并返回结构化 findings 文本；没有 walkthrough，没有 per-finding routing，也没有 blocking prompts。生成后菜单（见 5.4）将 `Run deeper doc review` 作为一等选项，让用户在需要时选择完整 interactive walkthrough。
+Headless is the default at this phase because most users want to start work after planning, not adjudicate every reviewer concern up front. Headless applies `safe_auto` fixes silently and returns structured findings text — no walkthrough, no per-finding routing, no blocking prompts. The post-generation menu (see 5.4) offers `Decide on the review's open items` as a first-class option so users can opt into the full interactive walkthrough when they want it.
 
-confidence check 和 ce-doc-review 是互补的：
-- confidence check 强化 rationale、sequencing、risk treatment 和 grounding
-- Document-review 检查 coherence、feasibility、scope alignment，并暴露 role-specific issues
+The confidence check and ce-doc-review are complementary:
+- The confidence check strengthens rationale, sequencing, risk treatment, and grounding
+- Document-review checks coherence, feasibility, scope alignment, and surfaces role-specific issues
 
-捕获 headless envelope，让它驱动生成后菜单上方的上下文摘要：
-- auto-applied fixes 数量
-- remaining findings 数量，按面向用户的 bucket 拆分（proposed fixes、decisions、FYI observations）
-- decisions 和 proposed fixes 的 severity breakdown（尤其是 P0/P1 数量，因为它们值得用户明确关注）
+Capture the headless envelope so it can drive the contextual summary above the post-generation menu:
+- The number of fixes auto-applied
+- The count of remaining findings, broken out by user-facing bucket (proposed fixes, decisions, FYI observations)
+- The severity breakdown of decisions and proposed fixes (specifically the P0/P1 count, since those benefit from explicit user attention)
 
-当 ce-doc-review 返回 "Review complete" 后，进入 Final Checks。
+When ce-doc-review returns "Review complete", proceed to Final Checks.
 
-**Pipeline mode（Pipeline 模式）:** Pipeline runs（LFG 或任何 `disable-model-invocation` context）会在 Phase 0.0 强制 `OUTPUT_FORMAT=md`，所以 pipeline mode 中上面的 format gate 永远不会选择 HTML skip path。Pipeline runs 总是用 `mode:headless` 和 plan path 调用 `ce-doc-review`；此阶段的 headless mode 与 interactive default 相同。Pipeline mode 不提供进一步 routing；caller 决定如何处理返回的 findings。将控制权交还给 caller 前，先处理所有 P0/P1 findings。
+**Pipeline mode:** Pipeline runs (LFG or any `disable-model-invocation` context) force `OUTPUT_FORMAT=md` at Phase 0.0, so the format gate above never selects the HTML skip path in pipeline mode. Pipeline runs always invoke `ce-doc-review` with `mode:headless` and the plan path — the headless mode is identical to the interactive default at this phase. No further routing is offered in pipeline mode; the caller decides what to do with the returned findings. Address any P0/P1 findings before returning control to the caller.
 
-## 5.3.9 Final Checks and Cleanup（最终检查与清理）
+## 5.3.9 Final Checks and Cleanup
 
-进入生成后选项前：
-- 确认 plan 在具体方面更强，而不仅仅是更长
-- 确认 planning boundary 保持完整
-- 当存在 origin document 时，确认 origin decisions 被保留
+Before proceeding to post-generation options:
+- Confirm the plan is stronger in specific ways, not merely longer
+- Confirm the planning boundary is intact
+- Confirm origin decisions were preserved when an origin document exists
 
-如果使用了 artifact-backed mode：
-- plan 安全更新后，清理临时 scratch directory
-- 如果当前平台不适合清理，说明 artifacts 留在何处
+If artifact-backed mode was used:
+- Clean up the temporary scratch directory after the plan is safely updated
+- If cleanup is not practical on the current platform, note where the artifacts were left
 
-**Format-specific composition（特定格式组合）.** 当 `OUTPUT_FORMAT=html`（在 SKILL.md Phase 0.0 中解析）时，plan 会写成单个自包含 `.html` 文件；不存在 markdown sibling。阅读 `references/html-rendering.md` 获取 composition rules：invariants、precedence stack、format principles、agent-consumability rules 和 post-compose audit。下游 consumers（ce-work、人类读者）读取的 artifact 是该 `.html` 文件。`ce-doc-review` 目前不是 HTML consumer；它的 mutation 机制今天仍是 markdown-only，因此 HTML plans 会跳过 5.3.8 doc-review pass，直到这个缺口补上。
+**Format-specific composition.** When `OUTPUT_FORMAT=html` (resolved in SKILL.md Phase 0.0), the plan is written as a single self-contained `.html` file — there is no markdown sibling. Read `references/html-rendering.md` for composition rules: invariants, precedence stack, format principles, agent-consumability rules, and the post-compose audit. The `.html` file is the artifact downstream consumers (ce-work, human readers) read. `ce-doc-review` is not a current HTML consumer — its mutation mechanics are markdown-only today, and HTML plans skip the 5.3.8 doc-review pass until that gap closes.
 
-当 `OUTPUT_FORMAT=md` 时，按 `references/markdown-rendering.md` 直接写 markdown。不组合 HTML。
+When `OUTPUT_FORMAT=md`, write the markdown directly per `references/markdown-rendering.md`. No HTML is composed.
 
-本次运行中的所有 mutation 都稳定后（initial write、deepening synthesis、当 `OUTPUT_FORMAT=md` 时的 ce-doc-review `safe_auto` fixes），单一路径上的 artifact 即反映最终状态。Publishing to Proof 是 one-way share action；它不会 sync edits 回 local file，也不是 plan artifact 的 finalization step。HTML runs 跳过 ce-doc-review autofix step（见 5.3.8 format gate）。
+After all mutations in this run have settled (initial write, deepening synthesis, ce-doc-review `safe_auto` fixes when `OUTPUT_FORMAT=md`), the artifact at its single path reflects the final state. Publishing to Proof is one-way and does not mutate the local file. HTML runs skip the ce-doc-review autofix step (see 5.3.8 format gate).
 
-## 5.4 Post-Generation Options（生成后选项）
+## 5.4 Post-Generation Options
 
-**Pipeline mode（Pipeline 模式）:** 如果由 LFG 等 automated workflow 或任何 `disable-model-invocation` context 调用，跳过下面的 interactive menu，并立即将控制权交还给 caller。plan 文件已写入，confidence check 已运行，ce-doc-review 也已运行；caller（例如 lfg）决定下一步。
+**Pipeline mode:** If invoked from an automated workflow such as LFG or any `disable-model-invocation` context, skip the interactive menu below and return control to the caller immediately. The plan file has already been written, the confidence check has already run, and ce-doc-review has already run — the caller (e.g., lfg) determines the next step.
 
-**Path format（路径格式）:** 聊天输出中的文件引用使用 absolute paths；relative paths 在大多数终端中不会自动链接为可点击项。
+**Path format:** Use absolute paths for chat-output file references — relative paths are not auto-linked as clickable in most terminals.
 
-**Summary line above the menu（菜单上方摘要行，始终）：** 打印一行简洁文本，总结 headless review 状态，例如：`Doc review applied 3 fixes. 2 decisions, 1 proposed fix, 4 FYI observations remain (1 at P1).` 当没有应用修复且没有 findings 剩余时，打印 `Doc review clean — no fixes needed.` 当 envelope 带有 `skipped_reason: output_format_html`（HTML run，依据 Phase 5.3.8 format gate）时，打印 `Doc review skipped — ce-doc-review is markdown-only today; the HTML plan was not reviewed.`，让用户知道 autofix pass 没有在该 artifact 上运行。这一行说明 autofix pass 做了什么（或没做什么），让用户有上下文来选择下面的菜单选项。
+**Summary line above the menu (always):** Print a single concise line summarizing the headless review state — e.g., `Doc review applied 3 fixes. 2 decisions, 1 proposed fix, 4 FYI observations remain (1 at P1).` When no fixes were applied and no findings remain, print `Doc review clean — no fixes needed.` When the envelope carries `skipped_reason: output_format_html` (HTML run, per Phase 5.3.8 format gate), print `Doc review skipped — ce-doc-review is markdown-only today; the HTML plan was not reviewed.` so the user knows the autofix pass did not run on this artifact. This line establishes what the autofix pass did (or didn't) so the user has the context to choose between the menu options below.
 
-**Question（问题）:** "Plan ready at `<absolute path to plan>`. What would you like to do next?"
+**Question:** "Plan ready at `<absolute path to plan>`. What would you like to do next?"
 
-**Options（选项）:**
-1. **Start `/ce-work`** (recommended) - Begin implementing this plan in the current session（在当前 session 中开始实现此 plan）
-2. **Run deeper doc review** - 交互式走查剩余 findings（完整 ce-doc-review walkthrough）
-3. **Create Issue** - 从此 plan 在已配置的 issue tracker（GitHub 或 Linear）创建 issue
-4. **Publish to Proof** *(md)* / **Open in browser** *(html)* - 根据 output format 选择分享或打开 artifact
-5. **Pause** - 停在 plan artifact
+**Options:**
+1. **Start `/ce-work`** - Best for shorter work, or when you want to review and possibly steer as it goes (runs via the `ce-work` skill, in this session). Show only for `artifact_readiness: implementation-ready` plus `execution: code`; universal-planning, answer-seeking, approach-plan, and requirements-only artifacts keep their own handoff/checkpoint behavior.
+2. **Run it as a `/goal`** - Run this plan as an autonomous `/goal` to its Definition of Done — fewer check-ins; good for longer or unattended runs. The alternative to option 1, not an add-on — pick one. Show only when (a) the artifact is `artifact_readiness: implementation-ready` plus `execution: code` AND (b) the host has goal mode at all — a callable goal tool (Codex `create_goal`) or a user-typed `/goal` (Claude Code); omit it where neither exists. Where the host can start a goal directly the session begins it immediately; where it cannot, it hands over a copyable `/goal` prompt. See the routing below.
 
-**Menu rendering（菜单渲染）:** 该菜单有 5 个选项，超过 `AskUserQuestion` 的 4-option cap。根据 AGENTS.md 中对合法 option overflow 的窄例外，将此菜单作为聊天中的编号列表渲染，并带上提示 "Pick a number or describe what you want."，而不是删减选项来适配 cap。每个选项都是独立 destination/workflow，删除任何一个都会丢失真实用户选择（deeper review、issue creation、Proof、ce-work 和 pause 在实践中都分别被请求）。在 blocking question tools 没有选项上限的平台上（例如 Codex `request_user_input`、Pi `ask_user`），使用平台 blocking tool 提供全部 5 个选项。当平台 blocking tool 不可用或报错时（例如 Codex edit modes 中未暴露 `request_user_input`，或 `ask_user` 返回 no match），回退到同样的聊天编号列表渲染，并带 "Pick a number or describe what you want." 提示；这与 `AskUserQuestion` overflow path 的 fallback 相同。绝不要静默跳过问题。
+**Recommended marker (dynamic):** `/goal` is the recommended default when its host supports it — render option 2 as **Run it as a `/goal`** *(recommended)* and leave option 1 unmarked. On hosts without `/goal` (option 2 omitted), mark option 1 **Start `/ce-work`** *(recommended)* instead. Exactly one option ever carries *(recommended)*.
+3. **Decide on the review's open items** - Confirm or skip the suggested edits, and settle the judgment calls the auto-pass left for you. (Safe, mechanical fixes were already applied; you can also defer items into Open Questions.)
+4. **Create Issue** - Create a tracked issue from this plan in your configured issue tracker (e.g., GitHub Issues, Linear, Jira)
+5. **Publish to Proof — shareable link** - Publish the plan to Every's Proof editor and get a shareable link to read, comment on, or share with others. One-way: the local plan file stays canonical. **Render only when `OUTPUT_FORMAT=md`.**
+5. **Open in browser** - Open the HTML plan file locally for review and sharing. **Render only when `OUTPUT_FORMAT=html`.**
 
-**Hide `Run deeper doc review` when no actionable findings remain（当没有 actionable findings 剩余或 doc review 被跳过时，隐藏 `Run deeper doc review`）。** 仅当 headless envelope 报告 `proposed_fixes_count + decisions_count > 0` 时显示 option 2，即至少存在一个 confidence anchor 为 `75` 或 `100` 的 `gated_auto` 或 `manual` finding。其他情况都移除该选项，包括 FYI-only 状态。FYI observations（anchor `50`）不会进入 `ce-doc-review` 的 interactive routing question 或 walkthrough；该流程仅对 actionable findings 开门。因此只有 FYI 可看的 `Run deeper doc review` 选项会成为死路：ce-doc-review 会重新分派 persona team，找到相同 FYIs，跳过 routing question，并落到 terminal question，而没有任何可 walk through 的内容。用户为一次没有参与界面的 dispatch 付出了成本。调用 deeper review 时使用 `ce-doc-review` without** `mode:headless`。**当 envelope 带有 `skipped_reason: output_format_html` 时也移除 option 2**；ce-doc-review 的 mutation 机制今天是 markdown-only（见 Phase 5.3.8 format gate），HTML plan 上的 `Run deeper doc review` 选项会进入同一个 markdown-oriented walkthrough，而 format gate 正是为了阻止它。当 option 2 被移除时，菜单变为 4 个选项（上面的 1、3、4、5），在 Claude Code 上回退到 `AskUserQuestion`，并在显示时重新编号为 1-4，让用户看到干净序列。菜单上方摘要行仍在存在 FYI 时说明 FYI count（`Doc review applied 3 fixes. 2 FYI observations remain.`），让用户看到发现了什么，即使没有对应菜单动作；FYIs 可见于菜单旁一起渲染的 headless envelope text。
+There is no "done" / "pause" option — the blocking question already waits, and the user ends the turn by dismissing it (Esc) or just not picking anything. The plan file is already saved.
 
-根据选择进行 routing（裸 per-option routing 也内联写在 SKILL.md 中，避免未加载本 reference 时遗漏；下面的复杂 sub-flows 是本 reference 仍存在的原因）：
-- **Start `/ce-work`** -> 通过平台的 skill-invocation primitive 调用 `ce-work`，传入 plan path。
-- **Run deeper doc review** -> 调用 `ce-doc-review` 的 interactive walkthrough。
-- **Create Issue** -> 按 issue tracker configuration 创建 issue。
-- **Publish to Proof** -> 调用 `ce-proof` publish local markdown file，返回 shareable link；local file 保持 canonical。
-- **Open in browser** -> 打开 HTML artifact。
+**Option 5 format-keyed label.** Under exclusive output mode, the plan exists as exactly one artifact — `.md` or `.html`, never both. Render the option 5 label matching the produced format. Proof ingests the `.md` source, so it does not apply to HTML runs; the browser option opens the local `.html` file directly. Implementation handoff (options 1 and 2) remains available in both modes only when the artifact is implementation-ready code — `ce-work` reads either format, and the launch prompt is emitted at handoff regardless of format (see the ce-work skill's plan-input handling).
 
-## Issue Creation（创建 Issue）
+**Menu rendering:** The menu has up to 5 options (execution options 1 and 2 render only for implementation-ready code, and option 2 only on hosts with a `/goal` command; option 3 is conditional — see below). When 5 render, exceeding the `AskUserQuestion` 4-option cap, render the menu as a numbered list in chat with the hint "Pick a number or describe what you want." rather than trimming options — each is a distinct destination and none are removable without losing real user choice. On platforms whose blocking question tools have no option cap (e.g., Codex `request_user_input`, Pi `ask_user`), use the blocking tool with all rendered options. When the visible-option count is 4 or fewer (e.g., a requirements-only/non-code plan hides options 1 and 2, or doc review is dropped), use `AskUserQuestion` on Claude Code and renumber the visible options 1-N. When the platform's blocking tool is unavailable or errors (e.g., Codex edit modes where `request_user_input` is not exposed, or `ask_user` returns no match), fall back to the same numbered-list-in-chat rendering. Never silently skip the question.
 
-当用户选择 "Create Issue" 时：
+**Hide `Decide on the review's open items` (option 3) when no actionable findings remain or doc review was skipped.** Show this option only when the headless envelope reports `proposed_fixes_count + decisions_count > 0` — i.e., at least one `gated_auto` or `manual` finding at confidence anchor `75` or `100`. Drop the option in any other case, including FYI-only state. FYI observations (anchor `50`) do not enter `ce-doc-review`'s interactive routing question or walkthrough — that flow is gated to actionable findings — so a `Decide on the review's open items` option that only has FYIs to show is a dead-end: ce-doc-review would re-dispatch the persona team, find the same FYIs, skip the routing question, and fall through to the terminal question with nothing to walk through. The user paid the dispatch cost for no engagement surface. **Also drop this option when the envelope carries `skipped_reason: output_format_html`** — ce-doc-review's mutation mechanics are markdown-only today (see Phase 5.3.8 format gate), so a `Decide on the review's open items` option on an HTML plan would route into the same markdown-oriented walkthrough the gate exists to prevent. Always renumber the *visible* options 1-N for display so users see a clean sequence (e.g., an implementation-ready plan with no actionable findings shows ce-work, give-me-`/goal`, Create Issue, Proof/browser, Done; a requirements-only plan hides both execution options and shows only the doc/issue/share/pause options). The summary line above the menu still names the FYI count when present (`Doc review applied 3 fixes. 2 FYI observations remain.`) so the user sees what was found, even though there is no menu action attached to it — the FYIs are visible in the headless envelope text the menu rendered alongside.
 
-1. **Identify the project's issue tracker from the active instructions and conventions already in your context（从已经在上下文中的 active instructions 和约定识别项目 issue tracker）** — 也就是项目实际使用的 issue / project-management tool（例如 GitHub Issues、Linear、Jira）。不要为了这一步打开或点名特定 instruction files；项目 instructions 已经在你的上下文中。查找明确的 `project_tracker:` declaration（`github`、`linear` 等）或任何已记录的 tracker convention。只有当你的上下文没有携带项目 instructions（例如你是 fresh subagent）或其中没有说明时，才查补充信号：`README.md`、`CONTRIBUTING.md`、`.github/` 下的 PR templates，或可见的 tracker URLs。
+Based on selection (the bare per-option routing is also stated inline in the SKILL.md so it cannot be missed when this reference is not loaded; the elaborate sub-flows below are the reason this reference still exists):
+- **Start `/ce-work`** -> Classify the artifact first. If it is not `artifact_readiness: implementation-ready` plus `execution: code`, do not execute it; route requirements-only artifacts back to `ce-plan` enrichment and non-code artifacts to their own workflow. If it is executable, invoke the `ce-work` skill via the platform's skill-invocation primitive, passing the plan path as the skill argument; `ce-work` then owns engine selection (inline/subagent vs goal-mode vs dynamic-workflow) and the implementation tail. If no skill-invocation primitive exists on this host, print the `ce-work` fallback prompt for the user to run; in that prompt, tell the executor to read Goal Capsule, Verification Contract, Definition of Done, and active U-IDs (scanning headings to find them) rather than the whole document first. Do not merely tell the user to type `/ce-work` when a skill invocation primitive is available.
+- **Run it as a `/goal`** -> Build a **thin** implementation objective from the plan (generated here at handoff, never written into the doc). It points to the plan's sections; do **not** copy the plan's resolved decisions, exact verification commands, or requirements into the prompt. **Deletion test:** if your draft names a specific command, file path, U-ID dependency relationship, stop condition, or DoD item, cut it — the objective should read identically for any plan except the substituted path. Don't hardcode an open-a-PR or do-not-open-a-PR directive; carry the PR-precedence line instead. The objective: *implement `<plan-path>` to its Definition of Done; the plan is the authority — scan headings, don't read it whole; read the Goal Capsule, then work the units in dependency order, reading each unit plus its cited R/F/AE/KTD; run the plan's Verification Contract gates and satisfy each unit's test scenarios; track progress outside the plan file; follow the plan's PR/landing strategy if it defines one, with the repo's conventions and the user's preferences overriding it; surface a genuine blocker (something that changes scope or contradicts the plan) instead of guessing, using judgment on details the plan leaves open.* Then, by host capability — either way `ce-work` does **not** also run (that would double-execute and split tail ownership):
+  - **If a callable goal tool is available (Codex `create_goal`):** call `create_goal` with that objective. The current session works toward it; do **not** call `update_goal` (the goal session marks its own completion). No copy-paste.
+  - **If only a user-typed `/goal` exists (Claude Code):** print that objective as a single copyable `/goal …` block and tell the user to paste it at the start of a message (a skill cannot issue `/goal` itself there). After printing, return to the options.
 
-2. **Create the issue through whatever interface that tracker actually exposes in this environment（通过该 tracker 在当前环境实际暴露的接口创建 issue）** — platform connector/MCP tool、documented API/GraphQL credentials，或 documented CLI。先主动 discover 可用能力：使用平台的 tool-discovery primitive（例如 Claude Code 中的 `ToolSearch`）查找 tracker connector 或 MCP tool，再假设不存在。Lazy-loaded connectors 和 shell 外保存的 credentials 不会出现在 passive check 中。Do not assume a tracker means a particular CLI, and do not treat a missing binary, env var, or unloaded MCP server as proof the tracker is unavailable — 当 access 通过 connector 或 raw API（credentials 保存在 shell 外）时，这些都是 false negatives。使用 direct API 时，绝不要打印 secret values；从磁盘读取 plan body，并按 API contract 作为 issue 的 markdown/description 发送。常见情况示例：
+  Render only for implementation-ready code plans, and only where the host has goal mode at all (a callable tool or a user-typed `/goal`) — omit the option where neither exists.
+- **Decide on the review's open items** -> Re-invoke the `ce-doc-review` skill on the plan path **without** `mode:headless` so the interactive routing question and walkthrough fire. The headless pass already applied `safe_auto` fixes and recorded its findings in the session, so the interactive pass picks up where headless stopped — its R29 suppression rule prevents prior-round Skipped/Deferred entries from re-raising. After it returns, re-render this menu with the refreshed counts so the user can pick what to do next.
+- **Create Issue** -> Follow the Issue Creation section below
+- **Publish to Proof — shareable link** -> Load the `ce-proof` skill to publish the plan. Pass:
+  - source file: `docs/plans/<plan_filename>.md`
+  - doc title: `Plan: <plan title from frontmatter>`
+  - identity: `ai:compound-engineering` / `Compound Engineering`
+
+  ce-proof creates a shared Proof doc from the plan file (Create and Share workflow), binds the display name, and returns the share URL. Surface the URL to the user — they can open it to read, comment, or share with others — then return to the post-generation options. This is a one-way publish: the local plan file stays canonical and nothing syncs back, so no re-review is needed and the menu re-renders with the same residual findings as before.
+
+  Note: the Proof option only renders when `OUTPUT_FORMAT=md`. Proof ingests markdown; HTML plans use the local browser option instead.
+
+  If the upload fails (network error, Proof API down), retry once after a short wait. If it still fails, tell the user the upload didn't succeed and briefly explain why, then return to the options — don't leave them wondering why the option did nothing.
+- **Open in browser** -> Display the absolute path to the `.html` plan file so the user can open it locally. Where the platform exposes a browser-opening primitive (e.g., `open` on macOS, `xdg-open` on Linux, `start` on Windows), the agent may invoke it directly; otherwise print the absolute path and let the user open it. After the path is displayed (or the browser is opened), return to the post-generation options so the user can pick a follow-up action.
+- **Free-form prompts that target the findings** (e.g., the user types "review", "walk through", "deep review" instead of picking a numbered option) -> route as if they had picked `Decide on the review's open items`. Do not loop back to the menu without firing the review. **Exception:** when the envelope carries `skipped_reason: output_format_html`, do not fire ce-doc-review — instead, reply once with `ce-doc-review is markdown-only today; the HTML plan can't be reviewed without HTML-aware mutation support. Switch to /ce-plan output:md to regenerate as markdown if you want a review pass.` and loop back to the menu.
+- **Other free-form input** -> Accept revisions to the plan and loop back to options.
+
+## Issue Creation
+
+When the user selects "Create Issue":
+
+1. **Identify the project's issue tracker from the active instructions and conventions already in your context** — the issue / project-management tool the project uses (e.g., GitHub Issues, Linear, Jira). Don't open or name specific instruction files to do this; the project's instructions are already available to you. Look for an explicit `project_tracker:` declaration (`github`, `linear`, …) or any documented tracker convention. Only if your context doesn't already carry the project's instructions (e.g., you're a fresh subagent) or they're silent, consult supplementary signals: `README.md`, `CONTRIBUTING.md`, PR templates under `.github/`, or visible tracker URLs.
+
+2. **Create the issue through whatever interface that tracker actually exposes in this environment** — a platform connector/MCP tool, documented API/GraphQL credentials, or a documented CLI. First actively discover what's available: use the platform's tool-discovery primitive (e.g., `ToolSearch` in Claude Code) to look for a tracker connector or MCP tool before assuming none exists — lazy-loaded connectors and credentials stored outside the shell won't surface in a passive check. Do not assume a tracker means a particular CLI, and do not treat a missing binary, env var, or unloaded MCP server as proof the tracker is unavailable — those are false negatives when access comes through a connector or a raw API with credentials stored outside the shell. When using a direct API, never print secret values; read the plan body from disk and send it as the issue's markdown/description per the API contract. Worked examples for the common cases:
    - **GitHub** — `gh issue create --title "<type>: <title>" --body-file <plan_path>`
-   - **Linear**（no guaranteed first-party CLI）— 按优先级选择：能创建 issues 的 Linear connector 或 MCP tool → documented direct API/GraphQL credentials and endpoint → documented local Linear CLI（仅当项目或用户明确说明它已安装并认证时）。
+   - **Linear** (no guaranteed first-party CLI) — prefer, in order: a Linear connector or MCP tool that can create issues → documented direct API/GraphQL credentials and endpoint → a documented local Linear CLI, only when the project or user explicitly states it is installed and authenticated.
 
-3. 如果没有配置 tracker，用平台 blocking question tool 询问用户使用哪个 tracker：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先调用 `ToolSearch` 并使用 `select:AskUserQuestion`）、Codex 中的 `request_user_input`、Antigravity CLI（`agy`）中的 `ask_question`、Pi 中的 `ask_user`（需要 `pi-ask-user` extension）。只有当不存在 blocking tool 或调用报错时（例如 Codex edit modes）才回退到聊天提问；不要因为需要 schema load 就回退。绝不要静默跳过。提供三个显式选项 — `GitHub`、`Linear`、`Skip` — 并允许用户通过 tool 内置的 free-form / "Other" input 命名不同 tracker（Jira 等）：`AskUserQuestion` 总是提供 free-form，`request_user_input` / `ask_user` 也有自己的 free-form。不要额外添加显式第四个 `Other` 选项；在 tool 已经提供 free-form 时这是重复的，并且会超过只接受 2-3 个显式选项的工具上限（例如 Codex `request_user_input`）。如果 tool 没有 free-form path，通过聊天 fallback 捕获 other-tracker name。然后：
-   - 按 step 2 中所选 tracker 的 capability path 创建 issue
-   - 如果用户通过 free-form 命名了不同 tracker，且没有说明其 reachable interface，先询问接口，然后通过 step 2 的 capability path 创建 issue
-   - 提议把选择持久化为 `project_tracker: <value>` declaration，写入项目 root agent-instructions file（例如 `AGENTS.md`；如果它通过 `@` include 另一个文件，则写入 substantive one）。使用小写 tracker key（`github`、`linear`、`jira` 等），不是 display label，这样未来运行会匹配 step 1 并跳过此 prompt
-   - 如果选择 `Skip`，不创建 issue，返回 options
+3. If no tracker is configured, ask the user which tracker they use with the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to asking in chat only when no blocking tool exists or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip. Offer three explicit options — `GitHub`, `Linear`, `Skip` — and let the user name a different tracker (Jira, etc.) through the tool's built-in free-form / "Other" input: `AskUserQuestion` always provides it, and `request_user_input` / `ask_user` supply their own. Don't add an explicit fourth `Other` option — that's redundant where the tool already offers free-form and can exceed the option cap on tools that accept only 2–3 explicit choices (e.g., Codex `request_user_input`). When the tool exposes no free-form path, capture the other-tracker name via the chat fallback. Then:
+   - Proceed with the chosen tracker's creation path above
+   - If the user names a different tracker through the free-form path, ask for its reachable interface if they didn't say, then create the issue via the capability path in step 2
+   - Offer to persist the choice by adding a `project_tracker: <value>` declaration to the project's root agent-instructions file (e.g., `AGENTS.md`; if it `@`-includes another file, write to the substantive one). Use the lowercase tracker key (`github`, `linear`, `jira`, …) — not the display label — so future runs match step 1 and skip this prompt
+   - If `Skip`, return to the options without creating an issue
 
-4. 如果 actively discovering available connector/MCP tools 并遵循 documented access method 后，检测到的 tracker 仍没有 reachable interface（没有 working connector、MCP tool、CLI 或 API path），显示清晰错误（例如 "`gh` CLI not found or not authenticated for GitHub Issues"；"Linear is documented for this project, but no connector, MCP tool, or API credentials were found"），然后返回 options。不要静默 fallback 到本地 issue-plan document，除非用户明确要求 local-only artifact。
+4. If the detected tracker has no reachable interface after actively discovering available connector/MCP tools and following its documented access method — no working connector, MCP tool, CLI, or API path — surface a clear error (e.g., "`gh` CLI not found or not authenticated for GitHub Issues"; "Linear is documented for this project, but no connector, MCP tool, or API credentials were found") and return to the options. Do not silently fall back to a local issue-plan document unless the user explicitly asks for a local-only artifact.
 
-issue 创建后：
-- 显示 issue URL
-- 使用平台 blocking question tool 询问是否继续 `/ce-work`
+After issue creation:
+- Display the issue URL
+- Ask whether to proceed to `/ce-work` using the platform's blocking question tool

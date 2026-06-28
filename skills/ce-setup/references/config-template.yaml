@@ -30,13 +30,16 @@
 # pulse_pending_metrics: "retention_d7,nps"             # comma-separated strategy metrics，等待 instrumentation；render 为 'no data'
 # pulse_excluded_metrics: "north_star"                  # comma-separated strategy metrics，故意不纳入 pulse
 
-# --- Output format（输出格式） ---
-# Per-skill output format default。选择 artifact 写入时使用的 exclusive format：
-# `md` 产生 markdown file，`html` 产生单个 self-contained HTML file。
-# 两者 mutually exclusive，不会生成 sibling artifact。
-# 如需影响 HTML styling，见 DESIGN.md 或你的 agent instructions。
-# CLI arguments 会覆盖这些 defaults；pipeline contexts
-# （例如 LFG、disable-model-invocation）始终 force `md`。
+# --- Output format ---
+# Per-skill output format default. Selects the exclusive format the artifact
+# is written in: `md` produces a markdown file, `html` produces a single
+# self-contained HTML file. The two are mutually exclusive -- there is no
+# sibling artifact. See DESIGN.md or your agent instructions to influence
+# HTML styling. Precedence: a format request in your prompt for that run wins
+# (e.g. "output:html" or "make it HTML"); a preference you established earlier
+# (in-session, saved to memory, or in your agent instructions) overrides these
+# keys (this config is the persisted fallback); pipeline contexts (e.g., LFG,
+# disable-model-invocation) always force `md`.
 
 # plan_output: html              # md | html (default: md)
 # brainstorm_output: html        # md | html (default: md)
