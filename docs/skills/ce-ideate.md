@@ -194,8 +194,8 @@ Single-prompt ideation 会塌缩到 agent 最常训练的方向。不同 frames 
 **它真的适用于 non-software topics 吗？**
 是。相同的 generate-critique-survive engine 会用 domain-native language 处理 naming、narrative、personal decisions 和 business strategy。Codebase grounding 会替换为 user-context synthesis 和 external research。
 
-**如果我想在进入 brainstorm 前 tweak 某个 idea 呢？**
-选择 "Iterate on one idea"：说明 idea 名称以及你想怎么改（调整 scope、提问、深入分析）。实际调整会更新已保存文件；纯 Q&A 不会。如果你后来不想保留自动写出的文件，说 "discard" 即可。
+**如果我想在进入 brainstorm 前 tweak 或讨论这些 ideas 呢？**
+选择 "Discuss or refine the ideas first"：留在 `ce-ideate` 中跨整组 ideas 继续工作，可以调整或追问某个 idea、比较多个 ideas，或把它们组合/合并。调整和合并会更新已保存文件；纯 Q&A 和比较不会。文件会自动写入；如果你不想保留，说 "discard" 即可。
 
 **如果我的 prompt ambiguous 呢？**
 当 prompt 只指向某种 quality（`improvements`、`quick wins`）而不是 specific thing 时，subject-identification gate 会问一个 scope question。"Surprise me" 会作为真实 option 提供，而不是 fallback。
