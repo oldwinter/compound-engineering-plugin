@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "面向 Claude Code 和 Codex extensions 的 plugin marketplace",
-    "version": "1.0.3"
+    "version": "1.0.4"
   },
   "plugins": [
     {
