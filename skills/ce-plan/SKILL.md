@@ -78,12 +78,21 @@ Resolution steps:
 4. **Default.** Otherwise `OUTPUT_FORMAT=md`.
 5. **Pipeline override.** When invoked from LFG or any `disable-model-invocation` context, force `OUTPUT_FORMAT=md` regardless of steps 1-4. `ce-work` and other automated downstream consumers parse markdown reliably; HTML in pipeline runs is unnecessary friction.
 
-**Token-parsing convention:** only literal-prefix flag tokens (`output:`, `mode:`, `delegate:` where applicable) are consumed and stripped. Other `<word>:<word>` tokens — including conventional commit prefixes like `feat:`, `fix:`, `chore:` that may appear inside a feature description — pass through verbatim.
+**Token-parsing convention:** only literal-prefix flag tokens (`output:`, `mode:`, the exact `confirm:auto`/`confirm:ask` forms, `delegate:` where applicable) are consumed and stripped. Other `<word>:<word>` tokens — including conventional commit prefixes like `feat:`, `fix:`, `chore:`, and any unrecognized `confirm:<value>` (e.g., a `confirm: delete-account modal` feature description) — pass through verbatim.
 
 **Load the format-rendering reference based on the resolved value.** Section content is the same in either format; presentation differs. Both references are paired with `references/plan-sections.md`, which describes what the plan contains regardless of format.
 
 - When `OUTPUT_FORMAT=md`, read `references/markdown-rendering.md` for format principles.
 - When `OUTPUT_FORMAT=html`, read `references/html-rendering.md` for format principles.
+
+**Resolve the scoping-confirmation setting.** Also before any gate fires, determine `SKIP_SCOPING_CONFIRM` (boolean, default `false`) — whether the pre-plan scoping-synthesis confirmation gates (Phase 0.7 solo, Phase 5.1.5 brainstorm-sourced) proceed without waiting for the user. This skips **only** that scoping confirmation; it never suppresses genuine blocking questions (Phase 0.4 routing, Phase 0.5 product blockers, Phase 2 architecture questions, source-doc disambiguation) or the Phase 5.4 post-generation menu. Precedence mirrors output mode:
+
+1. **In-prompt request.** `confirm:auto` skips the gate for this run; `confirm:ask` forces it on for this run. Honor an equivalent plain-language instruction the same way ("just write it, don't ask me to confirm" → skip; "ask me before writing the plan" → ask). Consume and strip the token **only** for the two recognized values `confirm:auto` and `confirm:ask`. A bare `confirm:` or any other value (e.g., `confirm:delete-account`) is **not** a flag — leave it verbatim in the feature description and fall through (this is narrower than `output:`, which strips unknown values: `confirm` has only two valid values, and a description can legitimately begin with a word like "confirm:").
+2. **User-stated preference.** Honor a scoping-confirmation preference the user established earlier — earlier in this session, in your memory, or written into their active instructions — that is already in your context (e.g., a remembered "stop asking me to confirm plan scope"). A remembered preference overrides the config key. Do not open or search instruction files to find it — act only on a preference already present in your context.
+3. **Config.** An **active (non-commented)** `plan_skip_scoping_confirm:` key matching `true`/`false`. Commented (`#`-prefixed) or invalid values fall through silently.
+4. **Default.** Otherwise `ask` — the gate fires per the existing tier rules.
+
+Pipeline / `disable-model-invocation` runs already skip the chat confirmation (headless mode), so this setting is moot there.
 
 #### 0.1 Resume Existing Plan Work When Appropriate
 
@@ -293,6 +302,14 @@ No open decisions to weigh in on — proceeding to research. Interrupt if I have
 Then continue to Phase 1 without a blocking question.
 
 **Headless mode**: internal draft is composed but stage 2 (chat-time call-outs) is skipped — no synchronous user to confirm to. Continue to Phase 1 research as normal. At plan-write time (Phase 5.2), Inferred bets from the internal draft route to a `## Assumptions` section in the plan instead of Key Technical Decisions. See `references/synthesis-summary.md` Headless mode for the full routing.
+
+**Opt-in skip (`SKIP_SCOPING_CONFIRM`)**: when the scoping-confirmation setting resolved to skip in Phase 0.0, override the tier guard for *this gate only*. Compose the stage-1 internal draft as usual, route its Inferred bets to `## Assumptions` at plan-write exactly like headless mode — but because a synchronous user is present, emit the announcement below instead of staying silent, then continue to Phase 1 research without waiting. The skip covers only this scoping confirmation: Phase 0.4 routing, Phase 0.5 blockers, Phase 2 questions, source-doc disambiguation, and the Phase 5.4 menu still fire, and the Phase 5.3 confidence-check / deepening pass (not a confirmation gate) still runs.
+
+````text
+Planning: [1-3 line scope claim]
+
+Scoping confirmation is off, so I'm proceeding to research without waiting. Inferred scope is recorded under Assumptions in the plan — interrupt if I have it wrong.
+````
 
 ### Phase 1: Gather Context
 
@@ -724,6 +741,14 @@ No open decisions to weigh in on — proceeding to plan-write. Interrupt if I ha
 Then continue to Phase 5.2 without a blocking question.
 
 **Headless mode**: internal draft is composed but stage 2 (chat-time call-outs) is skipped — no synchronous user to confirm to. Proceed to Phase 5.2 plan-write. Inferred bets from the internal draft route to a `## Assumptions` section in the plan instead of Key Technical Decisions. See `references/synthesis-summary.md` Headless mode for the full routing.
+
+**Opt-in skip (`SKIP_SCOPING_CONFIRM`)**: when the scoping-confirmation setting resolved to skip in Phase 0.0, override the tier guard for *this gate only*. Compose the stage-1 internal draft as usual, route its Inferred bets to `## Assumptions` at plan-write exactly like headless mode — but because a synchronous user is present, emit the announcement below instead of staying silent, then proceed to Phase 5.2 plan-write without waiting. The skip covers only this scoping confirmation: Phase 0.4 routing, Phase 0.5 blockers, Phase 2 questions, source-doc disambiguation, and the Phase 5.4 menu still fire, and the Phase 5.3 confidence-check / deepening pass (not a confirmation gate) still runs.
+
+````text
+Planning [brief brainstorm-scope restatement] — [plan-specific shape in one clause].
+
+Scoping confirmation is off, so I'm proceeding to plan-write without waiting. Inferred scope is recorded under Assumptions in the plan — interrupt if I have it wrong.
+````
 
 #### 5.2 Write Plan File
 
