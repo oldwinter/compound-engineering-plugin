@@ -94,7 +94,7 @@ Commit messages 和 PR titles：context 中的 repo conventions 最优先；rece
 
 ### 7. Evidence integration（证据集成）
 
-当 change 有 observable behavior（UI rendering、CLI output、带 runnable example 的 API behavior、generated artifacts），skill 会询问是否 capture evidence；如果 yes，加载 `/ce-demo-reel` 捕获 GIF、terminal recording 或 screenshot，然后 splice 到 body 的 `## Demo` section。Categorical no-evidence cases（docs-only、markdown-only、changelog-only、CI/config-only、test-only 或 pure internal refactors）会直接 skip prompt。Agent judgment 也可对自己 authored 且确认 non-observable 的 changes skip prompt（internal plumbing、type-only changes 等）。
+当 change 有 observable behavior（UI rendering、CLI output、带 runnable example 的 API behavior、generated artifacts），skill 会询问是否 capture evidence；如果 yes，就用当前可用的截图、recording 或 terminal capture workflow 捕获 GIF、terminal recording 或 screenshot，然后 splice 到 body 的 `## Demo` section。Categorical no-evidence cases（docs-only、markdown-only、changelog-only、CI/config-only、test-only 或 pure internal refactors）会直接 skip prompt。Agent judgment 也可对自己 authored 且确认 non-observable 的 changes skip prompt（internal plumbing、type-only changes 等）。
 
 ### 8. 重写 existing PR 前确认
 
@@ -108,7 +108,7 @@ Commit messages 和 PR titles：context 中的 repo conventions 最优先；rece
 
 Skill 检测到你在 meaningful-named feature branch 上、没有 upstream，并且有四个 uncommitted files，覆盖 database migration、model change、controller update 和 UI component。它从 recent commits 识别 repo convention（带 scope 的 conventional commits），并把工作拆成两个 commits（data layer；UI），按 file level grouping，不做 interactive hunk staging。然后用 `-u` push。
 
-它 resolve PR commit range，读取所有 commits 的 diff（不只是 working-tree diff），并检测到 change 有 observable UI behavior。它询问是否 capture evidence；你说 yes；它加载 `/ce-demo-reel` 并获得 GIF。
+它 resolve PR commit range，读取所有 commits 的 diff（不只是 working-tree diff），并检测到 change 有 observable UI behavior。它询问是否 capture evidence；你说 yes；它用可用 capture workflow 获得 GIF。
 
 Composition pass 产出 title（`feat(notifications): add per-type mute with TTL`）和 body，包含 summary、key decisions、test plan、demo GIF 和 operational validation section。它用 quoted heredoc sentinel 把 body 写入 temp file，并运行 `gh pr create --title ... --body-file ...`。
 
@@ -196,5 +196,4 @@ Skill 尊重你的 git config 和 pre-commit hooks。它绝不会传 `--no-verif
 - [`ce-work`](./ce-work.md) - Phase 4 handoff target（Phase 4 交接目标）；standard upstream caller
 - [`ce-debug`](./ce-debug.md) - skill-owned branch 上 successful fix（成功修复）后调用此 skill
 - [`ce-commit`](./ce-commit.md) - local-commit-only sibling；不想 push 或 open PR 时使用
-- [`ce-demo-reel`](./ce-demo-reel.md) - behavior observable 时用于 evidence capture
 - [`ce-compound`](./ce-compound.md) - 捕获 reusable learning；可 chain 回此 skill push learning doc

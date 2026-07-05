@@ -1,6 +1,6 @@
 {
   "name": "compound-engineering",
-  "version": "3.15.0",
+  "version": "3.17.1",
   "description": "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具",
   "keywords": [
     "brainstorming",
@@ -18,7 +18,7 @@
   "interface": {
     "displayName": "Compound Engineering",
     "shortDescription": "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具",
-    "longDescription": "Compound Engineering 引导 AI agents 完成 strategy、ideation、requirements、planning、execution、debugging、review、PR feedback 与 learnings 沉淀，让后续工程工作更容易。",
+    "longDescription": "Compound Engineering 引导 AI agents 完成 strategy、ideation、requirements、planning、execution、debugging、review、PR feedback 与 captured learnings，让后续工程工作更容易。",
     "developerName": "Kieran Klaassen and Trevin Chow",
     "websiteURL": "https://github.com/EveryInc/compound-engineering-plugin"
   }

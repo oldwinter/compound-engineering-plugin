@@ -1,0 +1,6 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "compound-engineering",
+  "version": "3.17.1",
+  "description": "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具"
+}

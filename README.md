@@ -12,7 +12,7 @@
 
 Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execution：
 
-- 写 code 前用 `/ce-brainstorm` 和 `/ce-plan` 充分 plan
+- 写 code 前用 `/ce-brainstorm` 和 `/ce-plan` 基于 readiness 的统一 plan artifact 充分 plan
 - 用 `/ce-code-review` 和 `/ce-doc-review` review，捕获问题并校准判断
 - 用 `/ce-compound` 把 knowledge codify 成可复用资产
 - 保持质量，让未来 changes 更容易
@@ -21,6 +21,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 **了解更多**
 
+- [Skill documentation catalog](docs/skills/README.md)
 - [Compound engineering: how Every codes with agents](https://every.to/chain-of-thought/compound-engineering-how-every-codes-with-agents)
 - [The story behind compounding engineering](https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it)
 
@@ -30,12 +31,12 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 | Skill | Purpose（用途） |
 |-------|---------|
-| `/ce-brainstorm` | 通过 interactive Q&A 思考 feature 或 problem，并写出尺寸合适的 requirements doc |
-| `/ce-plan` | 把 requirements 转成带 guardrails 的详细 implementation plan |
-| `/ce-work` | 使用 worktrees 和 task tracking 执行 plan |
-| `/ce-simplify-code` | 在 review 前 refinement 新写的 code，提升 clarity 和 reuse |
-| `/ce-code-review` | 合并前按 plan 进行 multi-agent review |
-| `/ce-compound` | 把 learning 捕获到 `docs/solutions/`，让下一轮 loop 更聪明 |
+| [`/ce-brainstorm`](docs/skills/ce-brainstorm.md) | 通过 interactive Q&A 思考 feature 或 problem，并在 planning 前写出 requirements-only unified plan |
+| [`/ce-plan`](docs/skills/ce-plan.md) | 将 feature ideas 或 requirements-only plans enrich 为 implementation-ready plans |
+| [`/ce-work`](docs/skills/ce-work.md) | 使用 worktrees 和 task tracking 执行 implementation-ready plans |
+| [`/ce-simplify-code`](docs/skills/ce-simplify-code.md) | 在 review 前 refinement 新写的 code，提升 clarity 和 reuse |
+| [`/ce-code-review`](docs/skills/ce-code-review.md) | 合并前按 plan 进行 multi-agent review |
+| [`/ce-compound`](docs/skills/ce-compound.md) | 把 learning 捕获到 `docs/solutions/`，让下一轮 loop 更聪明 |
 
 每个 cycle 都会 compound：`/ce-compound` 写下 learnings，下一次 `/ce-brainstorm` 和 `/ce-plan` 会读取它们作为 grounding。Brainstorms sharpen plans，plans inform future plans，reviews catch more issues，patterns get documented。这个 return arrow 就是重点。
 
@@ -45,10 +46,12 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 | Skill | 何时使用 |
 |-------|---------|
-| `/ce-ideate` | *Loop 之前*，当你还不知道要 build 什么时使用：生成并严格排序 grounded ideas，然后把最强的一个送入 `/ce-brainstorm` |
-| `/ce-strategy` | *Upstream anchor*：创建并维护 `STRATEGY.md`，由 ideate、brainstorm 和 plan 读取作为 grounding，让 strategy choices 流入每个 feature |
-| `/ce-product-pulse` | *Outer loop*：给定时间窗口内用户实际经历了什么（usage、performance、errors）的 report，保存到 `docs/pulse-reports/`；follow-ups 反馈到 ideation 和 brainstorming |
-| `/ce-debug` | 当输入是 bug 而不是 feature 时，替代 brainstorm -> plan -> work：reproduce，trace causal chain 到 root cause，然后 fix |
+| [`/ce-ideate`](docs/skills/ce-ideate.md) | *Loop 之前*，当你还不知道要 build 什么时使用：生成并严格排序 grounded ideas，然后把最强的一个送入 `/ce-brainstorm` |
+| [`/ce-strategy`](docs/skills/ce-strategy.md) | *Upstream anchor*：创建并维护 `STRATEGY.md`，由 ideate、brainstorm 和 plan 读取作为 grounding，让 strategy choices 流入每个 feature |
+| [`/ce-product-pulse`](docs/skills/ce-product-pulse.md) | *Outer loop*：给定时间窗口内用户实际经历了什么（usage、performance、errors）的 report，保存到 `docs/pulse-reports/`；follow-ups 反馈到 ideation 和 brainstorming |
+| [`/ce-debug`](docs/skills/ce-debug.md) | 当输入是 bug 而不是 feature 时，替代 brainstorm -> plan -> work：reproduce，trace root cause，fix，然后在必要时 polish/review 并 handoff 给 PR |
+| [`/ce-pov`](docs/skills/ce-pov.md) | *On demand, before you commit*：对是否采用、切换或重新评估外部 technology、library、pattern、platform 给出 decisive、project-grounded verdict；支持 cold 或 mid-session，并基于 verdict 提议下一步（`/ce-plan`、`/ce-brainstorm` 或 spike） |
+| [`/ce-explain`](docs/skills/ce-explain.md) | *On demand, to keep learning*：把 concept、diff、idea 或 “what did I do this week?” 变成写给你个人的 dense visual explainer，可选 check-in（diff 的 predict-then-reveal、corrected exercises）让内容留下来 |
 
 完整 catalog 和 skill chaining 见 [docs/skills](docs/skills/README.md)。完整 inventory 见[下方](#full-skill-inventory)。
 
@@ -105,7 +108,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 安装后，在任意 project 中运行 `/ce-setup`。它会检查 repo-local config、报告 optional tool capabilities，并帮助把 machine-local CE settings 安全地放进 gitignore。
 
-`compound-engineering` plugin 当前包含 26 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
+`compound-engineering` plugin 当前包含 29 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
 
 ### Full Skill Inventory（完整 Skill 清单）
 
@@ -113,20 +116,23 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 |-------|---------|
 | `/ce-strategy` | 创建或维护 `STRATEGY.md` |
 | `/ce-ideate` | 生成并严格评估 grounded ideas |
+| `/ce-pov` | 对外部输入形成 decisive、project-grounded verdict |
+| `/ce-explain` | 将 concept、diff、idea 或你自己的一段 work 解释成个人学习 artifact |
 | `/ce-brainstorm` | 探索 requirements 并写出尺寸合适的 requirements doc |
 | `/ce-plan` | 创建 structured implementation plans |
 | `/ce-work` | 系统性执行 implementation plans |
 | `/ce-code-review` | 使用 skill-local reviewer personas review code |
 | `/ce-doc-review` | Review requirements 和 plan documents |
-| `/ce-debug` | Reproduce failures，trace root cause，并 fix bugs |
+| `/ce-debug` | Reproduce failures，trace root cause，fix bugs，并为 non-trivial fixes 准备 PR |
 | `/ce-compound` | 记录已解决问题，compound team knowledge |
 | `/ce-compound-refresh` | Refresh stale 或 drifting learnings |
 | `/ce-optimize` | 运行 iterative optimization loops |
 | `/ce-product-pulse` | 生成 time-windowed product pulse reports |
 | `/ce-riffrec-feedback-analysis` | 把 Riffrec recordings 或 notes 转成 structured feedback |
+| `/ce-sweep` | Sweep feedback sources，track item lifecycles，并产出 `/lfg`-ready plan |
 | `/ce-resolve-pr-feedback` | Resolve PR review feedback |
 | `/ce-commit` | 创建带清晰 message 的 git commit |
-| `/ce-commit-push-pr` | Commit、push 并 open PR |
+| `/ce-commit-push-pr` | Commit、push、open PR，并保留 related work references |
 | `/ce-worktree` | 确保 work 在 isolated git worktree 中进行 |
 | `/ce-promote` | Draft user-facing announcement copy |
 | `/ce-test-browser` | 对 PR-affected pages 运行 browser tests |
@@ -135,7 +141,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | `/ce-simplify-code` | Simplify recent code changes |
 | `/ce-polish` | 启动 dev server 并迭代 UX polish |
 | `/ce-proof` | 创建、编辑和分享 Proof documents |
-| `/ce-dogfood-beta` | 对 active branch 做 diff-scoped browser QA |
+| `/ce-dogfood` | 对 active branch 做 hands-off diff-scoped browser QA，并可自主修复小 breakages |
 | `/lfg` | 完整 autonomous engineering workflow |
 
 ---

@@ -233,6 +233,5 @@ Manual mode 会给出正确 start command 并停止。Pipeline mode 会根据 pr
 
 - [`ce-code-review`](./ce-code-review.md) - 可为 browser-affecting PRs spawn 此 skill（同一 checkout 并发时使用 `mode:report-only`）
 - [`ce-test-xcode`](./ce-test-xcode.md) - iOS simulator testing 的 sibling skill
-- [`ce-demo-reel`](./ce-demo-reel.md) - 捕获 PR descriptions 的 visual evidence；complementary to test summary
 - [`ce-work`](./ce-work.md) - Phase 3 verification 中可能调用此 skill 的 orchestrator
 - [`ce-setup`](./ce-setup.md) - 安装 `agent-browser` 和其他 dependencies

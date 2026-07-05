@@ -117,7 +117,7 @@ cd "$(git rev-parse --show-toplevel)"      # return to the current checkout root
 不会。Step 0 会检测 existing isolation 并原地工作。Worktree-from-worktree 正是该 skill 要防止的 failure mode。
 
 **如何清理 worktree？**
-运行 `cd "$(git rev-parse --show-toplevel)"` 离开它，然后运行 `git worktree remove .worktrees/<branch>`。当 remote tracking branch 已消失时，`/ce-clean-gone-branches` 会一起处理 worktree 和 branch cleanup。
+运行 `cd "$(git rev-parse --show-toplevel)"` 离开它，然后运行 `git worktree remove .worktrees/<branch>`。当 remote tracking branch 已消失时，用 `git branch --merged` 和 `git fetch --prune` 辅助清理 stale branches。
 
 ---
 
@@ -125,4 +125,3 @@ cd "$(git rev-parse --show-toplevel)"      # return to the current checkout root
 
 - [`/ce-work`](./ce-work.md) - 将此 skill 作为 isolation option 提供
 - [`/ce-code-review`](./ce-code-review.md) - 为 concurrent review 提供 worktree isolation
-- [`/ce-clean-gone-branches`](./ce-clean-gone-branches.md) - remote tracking branch 消失时一起清理 worktrees 和 branches

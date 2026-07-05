@@ -1,50 +1,58 @@
 # Visual Probes
 
-当 brainstorm decision 通过看一个粗糙 artifact 比读 prose 更快判断时，使用 visual probes。Visual probe 是一次性 decision sketch，不是 prototype、implementation plan、UI spec 或 design deliverable；it is not a prototype, not implementation, not a design deliverable, and not a UI spec。
+Use visual probes when a brainstorm decision is faster to judge by seeing a rough artifact than by reading prose. A visual probe is a disposable decision sketch, not a prototype, implementation plan, UI spec, or design deliverable.
 
 ## Trigger
 
-只有当下一个问题包含具体 visual decision 时，才使用本 reference：
+Use this reference only when the next question has a specific visual decision:
 
-- behavior shape："Which annotation or drawing behavior feels right?"
-- layout shape："Which navigation structure matches the workflow?"
-- flow shape："Where should this decision point sit?"
-- state shape："Which empty/loading/error state communicates the right thing?"
-- diagram shape："Which relationship or system boundary is clearer?"
+- behavior shape: "Which annotation or drawing behavior feels right?"
+- layout shape: "Which navigation structure matches the workflow?"
+- flow shape: "Where should this decision point sit?"
+- state shape: "Which empty/loading/error state communicates the right thing?"
+- diagram shape: "Which relationship or system boundary is clearer?"
 
-不要把 visual probe 用于 product goals、scope boundaries、success criteria、evidence probes、tradeoff prose，或在 chat 中更容易讨论的 technical decisions。
+Do not use a visual probe for product goals, scope boundaries, success criteria, evidence probes, tradeoff prose, or technical decisions that are easier to discuss in chat.
+
+## The gate (when the offer must fire)
+
+When the Phase 0.3 tripwire flagged an inherently-visual topic, the offer must fire before the **first** decision about shape, behavior, state, layout, flow, or a diagram is raised in *any* form — plain chat or a blocking question.
+
+**Timing is state-based, not memory-based.** Anchor the check to the decision you are about to raise, not to a "pending gate" remembered since Phase 0.3: offer unless this specific decision has already been through the offer (the user already chose text or visual for it). This gate takes precedence over the default blocking-question path — do not raise the shape decision as an `AskUserQuestion`/`request_user_input` menu, or as a plain-chat shape question, until the user has declined visual (or visual feedback has returned to chat).
+
+**An ASCII preview or text mockup embedded inside the question's choices does NOT satisfy the offer** — that shortcut is exactly what this gate exists to stop. The offer is its own prior question with two options (sketch vs describe); only after the user chooses does the shape decision proceed.
 
 ## Offer
 
-在 decision point 只询问一次。不要开启 session-wide mode。
+Ask once at the decision point. Do not enable a session-wide mode.
 
-可用时，使用平台的 blocking question tool 让用户 opt in（`AskUserQuestion`、`request_user_input`、`ask_user` 或 equivalent）。只有当不存在 interactive question tool 或 tool 报错时，才用 plain chat question。Opt-in 应有两个清晰选项：
+Use the platform's blocking question tool for the opt-in when available (`AskUserQuestion`, `request_user_input`, `ask_user`, or equivalent). Use a plain chat question only when no interactive question tool exists or the tool errors. The opt-in should have two clear options:
 
-- Visual sketch — 在 local browser 中创建粗糙选项
-- Text description — 在 chat 中继续决策
+- Visual sketch — create rough options in a local browser
+- Text description — keep the decision in chat
 
-使用这段措辞：
+Use this wording:
 
 > This decision may be easier to judge visually. I can either sketch rough options in a local browser so you can react to the shape, or keep it in chat and describe the options textually, which is faster but lower-fidelity. Which do you prefer?
 
-Text path 必须可信。如果无法用文字把 decision 讲清楚，就还没有理解到足以 sketch 的程度。
+The text path must be credible. If you cannot explain the decision clearly in text, you do not understand it well enough to sketch it.
 
-如果用户选择 text，继续在 chat 中推进，并且不要为同一个 decision 再次提供 visual path。如果用户选择 visual，继续下面流程。
+If the user chooses text, continue in chat and do not re-offer for the same decision. If they choose visual, proceed below.
 
 ## Visual Path
 
-创建能回答当前问题的最低成本 artifact。优化目标是快速获得反馈，而不是 polished。
+Create the cheapest artifact that answers the current question. Optimize for fast feedback, not polish.
 
-允许：
+Allowed:
 
 - rough behavior sketches
 - low-fidelity wireframes
 - state comparisons
 - flow diagrams
 - simple A/B/C visual contrasts
-- 仅当 behavior 本身就是 decision 时，创建 disposable interaction demos
+- disposable interaction demos only when behavior itself is the decision
 
-避免：
+Avoid:
 
 - polished branding
 - final colors or typography
@@ -52,72 +60,80 @@ Text path 必须可信。如果无法用文字把 decision 讲清楚，就还没
 - pixel-perfect layout
 - production-like implementation
 - unnecessary animation
-- 会暗示 exact UI commitments 的细节
+- details that imply exact UI commitments
 
-把 artifact 标为 directional。说明用户应该判断什么、忽略什么。
+Label the artifact as directional. State what the user should judge and what they should ignore.
 
 ## Display Helper
 
-当当前平台可以运行 bundled skill script 时，使用随附的 display-only helper：
+Use the bundled display-only helper when the current platform can run a bundled skill script. Invoke it via the `SKILL_DIR` anchor: set `SKILL_DIR` to the absolute path of the directory containing the `ce-brainstorm` `SKILL.md` you loaded (the Bash tool's cwd is the user's project, not the skill dir), and re-set it in the same command on each call since shell vars don't persist between Bash invocations. Do not resolve the helper from the user's project CWD.
 
-- Helper：`scripts/visual-probe-server.js`
-- 运行前相对已加载的 `ce-brainstorm` skill directory 解析 helper path。不要从用户 project CWD 解析。
-- Start：`node <resolved-helper-path> start --root /tmp/compound-engineering/ce-brainstorm-visual/<run-id>`
-- Start foreground：`node <resolved-helper-path> start --root /tmp/compound-engineering/ce-brainstorm-visual/<run-id> --foreground`
-- Status：`node <resolved-helper-path> status --root /tmp/compound-engineering/ce-brainstorm-visual/<run-id>`
-- Stop：`node <resolved-helper-path> stop --root /tmp/compound-engineering/ce-brainstorm-visual/<run-id>`
+Start (detached):
 
-Helper 会创建 `screens/` 和 `state/`，serve `screens/` 中最新的 `.html` 文件，写入 `state/display-info.json`，并暴露 `/version` 供浏览器 poll screen changes。浏览器只在最新 screen 改变时 reload；不得基于 timer 持续 reload。`/version` polling 不算 activity，因此废弃的 browser tab 不会让 server 永远存活。Detached servers 会在可解析时监控 owning harness process，所有 servers 都会在 idle timeout 后退出。Helper 没有 click tracking，也没有 browser-to-agent event path。
+```bash
+SKILL_DIR="<absolute path of the ce-brainstorm skill directory>"
+node "$SKILL_DIR/scripts/visual-probe-server.js" start --root /tmp/compound-engineering/ce-brainstorm-visual/<run-id>
+```
 
-如果 helper path 不可用，或平台无法干净展示 local URL，简短说明原因并使用 text path。不要为了补偿 brainstorm 期间的平台限制，而构建 custom event system 或 long-lived server。
+Append `--foreground` to that `start` command for foreground mode. Status and stop take the same anchor — and because `SKILL_DIR` does not persist between Bash invocations, each must re-set it in its own call rather than reuse the `start` block's value:
+
+```bash
+SKILL_DIR="<absolute path of the ce-brainstorm skill directory>"
+node "$SKILL_DIR/scripts/visual-probe-server.js" status --root /tmp/compound-engineering/ce-brainstorm-visual/<run-id>
+# stop: the same command with `stop` in place of `status` (re-set SKILL_DIR again)
+```
+
+If `SKILL_DIR` cannot be resolved to a concrete skill directory, do not guess from the project CWD — use the text path.
+
+The helper creates `screens/` and `state/`, serves the newest `.html` file in `screens/`, writes `state/display-info.json`, and exposes `/version` so the browser can poll for screen changes. The browser reloads only when the newest screen changes; it must not continually reload on a timer. `/version` polling does not count as activity, so an abandoned browser tab cannot keep the server alive forever. Detached servers monitor the owning harness process when it can be resolved, and all servers exit after an idle timeout. The helper has no click tracking or browser-to-agent event path.
+
+If the helper path is unavailable or the platform cannot display a local URL cleanly, say so briefly and use the text path. Do not build a custom event system or long-lived server to compensate during the brainstorm.
 
 ## Launch Mode by Platform
 
-Server 到处都一样；只改变 launch mode。
+The server is the same everywhere; only the launch mode changes.
 
-- **Claude Code / Claude desktop app：** 默认使用 detached `start`。如果 app 能打开 localhost URLs，展示返回的 URL 并继续。如果 browser surface 不可用，使用 text path。
-- **Codex CLI / Codex app：** 如果 detached processes 会被 reap，或 URL 在 tool call 后失效，通过平台的 long-running/background terminal mechanism 使用 `start --foreground`。如果没有稳定 browser surface，使用 text path。
-- **Plain terminal UI：** 打印返回的 URL，让用户手动打开。如果打开 browser 会打断流程，就在 chat 中继续 decision。
-- **Remote or containerized sessions：** 如果 `localhost` 无法从用户 browser 访问，用 `--host 0.0.0.0` 启动，并告诉用户要打开哪个 host/port。如果无法讲清楚，使用 text path。
+- **Claude Code / Claude desktop app:** detached `start` is the default path. If the app opens localhost URLs, show the returned URL and continue. If the browser surface is unavailable, use the text path.
+- **Codex CLI / Codex app:** if detached processes are reaped or the URL dies after the tool call, use `start --foreground` through the platform's long-running/background terminal mechanism. If there is no stable browser surface, use the text path.
+- **Plain terminal UI:** print the returned URL for the user to open manually. If opening a browser would interrupt the flow, keep the decision in chat.
+- **Remote or containerized sessions:** if `localhost` is not reachable from the user's browser, start with `--host 0.0.0.0` and tell the user which host/port to open. If that cannot be made clear, use the text path.
 
-不要因为存在 local server 就强行走 visual path。用户选择 visual 是为了更快理解 decision；如果平台 plumbing 反而挡路，就切回 text。
+Never force the visual path because a local server exists. The user chose visual to understand the decision faster; if the platform plumbing gets in the way, switch back to text.
 
 ## Post-Artifact Feedback
 
-After showing the visual artifact, 可用时使用平台的 blocking question tool 收集 bounded artifact feedback。这仍然是 chat-based feedback，不是 browser event capture。
+After showing the visual artifact, use the platform's blocking question tool for bounded artifact feedback when available. This is still chat-based feedback, not browser event capture.
 
-当预期回答是小型 choice set 时，使用 bounded interactive question：
+Use a bounded interactive question when the expected response is a small choice set:
 
 - A/B/C/D option selection
 - visual direction vs mix
 - choose one layout/state/behavior
 - accept one option with requested tweaks
 
-Tool 支持时包含 free-text fallback option。只有当 feedback 确实是 open critique、不存在 interactive question tool，或 tool 报错时，才使用 plain chat。
+Include a free-text fallback option when the tool supports it. Use plain chat only when feedback is genuinely open critique, no interactive question tool exists, or the tool errors.
 
-推荐 post-artifact prompt：
+Good post-artifact prompt:
 
 > Which direction best matches what you want? Pick A, B, C, D, or mix, and use the free-text fallback for anything that feels off. Judge the behavior shape, not the exact styling.
 
-不要要求用户在 browser artifact 内点击。Question tool 用于 artifact 可见后的 chat/session response。
+Do not ask the user to click inside the browser artifact. The question tool is for the chat/session response after the artifact is visible.
 
 ## Interaction Contract
 
-Browser/artifact 是 display-only。Feedback 发生在 chat 中。
+The browser/artifact is display-only. Feedback happens in chat.
 
-不要在 v1 中添加 click tracking、selected states、event ingestion、forms、analytics 或 "submit" affordances。不要要求用户点击某个 option。让用户查看 artifact，然后在 chat 中回复 choice、mix 或 correction。
+Do not add click tracking, selected states, event ingestion, forms, analytics, or "submit" affordances in v1. Do not ask the user to click an option. Ask them to look at the artifact and reply in chat with the choice, mix, or correction.
 
-No click tracking；do not ingest browser events。Visual probe v1 只展示 artifact，不读取 browser-side interaction state。
-
-如果没有 interactive question tool，展示 artifact 后使用这个 plain-chat fallback：
+If no interactive question tool is available, use this plain-chat fallback after showing the artifact:
 
 > I’m showing three rough options. Reply here with A, B, C, or "mix", plus anything that feels off. Judge the behavior shape, not the exact styling.
 
-用户的 chat response 是 authoritative。Visual artifact 只是 supporting context。
+The user's chat response is authoritative. The visual artifact is supporting context only.
 
 ## File Placement
 
-默认使用 OS temp，因为 visual probes 是一次性 scratch：
+Use OS temp by default because visual probes are disposable scratch:
 
 ```text
 /tmp/compound-engineering/ce-brainstorm-visual/<run-id>/
@@ -127,4 +143,4 @@ No click tracking；do not ingest browser events。Visual probe v1 只展示 art
     display-info.json
 ```
 
-只有当用户明确想在 session 后 inspect、preserve 或 curate sketches 时，才使用 `.context/compound-engineering/ce-brainstorm-visual/<run-id>/`。`docs/brainstorms/` 下的 final requirements doc 才是 durable artifact。
+Use `.context/compound-engineering/ce-brainstorm-visual/<run-id>/` only when the user explicitly wants to inspect, preserve, or curate the sketches after the session. The probe is disposable scratch; the durable artifact is the Phase 3 requirements-only unified plan under `docs/plans/`.

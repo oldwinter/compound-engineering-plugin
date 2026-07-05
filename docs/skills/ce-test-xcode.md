@@ -151,7 +151,7 @@ Skill 停止 log capture，并可选 shutdown simulator。
 - **`/ce-code-review` Tier 2**：review iOS-touching PRs 时，workflow 可以 spawn agent 运行此 skill，在 simulator 上 build、测试 key screens，并检查 crashes
 - **`/ce-work` Phase 3 / Phase 4**：iOS-heavy work 打开 PR 前适合运行；test summary 成为 PR description 的 verification narrative
 
-Skill output（test summary）适合作为 PR descriptions 中的 evidence，补充 `/ce-demo-reel` 的 visual demos。
+Skill output（test summary）适合作为 PR descriptions 中的 evidence，补充人工或自动化捕获的 visual demos。
 
 ---
 
@@ -216,5 +216,4 @@ Skill 捕获 build errors 并报告具体细节。Build failed 时不会继续 i
 
 - [`ce-code-review`](./ce-code-review.md) - 可为 iOS-touching PRs spawn 此 skill 作为 verification step
 - [`ce-test-browser`](./ce-test-browser.md) - 通过 agent-browser 做 web-app testing 的 sibling skill
-- [`ce-demo-reel`](./ce-demo-reel.md) - 捕获 PR descriptions 的 visual evidence；complementary to test summary
 - [`ce-work`](./ce-work.md) - Phase 3 verification 中可能调用此 skill 的 orchestrator
