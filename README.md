@@ -310,14 +310,36 @@ pi install npm:pi-ask-user
 
 ### Antigravity CLI (`agy`)
 
-Google has replaced the consumer Gemini CLI with [Antigravity CLI](https://antigravity.google) (`agy`), which still runs on Gemini models. Unlike Gemini CLI, `agy` installs plugins from a **local checkout** (not a repository URL), so clone this repository and install the bundled `.agy` plugin directory:
+Google 已用 [Antigravity CLI](https://antigravity.google)（`agy`）替代 consumer Gemini CLI，后者仍运行在 Gemini models 上。直接从 GitHub 安装 Compound Engineering，无需 clone：
+
+```bash
+agy plugin install https://github.com/EveryInc/compound-engineering-plugin
+```
+
+用下面命令验证：
+
+```bash
+agy plugin list
+```
+
+repository root 就是 plugin package（`plugin.json` 加 `skills/`）。
+
+本地 checkout 或 pinned release 可用：
 
 ```bash
 git clone https://github.com/EveryInc/compound-engineering-plugin
+agy plugin install ./compound-engineering-plugin
+```
+
+bundled `.agy/` directory 仍可作为 compatibility entry point：
+
+```bash
 agy plugin install ./compound-engineering-plugin/.agy
 ```
 
-`agy` also loads `GEMINI.md` workspace context from the checkout.
+`agy` 也会从 checkout 加载 `GEMINI.md` workspace context。
+
+pinning、本地开发、uninstall 和 legacy Gemini import 见 [`.agy/INSTALL.md`](.agy/INSTALL.md)。
 
 ### Existing Installs
 
