@@ -9,6 +9,7 @@
 - **Missing timeouts on external calls** -- HTTP clients、database connections 或 RPC calls 没有 explicit timeouts，会在 dependency 变慢时无限挂起，消耗 threads/connections，直到 service unresponsive。
 - **Error swallowing (catch-and-ignore)** -- `catch (e) {}`、`.catch(() => {})`，或 error handlers 只是 log 但不 propagate、返回 misleading defaults，或静默继续。Caller 以为 operation 成功；data 却不是。
 - **Cascading failure paths** -- service A 的 failure 导致 service B aggressive retry，进一步 overload service C。或：slow dependency 让 request queues 堆满，导致 health checks fail，触发 restarts，再导致 cold-start storms。追踪 failure propagation path。
+- **Stand-in guard fidelity** -- 当 change 是代替真实流程的 check、build 或 deploy step（CI gate、smoke test、deploy dry-run）时，验证它复现了与 production 相同的 context、inputs 和 steps，包括 build context、working directory、prepared dirs 和 env，而不是仅仅运行成绿。在不同 context 中运行的 guard 可能在 production 失败时仍然 pass；没有如实镜像被保护对象的 green gate，就是 silent-pass failure mode。
 
 ## Confidence calibration（置信度校准）
 

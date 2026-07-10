@@ -40,6 +40,8 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
 
 如果一个 doc cluster 有 3+ overlapping docs，pairwise 处理：先 consolidate 重叠最多的两个 docs，然后评估 merged result 是否应与下一个 doc consolidate。
 
+完成 merge 后，对 canonical doc 运行 mechanical claims check（见下方 Replace flow 的 step 4）。Merged content 会连同它的 citations 一起带入，而 consolidation 是 cross-references 最容易失效的地方。
+
 **Merge 以外的 structural edits：** Consolidate 也覆盖反向情况。如果一个 doc 已变得笨重，并覆盖多个适合 separate retrieval 的 distinct problems，可以建议拆分。只有当 sub-topics 真正 independent，且 maintainer 可能只搜索其中一个而不需要另一个时才这样做。
 
 ## Replace Flow（替换流程）
@@ -79,7 +81,15 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
      Nested values、array items 和 already-quoted values 不在这里的 scope 内（array-item quoting 由上方 schema/YAML-safety step 处理）。然后在 completion output 中说明 bundled script validator 在此平台 unavailable，已手动应用 checks。
 
    Validator 不 enforce schema rules，也不 flag YAML reserved-indicator characters（那些会 downstream 产生 loud parser errors，而非 silent corruption：out of scope）。仅使用 Python 3 stdlib（无 PyYAML 或其它 deps）。
-4. Subagent 完成后，orchestrator 删除 old learning file。New learning 的 frontmatter 可选包含 `supersedes: [old learning filename]` 以便 traceability，但这不是必须；git history 和 commit message 提供相同信息。
+4. **对 successor doc 运行 mechanical claims check。** Bundled `scripts/validate-doc-claims.py` 会 flag tree 中缺失的 cited repo paths、无法 resolve 或 unreachable 的 commit SHAs、无法 resolve 的 relative doc links，以及 dangling drafting scaffold（"Learning 3"、未 resolve 的 `{{...}}` tokens）：
+
+   ```bash
+   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
+   python3 "$SKILL_DIR/scripts/validate-doc-claims.py" <new-learning-path>
+   ```
+
+   Exit 1 flags 是 **adjudication input，而不是 failures**。描述 removed code 的 successor doc 可能合理地引用已不存在的 paths。通过修正 citation、将其标注为 historical，或确认其为 intentional 来处理每个 flag；scaffold flags 必须始终修复。如果该 script 在当前平台无法 resolve，手动扫描 body 中的相同 patterns，并在 report 中说明。
+5. Subagent 完成后，orchestrator 删除 old learning file。New learning 的 frontmatter 可选包含 `supersedes: [old learning filename]` 以便 traceability，但这不是必须；git history 和 commit message 提供相同信息。
 
 **当 evidence insufficient 时：**
 

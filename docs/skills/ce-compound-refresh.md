@@ -62,7 +62,7 @@ Phase 1.75 把 document set 作为整体评估：按五个 dimensions（problem 
 
 ### 4. 通过 subagent 执行 Replace：context isolation
 
-当 learning 的 core guidance 已经误导时，orchestrator 会分派 subagent 写 replacement（一次一个、顺序执行；replacements 可能需要读取大量 code，parallelism 会带来 context exhaustion 风险）。Subagent 接收 old learning、investigation evidence、target path 和 contract files（schema、category mapping、template），在不污染 orchestrator context 的情况下写出干净 successor。
+当 learning 的 core guidance 已经误导时，orchestrator 会分派 subagent 写 replacement（一次一个、顺序执行；replacements 可能需要读取大量 code，parallelism 会带来 context exhaustion 风险）。Subagent 接收 old learning、investigation evidence、target path 和 contract files（schema、category mapping、template），在不污染 orchestrator context 的情况下写出干净 successor。Successor（以及任何 consolidated canonical doc）随后会通过 mechanical claims check（`scripts/validate-doc-claims.py`）：对照 tree 验证 cited paths、commit SHAs、relative links 和 drafting scaffold，并对 flags 进行 adjudication，而不是自动判定失败。
 
 ### 5. Evidence 不足时标记 stale
 

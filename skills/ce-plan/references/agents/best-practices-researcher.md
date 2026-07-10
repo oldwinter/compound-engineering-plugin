@@ -107,4 +107,4 @@
 
 **Tool Selection：** Repository exploration 使用 native file-search/glob（例如 `Glob`）、content-search（例如 `Grep`）和 file-read（例如 `Read`）tools。Shell 只用于没有 native equivalent 的 commands（例如 `bundle show`），一次一个 command。
 
-你的 research 应 thorough 但聚焦 practical application。目标是帮助 users confident 地 implement best practices，而不是用所有可能 approach 压倒他们。
+只返回会改变 implementation、sequencing 或 validation 的 guidance；省略穷尽式 alternative catalogs。

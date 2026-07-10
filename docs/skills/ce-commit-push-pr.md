@@ -43,6 +43,8 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 - **Body-file safety**：每个 PR description 写入 temp file，并通过 `--body-file <path>` 传递，绝不通过 stdin
 - **Convention detection**：context 中的 repo conventions > recent commit history > conventional-commits default
 - **Full PR commit-range resolution**：descriptions 覆盖 PR 中所有 commits，而不只是 working-tree diff
+- **Related-reference preflight**：识别 work-item references，并且只在 PR 真正解决该 item 时才使用 closing magic words
+- **Concept teaching**：当 PR 向 codebase 引入新 concept（pattern、technique、library 或 domain idea）时，description 会增加用于讲解它的 `## New concepts` section，让 readers 无需打开 diff 也能理解并复述 change
 
 ---
 
@@ -100,6 +102,10 @@ Commit messages 和 PR titles：context 中的 repo conventions 最优先；rece
 
 当 skill 在有 open PR 的 branch 上运行，且你想 rewrite description 时，它会 preview：new Summary 前两句加 total body line count，并在 apply 前询问 confirmation。前两句承载 reviewer 大部分注意力。如果 decline，可以传入 focus text regenerate，不 apply 任何东西。
 
+### 10. Concept-teaching section — the PR teaches what it introduces
+
+Agent-driven development removed the learning that writing code by hand used to provide. When the composition pass judges that the change introduces a concept new to the codebase — checked against the base ref, never the working tree, so the PR's own code doesn't mask novelty — the description gains a dedicated `## New concepts` section: what the concept is, why it was chosen here over the obvious alternative, and one example from this PR's behavior. Absence is the common case by design: established repo patterns, refactors, renames, and dependency bumps never fire it. After the PR ships, a one-line offer points to `/ce-explain` for interactive learning, and an opt-in config key (`pr_teaching_archive`) archives the explainer to `docs/explainers/` and links it from the PR. Turn the whole feature off per repo with `pr_teaching_section: false` in `.compound-engineering/config.local.yaml`.
+
 ---
 
 ## 快速示例
@@ -138,8 +144,9 @@ Composition pass 产出 title（`feat(notifications): add per-type mute with TTL
 
 `ce-commit-push-pr` 是多个 skills 的 standard shipping handoff：
 
+- **`/lfg` step 8**：使用 `mode:pipeline` 调用（non-interactive：没有 blocking asks，existing-PR rewrite 默认为 no）；当打印 `New concepts:` trailer 时，lfg 会在 completion output 中复述该 concept 和 `/ce-explain` pointer
 - **`/ce-work` Phase 4**：传递 plan summary、key decisions、testing notes、evidence context、operational validation 和任何 accepted Known Residuals
-- **`/ce-debug` Phase 4**（skill-owned branch）：successful fix 后默认 commit-and-PR，不再 prompt；包含 issue tracker 的 auto-close syntax（例如 GitHub 的 `Fixes #N`、Linear 的 `Closes ABC-123`）
+- **`/ce-debug` Phase 4**（skill-owned branch）：successful fix 后默认 commit-and-PR，不再 prompt；只在 PR 解决 issue 时包含 closing syntax，对 partial、investigative 或 uncertain links 则使用 non-closing related syntax
 - **`/ce-compound`**：写入 learning doc 后，可 commit + push，并用新 commit 更新 open PR
 
 ---
@@ -166,6 +173,8 @@ Skill 直接调用比作为 chain 一部分更常见：
 | `"update the PR description"` / `"refresh the PR description"` | 更新 existing PR description |
 | `<PR URL or number>` | 对该 PR 操作（description-only 或 update，取决于 intent） |
 | `"...<focus text>"` | 引导 description composition（例如 "include the benchmarking results"） |
+| `mode:pipeline` | 供 orchestrated callers 使用的 non-interactive modifier；禁用所有 blocking ask（existing-PR rewrite 默认为 no） |
+| `archive:on\|off` | 单次运行覆盖 `pr_teaching_archive` config key（把 explainer doc 归档到 `docs/explainers/`） |
 
 ---
 
@@ -188,6 +197,9 @@ Skill 尊重你的 git config 和 pre-commit hooks。它绝不会传 `--no-verif
 
 **能创建 draft PR 吗？**
 使用 description-only mode 生成 body，然后自己用 `gh pr create --draft --title "..." --body-file "..."` apply。Full workflow 目前没有暴露 draft flag。
+
+**Why doesn't my PR have a `## New concepts` section?**
+By design, most PRs shouldn't. The section fires only when the change introduces a concept that is both new to this codebase (checked against the base ref) and transferable beyond it — routine use of established repo patterns, refactors, renames, and dependency bumps never qualify. A missing section costs little; a patronizing one trains readers to skip the feature. If you never want the section, set `pr_teaching_section: false` in `.compound-engineering/config.local.yaml`.
 
 ---
 

@@ -46,8 +46,13 @@
 - **One question per turn**，即使 sub-questions 看起来相关
 - **Right-sized ceremony**：Lightweight / Standard / Deep / Deep-product tiers
 - **Named gap lenses** 在生成 approaches 前强迫 premises 严谨
-- **Background grounding** 在用户思考时并行运行
-- **Display-only visual probes** 在空间、行为或视觉决策需要看图胜过读文字时提供本地粗糙探针
+- **Opt-in blindspot pass** 在 interview 继续探讨用户不熟悉的领域前，先映射其 decision surface
+- **Background grounding scout** 在你回答开场问题时，用 cheap model 收集逐字 repo evidence
+- **2-3 个 concrete approaches**，列出 tradeoffs 并明确 recommendation
+- **Opt-in visual probes** 用于那些通过粗略 sketch 比 prose 更快做出判断的 decisions
+- **Synthesis Summary** 作为 doc 落地前最后一次纠正 scope 的机会
+- **Fresh-context claim verification** 在 doc 落地前检查其 repo claims
+- **Right-sized Product Contract** 内置于 unified plan，并使用会流入 planning 的 stable identifiers（R/A/F/AE）
 
 ---
 
@@ -95,7 +100,11 @@ Requirements doc 携带 plan-feeding identifiers：R-IDs（Requirements）、A-I
 
 Requirements 描述从用户视角期待的 **what** behavior。默认不描述 libraries、schemas、endpoints、file layouts 或 code structure，除非 brainstorm 本身就是 technical 或 architectural decision。这让 planning 的工作保持干净：发明 **how**，而不是 **what**。
 
-### 9. Grounding and verification ride inside your think-time
+### 9. 陌生领域的 Blindspot pass
+
+Interview 机制假设你能评估它问的内容，而当你要在不熟悉的领域里划定 scope 时，这个假设恰好会失效。当你表明自己不熟悉（例如 "I know nothing about the auth modules" 或 "I don't know what color grading is"），或者连续回答显示你是 *无法权衡 options* 而不是只是还没决定时，`ce-brainstorm` 会在继续追问该领域前提供 **blindspot pass**：一张 grounded map，列出 3-7 个你尚不知道该问的 decisions 和 hazards，并说明它们为何与你的 topic 相关、有哪些 realistic options，以及 recommended default。你选择要逐一走过哪些；其余项采用 default，并记为 explicit assumptions。它把 unknown unknowns 转成 known unknowns，让 interview 提取的是 choices 而非 guesses。Software 和 non-software routes 都适用。
+
+### 10. Grounding 和 verification 嵌入你的思考时间
 
 On Standard and Deep brainstorms, a cheap extraction-tier scout is dispatched in the background while you answer the first question. It writes a grounding dossier — verbatim quotes with `file:line` pointers — to scratch storage and hands back a short gist, so the dialogue stays lean while the evidence stays available on demand. Before the requirements-only unified plan is written, a fresh-context verifier (a mid-tier model that never saw the dialogue) checks the Product Contract's repo claims — absence claims, file references — against the codebase, running while you review the synthesis confirmation. Refuted claims are corrected before the plan lands; unverifiable ones become explicit assumptions. The dossier path is handed to `ce-plan` so planning starts from verified quotes instead of re-scanning. On platforms without per-agent model selection, both run on the inherited model with the same read budgets; with no subagent support at all, the skill falls back to inline scanning and verification.
 
@@ -122,6 +131,7 @@ Right-sized requirements doc 写入，Phase 4 menu 提供 next steps：`/ce-plan
 - Scope unclear（"add notifications"：什么 kind？for whom？when？）
 - 想要可以 hand 给其他 contributor 或 planning 的 structured artifact
 - Vague problem statement 需要变成真正的 product decision
+- 必须在你不熟悉的领域中划定 scope，由 blindspot pass 在提问前映射 decision surface
 - 你正在做 non-software 工作（named products、roadmap choices、decisions）
 
 以下情况跳过 `ce-brainstorm`：
@@ -201,6 +211,12 @@ Agent 在呈现 scoping synthesis 前，会把 internal draft 分成三类（Sta
 
 **它适用于 non-software topics 吗？**
 是。Domain-agnostic facilitator 会为 naming、decisions、planning 等保留 one-question-at-a-time discipline 和 right-sizing。
+
+---
+
+## Fable elevation（仅 Claude Code）
+
+即使当前 session 使用较便宜的 model，`ce-brainstorm` 仍可用更强的 reasoning model 生成 approaches：它通过 subagent 把 approach generation 分派给 Fable，因此无需切换整个 session 就能得到更锐利、更不 generic 的 options。可在每次运行的 prompt 中说 "use fable" 来 opt in，或在 `.compound-engineering/config.local.yaml` 中设置 `brainstorm_use_fable: true`。Mechanical host gate 会让它在所有非 Claude Code harness（Codex、Cursor）上静默 no-op。详见 `references/reasoning-elevation.md`。
 
 ---
 

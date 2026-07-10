@@ -74,19 +74,25 @@ Related Docs Finder 会按五个 dimensions 评估与 existing `docs/solutions/`
 
 Proposed addition 会匹配 existing file 的 tone 和 density：能塞进 existing directory listing 时就是单行；只有没有合适位置时才新增小 headed section。
 
-### 5. 选择性 refresh trigger
+### 5. Grounding validation：claims 在 compound 前对照 tree 验证
+
+Solution doc 的价值取决于其 claims 是否真实，而基于 conversation evidence 起草容易引入三种失败形态：从 session-level summary 而不是 source 写出 code-behavior claims；宣称 "fixed in X"，但 current checkout 看不到该 merge；以及 drafting scaffold（"Learning 3"）泄漏进最终 doc。
+
+Phase 2.45 用两层机制关闭这些缺口。Deterministic script（`scripts/validate-doc-claims.py`）检查 cited repo paths、commit SHAs（按 HEAD 与 upstream default branch 的 reachability 分类，从而区分 stale checkout 和 fabricated citation）、relative links 以及 dangling scaffold。其 flags 需要 adjudication，不会自动判定失败，因为 doc 可能合理地引用一个恰好被它记录的 fix 删除的 path。然后，read-only validator subagent（Full 和 headless modes）通过引用 defining source line 验证 code-behavior claims，通过 remote truth（`gh` 为 primary，local git 为 fallback）验证 merge-state claims，并检查 countable assertions 的 internal completeness。起草阶段同样适用这种 discipline：Solution Extractor 必须先读 defining line 再声明 behavior，并优先引用 PR numbers，而不是对 rebase 敏感的 SHAs。
+
+### 6. 选择性 refresh trigger
 
 捕获 new learning 后，`ce-compound` 会检查是否应以 narrow scope hint 调用 `/ce-compound-refresh`。它不会默认运行 refresh；只在 new learning 暗示某篇具体 older doc 可能 stale（contradicted、superseded，或所在 domain 刚 refactored）时触发。
 
-### 6. Specialized post-review（专门后置 review）
+### 7. Specialized post-review（专门后置 review）
 
 根据 problem type，可选 skill-local prompt assets review 文档：performance issues 使用 `performance-oracle`，security 使用 `security-sentinel`，database 使用 `data-integrity-guardian`。Code-heavy docs 也可以对 drafted examples 和 explanatory claims 做 read-only simplification review；这不会 invoke `ce-simplify-code`，也不会 mutate product code。
 
-### 7. Session history integration（session history 集成，opt-in）
+### 8. Session history integration（session history 集成，opt-in）
 
 Full mode 可选择分派 skill-local session-history prompt，跨 harnesses 搜索 prior sessions 的相关 context：此前尝试过什么、什么没有用、关键 decisions。Findings 会折入 bug track 的 "What Didn't Work" 或 knowledge track 的 "Context"。默认 off，因为 token 成本高；用户显式 opt in。
 
-### 8. Auto-invoke triggers（自动调用触发条件）
+### 9. Auto-invoke triggers（自动调用触发条件）
 
 "that worked"、"it's fixed"、"working now"、"problem solved" 等短语会 auto-invoke 此 skill，让 capture 发生在 context 最新鲜时。用户也可以用 `/ce-compound [context]` 立即捕获。
 
@@ -100,7 +106,7 @@ Full mode 可选择分派 skill-local session-history prompt，跨 harnesses 搜
 
 三个 subagents 并行分派：Context Analyzer 读取 conversation history，分类为 `performance_issue`（bug track），提出 filename 和 category。Solution Extractor 用 before/after code 组织 fix。Related Docs Finder grep `docs/solutions/` 中的相关 issues，报告与一篇不同 N+1 case 的旧 doc 有 moderate overlap。
 
-Orchestrator 组装 doc，通过 YAML safety script 验证 frontmatter，并写入 `docs/solutions/performance-issues/n-plus-one-brief-generation.md`。Discoverability check 发现 `AGENTS.md` 未提到 `docs/solutions/`，提出给 existing directory listing 添加一行，并在你确认后应用。
+Orchestrator 组装 doc，通过 YAML safety script 验证 frontmatter，并写入 `docs/solutions/performance-issues/n-plus-one-brief-generation.md`。接着运行 grounding validation：mechanical script 确认每个 cited path 和 SHA 都能 resolve，validator subagent 引用定义 ORM default batching behavior 的 source line，以验证 doc 中的对应 claim。Discoverability check 发现 `AGENTS.md` 未提到 `docs/solutions/`，提出给 existing directory listing 添加一行，并在你确认后应用。
 
 Phase 3 分派 local `performance-oracle` prompt，并因为 doc 包含 code examples，对 drafted examples 和 approach 做 read-only simplification check。Phase 2.5 提示 refresh recommendation：旧 N+1 doc 可能值得 consolidation review。Skill 建议用 `/ce-compound-refresh n-plus-one` 作为 narrow scope hint，然后结束。
 
@@ -161,7 +167,7 @@ docs/solutions/[category]/[filename].md
 
 Categories 会 auto-detect。Bug-track examples：`build-errors/`、`test-failures/`、`runtime-errors/`、`performance-issues/`、`database-issues/`、`security-issues/`、`ui-bugs/`、`integration-issues/`、`logic-errors/`。Knowledge-track examples：`architecture-patterns/`、`design-patterns/`、`tooling-decisions/`、`conventions/`、`workflow-issues/`、`developer-experience/`、`documentation-gaps/`、`best-practices/`。
 
-Doc 带 YAML frontmatter（`module`、`tags`、`problem_type` 等）以便 search。Validation 通过 `scripts/validate-frontmatter.py` 运行，用于捕获 silent corruption（malformed `---` delimiters、scalar values 中未 quote 的 `:`）。
+Doc 带 YAML frontmatter（`module`、`tags`、`problem_type` 等）以便 search。Validation 通过 `scripts/validate-frontmatter.py` 运行，用于捕获 silent corruption（malformed `---` delimiters、scalar values 中未 quote 的 `:`）；`scripts/validate-doc-claims.py` 则对照 tree 检查 body 中的 cited paths、SHAs、links 和 drafting scaffold。
 
 如果 discoverability check 发现 knowledge store 未暴露，skill 也可能对 `AGENTS.md`/`CLAUDE.md` 做小编辑。
 

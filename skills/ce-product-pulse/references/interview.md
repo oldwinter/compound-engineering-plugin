@@ -224,11 +224,11 @@ config 写入并展示给用户后，在 hand back to Phase 2 前提供 scheduli
 
 ## Config File Shape（配置文件形态）
 
-interview 完成后，将 `pulse_*` block merge 到 `<repo-root>/.compound-engineering/config.local.yaml`。用 `git rev-parse --show-toplevel` resolve repo root。保留 file 中已有的任何 non-pulse keys（例如 `work_delegate_*`）；只添加或更新 `pulse_*` keys。
+interview 完成后，将 `pulse_*` block merge 到 `<repo-root>/.compound-engineering/config.local.yaml`。用 `git rev-parse --show-toplevel` resolve repo root。保留 file 中已有的任何 non-pulse keys（例如 `plan_*`）；只添加或更新 `pulse_*` keys。
 
 如果 file 尚不存在，创建 directory 和 file。如果 `.compound-engineering/config.local.yaml` 尚未被 `.gitignore` 覆盖，写入前 offer 添加 entry。
 
-pulse block 使用这些 flat keys（为 consistency 匹配 `work_delegate_*` precedent）：
+pulse block 使用带 skill prefix 的 flat keys，从而能共享 config file，而不会拥有 unrelated settings：
 
 ~~~yaml
 # --- Product pulse ---

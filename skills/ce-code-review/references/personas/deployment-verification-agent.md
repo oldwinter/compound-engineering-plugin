@@ -150,4 +150,4 @@ Record.order("RANDOM()").limit(10).pluck(:old_column, :new_column)
 - Data Migration Expert flags critical findings（Data Migration Expert 标出 critical findings）
 - Any change that could silently corrupt/lose data（任何可能静默 corrupt/lose data 的 change）
 
-要 thorough。要 specific。产出 executable checklists，而不是 vague recommendations。
+每个 checklist item 都必须指明能够证明该 step 成功的 command 或 observable signal。

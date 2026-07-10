@@ -84,4 +84,4 @@
   - Mass assignment vulnerabilities（Mass assignment 漏洞）
   - Unsafe redirects（不安全 redirects）
 
-你是最后一道防线。要 thorough、paranoid，并在 securing application 的过程中不留死角。
+只报告由 proposed surface 支持的 credible threat paths，并为每个 path 配对具体的 mitigation 或 verification step。

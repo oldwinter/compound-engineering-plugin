@@ -114,35 +114,35 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 | Skill | Purpose（用途） |
 |-------|---------|
-| `/ce-strategy` | 创建或维护 `STRATEGY.md` |
-| `/ce-ideate` | 生成并严格评估 grounded ideas |
-| `/ce-pov` | 对外部输入形成 decisive、project-grounded verdict |
-| `/ce-explain` | 将 concept、diff、idea 或你自己的一段 work 解释成个人学习 artifact |
-| `/ce-brainstorm` | 探索 requirements 并写出尺寸合适的 requirements doc |
-| `/ce-plan` | 创建 structured implementation plans |
-| `/ce-work` | 系统性执行 implementation plans |
-| `/ce-code-review` | 使用 skill-local reviewer personas review code |
-| `/ce-doc-review` | Review requirements 和 plan documents |
-| `/ce-debug` | Reproduce failures，trace root cause，fix bugs，并为 non-trivial fixes 准备 PR |
-| `/ce-compound` | 记录已解决问题，compound team knowledge |
-| `/ce-compound-refresh` | Refresh stale 或 drifting learnings |
-| `/ce-optimize` | 运行 iterative optimization loops |
-| `/ce-product-pulse` | 生成 time-windowed product pulse reports |
-| `/ce-riffrec-feedback-analysis` | 把 Riffrec recordings 或 notes 转成 structured feedback |
-| `/ce-sweep` | Sweep feedback sources，track item lifecycles，并产出 `/lfg`-ready plan |
-| `/ce-resolve-pr-feedback` | Resolve PR review feedback |
-| `/ce-commit` | 创建带清晰 message 的 git commit |
-| `/ce-commit-push-pr` | Commit、push、open PR，并保留 related work references |
-| `/ce-worktree` | 确保 work 在 isolated git worktree 中进行 |
-| `/ce-promote` | Draft user-facing announcement copy |
-| `/ce-test-browser` | 对 PR-affected pages 运行 browser tests |
-| `/ce-test-xcode` | 在 simulator 上 build 和 test iOS apps |
-| `/ce-setup` | Diagnose optional tool capabilities 和 project config |
-| `/ce-simplify-code` | Simplify recent code changes |
-| `/ce-polish` | 启动 dev server 并迭代 UX polish |
-| `/ce-proof` | 创建、编辑和分享 Proof documents |
-| `/ce-dogfood` | 对 active branch 做 hands-off diff-scoped browser QA，并可自主修复小 breakages |
-| `/lfg` | 完整 autonomous engineering workflow |
+| [`/ce-strategy`](docs/skills/ce-strategy.md) | 创建或维护 `STRATEGY.md` |
+| [`/ce-ideate`](docs/skills/ce-ideate.md) | 生成并严格评估 grounded ideas |
+| [`/ce-pov`](docs/skills/ce-pov.md) | 对外部输入形成 decisive、project-grounded verdict |
+| [`/ce-explain`](docs/skills/ce-explain.md) | 将 concept、diff、idea 或你自己的一段 work 解释成个人学习 artifact |
+| [`/ce-brainstorm`](docs/skills/ce-brainstorm.md) | 探索 requirements 并写出尺寸合适的 requirements doc |
+| [`/ce-plan`](docs/skills/ce-plan.md) | 创建 structured implementation plans |
+| [`/ce-work`](docs/skills/ce-work.md) | 系统性执行 implementation plans |
+| [`/ce-code-review`](docs/skills/ce-code-review.md) | 使用 skill-local reviewer personas review code |
+| [`/ce-doc-review`](docs/skills/ce-doc-review.md) | Review requirements 和 plan documents |
+| [`/ce-debug`](docs/skills/ce-debug.md) | Reproduce failures，trace root cause，fix bugs，并为 non-trivial fixes 准备 PR |
+| [`/ce-compound`](docs/skills/ce-compound.md) | 记录已解决问题，compound team knowledge |
+| [`/ce-compound-refresh`](docs/skills/ce-compound-refresh.md) | Refresh stale 或 drifting learnings |
+| [`/ce-optimize`](docs/skills/ce-optimize.md) | 运行 iterative optimization loops |
+| [`/ce-product-pulse`](docs/skills/ce-product-pulse.md) | 生成 time-windowed product pulse reports |
+| [`/ce-riffrec-feedback-analysis`](docs/skills/ce-riffrec-feedback-analysis.md) | 把 Riffrec recordings 或 notes 转成 structured feedback |
+| [`/ce-sweep`](docs/skills/ce-sweep.md) | Sweep feedback sources，track item lifecycles，并产出 `/lfg`-ready plan |
+| [`/ce-resolve-pr-feedback`](docs/skills/ce-resolve-pr-feedback.md) | Resolve PR review feedback |
+| [`/ce-commit`](docs/skills/ce-commit.md) | 创建带清晰 message 的 git commit |
+| [`/ce-commit-push-pr`](docs/skills/ce-commit-push-pr.md) | Commit、push 并 open PR，同时讲解本次 change 新引入的任何 concept |
+| [`/ce-worktree`](docs/skills/ce-worktree.md) | 确保 work 在 isolated git worktree 中进行 |
+| [`/ce-promote`](docs/skills/ce-promote.md) | Draft user-facing announcement copy |
+| [`/ce-test-browser`](docs/skills/ce-test-browser.md) | 对 PR-affected pages 运行 browser tests |
+| [`/ce-test-xcode`](docs/skills/ce-test-xcode.md) | 在 simulator 上 build 和 test iOS apps |
+| [`/ce-setup`](docs/skills/ce-setup.md) | Diagnose optional tool capabilities 和 project config |
+| [`/ce-simplify-code`](docs/skills/ce-simplify-code.md) | Simplify recent code changes |
+| [`/ce-polish`](docs/skills/ce-polish.md) | 启动 dev server 并迭代 UX polish |
+| [`/ce-proof`](docs/skills/ce-proof.md) | 创建、编辑和分享 Proof documents |
+| [`/ce-dogfood`](docs/skills/ce-dogfood.md) | 对 active branch 做 hands-off diff-scoped browser QA，并可自主修复小 breakages |
+| [`/lfg`](docs/skills/lfg.md) | 完整 autonomous engineering workflow |
 
 ---
 
@@ -230,6 +230,44 @@ You can also browse it through Kimi's custom marketplace flow:
 ```
 
 After installing or updating, run `/reload` or start a new Kimi session so the plugin skills are loaded.
+
+### Grok Build CLI (`grok`)
+
+xAI's [Grok Build CLI](https://x.ai/cli) (`grok`) installs Compound Engineering directly from this repository — the repo root is a valid Grok plugin (`grok` reads the existing Claude-compatible manifests, and the repo also ships a native `.grok-plugin/plugin.json`):
+
+```bash
+grok plugin install EveryInc/compound-engineering-plugin
+```
+
+This tracks the repository; run `grok plugin update` to pull the latest. To browse it as a marketplace source instead, the repo ships a native `.grok-plugin/marketplace.json`:
+
+```bash
+grok plugin marketplace add EveryInc/compound-engineering-plugin
+grok plugin install compound-engineering
+```
+
+Both paths track the repository directly (no commit pin), so no Bun install step is needed. Add `--trust` to skip the install confirmation. `grok` stores config under `~/.grok`; start a new session after installing so the skills load.
+
+Compound Engineering is also being submitted to the official [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace); see [`docs/grok-marketplace-submission.md`](docs/grok-marketplace-submission.md) for the maintainer runbook.
+
+### Devin CLI
+
+Devin CLI can install Compound Engineering directly from GitHub because the repo ships a native `.devin-plugin/plugin.json` manifest:
+
+```bash
+devin plugins install EveryInc/compound-engineering-plugin
+```
+
+Verify the install and inspect the skills:
+
+```bash
+devin plugins list
+devin plugins info compound-engineering
+```
+
+Update to the latest version with `devin plugins update compound-engineering`. Plugins load at session start, so start a new Devin session after installing or updating for the skills to appear (as `/compound-engineering:<skill>` slash commands).
+
+A few skills declare Claude-style `allowed-tools` names that Devin does not map (for example `Bash`); those skills still work, but some of their actions ask for permission instead of running auto-approved. See [`docs/specs/devin.md`](docs/specs/devin.md) for details.
 
 ### GitHub Copilot
 
@@ -428,6 +466,14 @@ To test the local marketplace catalog instead, pass the catalog path:
 ```text
 /plugins marketplace /path/to/compound-engineering-plugin/.kimi-plugin/marketplace.json
 ```
+
+**Devin CLI**
+
+```bash
+devin plugins install /path/to/compound-engineering-plugin
+```
+
+Local installs are linked to the checkout rather than copied, so skill edits apply on the next Devin session without reinstalling.
 
 **OpenCode**
 

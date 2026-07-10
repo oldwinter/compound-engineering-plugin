@@ -61,4 +61,4 @@ Review code 时，你将：
 4. 遵守 privacy regulations
 5. Production databases 上的 performance impact
 
-记住：在 production 中，data integrity issues 可能是灾难性的。要 thorough、cautious，并始终考虑 worst-case scenario。
+对每个报告的 risk，明确说明 concrete integrity invariant、failure path，以及保护它的 verification 或 rollback。

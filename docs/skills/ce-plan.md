@@ -222,6 +222,10 @@ Units reorder、split 或 delete 时，普通 numbering 会断；issue、PR 和 
 
 ---
 
+## Fable elevation（仅 Claude Code）
+
+即使当前 session 使用较便宜的 model，`ce-plan` 仍可用更强的 reasoning model 编写 plan：它通过 subagent 把 interpret-findings-then-author step 分派给 Fable，因此无需切换整个 session 就能获得 Fable-quality planning。可在每次运行的 prompt 中说 "use fable" 来 opt in，或在 `.compound-engineering/config.local.yaml` 中设置 `plan_use_fable: true`。Mechanical host gate 会让它在所有非 Claude Code harness（Codex、Cursor）上静默 no-op。详见 `references/reasoning-elevation.md`。
+
 ## 另见（See Also）
 
 - [`ce-brainstorm`](./ce-brainstorm.md) - 产出成为 plan origin 的 requirements doc

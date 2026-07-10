@@ -56,7 +56,7 @@ Generalist code review prompts 常以可预测方式塌缩：
 - **Stack-specific conditional**：Julik frontend races、Swift/iOS；只在 matching runtime domain 被触及时选择。Structural quality（complexity deletion、1k-line regressions、spaghetti）属于 always-on maintainability persona
 - **CE conditional（migrations）**：risky migration diffs 触发 `deployment-verification-agent`；schema drift 和 migration safety 由 `data-migration` persona 处理
 
-Persona selection 是 agent judgment，不是 keyword matching。Instruction-prose files（Markdown skills、JSON schemas）是 product code，但会跳过 runtime-focused reviewers（adversarial、races），因为它们不适用。
+Persona selection 是 agent judgment，不是 keyword matching。Instruction-prose files（Markdown skills、JSON schemas）是 product code，但会跳过 runtime-focused reviewers（adversarial、races），因为它们不适用。例外是 **silent-pass verification mechanism**（CI/CD gate、build/deploy step、coverage/lint gate，或可能掩盖 production 问题的 test harness/mock）：即使只是小型 config diff，也会获得 adversarial + cross-model lens，因为它的风险在于 fidelity，即真实结果为红时却显示为绿，而不是 blast radius。
 
 ### 2. Severity（P0-P3）和 autofix class 是 orthogonal
 
@@ -191,7 +191,7 @@ Conflicting mode flags（或 conflicting grouping flags）会以 error 停止。
 该用时就用它；quick-review short-circuit 会明确 defer。`ce-code-review` 用于你需要 diff-aware persona selection、calibrated severity 的 structured findings、autofix routing 和 residual work handling 的情况。它是更重的工具；当 work 值得时使用。
 
 **它怎么决定 dispatch 哪些 personas？**
-基于 actual diff 的 agent judgment，不是 keyword matching。4 always-on + 2 CE always-on personas 每次 review 都跑。Cross-cutting 和 stack-specific personas 在对应 concern 被触及时添加（例如 auth files changed 时添加 security；存在 migration 或 schema dump files 时添加 `data-migration-reviewer`）。Instruction-prose files 会跳过 runtime-focused reviewers（adversarial、races）。
+基于 actual diff 的 agent judgment，不是 keyword matching。4 always-on + 2 CE always-on personas 每次 review 都跑。Cross-cutting 和 stack-specific personas 在对应 concern 被触及时添加（例如 auth files changed 时添加 security；存在 migration 或 schema dump files 时添加 `data-migration-reviewer`）。Instruction-prose files 会跳过 runtime-focused reviewers（adversarial、races），但 silent-pass verification mechanism（CI/CD gate、build/deploy step、coverage/lint gate、test harness/mock）例外：无论 diff 多小，都会获得 adversarial + cross-model pass。
 
 **Interactive（default）和 `mode:agent` 有什么区别？**
 Interactive 是 human-facing mode：markdown report；review 自行应用 safe、verified fixes（Applied section），tree clean 时 commit（dirty 时留给你的 commit）；绝不 push。`mode:agent` 是 machine handoff：一个 JSON object，report-only；review 不 mutate，caller（例如 `/ce-work`）按自己的规则应用 findings。`mode:headless` 是 `mode:agent` 的 deprecated alias。

@@ -86,7 +86,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`skil
 | Skill | Description（说明） |
 |-------|-------------|
 | [`/ce-commit`](./ce-commit.md) | 创建单个精心组织的 git commit：convention-aware、sensitive-file-safe、file-level logical splitting |
-| [`/ce-commit-push-pr`](./ce-commit-push-pr.md) | 从 working changes 到 open PR，并生成 adaptive descriptions，保留 related references；三种 modes（full workflow / description update / description-only generation） |
+| [`/ce-commit-push-pr`](./ce-commit-push-pr.md) | 从 working changes 到 open PR，并生成 adaptive descriptions，保留 related references；支持三种 modes（full workflow / description update / description-only generation），并为本次 change 新引入的任何 concept 添加 concept-teaching section |
 | [`/ce-worktree`](./ce-worktree.md) | 确保 work 在 isolated git worktree 中进行：检测 existing isolation，优先使用 harness native worktree tool，最后 fallback 到 plain git |
 
 ---
