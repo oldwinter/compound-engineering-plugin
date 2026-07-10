@@ -36,29 +36,28 @@
 # brainstorm_output: html        # md | html (default: md)
 # ideate_output: md              # md | html (default: html -- ideation docs are human-facing, so HTML is the default; set md to opt out)
 
-# --- Fable elevation (Claude Code only) ---
-# Claude Code ONLY; silently ignored on every other harness (Codex, Cursor, ...).
-# When on, /ce-plan and /ce-brainstorm dispatch their reasoning-heavy step (plan
-# authoring; approach generation) to the Fable model via a subagent, so you get
-# higher-reasoning output even when your session model is cheaper -- no session
-# switch. Per-skill so you can enable one without the other. You can also just
-# say "use fable" in a prompt for a one-off. Invalid/commented/missing -> off.
+# --- Fable elevation（仅 Claude Code）---
+# 只在 Claude Code 上生效；其他 harness（Codex、Cursor 等）会静默忽略。
+# 开启后，/ce-plan 和 /ce-brainstorm 会通过 subagent 把 reasoning-heavy
+# step（plan authoring；approach generation）分派给 Fable model。即使 session
+# model 较便宜，也能得到 higher-reasoning output，无需切换 session。
+# 每个 skill 独立配置，也可在单次 prompt 中说 "use fable"。
+# Invalid/commented/missing -> off。
 
 # plan_use_fable: true           # true | false (default: false)
 # brainstorm_use_fable: true     # true | false (default: false)
-# fable_nudge: false             # true | false (default: true -- one-time tip when elevation is available but off)
+# fable_nudge: false             # true | false（default: true；elevation 可用但未开启时提示一次）
 
-# --- PR concept teaching (ce-commit-push-pr) ---
-# When a PR introduces a concept new to the codebase, the generated PR
-# description gains a "New concepts" section teaching it. The section toggle is
-# the single gate: off disables judgment, the section, the /ce-explain offer,
-# and archival. Archival additionally writes the explainer to docs/explainers/
-# and links it from the PR (full-workflow runs only; override per run with
-# archive:on|off). Note: this file is gitignored and per-checkout -- fresh
-# worktrees don't inherit it.
+# --- PR concept teaching（ce-commit-push-pr）---
+# 当 PR 向 codebase 引入新 concept 时，生成的 PR description 会增加
+# "New concepts" section 来讲解它。Section toggle 是单一 gate：关闭后会同时
+# 禁用 judgment、section、/ce-explain offer 和 archival。Archival 还会把
+# explainer 写入 docs/explainers/ 并从 PR 链接（仅 full-workflow runs；
+# 单次运行可用 archive:on|off 覆盖）。注意：该 file 被 gitignore，且按
+# checkout 存储；fresh worktrees 不会继承。
 
 # pr_teaching_section: false     # true | false (default: true)
-# pr_teaching_archive: true      # true | false (default: false; full-workflow runs only)
+# pr_teaching_archive: true      # true | false（default: false；仅 full-workflow runs）
 
 # --- ce-plan scoping confirmation ---
 # By default /ce-plan pauses before research/plan-write to show a scoping

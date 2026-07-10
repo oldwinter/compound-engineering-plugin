@@ -74,7 +74,7 @@ Determine `OUTPUT_FORMAT` before any other phase fires. Output mode is **exclusi
 **Read config.** The repo root is pre-resolved at skill load:
 !`git rev-parse --show-toplevel`
 
-If the line above is an absolute path, use it as `<repo-root>`. If it is empty, shows an error, or still shows a backtick command string (a harness that did not run the pre-resolution), resolve `<repo-root>` at runtime by running `git rev-parse --show-toplevel` with the shell tool. Then read `<repo-root>/.compound-engineering/config.local.yaml` with the native file-read tool. If the root cannot be resolved (not a git repo) or the file does not exist, fall through to the defaults below.
+如果上面这一行是 absolute path，将其用作 `<repo-root>`。如果它为空、显示 error，或仍显示 backtick command string（表明 harness 没有执行 pre-resolution），就在 runtime 使用 shell tool 运行 `git rev-parse --show-toplevel` 来 resolve `<repo-root>`。然后使用 native file-read tool 读取 `<repo-root>/.compound-engineering/config.local.yaml`。如果无法 resolve root（不是 git repo）或 file 不存在，则继续使用下方 defaults。
 
 Resolution steps:
 
@@ -206,7 +206,7 @@ If no relevant Product Contract source exists, planning may proceed from the use
 If no relevant requirements document exists, or the input needs more structure:
 - Assess whether the request is already clear enough for direct technical planning — if so, continue to Phase 0.5
 - If the ambiguity is mainly product framing, user behavior, or scope definition, recommend `ce-brainstorm` as a suggestion — but always offer to continue planning here as well
-- If the user signals they lack working knowledge of the problem domain itself, recommend `ce-brainstorm` — its blindspot pass maps the territory's decision surface before requirements are extracted — but honor their choice to continue here; Phase 2's unfamiliar-territory scaffolding then applies
+- 如果用户表明自己缺少 problem domain 本身的 working knowledge，建议使用 `ce-brainstorm`；它的 blindspot pass 会在提取 requirements 前映射 territory 的 decision surface。但仍要尊重用户继续在此 planning 的选择；此时应用 Phase 2 的 unfamiliar-territory scaffolding
 - If the user wants to continue here (or was already explicit about wanting a plan), run the planning bootstrap below
 
 The planning bootstrap should establish:
@@ -457,7 +457,7 @@ For each question, decide whether it should be:
 
 Ask the user only when the answer materially affects architecture, scope, sequencing, or risk and cannot be responsibly inferred. Use the platform's blocking question tool when available (see Interaction Method).
 
-**Scaffold questions on unfamiliar territory.** When the user has signaled they lack working knowledge of the area a question lives in — an explicit "I don't know X", or earlier answers showing they *cannot evaluate* options rather than merely haven't decided — do not ask the question naked. Present it as a taught decision: the realistic options, one clause each on the trade-off that matters for this plan, and a recommended default. If the user still cannot evaluate, record the default as an explicit assumption in the plan instead of extracting a guess. In pipeline mode (LFG, any `disable-model-invocation` context) this scaffolding never presents anything — resolve to the recommended default and record it as an explicit assumption in the plan.
+**为陌生 territory 上的问题提供 scaffolding。** 当用户已表明自己缺少该问题所在 area 的 working knowledge，例如明确说 "I don't know X"，或之前的回答显示他们 *无法评估* options，而不是只是尚未决定，就不要裸着提问。将其呈现为 taught decision：列出 realistic options，每个 option 用一个 clause 说明对当前 plan 重要的 trade-off，并给出 recommended default。如果用户仍无法评估，就把 default 记录为 plan 中的 explicit assumption，而不是提取猜测。在 pipeline mode（LFG 或任何 `disable-model-invocation` context）中，该 scaffolding 不展示任何交互：直接 resolve 为 recommended default，并将其记录为 plan 中的 explicit assumption。
 
 **Do not** run tests, build the app, or probe runtime behavior in this phase. The goal is a strong plan, not partial execution.
 
@@ -676,7 +676,7 @@ Fires **whenever Phase 0.2 resolved an upstream Product Contract source** — a 
 
 #### 5.2 Write Plan File
 
-**Reasoning elevation (Claude Code only).** Before authoring the plan, if positively Claude Code (`CLAUDECODE=1`, not Cursor/Codex), load `references/reasoning-elevation.md` and follow it — it may dispatch the interpret-findings-then-author step to a higher-reasoning model when the user has opted in, and it owns the completion-time discoverability tip. On any non-Claude host, skip it entirely — proceed on the session model with no mention. If a prompt names a model this skill does not recognize on this harness, proceed on the session model without comment.
+**Reasoning elevation（仅 Claude Code）。** 在编写 plan 前，如果已机械确认当前是 Claude Code（`CLAUDECODE=1`，且不是 Cursor/Codex），加载并遵循 `references/reasoning-elevation.md`。当用户 opt in 时，它可能把 interpret-findings-then-author step 分派给更强的 reasoning model，并负责 completion-time discoverability tip。在任何非 Claude host 上完全跳过：直接使用 session model，不要提及。如果 prompt 指定了当前 harness 上该 skill 不识别的 model，不作说明，直接使用 session model。
 
 **REQUIRED: Write the plan file to disk before presenting any options.**
 
@@ -778,6 +778,8 @@ After document review and final checks, print a one-line summary of the headless
 2. **Run it as a `/goal`** - Choose this if you'd rather run the plan through your harness's autonomous goal mode instead of ce-work's build-and-ship flow. The alternative to option 1, not an add-on — pick one. Implementation-ready code plans only, and only where the host has goal capability (Codex `create_goal` in the available tool list, or a user-typed `/goal` in Claude Code). Where it can start directly, it does; otherwise it hands over a copy-paste prompt.
 
 **Recommended marker:** `ce-work` (option 1) always carries *(recommended)* and option 2 stays unmarked. `ce-work` is the correctly-layered execution entry point — it owns engine selection and reaches goal or dynamic-workflow engines itself when a plan's shape warrants, so recommending it never forecloses goal mode. Exactly one option carries the marker.
+
+**中文说明：** Option 1 `ce-work` 始终是 recommended default，负责在当前 session 中 build and ship，并自行选择合适 engine。Option 2 `/goal` 是用户主动选择 harness native autonomous goal loop 时的替代项，与 option 1 二选一；恰好一个 option 带 *(recommended)*。
 3. **Decide on the review's open items** - Confirm or skip the suggested edits, and settle the judgment calls the auto-pass left for you. (Safe, mechanical fixes were already applied; you can also defer items into Open Questions.)
 4. **Create Issue** - Create a tracked issue from this plan in your configured issue tracker (e.g., GitHub Issues, Linear, Jira)
 5. **Publish to Proof — shareable link** - Publish the plan to Every's Proof editor and get a shareable link to read, comment on, or share with others. One-way: the local plan file stays canonical. **Render only when `OUTPUT_FORMAT=md`.**

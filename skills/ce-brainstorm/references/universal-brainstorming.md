@@ -35,7 +35,7 @@ Drop the blocking tool only when (a) the answer is inherently narrative ("walk m
 
 **Ask what they're already thinking.** Before offering ideas, find out what the user has considered, tried, or rejected. This prevents fixation on AI-generated ideas and surfaces hidden constraints.
 
-**When the user doesn't know the domain** — if they flag missing working knowledge of the territory ("I need to grade this video but don't know what color grading is"), or two consecutive answers show they *cannot evaluate* a question's substance rather than merely haven't decided, read `references/blindspot-pass.md` and offer the pass before questioning them further on that territory. It applies on this route unchanged (see its "Universal route" section).
+**当用户不了解该 domain 时**：如果他们表明自己缺少该 territory 的 working knowledge（例如 "I need to grade this video but don't know what color grading is"），或者连续两个回答显示他们 *无法评估* 问题实质，而不是只是还没决定，就读取 `references/blindspot-pass.md`，并在继续询问该 territory 之前提供 pass。该 pass 在此 route 上原样适用（见其 "Universal route" section）。
 
 **When the user represents a group** (couple, family, team) — surface whose preferences are in play and where they diverge. The brainstorm shifts from "help you decide" to "help you find alignment." Ask about each person's priorities, not just the speaker's.
 

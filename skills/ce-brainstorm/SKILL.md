@@ -36,7 +36,7 @@ These rules apply to every brainstorm, including the universal (non-software) fl
 
 ## Output Guidance
 
-- **Prioritize decision-relevant detail** - Preserve the facts, tradeoffs, and caveats needed for the next decision; trim introductions, repetition, and optional background first.
+- **优先保留与决策相关的细节** - 保留下一个决策所需的事实、tradeoffs 和 caveats；优先精简引言、重复内容和可选背景。
 
 ## Model Tiers
 
@@ -61,7 +61,7 @@ Determine `OUTPUT_FORMAT` before any other phase fires. Output mode is **exclusi
 **Read config.** The repo root is pre-resolved at skill load:
 !`git rev-parse --show-toplevel`
 
-If the line above is an absolute path, use it as `<repo-root>`. If it is empty, shows an error, or still shows a backtick command string (a harness that did not run the pre-resolution), resolve `<repo-root>` at runtime by running `git rev-parse --show-toplevel` with the shell tool. Then read `<repo-root>/.compound-engineering/config.local.yaml` with the native file-read tool. If the root cannot be resolved (not a git repo) or the file does not exist, fall through to the defaults below.
+如果上面这一行是 absolute path，将其用作 `<repo-root>`。如果它为空、显示 error，或仍显示 backtick command string（表明 harness 没有执行 pre-resolution），就在 runtime 使用 shell tool 运行 `git rev-parse --show-toplevel` 来 resolve `<repo-root>`。然后使用 native file-read tool 读取 `<repo-root>/.compound-engineering/config.local.yaml`。如果无法 resolve root（不是 git repo）或 file 不存在，则继续使用下方 defaults。
 
 Resolution steps:
 
@@ -142,7 +142,7 @@ Product-tier triggers additional Phase 1.2 questions and additional Product Cont
 
 **Visual probe tripwire.** If the feature is inherently visual or spatial — drawing/canvas tools, annotation behavior, visual editors, UI layout or navigation, interaction states, charts, diagrams, animation, maps, timelines, or spatial flows — read `references/visual-probes.md` now. Strong signals include freehand vs constrained drawing behavior, canvas annotation tools, layout comparisons, and state/flow placement. Loading the reference here is readiness only; it owns when the gate fires (state-based, at the first shape/behavior/state/layout/flow/diagram decision), the text-vs-visual offer, and helper invocation.
 
-**Unfamiliarity tripwire.** If the user signals they lack working knowledge of the domain or the territory the topic touches — "I know nothing about X", "never touched the auth modules", "I don't know what's possible / what I should be asking" — read `references/blindspot-pass.md` now. Loading here is readiness only; the reference owns when the offer fires (territory-scoped, before the first substantive question into the flagged territory), the map's shape, and how mapped decisions re-enter the dialogue.
+**陌生领域 tripwire。** 如果用户表明自己缺少该 domain 或 topic 涉及领域的 working knowledge，例如 "I know nothing about X"、"never touched the auth modules"、"I don't know what's possible / what I should be asking"，立即读取 `references/blindspot-pass.md`。此处加载只是为了 readiness；该 reference 负责决定 offer 何时触发（按 territory 限定，在进入 flagged territory 的第一个 substantive question 之前）、map 的形状，以及 mapped decisions 如何重新进入 dialogue。
 
 ### Phase 1: Understand the Idea
 
@@ -191,7 +191,7 @@ Read `references/product-pressure-test.md` for the per-tier lens catalog (Lightw
 
 Follow the Interaction Rules above. Use the platform's blocking question tool when available.
 
-**Blindspot gate — check it before probing flagged territory.** If the Phase 0.3 unfamiliarity tripwire fired, fire the blindspot offer from `references/blindspot-pass.md` before the first substantive question into the flagged territory (questions about the user's own problem, users, and evidence proceed normally — the gate is territory-scoped). The gate also arms mid-dialogue without a tripwire: when two consecutive answers show the user *cannot evaluate* the question's substance — not merely hasn't decided — read the reference and offer the pass then. Never silently switch into teaching; the offer is a blocking question.
+**Blindspot gate：在探查 flagged territory 前检查。** 如果 Phase 0.3 的 unfamiliarity tripwire 已触发，在进入 flagged territory 的第一个 substantive question 之前，先触发 `references/blindspot-pass.md` 中的 blindspot offer。关于用户自身 problem、users 和 evidence 的问题正常进行，因为该 gate 按 territory 限定。即使没有 tripwire，gate 也会在 dialogue 中途 arm：当连续两个回答显示用户 *无法评估* 问题实质，而不是只是还没决定时，读取该 reference 并提供 pass。绝不要静默切换为教学；offer 必须是 blocking question。
 
 **Visual-probe gate — precondition, check it before raising the first shape decision.** If the Phase 0.3 tripwire fired, then before raising the first decision about shape, behavior, state, layout, flow, or a diagram — in any form, plain chat or a blocking tool — fire the text-vs-visual offer from `references/visual-probes.md`. The gate is state-based: offer unless this specific decision has already been through it; anchor the check to the decision you are about to raise, not a "pending gate" remembered since Phase 0.3. It **takes precedence over the default blocking-question path** (Interaction Rule 4): do not raise the shape decision as an `AskUserQuestion`/`request_user_input` menu until the user has declined visual. **An ASCII preview or text mockup inside the question's choices does not satisfy the offer** — that is the shortcut this gate exists to stop. Use the platform's blocking question tool for the text-vs-visual offer itself when available; the reference owns the offer wording, the cheapest-probe build, helper invocation, and the display-only feedback contract.
 
@@ -211,7 +211,7 @@ Follow the Interaction Rules above. Use the platform's blocking question tool wh
 
 ### Phase 2: Explore Approaches
 
-**Reasoning elevation (Claude Code only).** Before generating approaches, if positively Claude Code (`CLAUDECODE=1`, not Cursor/Codex), load `references/reasoning-elevation.md` and follow it — it may dispatch approach generation to a higher-reasoning model when the user has opted in, and it owns the completion-time discoverability tip. On any non-Claude host, skip it entirely — proceed on the session model with no mention. If a prompt names a model this skill does not recognize on this harness, proceed on the session model without comment.
+**Reasoning elevation（仅 Claude Code）。** 在生成 approaches 之前，如果已机械确认当前是 Claude Code（`CLAUDECODE=1`，且不是 Cursor/Codex），加载并遵循 `references/reasoning-elevation.md`。当用户 opt in 时，它可能把 approach generation 分派给更强的 reasoning model，并负责 completion-time discoverability tip。在任何非 Claude host 上完全跳过：直接使用 session model，不要提及。如果 prompt 指定了当前 harness 上该 skill 不识别的 model，不作说明，直接使用 session model。
 
 If multiple plausible directions remain, propose **2-3 concrete approaches** based on research and conversation. Otherwise state the recommended direction directly.
 

@@ -16,6 +16,8 @@ argument-hint: "[PR ref] [mode:pipeline] [archive:on|off]"
 
 **`mode:pipeline` modifier** — set by orchestrated callers (e.g., `lfg`). Run the resolved mode non-interactively: suppress every blocking ask. Step 5's existing-PR rewrite question defaults to **not rewriting**; in description-update mode the preview ask is skipped and the rewrite applies directly (the update invocation itself is the apply intent); any other suppressed ask takes its conservative documented default (keep the current branch; if Pre-A cannot resolve a base, stop and report rather than guess).
 
+**中文说明：** `mode:pipeline` 由 `lfg` 等 orchestrated caller 传入，要求整个已选 mode 以 non-interactive 方式运行。所有 blocking ask 都使用文档中的保守 default；existing-PR rewrite 默认不重写，无法 resolve base 时停止并报告，绝不猜测。
+
 ## Context
 
 **On platforms other than Claude Code**, run the Context fallback below. **In Claude Code**, the labeled sections contain pre-populated data — use them directly.
@@ -105,6 +107,8 @@ Do not block PR creation solely because no visual artifact exists. Test output a
 
 **Concept teaching gate** before composition. Use the pre-resolved repo root from Context (if it is empty or shows a literal command string, resolve it at runtime with `git rev-parse --show-toplevel`) and read `<repo-root>/.compound-engineering/config.local.yaml` with the native file-read tool. Only an **active (non-commented)** `pr_teaching_section:` key counts — lines starting with `#` are YAML comments, and the shipped template documents keys as commented examples; matching those would silently flip the gate. The gate is off only when the active value is exactly `false`; a missing file, missing key, or any other value means the default: **on**. The same read resolves `pr_teaching_archive:` — on only when the active value is exactly `true`, otherwise **off** — and a per-run `archive:on|off` token overrides the archive key for this invocation.
 
+**中文说明：** Composition 前需要 resolve concept-teaching gate。只认可 active（非 comment）的 `pr_teaching_section:`；精确为 `false` 时才关闭，其余情况默认开启。`pr_teaching_archive:` 只在精确为 `true` 时开启，且单次 `archive:on|off` 可覆盖 config。Gate 关闭时，同时跳过 novelty judgment、section、trailer、offer 和 archival。
+
 - Gate **on** — judge concept novelty and compose the section per **Step B2** of the reference. The gate is single: when it is off, skip judgment, the section, the Step 5 trailer and offer, and archival entirely.
 - Gate **off** — compose the description without any concept handling.
 
@@ -125,6 +129,8 @@ Then continue with the rest of the reference (Steps A through E, including the S
 
 **Explainer archival** — runs only in full workflow, with `pr_teaching_archive` on, a composed `## New concepts` section, and the apply confirmed (new-PR create, or existing-PR rewrite accepted); a declined rewrite skips archival entirely so no unlinked doc commit is left behind. All paths resolve from the pre-resolved repo root in Context, never the CWD. With two taught concepts, write one file per concept and stage both in the single commit. Execute as explicit transitions immediately before the `gh` call:
 
+**中文说明：** Explainer archival 只在 full workflow、archive 开启、已生成 `## New concepts`，且 apply 已确认时运行。Declined rewrite skips archival，避免留下未链接的 doc commit。所有 path 都从 pre-resolved repo root resolve，每个 concept 一个 file，只 stage 这些 files，绝不强制添加 ignored path。
+
 1. `git check-ignore -q docs/explainers/YYYY-MM-DD-<concept-slug>.md` (from the repo root) — the check works on not-yet-created paths. If the path is ignored, print a one-line warning and skip archival entirely, writing nothing (never `git add -f`).
 2. Write the file (create the directory if needed) with YAML frontmatter `title`, `date`, `input_shape: concept`, `subject`, and the teaching content. If the file already exists from a prior run, overwrite it.
 3. `git add` those file(s) only (never `-A`), commit with `docs(explainer): teach <concept>[, <concept>]`, and push. If the commit reports nothing to commit, the doc is already committed from a prior run — keep the link and continue.
@@ -133,6 +139,8 @@ Then continue with the rest of the reference (Steps A through E, including the S
 If the doc write, commit, or push fails, warn and continue to PR creation without the link — never strand the flow between commit and PR.
 
 **Concept trailer** — when a body applied by this run contains a `## New concepts` section, print one line after the PR URL in every mode: `New concepts: <name>[, <name>]`. In interactive full-workflow runs follow it with one line per taught concept: `Run /ce-explain <name> to go deeper.` No trailer when this run applied no body — including a rewrite that was declined or pipeline-defaulted to no — or no PR exists.
+
+**中文说明：** `New concepts:` 和 `Run /ce-explain` 是下游 workflow 会读取的精确 output contract，保持原样输出。
 
 ---
 

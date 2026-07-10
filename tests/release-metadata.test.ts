@@ -497,9 +497,7 @@ describe("release metadata", () => {
     await syncReleaseMetadata({ root, write: true })
 
     const afterContents = JSON.parse(await Bun.file(devinPath).text())
-    expect(afterContents.description).toBe(
-      "Brainstorm, plan, debug, review, and compound learnings with AI agents",
-    )
+    expect(afterContents.description).toBe(COMPOUND_DESCRIPTION)
   })
 
   test("reports Codex plugin.json name mismatch as structural error", async () => {

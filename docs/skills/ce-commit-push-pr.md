@@ -102,9 +102,9 @@ Commit messages 和 PR titles：context 中的 repo conventions 最优先；rece
 
 当 skill 在有 open PR 的 branch 上运行，且你想 rewrite description 时，它会 preview：new Summary 前两句加 total body line count，并在 apply 前询问 confirmation。前两句承载 reviewer 大部分注意力。如果 decline，可以传入 focus text regenerate，不 apply 任何东西。
 
-### 10. Concept-teaching section — the PR teaches what it introduces
+### 10. Concept-teaching section：PR 会讲解它引入的内容
 
-Agent-driven development removed the learning that writing code by hand used to provide. When the composition pass judges that the change introduces a concept new to the codebase — checked against the base ref, never the working tree, so the PR's own code doesn't mask novelty — the description gains a dedicated `## New concepts` section: what the concept is, why it was chosen here over the obvious alternative, and one example from this PR's behavior. Absence is the common case by design: established repo patterns, refactors, renames, and dependency bumps never fire it. After the PR ships, a one-line offer points to `/ce-explain` for interactive learning, and an opt-in config key (`pr_teaching_archive`) archives the explainer to `docs/explainers/` and links it from the PR. Turn the whole feature off per repo with `pr_teaching_section: false` in `.compound-engineering/config.local.yaml`.
+Agent-driven development 消除了亲手写 code 原本会带来的学习过程。当 composition pass 判断 change 向 codebase 引入了新 concept 时，description 会增加专门的 `## New concepts` section。新鲜度对照 base ref 检查，而不是 working tree，避免 PR 自身的 code 掩盖其 novelty。Section 会解释 concept 是什么、为何在这里选择它而不是 obvious alternative，并给出一个来自本 PR behavior 的 example。按设计，没有该 section 才是常态：established repo patterns、refactors、renames 和 dependency bumps 都不会触发它。PR ship 后，一行 offer 会指向 `/ce-explain` 进行 interactive learning；opt-in config key `pr_teaching_archive` 会把 explainer 归档到 `docs/explainers/`，并从 PR 链接过去。要在当前 repo 完全关闭该 feature，请在 `.compound-engineering/config.local.yaml` 中设置 `pr_teaching_section: false`。
 
 ---
 
@@ -198,8 +198,8 @@ Skill 尊重你的 git config 和 pre-commit hooks。它绝不会传 `--no-verif
 **能创建 draft PR 吗？**
 使用 description-only mode 生成 body，然后自己用 `gh pr create --draft --title "..." --body-file "..."` apply。Full workflow 目前没有暴露 draft flag。
 
-**Why doesn't my PR have a `## New concepts` section?**
-By design, most PRs shouldn't. The section fires only when the change introduces a concept that is both new to this codebase (checked against the base ref) and transferable beyond it — routine use of established repo patterns, refactors, renames, and dependency bumps never qualify. A missing section costs little; a patronizing one trains readers to skip the feature. If you never want the section, set `pr_teaching_section: false` in `.compound-engineering/config.local.yaml`.
+**为什么我的 PR 没有 `## New concepts` section？**
+这是有意的设计：大多数 PR 都不应该有。只有当 change 引入的 concept 对当前 codebase 确实是新的（对照 base ref 检查），而且能够迁移到该 codebase 之外时，section 才会触发。常规使用 established repo patterns、refactors、renames 和 dependency bumps 都不符合条件。缺少 section 的代价很小；像说教一样的 section 却会训练 readers 直接跳过这个 feature。如果你永远不想生成该 section，请在 `.compound-engineering/config.local.yaml` 中设置 `pr_teaching_section: false`。
 
 ---
 

@@ -71,6 +71,8 @@ When invoking any skill referenced below, resolve its name against the available
 
    This commits any remaining changes, pushes the branch, and opens a pull request — non-interactively, per the mode token. If it prints a `New concepts:` trailer after the PR URL, record the concept name(s) for step 10. If step 6 already opened a PR (check with `gh pr view --json number,url,state 2>/dev/null`), skip PR creation but still commit and push any uncommitted changes. **Per the shipping precondition, when no remote is configured, do NOT invoke `ce-commit-push-pr` — its commit step pushes unconditionally (`git push -u origin HEAD`), so a literal invocation would still hit the impossible push. Instead commit any remaining changes locally yourself (`git add -A && git commit`) and skip the push and PR creation entirely.**
 
+   **中文说明：** 该 step 使用 `mode:pipeline` 非交互地 commit、push 并 open PR。如果 PR URL 后出现 `New concepts:` trailer，记住 concept names，供 step 10 使用。没有 remote 时不得调用该 skill；只做 local commit，并跳过 push/PR。
+
 9. **CI watch and autofix loop** (only when an open PR exists for the current branch)
 
    Detect the PR; if none exists or `gh` is unavailable, skip this step entirely and proceed to step 10.
@@ -125,5 +127,7 @@ When invoking any skill referenced below, resolve its name against the available
 10. Output `<promise>DONE</promise>` when complete
 
     If step 8 recorded a `New concepts:` trailer, first echo one line per concept: `New concept introduced: <name> — run /ce-explain <name> to go deeper.` Then output the DONE promise.
+
+    **中文说明：** `New concepts:`、`New concept introduced:` 和 `run /ce-explain` 是与上游 skill 对齐的精确 seam contract，必须保持原样。
 
 Start with step 1 now. Remember: plan FIRST, then work. Never skip the plan.

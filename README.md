@@ -4,6 +4,19 @@
 
 让每一个工程工作单元都比上一个更容易的 AI skills。
 
+## 安装中文版
+
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `ee2fee4c`。
+
+在 Claude Code 中安装这个中文 fork：
+
+```text
+/plugin marketplace add oldwinter/compound-engineering-plugin
+/plugin install compound-engineering
+```
+
+安装后，runtime 会加载这个 fork 中的 `skills/*/SKILL.md` 及各 skill 自带的 `references/`；这些是中文本地化的实际执行入口。下方保留的 `EveryInc/compound-engineering-plugin` 命令指向上游英文版，不应当作中文版安装命令。
+
 ## Philosophy（理念）
 
 **每一个工程工作单元都应该让后续工作更容易，而不是更困难。**
@@ -233,41 +246,41 @@ After installing or updating, run `/reload` or start a new Kimi session so the p
 
 ### Grok Build CLI (`grok`)
 
-xAI's [Grok Build CLI](https://x.ai/cli) (`grok`) installs Compound Engineering directly from this repository — the repo root is a valid Grok plugin (`grok` reads the existing Claude-compatible manifests, and the repo also ships a native `.grok-plugin/plugin.json`):
+xAI 的 [Grok Build CLI](https://x.ai/cli)（`grok`）可以直接从本 repository 安装 Compound Engineering。Repo root 本身就是有效的 Grok plugin：`grok` 会读取现有的 Claude-compatible manifests，而且 repo 也提供 native `.grok-plugin/plugin.json`：
 
 ```bash
 grok plugin install EveryInc/compound-engineering-plugin
 ```
 
-This tracks the repository; run `grok plugin update` to pull the latest. To browse it as a marketplace source instead, the repo ships a native `.grok-plugin/marketplace.json`:
+这种安装会跟踪 repository；运行 `grok plugin update` 即可拉取最新版。如果想将其作为 marketplace source 浏览，repo 也提供 native `.grok-plugin/marketplace.json`：
 
 ```bash
 grok plugin marketplace add EveryInc/compound-engineering-plugin
 grok plugin install compound-engineering
 ```
 
-Both paths track the repository directly (no commit pin), so no Bun install step is needed. Add `--trust` to skip the install confirmation. `grok` stores config under `~/.grok`; start a new session after installing so the skills load.
+两种 path 都会直接跟踪 repository（没有 commit pin），因此不需要 Bun install step。添加 `--trust` 可跳过安装确认。`grok` 把 config 存在 `~/.grok` 下；安装后启动新 session，以便加载 skills。
 
-Compound Engineering is also being submitted to the official [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace); see [`docs/grok-marketplace-submission.md`](docs/grok-marketplace-submission.md) for the maintainer runbook.
+Compound Engineering 也正在提交到官方 [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace)；maintainer runbook 见 [`docs/grok-marketplace-submission.md`](docs/grok-marketplace-submission.md)。
 
 ### Devin CLI
 
-Devin CLI can install Compound Engineering directly from GitHub because the repo ships a native `.devin-plugin/plugin.json` manifest:
+Repo 提供 native `.devin-plugin/plugin.json` manifest，因此 Devin CLI 可以直接从 GitHub 安装 Compound Engineering：
 
 ```bash
 devin plugins install EveryInc/compound-engineering-plugin
 ```
 
-Verify the install and inspect the skills:
+验证安装并检查 skills：
 
 ```bash
 devin plugins list
 devin plugins info compound-engineering
 ```
 
-Update to the latest version with `devin plugins update compound-engineering`. Plugins load at session start, so start a new Devin session after installing or updating for the skills to appear (as `/compound-engineering:<skill>` slash commands).
+使用 `devin plugins update compound-engineering` 更新到最新版。Plugins 会在 session 开始时加载，因此安装或更新后需要启动新 Devin session，skills 才会以 `/compound-engineering:<skill>` slash commands 出现。
 
-A few skills declare Claude-style `allowed-tools` names that Devin does not map (for example `Bash`); those skills still work, but some of their actions ask for permission instead of running auto-approved. See [`docs/specs/devin.md`](docs/specs/devin.md) for details.
+少数 skills 声明了 Devin 尚未映射的 Claude-style `allowed-tools` names（例如 `Bash`）。这些 skills 仍可工作，但某些 actions 会请求 permission，而不是 auto-approved 运行。详见 [`docs/specs/devin.md`](docs/specs/devin.md)。
 
 ### GitHub Copilot
 
@@ -473,7 +486,7 @@ To test the local marketplace catalog instead, pass the catalog path:
 devin plugins install /path/to/compound-engineering-plugin
 ```
 
-Local installs are linked to the checkout rather than copied, so skill edits apply on the next Devin session without reinstalling.
+Local install 会 link 到 checkout，而不是复制内容，因此无需重新安装，skill edits 就会在下一个 Devin session 生效。
 
 **OpenCode**
 

@@ -55,6 +55,8 @@ Note in the user-facing summary when the API fallback was used.
 
 ## Step A: Size the description
 
+**中文摘要：** Description 的大小取决于 reviewer 的 decision cost，而不是 diff 行数、file extension 或是否有视觉 surface。先找出 diff 自身无法证明的 material claims，只补足帮 reviewer 做决定所需的 context、evidence 和 residual uncertainty。
+
 **Size by decision cost, not diff shape.** What a description must cover is set by how much a reviewer cannot establish from the diff alone — not changed-line count, file extension, or visual surface. A 5-line edit to ranking logic or a deploy manifest can carry more reviewer uncertainty than a 500-line mechanical rename.
 
 Before sizing, name the change's **material claims** — what became possible, what was fixed, what risk changed, what design decision the reviewer must assess — and which of them the diff alone can't establish. Surface those; let the rest stay implicit. **Classify each changed file by runtime purpose, not extension** when you judge this: markdown or YAML may be inert docs and examples, or runtime agent instructions, configuration, product content, or production deployment behavior — a "docs-only" diff that is really runtime instruction carries real claims and is not auto-sized to one line.
@@ -125,6 +127,8 @@ Closing references can live in the opening paragraph when the body is tiny. Non-
 ---
 
 ## Step B2: Judge new concepts
+
+**中文摘要：** 先从 diff 中找最多两个 concept candidates，再对照 base ref，而不是 working tree，判断其是否对该 codebase 真的新颖。只有同时具备新颖性和可迁移性时才教学；absence is the common case。一旦生成，`## New concepts` section 必须说清它是什么、为何在这里选它、本 PR 中的一个 example，以及什么时候不该用。
 
 Decide whether the change introduces a concept — a pattern, technique, library, or domain idea — that a reader of this repo would plausibly not know. Skip this step entirely when the skill's concept teaching gate is off (SKILL.md Step 4).
 
@@ -204,6 +208,8 @@ Skip the badge if regenerating a body that already contains it.
 ---
 
 ## Step E: Pre-apply coverage audit
+
+**中文摘要：** 返回 body 前，用 Step A 的 material claims 做最后 coverage audit：补上 diff 无法自证的 claims，删除 diff 已明示的重复转述，区分 demonstrated results、assumptions 与 mixed/negative outcomes，并删去任何不会降低 reviewer confidence 的句子或 section。
 
 Before returning the body, check it against the material claims from Step A and revise if any answer is wrong:
 
