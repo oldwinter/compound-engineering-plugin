@@ -43,13 +43,13 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 ## 它的新意
 
-### 1. 两种 modes：Full vs Lightweight
+### 1. 两种 modes：Full vs Lightweight，由 agent 自动选择
 
-**Full mode** 并行运行三个 research subagents（Context Analyzer / Solution Extractor / Related Docs Finder），然后可选前台 Session Historian（默认 off，会跨 Claude Code、Codex、Cursor 搜索 prior sessions 的相关 context）。它会 cross-reference existing docs、detect duplicates，并运行 specialized reviews。
+**Full mode** 并行运行三个 research subagents（Context Analyzer / Solution Extractor / Related Docs Finder），并自动执行 session-history probe，跨 Claude Code、Codex、Cursor 搜索 prior sessions 中的相关 context。它会 cross-reference existing docs、detect duplicates，并运行 specialized reviews。
 
-**Lightweight mode** 以 single pass 完成同样的 documentation，不使用 subagents，不做 cross-referencing。更快、更省 tokens。适合 simple fixes 或 context 紧张时。
+**Lightweight mode** 以 single pass 完成同样的 documentation，不使用 subagents，也不做 cross-referencing。速度更快、消耗更少 tokens。
 
-用户显式选择 mode；skill 永不 auto-select。
+**Skill 会自行选择 mode，不会提问。** Full 是默认模式，因为与产生这条 learning 的工作相比，它增加的 token 成本很小；只有在 context 确实紧张（session 接近上限），或 fix 非常简单、cross-referencing 没有收益时，才会选择 Lightweight。这些条件 agent 能观察到，用户却看不到，因此提问只会让用户猜测。Skill 会在 output 第一行说明运行了哪个 mode 及原因；如果选择不符合你的偏好，重新运行的成本很低。
 
 ### 2. Bug track vs knowledge track：不同形状使用不同结构
 
@@ -88,9 +88,9 @@ Phase 2.45 用两层机制关闭这些缺口。Deterministic script（`scripts/v
 
 根据 problem type，可选 skill-local prompt assets review 文档：performance issues 使用 `performance-oracle`，security 使用 `security-sentinel`，database 使用 `data-integrity-guardian`。Code-heavy docs 也可以对 drafted examples 和 explanatory claims 做 read-only simplification review；这不会 invoke `ce-simplify-code`，也不会 mutate product code。
 
-### 8. Session history integration（session history 集成，opt-in）
+### 8. Session history integration（自动 probe，不向用户提问）
 
-Full mode 可选择分派 skill-local session-history prompt，跨 harnesses 搜索 prior sessions 的相关 context：此前尝试过什么、什么没有用、关键 decisions。Findings 会折入 bug track 的 "What Didn't Work" 或 knowledge track 的 "Context"。默认 off，因为 token 成本高；用户显式 opt in。
+当某个看似无关的 earlier session 实际包含相关问题解决经验时，搜索 prior sessions 才真正有价值；但 agent 和用户都无法事先知道是否存在，因此它不适合做成 yes/no prompt。Full mode 改用低成本的两阶段 probe：始终运行 discovery + metadata pass（与 research subagents 并行，几乎不增加 wall-clock），只有 candidate session 达到 relevance bar 时才升级到成本较高的 extraction + synthesis。通过条件是 current-branch match，或至少命中 2 个 topic keywords。命中后，findings 会折入 bug track 的 "What Didn't Work" 或 knowledge track 的 "Context"；未命中时记录 "no relevant prior sessions" 并继续。这个 gate 让 always-on probe 保持低成本。Lightweight 和 headless modes 会完全跳过它。
 
 ### 9. Auto-invoke triggers（自动调用触发条件）
 
@@ -102,9 +102,9 @@ Full mode 可选择分派 skill-local session-history prompt，跨 harnesses 搜
 
 你刚花 45 分钟 debug brief-generation flow 中的 N+1 query。你确认 fix 有效，然后说 "that worked, ship it."
 
-`ce-compound` auto-invokes（或你显式调用）。它询问使用 Full 还是 Lightweight mode，再问是否也搜索 session history。你选择 Full，不搜索 session history。
+`ce-compound` auto-invokes（或你显式调用）。因为剩余 context 充足，它会静默选择 Full mode，并在 output 顶部注明 "Ran Full mode."，不会弹出 prompt。
 
-三个 subagents 并行分派：Context Analyzer 读取 conversation history，分类为 `performance_issue`（bug track），提出 filename 和 category。Solution Extractor 用 before/after code 组织 fix。Related Docs Finder grep `docs/solutions/` 中的相关 issues，报告与一篇不同 N+1 case 的旧 doc 有 moderate overlap。
+三个 subagents 并行分派：Context Analyzer 读取 conversation history，分类为 `performance_issue`（bug track），提出 filename 和 category。Solution Extractor 用 before/after code 组织 fix。Related Docs Finder grep `docs/solutions/` 中的相关 issues，报告与一篇不同 N+1 case 的旧 doc 有 moderate overlap。与此同时，session-history probe 扫描 recent sessions；没有 candidate 达到 relevance bar，因此它记录 "no relevant prior sessions"，不会支付 synthesis 成本。
 
 Orchestrator 组装 doc，通过 YAML safety script 验证 frontmatter，并写入 `docs/solutions/performance-issues/n-plus-one-brief-generation.md`。接着运行 grounding validation：mechanical script 确认每个 cited path 和 SHA 都能 resolve，validator subagent 引用定义 ORM default batching behavior 的 source line，以验证 doc 中的对应 claim。Discoverability check 发现 `AGENTS.md` 未提到 `docs/solutions/`，提出给 existing directory listing 添加一行，并在你确认后应用。
 
@@ -153,7 +153,7 @@ Output 会反馈给 upstream skills：
 
 - **Just-finished problem**：`/ce-compound`（或从 "that worked" auto-invoked）
 - **With context hint（带 context hint）**：`/ce-compound "the email digest race condition we fixed"`
-- **Long session 中用 Lightweight**：context 紧张时，在 prompt 中选择 lightweight mode
+- **Long session 中用 Lightweight**：context 紧张时，skill 会自行选择 lightweight mode，并在 output 中说明
 
 Auto-invoke triggers 会在对话中触发；如果你刚确认某件事 works，不需要记住 slash command。
 
@@ -186,8 +186,8 @@ Auto-invoke triggers：conversation 中出现 "that worked"、"it's fixed"、"wo
 
 ## 常见问题
 
-**为什么有两种 modes？**
-Full mode 适用于大多数情况：parallel subagents 能捕获 duplicates、找到 related docs 并运行 specialized reviews。Lightweight mode 用于 simple fixes 或 context 紧张的 sessions，此时深度 cross-referencing 不值得 token 成本。
+**为什么有两种 modes，而且不让我选择？**
+Full mode 适用于大多数情况：parallel subagents 能捕获 duplicates、找到 related docs 并运行 specialized reviews。Lightweight mode 用于 simple fixes 或 context 紧张的 sessions，此时深度 cross-referencing 不值得 token 成本。Skill 会自行选择，而不是弹出 prompt，因为决定因素是剩余 context budget，这项信息 agent 能看到、用户看不到；提问只会让用户猜测。它会在 output 中报告选择，如果判断不符合你的偏好，重新运行的成本很低。
 
 **Bug track 和 knowledge track 有什么区别？**
 Bug track 捕获 incident-level fixes："X broke, here's why and how we fixed it." Knowledge track 捕获 durable guidance："this is how we do X here, and why." 两者 audience 和 structure 不同：bug track 有 Symptoms / What Didn't Work / Solution；knowledge track 有 Context / Guidance / When to Apply。

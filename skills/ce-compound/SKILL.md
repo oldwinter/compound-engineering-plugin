@@ -35,7 +35,7 @@ Check `$ARGUMENTS` for a `mode:headless` token. Tokens starting with `mode:` are
 
 | Mode | When | Behavior |
 |------|------|----------|
-| **Interactive** (default) | No mode token present | Ask Full vs Lightweight, ask about session history (Full only), prompt for Discoverability Check consent, end with "What's next?" |
+| **Interactive** (default) | No mode token present | 自动选择 Full 或 Lightweight 并报告选择结果；自动执行 session history probe（仅 Full）；询问是否同意 Discoverability Check；最后输出普通摘要（不显示 "What's next?" 菜单） |
 | **Headless** | `mode:headless` in arguments | No blocking questions. Run **Full mode without session history**. Apply the Discoverability Check edit silently if a gap exists. Skip Phase 3 specialized reviews. End with a structured terminal report — no "What's next?" menu. |
 
 Headless mode is intended for automations and skill-to-skill invocation where no human is present to answer questions. The doc itself is identical to what an interactive Full run would produce — classification work (track, category, overlap) follows the same rules and writes nothing extra into the artifact. Once detected, headless mode applies for the entire run.
@@ -68,32 +68,17 @@ When spawning subagents, pass the relevant file contents into the task prompt so
 
 ## Execution Strategy
 
-**In headless mode**, skip both questions below and go directly to **Full Mode** with session history disabled. Phase 1's session-history step (step 4) is omitted. Proceed straight to research.
+`ce-compound` 不会询问用户要运行哪种模式，也不会询问是否搜索 session history。这两项决策都更适合由 agent 作出：模式取决于 agent 可以观察到的 context budget；session history 是否有价值则是双方都无法预先知道的（真正有用的信息可能来自当前 agent 从未参与过的另一段早期 session），因此应通过低成本 probe 来判断，而不是提问。整个 workflow 唯一的 interactive prompt 是请求用户同意 Discoverability Check，因为这一步会编辑 tracked instruction file。
 
-**In interactive mode**, present the user with two options before proceeding, using the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
+**模式选择（Full 或 Lightweight）——直接判断，不要询问。**
 
-```
-1. Full (recommended) — the complete compound workflow. Researches,
-   cross-references, and reviews your solution to produce documentation
-   that compounds your team's knowledge.
+- 默认选择 **Full**：执行完整 workflow（research、cross-referencing、overlap detection、grounding validation）。几乎所有值得记录的 learning 都应该使用此模式；与产出该 learning 的工程工作相比，它消耗的 token 很少，而一份能够持续复利的文档价值远高于这点成本。
+- 只有在确实存在 context 压力时才选择 **Lightweight**（single-pass、无 subagents；参见 Lightweight Mode）：session 已接近 context limit，或者修复足够简单，cross-referencing 不会带来任何价值。这些条件 agent 能观察到、用户却无法观察到，正因如此才不应向用户提问。
+- 将所选模式和一行理由放在 completion output 的第一行（例如 "Ran Full mode." / "Ran Lightweight mode — session context was tight."）。如果 Lightweight 不符合用户偏好，重新运行只是少见且低成本的修正；这比每次运行都用 prompt 打断用户更划算。
 
-2. Lightweight — same documentation, single pass. Faster and uses
-   fewer tokens, but won't detect duplicates or cross-reference
-   existing docs. Best for simple fixes or long sessions nearing
-   context limits.
-```
+**在 headless mode 中**，完全跳过模式选择，直接运行禁用 session history 的 **Full Mode**（省略 Phase 1 step 4），然后进入 research。
 
-In interactive mode, do NOT pre-select a mode, do NOT skip this prompt, and wait for the user's choice before proceeding. (Headless mode bypasses this prompt per the "**In headless mode**" rule above and runs Full directly — these "do not skip" directives do not apply to headless.)
-
-**If the user chooses Full** (interactive mode only), ask one follow-up question before proceeding. Detect which harness is running (Claude Code, Codex, or Cursor) and ask:
-
-```
-Would you also like to search your [harness name] session history
-for relevant knowledge to help the Compound process? This adds
-time and token usage.
-```
-
-If the user says yes, run the internal session-history step in Phase 1 (see step 4). If no, skip it. Do not ask this in lightweight mode or headless mode. There is no standalone `ce-sessions` product surface; this support exists only inside the compounding workflow.
+**Session history——Full mode 中的自动 probe，绝不向用户提问。** 搜索以往 sessions 的意义，在于某个看似无关的早期 session 可能包含相关的问题解决过程；agent 和用户都无法预先知道这一点，因此询问没有意义。Full mode 会始终运行低成本的 discovery+metadata probe（Phase 1 step 4）；该 probe 与 research subagents 并行执行，几乎不增加 wall-clock time。只有 probe 找到真正相关的 candidate sessions 时，才升级到成本较高的 extraction+synthesis。Lightweight 和 headless modes 会完全跳过 session history。`ce-sessions` 没有独立的 product surface；这项能力只存在于 compounding workflow 内部。
 
 ---
 
@@ -169,7 +154,7 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
 
 **Dispatch order:**
 - Launch `Context Analyzer`, `Solution Extractor`, and `Related Docs Finder` in parallel (background)
-- **Then** run the internal session-history discovery/extraction/synthesis flow (see step 4 below) — only if the user opted in to session history. This flow is synchronous from this orchestrator's main-context turn, but the already-dispatched background subagents continue running in parallel underneath, so the wall-clock benefit is preserved (`max(session-history, slowest background subagent)`, not their sum). Running session history before the parallel block would serialize it in front of the research subagents and regress wall-clock time.
+- **然后**在 Full mode 中运行内部 session-history discovery/extraction/synthesis flow（见下面的 step 4）；Lightweight 和 headless modes 跳过此步骤。低成本 discovery+metadata probe 每次都会运行；只有命中相关候选时才升级到 extraction+synthesis（见 step 4 的 Escalation gate）。从 orchestrator 的 main-context turn 看，该 flow 是同步执行的，但已经 dispatch 的 background subagents 仍会在底层并行运行，因此 wall-clock 优势得以保留（耗时为 `max(session-history, slowest background subagent)`，而不是两者之和）。如果在 parallel block 之前运行 session history，就会把它串行放到 research subagents 前面，导致 wall-clock time 退化。
 
 <parallel_tasks>
 
@@ -243,8 +228,8 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
 
 </parallel_tasks>
 
-#### 4. **Session History** (internal flow after launching the parallel block — only if the user opted in)
-   - **Skip entirely** if the user declined session history in the follow-up question, if running in lightweight mode, or if running in headless mode.
+#### 4. **Session History**（启动 parallel block 后执行的内部 flow——在 Full mode 中自动运行）
+   - 在 lightweight mode 或 headless mode 中**完全跳过**。在 Full mode 中，它始终作为两阶段 probe 运行：低成本 discovery+metadata pass（见下文）每次都会执行；只有 probe 通过 relevance gate 时，才执行成本较高的 extraction+synthesis（见下面的 **Escalation gate**）。
    - Run session discovery, branch/keyword filtering, scan-window selection, deep-dive selection, and per-session extraction directly inside this skill using `scripts/session-history/`.
    - Read the skill-local synthesis prompt at `references/agents/session-historian.md`, then dispatch a generic subagent using that prompt content. Do not dispatch a standalone agent by type/name.
 
@@ -268,30 +253,34 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
    - Returns: structured digest of findings from prior sessions, or "no relevant prior sessions" if none found.
    - **Session history is the final Phase 1 input, not a workflow stop.** When it returns, proceed directly to Phase 2 with its output as the last input — do not emit a summary and do not pause for the user. A "no relevant prior sessions" return is still a valid input; the documentation gets written without session context.
 
-   **Script resolution.** On Claude Code, run the bundled scripts through `${CLAUDE_SKILL_DIR}/scripts/session-history/`. On platforms where `${CLAUDE_SKILL_DIR}` is unavailable and the script path cannot be resolved from the loaded skill directory, skip session history visibly with: "Session history was requested, but this platform did not expose the bundled session-history scripts to the runtime." Continue Phase 2 without session context.
+   **Script resolution。** 将 `SKILL_DIR` 设为刚才读取的 SKILL.md 所在目录的 absolute path，并从 `"$SKILL_DIR/scripts/session-history/"` 运行 bundled scripts。在下面的每个 bash block 中 inline 设置 `SKILL_DIR`（shell state 不会在 commands 之间保留）。如果磁盘上的 `"$SKILL_DIR/scripts/session-history/"` 下确实不存在 bundled scripts，则用以下精确文本明确说明并跳过 session history："Session history bundled scripts were not found in this skill's directory; skipping the session-history probe for this run." 随后在没有 session context 的情况下继续 Phase 2。
 
-   **Discovery pipeline.** Infer the scan window from the problem topic, starting with 7 days. Run discovery and metadata extraction:
+   **Discovery pipeline。** 根据 problem topic 推断 scan window，初始值为 7 days。运行 discovery 和 metadata extraction：
 
    ```bash
-   if [ -n "${CLAUDE_SKILL_DIR}" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/session-history/discover-sessions.sh" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/session-history/extract-metadata.py" ]; then
+   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
+   if [ -f "$SKILL_DIR/scripts/session-history/discover-sessions.sh" ] && [ -f "$SKILL_DIR/scripts/session-history/extract-metadata.py" ]; then
      REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
      REPO_NAME=$(basename "$REPO_ROOT")
      SCAN_DAYS="7"
-     bash "${CLAUDE_SKILL_DIR}/scripts/session-history/discover-sessions.sh" "$REPO_NAME" "$SCAN_DAYS" --cwd "$REPO_ROOT" | tr '\n' '\0' | xargs -0 python3 "${CLAUDE_SKILL_DIR}/scripts/session-history/extract-metadata.py" --cwd-filter "$REPO_ROOT"
+     bash "$SKILL_DIR/scripts/session-history/discover-sessions.sh" "$REPO_NAME" "$SCAN_DAYS" --cwd "$REPO_ROOT" | tr '\n' '\0' | xargs -0 python3 "$SKILL_DIR/scripts/session-history/extract-metadata.py" --cwd-filter "$REPO_ROOT"
    else
-     echo "Session history was requested, but this platform did not expose the bundled session-history scripts to the runtime."
+     echo "Session history bundled scripts were not found in this skill's directory; skipping the session-history probe for this run."
    fi
    ```
 
    Pi sessions are included when present under `~/.pi/agent/sessions/`; they carry `cwd` like Codex but no git branch. If `_meta.files_processed` is `0`, return `no relevant prior sessions`. If the first pass finds no relevant branch matches, or if processing Codex or Pi sessions, derive 2-4 keywords from the topic and re-run metadata extraction with `--keyword K1,K2,...`. Keep at most 5 sessions across Claude Code, Codex, Cursor, and Pi, ranked by branch match, keyword match count, file size over 30KB, and recency. Exclude the current session.
 
+   **Escalation gate。** 上面的 discovery+metadata pass 是低成本 probe，在 Full mode 中始终运行。只有至少一个保留的 candidate 达到 relevance bar 时，才升级到下面的 extraction 和 synthesis stages：匹配 current branch，或命中 ≥2 个 topic keywords。如果没有 candidate 达标（包括 `_meta.files_processed` 为 `0` 的情况），就在此停止，将 `no relevant prior sessions` 记录为 session-history input，并跳过 extraction 和 synthesis。正是这个 gate 让 always-on probe 保持低成本：只有 prior session 确实相关时，才付出高成本 synthesis 的开销。
+
    **Extraction pipeline.** Create `SCRATCH=$(mktemp -d -t ce-compound-sessions-XXXXXX)`. For each selected session, write extracted content to scratch files:
 
    ```bash
-   if [ -n "${CLAUDE_SKILL_DIR}" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/session-history/extract-skeleton.py" ]; then
-     python3 "${CLAUDE_SKILL_DIR}/scripts/session-history/extract-skeleton.py" --output "$SCRATCH/<session-id>.skeleton.txt" < <session-file>
+   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
+   if [ -f "$SKILL_DIR/scripts/session-history/extract-skeleton.py" ]; then
+     python3 "$SKILL_DIR/scripts/session-history/extract-skeleton.py" --output "$SCRATCH/<session-id>.skeleton.txt" < <session-file>
    else
-     echo "Session history was requested, but this platform did not expose the bundled session-history scripts to the runtime."
+     echo "Session history bundled scripts were not found in this skill's directory; skipping the session-history probe for this run."
    fi
    ```
 
@@ -311,7 +300,7 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
 
 <sequential_tasks>
 
-**WAIT for all Phase 1 inputs to complete before proceeding** — the three parallel subagents and, when the user opted in, the internal session-history flow. Session history is a Phase 1 input even though it runs in the orchestrator rather than as a public skill.
+**继续之前，等待所有 Phase 1 inputs 完成**——包括三个 parallel subagents，以及 Full mode 中的内部 session-history flow（它可能在 probe 阶段以 `no relevant prior sessions` 停止）。Session history 虽然在 orchestrator 内运行，而不是作为 public skill 运行，但仍然是 Phase 1 input。
 
 The orchestrating agent (main conversation) performs these steps:
 
@@ -656,6 +645,7 @@ Documentation skipped
 ```
 ✓ Documentation complete
 
+Ran Full mode.
 Auto memory: 2 relevant entries used as supplementary evidence
 
 Subagent Results:
@@ -679,15 +669,10 @@ Files written:
 This documentation will be searchable for future reference when similar
 issues occur in the Email Processing or Brief System modules.
 
-What's next?
-1. Continue workflow (recommended)
-2. Link related documentation
-3. Update other references
-4. View documentation
-5. Other
+Refresh recommendation: none
 ```
 
-**After displaying the interactive success output above, present the "What's next?" options using the platform's blocking question tool:** `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question. Do not continue the workflow or end the turn without the user's selection. (Interactive mode only — headless skips this per the headless block above.)
+**输出摘要后结束当前 turn——`ce-compound` 不显示 "What's next?" 菜单。** 文档已经写入，workflow 找到的所有 cross-references 也已经包含在其中。Cross-doc maintenance（修复*其他*文档中的 references、执行 consolidation）应通过上面的 `Refresh recommendation` 行交给专门处理此任务的 `ce-compound-refresh`，而不是在这里自动应用；否则会超出唯一 deliverable 的边界，编辑更多 tracked docs。如果用户想查看文件或执行 follow-up action，他们会主动提出。（仅 interactive mode。）
 
 **Alternate interactive output (when updating an existing doc due to high overlap):** in headless mode, this case is communicated via the `Overlap: high — existing doc updated` line of the headless terminal report above, not as a separate output block.
 

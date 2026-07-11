@@ -4,7 +4,7 @@
 
 - 上游项目：`EveryInc/compound-engineering-plugin`
 - 中文 fork：`oldwinter/compound-engineering-plugin`
-- 主要安装面：Claude Code plugin marketplace；其他 host 的原生 plugin manifest
+- 主要安装面：Claude Code plugin marketplace；其他 host 的原生 plugin manifest 或 native skills 目录
 - 目标用户：希望直接使用中文工程工作流、skill 和参考文档的开发者
 - 用户安装后实际读取的入口文件：`skills/*/SKILL.md`、各 skill 的 `references/`，以及 host 对应的 plugin manifest
 - 不应宣传为中文版安装的入口：指向 `EveryInc/compound-engineering-plugin` 的上游安装命令
@@ -44,7 +44,7 @@
 
 README 顶部提供“安装中文版”区块，必须说明这是社区中文 fork，并使用 `oldwinter/compound-engineering-plugin` 作为 marketplace source。上游 `EveryInc/compound-engineering-plugin` 命令可保留作英文版说明，但不能标注为中文版安装入口。
 
-当前同步基线：上游 commit `ee2fee4c`。
+当前同步基线：上游 commit `7f86be9d`。
 
 ## 同步后检查
 
@@ -57,6 +57,6 @@ README 顶部提供“安装中文版”区块，必须说明这是社区中文 
 
 ## 项目特殊规则
 
-- 上游同时支持 Claude Code、Codex、Cursor、Kimi、Grok、Devin、Pi 等 host；翻译不得改变各 host 的 manifest、权限映射或安装语义。
+- 上游同时支持 Claude Code、Codex、Cursor、Cline、Kimi、Grok、Devin、Pi 等 host；翻译不得改变各 host 的 manifest、权限映射或安装语义。
 - `skills/` 是 runtime source of truth；`docs/skills/` 是面向读者的镜像说明，两者涉及同一新增能力时应保持语义一致。
 - 长篇历史 plan、solution 和 spec 默认保留上游原文；只有实际运行入口、当前安装说明或用户直接依赖的文档需要增量翻译。

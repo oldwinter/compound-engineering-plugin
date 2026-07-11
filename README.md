@@ -244,6 +244,23 @@ You can also browse it through Kimi's custom marketplace flow:
 
 After installing or updating, run `/reload` or start a new Kimi session so the plugin skills are loaded.
 
+### Cline
+
+Cline 从包含 `SKILL.md` 的目录中按需加载 CE skills。先在 Cline 扩展中启用 **Settings -> Features -> Enable Skills**，再将本中文 fork 的 skills link 到全局或单个 project：
+
+```bash
+git clone https://github.com/oldwinter/compound-engineering-plugin
+./compound-engineering-plugin/.cline/scripts/install-skills.sh --global
+```
+
+从 checkout 安装到单个 project：
+
+```bash
+./compound-engineering-plugin/.cline/scripts/install-skills.sh --project
+```
+
+安装或更新 skills 后，请启动新的 Cline task。固定版本、本地开发和卸载步骤见 [`.cline/INSTALL.md`](.cline/INSTALL.md)。
+
 ### Grok Build CLI (`grok`)
 
 xAI 的 [Grok Build CLI](https://x.ai/cli)（`grok`）可以直接从本 repository 安装 Compound Engineering。Repo root 本身就是有效的 Grok plugin：`grok` 会读取现有的 Claude-compatible manifests，而且 repo 也提供 native `.grok-plugin/plugin.json`：
@@ -479,6 +496,14 @@ To test the local marketplace catalog instead, pass the catalog path:
 ```text
 /plugins marketplace /path/to/compound-engineering-plugin/.kimi-plugin/marketplace.json
 ```
+
+**Cline**
+
+```bash
+/path/to/compound-engineering-plugin/.cline/scripts/install-skills.sh --global
+```
+
+在 Cline 扩展中启用 **Settings -> Features -> Enable Skills**，然后启动新的 task。
 
 **Devin CLI**
 
