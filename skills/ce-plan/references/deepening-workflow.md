@@ -212,6 +212,8 @@ echo "$SCRATCH_DIR"
 
 当多个 agents 针对同一 section 返回 findings 时，一次呈现一个 agent，让用户能独立决定。展示前不要合并不同 agents 的 findings。
 
+针对带 `session-settled:` 标签 KTD 的 findings 也像其他 findings 一样展示；只有 pipeline/auto mode 会 suppress，interactive mode 绝不 suppress。用户接受了会改变 labeled KTD 的 finding，意味着形成了新的 settlement：更新 KTD text，并将其重新标记为 `user-approved`。
+
 所有 agents review 完成后，只将 accepted findings 带入 5.3.7。
 
 如果用户没有接受任何 findings，报告 "No findings accepted — plan unchanged." 然后直接进入 Phase 5.4（跳过 document-review 和 synthesis；plan 未修改）。这个 interactive-mode-only skip 不适用于 auto mode；auto mode 总是继续通过 5.3.7 和 5.3.8。无需显式 scratch cleanup；`$SCRATCH_DIR` 是 OS temp，会由 OS 清理；保留它可保存 rejected agent artifacts 以便 debugging。
@@ -223,6 +225,8 @@ echo "$SCRATCH_DIR"
 只 strengthen selected sections。保持 plan coherent，并保留整体 structure。
 
 **在 interactive mode 中：** 只 integrate 用户在 5.3.6b 接受的 findings。如果不同 agents 的 findings 触及同一 section，coherently reconcile 它们，但不要重新引入 rejected findings。
+
+**Session-settled KTD stability。** Deepening 可以向带 `session-settled:` 标签的 Key Technical Decision 添加 rationale 或 conflict call-out，但绝不能移除 annotation 或反转 decision（never removes the annotation or inverts the decision）。Contradiction evidence 按 severity ladder 路由：没有发现问题时静默继续；suboptimal-but-workable 时按 settled decision 继续，并给 KTD 添加 conflict call-out；invalidating 时按 SKILL.md Phase 5.2 pipeline contract blocked stop。
 
 Deepening 可以 tighten，而不只是 grow。Section 的强化可以通过删减和添加完成：collapse multi-idea sentences、drop hedges，并直接删除 superseded text，而不是保留 strikethrough 或在上面堆一个 separate "resolutions" layer。更短且 contradiction-free 的 section 更强。这不同于下方仍然禁止的 "rewrite the entire plan from scratch"。
 

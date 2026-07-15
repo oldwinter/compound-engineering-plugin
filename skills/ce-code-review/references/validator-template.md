@@ -46,7 +46,7 @@ Your task is to answer three questions:
    - The persona misread types or signatures
    - The persona flagged a pattern that is intentional in this codebase (check comments, parallel handlers, project conventions)
 
-2. **Is the issue introduced by THIS diff?** Use git blame or diff inspection. If the cited line predates this PR's commits and the diff does not interact with it (does not call into it, does not change its callers in a way that newly exposes the issue), the finding is pre-existing — not validated for externalization regardless of whether it is a real issue.
+2. **Is the issue introduced by THIS diff?** Use git blame or diff inspection against the reviewed tree (workspace in local-aligned; reviewed head ref in `pr-remote` / `branch-remote`). If the cited line predates this PR's commits and the diff does not interact with it (does not call into it, does not change its callers in a way that newly exposes the issue), the finding is pre-existing — not validated for externalization regardless of whether it is a real issue. When blame/log informs that verdict, prefer citing short-hash provenance in `reason` (e.g. `provenance: a1b2c3d Alice 2024-08-12 - …`) rather than a bare calendar year. Missing provenance when history was load-bearing is a soft quality miss — weaken confidence in the reason if needed, but do not reject an otherwise-correct finding solely because the persona omitted a provenance evidence line.
 
 3. **Is the issue not handled elsewhere?** Look for guards in callers, middleware in the request chain, framework defaults, type system constraints, or parallel handlers that already address the concern. If the issue is functionally prevented by surrounding infrastructure, the finding is invalid.
 
@@ -61,10 +61,10 @@ Return ONLY this JSON, no prose:
 
 Examples:
 
-- `{ "validated": true, "reason": "cited line 是此 diff 新增的，且缺少 parallel controllers 使用的 ownership guard。" }`
-- `{ "validated": false, "reason": "Line 87 已用 .present? check guard user.email；finding 描述的 null deref 不会发生。" }`
-- `{ "validated": false, "reason": "cited line 可追溯到 2024-08（pre-existing）；diff 未修改它，也未与其交互。" }`
-- `{ "validated": false, "reason": "Framework 已通过 Faraday default 处理 timeout case；不需要 application-level retry。" }`
+- `{ "validated": true, "reason": "Cited line is new in this diff and lacks the ownership guard used by parallel controllers." }`
+- `{ "validated": false, "reason": "Line 87 already guards user.email with .present? check; the null deref the finding describes cannot occur." }`
+- `{ "validated": false, "reason": "Cited line is pre-existing (provenance: a1b2c3d Alice 2024-08-12 - harden rescue); diff does not modify or interact with it." }`
+- `{ "validated": false, "reason": "Framework handles the timeout case via Faraday default; no application-level retry needed." }`
 
 Rules:
 - Be honest. If the original reviewer was right, validate. If they were wrong, reject. Conservative bias is preferred — when in doubt, reject.

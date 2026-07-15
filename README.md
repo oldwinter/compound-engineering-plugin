@@ -229,6 +229,28 @@ CODEX_HOME="$HOME/.codex/profiles/work" codex plugin add compound-engineering@co
 
 The marketplace step only makes the plugin available; the plugin install is what activates the native CE skills for that profile.
 
+#### 移除旧版 Codex tool map（native plugin 推出前的安装）
+
+如果你曾在 native Codex plugin 支持推出前，通过 Bun `convert` / `install --to codex` CLI 安装 Compound Engineering，该路径可能在你的**全局** Codex instructions file 中插入过一个 managed block：
+
+`<!-- BEGIN COMPOUND CODEX TOOL MAP -->` … `<!-- END COMPOUND CODEX TOOL MAP -->`
+
+它位于 `$CODEX_HOME/AGENTS.md`（默认 `~/.codex/AGENTS.md`）。这个 Claude-compat tool map 已经过时，因为 CE skills 会直接在内部指明 Codex tools；其中一行还错误地要求 Codex 把 subagent dispatch 收缩到 main thread。Native plugin 安装**不会**添加该 block。
+
+把以下 prompt 粘贴给 Codex（或任何可访问 home directory 的 agent）即可移除：
+
+```text
+从我的 Codex home AGENTS.md 中移除过时的 Compound Engineering Codex tool-map block。
+
+1. 如果设置了 CODEX_HOME，检查 `$CODEX_HOME/AGENTS.md`；否则检查 `~/.codex/AGENTS.md`。如果我使用 Codex profiles，还要检查 `~/.codex/profiles/*/AGENTS.md`。
+2. 查找精确 sentinels：`<!-- BEGIN COMPOUND CODEX TOOL MAP -->` 和 `<!-- END COMPOUND CODEX TOOL MAP -->`。
+3. 如果两者都存在，只删除从 BEGIN 行到 END 行（含首尾两行）的内容，其他 user content 保持不变。除非 project/repo AGENTS.md 中也出现了这两个精确 sentinels，否则不要编辑它。
+4. 如果移除后文件为空，则删除该文件。
+5. 简短展示修改前后的摘要；如果 block 原本就不存在，也请说明。不要添加 replacement tool map。
+```
+
+重新运行面向 Codex 的 Bun convert/install CLI，也会移除仍然存在的 block；新版 CLI 不再插入它。
+
 ### Kimi Code CLI
 
 Kimi Code CLI can install Compound Engineering directly from this repository because the repo ships a native `.kimi-plugin/plugin.json` manifest:

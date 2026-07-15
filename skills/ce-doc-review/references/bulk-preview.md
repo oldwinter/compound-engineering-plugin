@@ -42,7 +42,7 @@ Routing option B（top-level best-judgment）的 worked example：
 Auto-resolve plan — 8 findings:
 
 Applying (4):
-  [P0] Requirements Trace — Renumber R4 to match unit reference
+  [P0] Requirements Trace — Renumber R4 (the auth-token requirement) to match unit reference
   [P1] Unit 3 Files — Add read-fallback for renamed report file
   [P2] Key Technical Decisions — Use framework's Deprecated field rather than hand-rolling
   [P3] Overview — Correct wrong count (says 6, list has 5)
@@ -73,6 +73,7 @@ Skipping (2):
 - **Shape（形状）:** `[<severity>] <section> — <one-line summary>`
 - **Width target（宽度目标）:** 将 lines 保持在约 80 columns，让 preview 在 narrow terminals 中 clean render。必要时用 ellipsis truncate。
 - **No section numbering**，除非 reader 需要它定位 issue（多个 findings 命中同名 section 时）。
+- **Self-contained identifiers**：当 one-line summary 引用 document-defined identifier（例如 requirement/unit ID `R4`、`U3`）时，首次出现必须配上从 document 提取的简短 plain-language handle（例如 `R4 (the auth-token requirement)`），绝不能只显示 bare ID；遵循 `references/synthesis-and-presentation.md` 中 self-contained-rendered-lines rule。
 
 当某个 finding 没有可用的 `why_it_matters`（罕见，只在 persona output malformed 时），直接 fallback 到 finding title。如果这影响同一 run 中不止少数 findings，在 completion report 的 Coverage section 中注明 gap。
 

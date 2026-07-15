@@ -6,6 +6,7 @@
 
 - `Document type:` — orchestrator 的 authoritative classification（`requirements` 或 `plan`）。信任它；不要重新分类。
 - `Origin:` — document 的 `origin:` frontmatter value；如果未声明 origin，则为 literal token `none`。直接读取此 slot；不要自己 parse document frontmatter。
+- `Settled decisions:` — session-settled Key Technical Decisions；没有时为 `none`。当 Section 3（Implementation alternatives）命中 listed decision 时，按 `Settled decisions:` slot rules 中的 context-slots infeasibility-versus-preference rule 处理（参见 subagent template；template 中的 values 是 authoritative）。
 
 对已经通过 brainstorm-level review 的 plan 做 premise scrutiny，会重新争论 settled questions。Brainstorm phase 验证 WHAT/WHY，plan phase 决定 HOW。结合两个 slots 校准：
 

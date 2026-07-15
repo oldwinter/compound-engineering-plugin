@@ -99,6 +99,7 @@ Substitutions（替换规则）：
 
 - **`{plain-English title}`** — 适合作为 heading 的 3-8 个词摘要。它从 merged finding 的 `title` 字段派生，但要重述为可观察后果（例如 “Implementers will pick different tiers”，而不是 “Section X-Y lists four tiers”）。对 document-review findings 来说，可观察后果是对 *reader、implementer 或 downstream decision* 的影响，而不是 runtime behavior。
 - **`{section}`** — 来自 finding 的 `section` 字段。
+- **Document-defined identifiers** — 此 rendered block 中任何 requirement/unit ID（`R6`、`U3`）首次出现时，都必须带上从 document 提取的简短 plain-language handle（例如 `R6 (suppress peer panels on low-stakes calls)`），绝不能只显示 bare ID；遵循 `references/synthesis-and-presentation.md` 中 self-contained-rendered-lines rule，并遵守下方 code-span budget。
 - **`why_it_matters`** — 来自 merged finding 的 `why_it_matters` 字段。按原样渲染；subagent template 的 framing guidance 已确保它以 observable-consequence-first 表述。
 - **`suggested_fix`** — 来自 merged finding 的 `suggested_fix` 字段。渲染为描述意图的 prose，不要渲染为 raw markup。用户的任务是信任或拒绝该 action，不需要审查 exact text。规则：
   - **Default（默认）— 用一句话描述效果。** fix 达成什么，位于哪里？优先用 intent language，而不是 quoted text。

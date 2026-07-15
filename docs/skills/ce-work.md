@@ -21,9 +21,10 @@
 
 | Question（问题） | Answer（答案） |
 |----------|--------|
-| 它做什么？ | 读取 plan（或 scope 一个 bare prompt），按 guardrails 执行，持续运行 tests，交付 reviewed PR |
-| 何时使用 | 实现 `ce-plan` plan；小/中型 bare-prompt work；恢复 partly-shipped work |
+| 它做什么？ | 读取 implementation-ready plan（或 scope 一个 bare prompt），按 guardrails 执行，持续运行 tests，交付 reviewed PR |
+| 何时使用 | 实现带 `artifact_readiness: implementation-ready` 的 `ce-plan` plan；小/中型 bare-prompt work；恢复 partly-shipped work |
 | 产出什么 | Commits + PR（或 no-PR path 中只产生 commits） |
+| Caller-owned mode | 供 `lfg` 等 outer orchestrator 使用：`mode:return-to-caller <plan path>` 完成实现与本地验证，随后返回 structured envelope，并跳过 standalone shipping tail（final simplify、review、PR、CI）；implementation 中途的 Simplify as You Go 仍会运行 |
 | 下一步 | Review PR；运行 `/ce-compound` 捕获 learnings |
 | Distinguishing | Plan-aware idempotency、带 worktree isolation 的 subagent dispatch、带 residual gate 的 tiered review、PR 中的 operational validation |
 
@@ -87,6 +88,10 @@ Task 不是 code compiles 就算 done。任何 feature-bearing task 标记 compl
 
 不是每次 invocation 都有 plan。`ce-work` 接收 bare prompt，并按 complexity triage：trivial work（少量文件、无 behavior change）直接实现；small/medium work 构建 task list；large 或 sensitive work 建议先用 `/ce-brainstorm` 或 `/ce-plan`。这个 triage 让 `ce-work` 可以合理处理小工作，而不强制所有事情都走完整 chain。
 
+### 9. Session-settled decisions are not-yours-to-improve
+
+A KTD carrying a `session-settled:` label records a decision the user examined and chose for a reason — `ce-work` implements it as specified instead of "improving" it. The restraint is scoped tightly to labeled KTDs; judgment on everything the plan leaves open is unchanged, and real defects inside a settled approach still surface at full strength. A discovery that a settled decision genuinely can't work is a blocker return, never a silently-accepted residual; non-blocking proceed-and-flag conflicts ride the return envelope as `settled_decision_conflicts`.
+
 ---
 
 ## 快速示例
@@ -95,7 +100,7 @@ Task 不是 code compiles 就算 done。任何 feature-bearing task 标记 compl
 
 Parallel Safety Check 发现四个 units 之间没有 file overlap，且 worktree isolation 可用，于是四个 subagents 并行分派，各自使用自己的 branch。它们完成后，orchestrator 按 dependency order merge；每次 merge 后 tests 都通过。Idempotency check 捕获到其中一个 unit 的 verification 已被先前 session 满足，于是直接标为 complete，不重新实现。
 
-Diff 不在 sensitive surface 上，也不大且 diffuse，所以 harness-native review 处理它；两个 suggested findings 被 inline 修掉。Final validation 通过；operational validation plan 起草完成；`ce-commit-push-pr` 打开 PR，PR 包含 summary、testing notes、operational section 和 Compound Engineered badge。Plan 本身保持 untouched：它是 decision artifact，是否已经 shipped 由 git 派生，不记录在 doc 中。
+Diff 不在 sensitive surface 上，也不大且 diffuse，所以 harness-native review 处理它；两个 suggested findings 被 inline 修掉。Final validation 通过；operational validation plan 起草完成；`ce-work` 使用 `branding:on` 调用 `ce-commit-push-pr`，因此 PR 包含 summary、testing notes、operational section 和 generic Compound Engineering branding。Plan 本身保持 untouched：它是 decision artifact，是否已经 shipped 由 git 派生，不记录在 doc 中。
 
 ---
 
@@ -157,6 +162,16 @@ Shipping 之后，`/ce-compound` 会把任何 reusable learning（遇到的 bugs
 
 对于 large bare-prompt scope（cross-cutting、sensitive surfaces、many files），`ce-work` 会建议先用 `/ce-brainstorm` 或 `/ce-plan`，但会按你的选择继续。
 
+## Use Beneath an Outer Orchestrator
+
+当另一个 workflow 负责实现完成后的发布关卡（final simplify、code review、PR creation 和 CI watching）时，请调用：
+
+```text
+/ce-work mode:return-to-caller <plan path>
+```
+
+此模式让 `ce-work` 专注于实现与本地验证。实现中段的 "Simplify as You Go" 仍会在 Phase 2 运行（Mid-implementation "Simplify as You Go" still runs）。之后，`ce-work` 会返回一个 structured envelope，其中包含 changed files、completed units、verification evidence 和 blockers，并设置 `standalone_shipping_skipped: true`；它 does not run the standalone shipping tail，也就是 skips the standalone shipping tail (final simplify, review, PR, CI)。每一个实现后关卡仍由 caller 负责。
+
 ---
 
 ## 参考
@@ -166,6 +181,7 @@ Shipping 之后，`/ce-compound` 会把任何 reusable learning（遇到的 bugs
 | _(empty)_ | 自动使用 `docs/plans/` 中最新的 plan |
 | `<plan path>` | Origin-sourced execution |
 | `<bare prompt>` | 按 complexity triage（Trivial / Small-Medium / Large） |
+| `mode:return-to-caller <plan path>` | 供 outer orchestrator 使用：完成实现与本地验证，然后返回 structured evidence，不运行 standalone shipping tail（final simplify、review、PR、CI） |
 
 Output：通过 `ce-commit-push-pr` 产生 commits 和（通常）PR。整个过程中 plan 都是 read-only；`ce-work` 永远不 mutate plan。是否已经 shipped 由 git 派生，不记录在 doc 中。
 

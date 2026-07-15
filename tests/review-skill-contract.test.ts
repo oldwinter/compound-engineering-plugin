@@ -194,6 +194,28 @@ describe("ce-code-review contract", () => {
     expect(template).toMatch(/personas never produce/i)
   })
 
+  test("subagent template and schema require load-bearing line provenance in evidence", async () => {
+    const template = await readRepoFile(
+      "skills/ce-code-review/references/subagent-template.md",
+    )
+    const schemaRaw = await readRepoFile(
+      "skills/ce-code-review/references/findings-schema.json",
+    )
+    const schema = JSON.parse(schemaRaw)
+    const evidenceDescription = schema.properties.findings.items.properties.evidence.description as string
+
+    expect(template).toMatch(/Load-bearing line provenance/i)
+    expect(template).toMatch(/provenance: <shortsha>/i)
+    expect(template).toMatch(/omit provenance when the finding is fully justified from the diff/i)
+    expect(template).toMatch(/must not replace the quote-the-line/i)
+    expect(template).toMatch(/Do not dump full-file blame/i)
+    expect(template).toMatch(/pr-remote.*branch-remote.*reviewed head ref/is)
+
+    expect(evidenceDescription).toMatch(/additional concise provenance line/i)
+    expect(evidenceDescription).toMatch(/never dump full-file blame/i)
+    expect(evidenceDescription).toMatch(/omit when the finding is justified from the diff alone/i)
+  })
+
   test("subagent template points to action-class rubric without safe_auto", async () => {
     const template = await readRepoFile(
       "skills/ce-code-review/references/subagent-template.md",
@@ -301,6 +323,10 @@ describe("ce-code-review contract", () => {
     expect(validatorTemplate).toContain('"validated": true | false')
     expect(validatorTemplate).toMatch(/introduced by THIS diff/i)
     expect(validatorTemplate).toMatch(/handled elsewhere/i)
+    // Load-bearing provenance: prefer short-hash in reason; soft miss when omitted
+    expect(validatorTemplate).toMatch(/short-hash provenance/i)
+    expect(validatorTemplate).toMatch(/soft quality miss/i)
+    expect(validatorTemplate).toMatch(/provenance:/i)
   })
 
   test("Stage 5c applies safe fixes in default mode, report-only in mode:agent, no deny-list", async () => {
@@ -842,6 +868,80 @@ describe("ce-code-review contract", () => {
     expect(content).toMatch(/Each object in `triage_groups` carries/)
     expect(template).toMatch(/`triage_groups`.*batch related fixes by theme/)
   })
+})
+
+describe("cross-model peer skip legibility", () => {
+  // The worker logs a bounded `peer skip evidence:` tail of the peer's raw
+  // output at the no-usable-output skip point; the reference tells the agent to
+  // read that token from out.log to classify a quota/limit exhaustion. Producer
+  // and consumer live in separate files, so pin the shared contract token so
+  // they cannot drift silently and leave the classification prose toothless.
+  const pairs = [
+    {
+      worker: "skills/ce-code-review/scripts/cross-model-adversarial-review.sh",
+      reference: "skills/ce-code-review/references/cross-model-review.md",
+    },
+    {
+      worker: "skills/ce-doc-review/scripts/cross-model-doc-review.sh",
+      reference: "skills/ce-doc-review/references/cross-model-review.md",
+    },
+  ]
+
+  // A route "succeeded" (and so suppresses the cross-provider fallback) only
+  // when it returned a reviewer-shaped object with a top-level `findings` array
+  // — not merely any valid JSON. Accepting an error/envelope object (e.g. a grok
+  // 402 usage-exhausted body) would suppress the fallback and then be dropped at
+  // normalize, yielding no fold-in. The two workers must agree on this gate.
+  for (const worker of pairs.map((p) => p.worker)) {
+    test(`${worker} gates fallback on a findings-shaped return, not any valid JSON`, async () => {
+      const src = await readRepoFile(worker)
+      expect(src).toMatch(/out_missing_or_invalid\(\)/)
+      expect(src).toContain('(.findings|type)=="array"')
+    })
+  }
+
+  for (const { worker, reference } of pairs) {
+    test(`${worker} surfaces peer skip evidence that ${reference} classifies`, async () => {
+      const workerSrc = await readRepoFile(worker)
+      const referenceSrc = await readRepoFile(reference)
+
+      // Producer: the skip path emits the shared token from PEERLOG.
+      expect(workerSrc).toContain("peer skip evidence:")
+      expect(workerSrc).toContain('"$PEERLOG"')
+
+      // Peer stderr must be captured to its own file (NOT /dev/null) and surfaced
+      // too: an auth/quota/rate-limit message on stderr (claude/cursor) would
+      // otherwise be invisible to the classification. PEERLOG stays clean stdout
+      // for the findings brace-match and receipt jq-parse, so stderr is separate.
+      expect(workerSrc).toContain('2>"$PEERERR"')
+      expect(workerSrc).toContain("peer skip evidence (stderr):")
+
+      // Consumer: the reference points the agent at the same token and asks it
+      // to classify a quota/usage-limit exhaustion (harness-agnostic reasoning).
+      expect(referenceSrc).toContain("peer skip evidence:")
+      expect(referenceSrc).toMatch(/quota|usage-limit/i)
+      expect(referenceSrc).toMatch(/more than once in this session/i)
+    })
+  }
+
+  // The provider runs under `set -m` in its OWN process group so the worker can
+  // group-reap it without killing itself. On a clean worker exit the runner's
+  // final sweep only kills the worker's pgid, and a survivor the provider left
+  // in its own group reparents off the worker's tree — so BOTH run paths must
+  // reap "$pid" (the provider group) after wait, or that survivor leaks.
+  for (const worker of pairs.map((p) => p.worker)) {
+    test(`${worker} reaps the provider process group after waiting on it`, async () => {
+      const src = await readRepoFile(worker)
+      // run_codex_cmd: `wait "$pid" ... || true`, then the group sweep.
+      expect(src).toMatch(
+        /wait "\$pid" 2>\/dev\/null \|\| true\n(?:\s*#[^\n]*\n)*\s*reap "\$pid"/,
+      )
+      // run_timeout_cmd: `wait "$pid" ... || log ...`, then the group sweep.
+      expect(src).toMatch(
+        /wait "\$pid" 2>\/dev\/null \|\| log[^\n]*\n\s*reap "\$pid"/,
+      )
+    })
+  }
 })
 
 describe("testing-reviewer contract", () => {

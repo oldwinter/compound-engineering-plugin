@@ -112,7 +112,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`skil
 
 | Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-proof`](./ce-proof.md) | 通过 [Proof](https://www.proofeditor.ai)（Every 的 collaborative editor）publish、view、comment 和 edit markdown；支持 Web API 与 Local Bridge surfaces |
+| [`/ce-proof`](./ce-proof.md) | 通过 [Proof](https://www.proofeditor.ai)（Every 的 collaborative editor）publish、view、comment 和 edit markdown；使用 hosted v3 Web API 和 owner credential lifecycle |
 
 ---
 

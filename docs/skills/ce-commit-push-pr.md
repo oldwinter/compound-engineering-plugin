@@ -45,6 +45,7 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 - **Full PR commit-range resolution**：descriptions 覆盖 PR 中所有 commits，而不只是 working-tree diff
 - **Related-reference preflight**：识别 work-item references，并且只在 PR 真正解决该 item 时才使用 closing magic words
 - **Concept teaching**：当 PR 向 codebase 引入新 concept（pattern、technique、library 或 domain idea）时，description 会增加用于讲解它的 `## New concepts` section，让 readers 无需打开 diff 也能理解并复述 change
+- **Explicit, non-disruptive branding**：只有传入 `branding:on` 时，新 PR 才会添加 generic Compound Engineering badge；bare 或自动选择的 invocation 不添加任何 branding，rewrite existing PR 时则保留当前 branding
 
 ---
 
@@ -106,6 +107,10 @@ Commit messages 和 PR titles：context 中的 repo conventions 最优先；rece
 
 Agent-driven development 消除了亲手写 code 原本会带来的学习过程。当 composition pass 判断 change 向 codebase 引入了新 concept 时，description 会增加专门的 `## New concepts` section。新鲜度对照 base ref 检查，而不是 working tree，避免 PR 自身的 code 掩盖其 novelty。Section 会解释 concept 是什么、为何在这里选择它而不是 obvious alternative，并给出一个来自本 PR behavior 的 example。按设计，没有该 section 才是常态：established repo patterns、refactors、renames 和 dependency bumps 都不会触发它。PR ship 后，一行 offer 会指向 `/ce-explain` 进行 interactive learning；opt-in config key `pr_teaching_archive` 会把 explainer 归档到 `docs/explainers/`，并从 PR 链接过去。要在当前 repo 完全关闭该 feature，请在 `.compound-engineering/config.local.yaml` 中设置 `pr_teaching_section: false`。
 
+### 11. Session-settled provenance line（会话已定决策来源行）
+
+当存在带标签的 plan 时，PR body 会增加一行 static provenance，列出哪些 decisions 已在 session 中确定、各自属于哪个 class，以及它们取代了什么选项，让 reviewer 一眼看出用户已经作出的选择。没有 plan 的 run 会省略该行。
+
 ---
 
 ## 快速示例
@@ -144,9 +149,9 @@ Composition pass 产出 title（`feat(notifications): add per-type mute with TTL
 
 `ce-commit-push-pr` 是多个 skills 的 standard shipping handoff：
 
-- **`/lfg` step 8**：使用 `mode:pipeline` 调用（non-interactive：没有 blocking asks，existing-PR rewrite 默认为 no）；当打印 `New concepts:` trailer 时，lfg 会在 completion output 中复述该 concept 和 `/ce-explain` pointer
-- **`/ce-work` Phase 4**：传递 plan summary、key decisions、testing notes、evidence context、operational validation 和任何 accepted Known Residuals
-- **`/ce-debug` Phase 4**（skill-owned branch）：successful fix 后默认 commit-and-PR，不再 prompt；只在 PR 解决 issue 时包含 closing syntax，对 partial、investigative 或 uncertain links 则使用 non-closing related syntax
+- **`/lfg` step 8**：使用 `mode:pipeline branding:on` 调用（non-interactive：没有 blocking asks，existing-PR rewrite 默认为 no）；当打印 `New concepts:` trailer 时，lfg 会在 completion output 中复述该 concept 和 `/ce-explain` pointer
+- **`/ce-work` Phase 4**：使用 `branding:on`，并传递 plan summary、key decisions、testing notes、evidence context、operational validation 和任何 accepted Known Residuals
+- **`/ce-debug` Phase 4**（skill-owned branch）：使用 `branding:on`；successful fix 后默认 commit-and-PR，不再 prompt；只在 PR 解决 issue 时包含 closing syntax，对 partial、investigative 或 uncertain links 则使用 non-closing related syntax
 - **`/ce-compound`**：写入 learning doc 后，可 commit + push，并用新 commit 更新 open PR
 
 ---
@@ -175,6 +180,7 @@ Skill 直接调用比作为 chain 一部分更常见：
 | `"...<focus text>"` | 引导 description composition（例如 "include the benchmarking results"） |
 | `mode:pipeline` | 供 orchestrated callers 使用的 non-interactive modifier；禁用所有 blocking ask（existing-PR rewrite 默认为 no） |
 | `archive:on\|off` | 单次运行覆盖 `pr_teaching_archive` config key（把 explainer doc 归档到 `docs/explainers/`） |
+| `branding:on\|off` | 显式添加或省略新建 PR 的 generic Compound Engineering branding；未传时默认 off，rewrite existing PR 时保留当前 branding |
 
 ---
 

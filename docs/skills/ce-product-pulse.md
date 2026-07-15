@@ -210,7 +210,7 @@ First-run interview 会在 `STRATEGY.md` 存在时 seed product name 和 key met
 支持。First-run setup 会提供通过 harness available scheduling primitive 设置 recurring pulse 的选项（存在时用 in-plugin `schedule` skill，或 cron/GitHub Actions 等 platform-native options）。Scheduling 永不自动发生；需要 explicit confirmation。
 
 **Non-Claude-Code platforms 呢？**
-只要有 read-only data-source tools，skill 可在任何 platform 上工作。Config 的 pre-resolution 是 harness-specific（Claude Code 通过 `!` backtick 读取），但其余部分 platform-agnostic。Interview 永不 inline schedule；它 hand off 给 harness 暴露的 scheduling primitive。
+只要有 read-only data-source tools，skill 就可在任何 platform 上工作。Config 在 runtime resolve：skill 使用 shell tool 运行 `git rev-parse --show-toplevel`，然后读取 config file，因此这里没有 harness-specific 机制。Interview 永不 inline schedule；它 hand off 给 harness 暴露的 scheduling primitive。
 
 ---
 

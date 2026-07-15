@@ -106,6 +106,7 @@ Restated: 2 (residual/deferred items suppressed as duplicates of actionable find
 
 - **Summary line**：始终出现在 reviewer list 后。格式："Applied N fixes. K items need attention (X errors, Y omissions). Z FYI observations." 除 FYI clause 为零时保留外，省略任何 zero clause（没有 FYI surfaced 也是有信息量的）。
 - **Applied fixes**：列出所有自动应用的 fixes（`safe_auto` tier）。每个 fix 包含足够 detail 以传达 substance，尤其是添加 content 或影响 document meaning 的 fixes。没有时省略 section。
+- **Self-contained references**：当 fix line 或 table cell 引用 reviewed document 定义的 identifier（例如 requirement/unit ID `R6`、`U3`）时，该 finding 中首次出现必须配上从 document 提取的简短 plain-language handle（例如 `R6 (suppress peer panels on low-stakes calls)`）；绝不能只用 bare identifier 描述它。该规则重申 `references/synthesis-and-presentation.md` Phase 4 的 “Self-contained rendered lines”，防止 interactive output 与 headless envelope drift。
 - **P0-P3 sections**：只包含有 actionable findings（`gated_auto` 或 `manual`）的 sections。省略 empty severity levels。每个 severity 内拆成 **Errors** 和 **Omissions** sub-headers。该 severity 没有某 type 时，省略对应 sub-header。`Tier` column 暴露 finding 是 `gated_auto`（存在 concrete fix，walk-through 中推荐 Apply）还是 `manual`（需要 user judgment）。
 - **FYI Observations**：Confidence anchor `50` 的 findings，无论 `autofix_class` 如何。为 transparency 在此展示；这些不是 actionable，也不进入 walk-through。没有时省略 section。
 - **Residual Concerns**：Personas 记录但未超过 confidence gate 的 residual concerns。为 transparency 列出；不会 promoted into review surface（按 synthesis step 3.4，cross-persona agreement boost 只在已 survived gate 的 findings 上运行）。没有时省略 section。

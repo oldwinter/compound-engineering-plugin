@@ -25,7 +25,7 @@ echo "HOST: $HOST"
 按优先级 resolve 每个 skill 的 boolean：
 
 1. **In-prompt intent**：对本次 run 的 prompt 做 reasoning。Affirmative intent（"use fable"、"get fable help"、"have fable plan this"）→ elevate。Negative intent（"don't use fable"、"no fable"）→ 不 elevate。Intent 需要 *reasoning，而不是 keyword matching*：仅仅把 "fable" 作为 subject matter 提及（例如 "design a fable-generator feature"）不构成 activation。
-2. **Config**：否则使用 per-skill key：ce-plan 用 `plan_use_fable`，ce-brainstorm 用 `brainstorm_use_fable`。读取方式必须与该 skill 在 Phase 0.0 resolve `plan_output` / `brainstorm_output` 的方式完全相同：如果 skill 已有 pre-resolved repo root，就使用它；否则运行 `git rev-parse --show-toplevel`，然后使用 native file-read tool 读取 `<repo-root>/.compound-engineering/config.local.yaml`。该 skill 在 Phase 0.0 已经读过一次这个 file；如果结果仍在 context 中，直接复用，不要重读。忽略被 comment（`#` prefix）的 lines。`true` → elevate；missing / commented / invalid / `false` / no file → off。
+2. **Config**：否则使用 per-skill key：ce-plan 用 `plan_use_fable`，ce-brainstorm 用 `brainstorm_use_fable`。读取方式必须与该 skill 在 Phase 0.0 resolve `plan_output` / `brainstorm_output` 的方式完全相同：如果已有该 skill resolve 的 repo root，就复用它；否则运行 `git rev-parse --show-toplevel`，然后使用 native file-read tool 读取 `<repo-root>/.compound-engineering/config.local.yaml`。该 skill 在 Phase 0.0 已经读过一次这个 file；如果结果仍在 context 中，直接复用，不要重读。忽略被 comment（`#` prefix）的 lines。`true` → elevate；missing / commented / invalid / `false` / no file → off。
 3. **Pipeline runs**：pipeline / `disable-model-invocation` runs 没有 prompt，因此只根据 config resolve；如果 key 开启，则 elevate。它仍然受 host gate 约束：复制到非 Claude harness 的 config 绝不会触发 elevation。
 
 如果 session model 已经是 Fable，elevation 没有意义：跳过 dispatch 和 nudge。
