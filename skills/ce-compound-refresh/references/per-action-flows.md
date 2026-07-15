@@ -68,9 +68,9 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
 
    ```bash
    if [ -n "${CLAUDE_SKILL_DIR}" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" ]; then
-     python3 "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" <new-learning-path>
+     python3 "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" <new-learning-path>;
    else
-     echo "Bundled validate-frontmatter.py not resolvable on this platform; applying the parser-safety checklist manually."
+     echo "Bundled validate-frontmatter.py not resolvable on this platform; applying the parser-safety checklist manually.";
    fi
    ```
 
@@ -84,7 +84,7 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
 4. **对 successor doc 运行 mechanical claims check。** Bundled `scripts/validate-doc-claims.py` 会 flag tree 中缺失的 cited repo paths、无法 resolve 或 unreachable 的 commit SHAs、无法 resolve 的 relative doc links，以及 dangling drafting scaffold（"Learning 3"、未 resolve 的 `{{...}}` tokens）：
 
    ```bash
-   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
+   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
    python3 "$SKILL_DIR/scripts/validate-doc-claims.py" <new-learning-path>
    ```
 

@@ -200,5 +200,6 @@ Skill 会展示 project URL 作为 fallback，并继续下一个 dependency。Ve
 
 ## 另见（See Also）
 
-- [`/ce-test-browser`](./ce-test-browser.md) - 依赖 `agent-browser`，由 `ce-setup` 安装
-- [`/ce-product-pulse`](./ce-product-pulse.md) - 使用 `ce-setup` bootstrap 的 `.compound-engineering/config.local.yaml`
+- [`/ce-test-browser`](./ce-test-browser.md) - 没有 capable host-native browser 时使用 `agent-browser`
+- [`/ce-dogfood`](./ce-dogfood.md) - 使用 `agent-browser` 做 diff-scoped QA
+- [`/ce-product-pulse`](./ce-product-pulse.md) - 使用 `.compound-engineering/config.local.yaml` 中的 pulse settings

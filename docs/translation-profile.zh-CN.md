@@ -44,7 +44,7 @@
 
 README 顶部提供“安装中文版”区块，必须说明这是社区中文 fork，并使用 `oldwinter/compound-engineering-plugin` 作为 marketplace source。上游 `EveryInc/compound-engineering-plugin` 命令可保留作英文版说明，但不能标注为中文版安装入口。
 
-当前同步基线：上游 commit `7f86be9d`。
+当前同步基线：上游 commit `1f6a70d0`。
 
 ## 同步后检查
 

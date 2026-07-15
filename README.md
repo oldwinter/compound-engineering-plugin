@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `7f86be9d`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `1f6a70d0`。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -121,7 +121,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 安装后，在任意 project 中运行 `/ce-setup`。它会检查 repo-local config、报告 optional tool capabilities，并帮助把 machine-local CE settings 安全地放进 gitignore。
 
-`compound-engineering` plugin 当前包含 29 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
+`compound-engineering` plugin 当前包含 30 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
 
 ### Full Skill Inventory（完整 Skill 清单）
 
@@ -146,6 +146,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-resolve-pr-feedback`](docs/skills/ce-resolve-pr-feedback.md) | Resolve PR review feedback |
 | [`/ce-commit`](docs/skills/ce-commit.md) | 创建带清晰 message 的 git commit |
 | [`/ce-commit-push-pr`](docs/skills/ce-commit-push-pr.md) | Commit、push 并 open PR，同时讲解本次 change 新引入的任何 concept |
+| [`/ce-babysit-pr`](docs/skills/ce-babysit-pr.md) | 持续 watch open PR，根据新到达的 review comments 和 CI 状态推动它走向 merge-ready |
 | [`/ce-worktree`](docs/skills/ce-worktree.md) | 确保 work 在 isolated git worktree 中进行 |
 | [`/ce-promote`](docs/skills/ce-promote.md) | Draft user-facing announcement copy |
 | [`/ce-test-browser`](docs/skills/ce-test-browser.md) | 对 PR-affected pages 运行 browser tests |

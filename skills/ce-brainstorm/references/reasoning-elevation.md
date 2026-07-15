@@ -9,10 +9,10 @@ Elevation 通过 subagent 把 reasoning-heavy authoring/interpretation step 分�
 在读取任何 Fable config key、解析 Fable intent 或输出任何 Fable string 之前，使用与 `ce-code-review` 相同的 env-var union 自我识别 host：
 
 ```bash
-if [ -n "${CURSOR_AGENT:-}${CURSOR_CONVERSATION_ID:-}" ]; then HOST=cursor
-elif [ "${CLAUDECODE:-}" = "1" ]; then HOST=claude
-elif [ -n "${CODEX_SANDBOX:-}${CODEX_SESSION_ID:-}${CODEX_THREAD_ID:-}${CODEX_CI:-}" ]; then HOST=codex
-else HOST=unknown; fi
+if [ -n "${CURSOR_AGENT:-}${CURSOR_CONVERSATION_ID:-}" ]; then HOST=cursor;
+elif [ "${CLAUDECODE:-}" = "1" ]; then HOST=claude;
+elif [ -n "${CODEX_SANDBOX:-}${CODEX_SESSION_ID:-}${CODEX_THREAD_ID:-}${CODEX_CI:-}" ]; then HOST=codex;
+else HOST=unknown; fi;
 echo "HOST: $HOST"
 ```
 

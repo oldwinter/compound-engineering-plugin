@@ -87,6 +87,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`skil
 |-------|-------------|
 | [`/ce-commit`](./ce-commit.md) | 创建单个精心组织的 git commit：convention-aware、sensitive-file-safe、file-level logical splitting |
 | [`/ce-commit-push-pr`](./ce-commit-push-pr.md) | 从 working changes 到 open PR，并生成 adaptive descriptions，保留 related references；支持三种 modes（full workflow / description update / description-only generation），并为本次 change 新引入的任何 concept 添加 concept-teaching section |
+| [`/ce-babysit-pr`](./ce-babysit-pr.md) | Watch open PR 并推动它走向 merge：comments-first 处理新 review comments（通过 `/ce-resolve-pr-feedback`）和 CI failures（通过 `/ce-debug`），使用 crash-safe、可恢复 tick；根据 harness 采用 continuous 或 checkpoint mode，并通过 settle window 避免过早报告 "ready to merge" |
 | [`/ce-worktree`](./ce-worktree.md) | 确保 work 在 isolated git worktree 中进行：检测 existing isolation，优先使用 harness native worktree tool，最后 fallback 到 plain git |
 
 ---
@@ -122,7 +123,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`skil
 | [`/ce-promote`](./ce-promote.md) | 为已发布 feature 起草 user-facing announcement copy（X、changelog、LinkedIn、email）：可选 Spiral CLI 做 voice matching，未安装时提供轻量 editorial & social expertise，只生成 drafts |
 | [`/ce-resolve-pr-feedback`](./ce-resolve-pr-feedback.md) | 并行评估、修复并回复 PR review feedback，包括 nitpicks |
 | [`/ce-dogfood`](./ce-dogfood.md) | 对 active branch 做 hands-off diff-scoped browser QA：map flows，自主修复小 breakages 并带 regression tests commit，写 durable report（仅手动调用） |
-| [`/ce-test-browser`](./ce-test-browser.md) | 只使用 `agent-browser`，在 PR / branch 影响的 pages 上做 end-to-end browser tests |
+| [`/ce-test-browser`](./ce-test-browser.md) | 采用 host-native browser 优先、`agent-browser` fallback 的层级，对 PR / branch 影响的 pages 做 end-to-end browser tests |
 | [`/ce-test-xcode`](./ce-test-xcode.md) | 用 XcodeBuildMCP 在 simulator 上 build 和 test iOS apps：screenshots、logs、human verification |
 | [`/ce-setup`](./ce-setup.md) | 诊断 optional tool capabilities，并 bootstrap safe project-local config |
 

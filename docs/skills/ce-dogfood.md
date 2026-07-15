@@ -73,7 +73,7 @@ Browser matrix green 但 test suite red，不是 “ready”。Verdict 前，ski
 
 ## `ce-dogfood` vs `ce-test-browser`
 
-二者都接受 PR / branch，并用 `agent-browser` 测 diff-affected pages。按你想要的结尾选择：
+二者都接受 PR / branch，并通过 browser 测试 diff-affected pages。`ce-test-browser` 优先使用 capable host-native browser，并 fallback 到 `agent-browser`；`ce-dogfood` 当前仍要求 `agent-browser`。按你想要的结尾选择：
 
 | | `ce-test-browser` | `ce-dogfood` |
 |---|---|---|

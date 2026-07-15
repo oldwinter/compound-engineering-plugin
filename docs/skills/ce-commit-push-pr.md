@@ -17,7 +17,7 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 | 它做什么？ | Commit、push 并 open PR；或只重写 existing PR description；或只生成 description 而不触碰 git |
 | 何时使用 | 想要 commits + PR；重写 existing PR description；为 branch 起草 description |
 | 产出什么 | Open PR（返回 URL）；或 updated PR description；或打印 description 供你自己应用 |
-| 下一步 | Review PR；ready 后 merge |
+| 下一步 | 默认自动 handoff 到 [`/ce-babysit-pr`](./ce-babysit-pr.md)，watch CI 和新 review、推动 PR 走向 merge-ready（可用 `babysit:off` 或 `auto_babysit: false` opt out）；它报告 ready 后由你 merge |
 
 ---
 

@@ -131,7 +131,7 @@ mkdir -p "/tmp/compound-engineering/ce-compound/$RUN_ID"
 **Resolve the agnostic project orientation from the shared cache (before dispatching subagents).** The question-agnostic orientation the Context Analyzer and Related Docs Finder rely on — the project's `CONCEPTS.md` vocabulary and the root instruction-file conventions/digests — is identical for every run at this commit, so reuse it instead of re-deriving. Set `SKILL_DIR` to this skill's directory and run the helper (full protocol in `references/repo-profile-cache.md`):
 
 ```bash
-SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
+SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
 python3 "$SKILL_DIR/scripts/repo-profile-cache.py" get
 ```
 
@@ -258,15 +258,8 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
    **Discovery pipeline。** 根据 problem topic 推断 scan window，初始值为 7 days。运行 discovery 和 metadata extraction：
 
    ```bash
-   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
-   if [ -f "$SKILL_DIR/scripts/session-history/discover-sessions.sh" ] && [ -f "$SKILL_DIR/scripts/session-history/extract-metadata.py" ]; then
-     REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-     REPO_NAME=$(basename "$REPO_ROOT")
-     SCAN_DAYS="7"
-     bash "$SKILL_DIR/scripts/session-history/discover-sessions.sh" "$REPO_NAME" "$SCAN_DAYS" --cwd "$REPO_ROOT" | tr '\n' '\0' | xargs -0 python3 "$SKILL_DIR/scripts/session-history/extract-metadata.py" --cwd-filter "$REPO_ROOT"
-   else
-     echo "Session history bundled scripts were not found in this skill's directory; skipping the session-history probe for this run."
-   fi
+   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
+   if [ -f "$SKILL_DIR/scripts/session-history/discover-sessions.sh" ] && [ -f "$SKILL_DIR/scripts/session-history/extract-metadata.py" ]; then REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); REPO_NAME=$(basename "$REPO_ROOT"); SCAN_DAYS="7"; bash "$SKILL_DIR/scripts/session-history/discover-sessions.sh" "$REPO_NAME" "$SCAN_DAYS" --cwd "$REPO_ROOT" | tr '\n' '\0' | xargs -0 python3 "$SKILL_DIR/scripts/session-history/extract-metadata.py" --cwd-filter "$REPO_ROOT"; else echo "Session history bundled scripts were not found in this skill's directory; skipping the session-history probe for this run."; fi
    ```
 
    Pi sessions are included when present under `~/.pi/agent/sessions/`; they carry `cwd` like Codex but no git branch. If `_meta.files_processed` is `0`, return `no relevant prior sessions`. If the first pass finds no relevant branch matches, or if processing Codex or Pi sessions, derive 2-4 keywords from the topic and re-run metadata extraction with `--keyword K1,K2,...`. Keep at most 5 sessions across Claude Code, Codex, Cursor, and Pi, ranked by branch match, keyword match count, file size over 30KB, and recency. Exclude the current session.
@@ -276,12 +269,8 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
    **Extraction pipeline.** Create `SCRATCH=$(mktemp -d -t ce-compound-sessions-XXXXXX)`. For each selected session, write extracted content to scratch files:
 
    ```bash
-   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
-   if [ -f "$SKILL_DIR/scripts/session-history/extract-skeleton.py" ]; then
-     python3 "$SKILL_DIR/scripts/session-history/extract-skeleton.py" --output "$SCRATCH/<session-id>.skeleton.txt" < <session-file>
-   else
-     echo "Session history bundled scripts were not found in this skill's directory; skipping the session-history probe for this run."
-   fi
+   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
+   if [ -f "$SKILL_DIR/scripts/session-history/extract-skeleton.py" ]; then python3 "$SKILL_DIR/scripts/session-history/extract-skeleton.py" --output "$SCRATCH/<session-id>.skeleton.txt" < <session-file>; else echo "Session history bundled scripts were not found in this skill's directory; skipping the session-history probe for this run."; fi
    ```
 
    Use `extract-errors.py` selectively when dead ends or recurring errors are likely useful. Pass only the scratch file paths and metadata to the synthesis subagent.
@@ -330,9 +319,9 @@ The orchestrating agent (main conversation) performs these steps:
 
    ```bash
    if [ -n "${CLAUDE_SKILL_DIR}" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" ]; then
-     python3 "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" <output-path>
+     python3 "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" <output-path>;
    else
-     echo "Bundled validate-frontmatter.py not resolvable on this platform; applying the parser-safety checklist manually."
+     echo "Bundled validate-frontmatter.py not resolvable on this platform; applying the parser-safety checklist manually.";
    fi
    ```
 
@@ -377,7 +366,7 @@ Doc（以及 Phase 2.4 中的任何 `CONCEPTS.md` entries）即将变成持久�
 1. **Mechanical claims check（每种 mode，包括 headless）。** 可选先运行 `git fetch --quiet`（best-effort；offline 时静默跳过；network 绝不是 correctness dependency）。然后对 written doc 运行 bundled validator：
 
    ```bash
-   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
+   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
    python3 "$SKILL_DIR/scripts/validate-doc-claims.py" <doc-path>
    ```
 

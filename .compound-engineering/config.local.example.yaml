@@ -59,6 +59,12 @@
 # pr_teaching_section: false     # true | false (default: true)
 # pr_teaching_archive: true      # true | false（default: false；仅 full-workflow runs）
 
+# --- ce-commit-push-pr babysit handoff ---
+# Full-workflow PR 打开后，ce-commit-push-pr 会自动调用 ce-babysit-pr，
+# watch CI 和新到达的 review，并推动 PR 走向 merge-ready。设为 false 可长期
+# opt out；单次运行可用 babysit:off token 覆盖。
+# auto_babysit: false            # true | false (default: true)
+
 # --- ce-plan scoping confirmation ---
 # By default /ce-plan pauses before research/plan-write to show a scoping
 # summary and wait for you to confirm scope. Set this to skip that wait: ce-plan
