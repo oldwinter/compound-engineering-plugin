@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `1f6a70d0`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `5f3b4494`。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -16,6 +16,8 @@
 ```
 
 安装后，runtime 会加载这个 fork 中的 `skills/*/SKILL.md` 及各 skill 自带的 `references/`；这些是中文本地化的实际执行入口。下方保留的 `EveryInc/compound-engineering-plugin` 命令指向上游英文版，不应当作中文版安装命令。
+
+**使用其他编辑器或 CLI？** Claude Code、Cursor、Codex、Kimi Code CLI、Cline、Grok Build CLI、Devin CLI、GitHub Copilot、Factory Droid、Qwen Code、OpenCode、Pi 和 Antigravity CLI 均受支持，详见[更多安装方式](#更多安装方式)。
 
 ## Philosophy（理念）
 
@@ -160,7 +162,9 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 ---
 
-## Install
+## 更多安装方式
+
+中文 fork 的 Claude Code 安装方式位于[文档顶部](#安装中文版)。以下命令均指向上游英文版，上游对这些平台提供同等支持。
 
 ### Claude Code
 
