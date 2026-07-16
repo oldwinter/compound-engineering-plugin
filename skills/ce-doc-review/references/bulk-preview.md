@@ -81,7 +81,14 @@ Skipping (2):
 
 ## Question and options（问题与选项）
 
-Preview body render 后，使用 platform 的 blocking question tool 询问用户（Claude Code 中 `AskUserQuestion`，Codex 中 `request_user_input`，Antigravity 中 `ask_user`，Pi 中 `ask_user`（需要 `pi-ask-user` extension））。在 Claude Code 中，该 tool 应已由 Interactive-mode pre-load step 加载；如果没有，现在用 query `select:AskUserQuestion` 调用 `ToolSearch`。下方 text fallback 仅在 harness 真正缺少 blocking tool 时适用：`ToolSearch` 没有 match、tool call 明确失败，或 runtime mode 不暴露它（例如没有 `request_user_input` 的 Codex edit modes）。Pending schema load 不是 fallback trigger。永远不要 silently skip question。
+把 preview 与 confirmation 当成两个有序的 user-facing events：
+
+1. **Preview event**：先在 conversation 中以 user-visible assistant text 输出完整 preview body。Hidden thinking or reasoning does not count（只存在于隐藏思考或推理中的内容不算）；也不能只把 preview 放进 question interface 的 input。
+2. **Decision event**：preview 可见后，再调用 harness 的 agent-callable blocking-question capability（agent 可调用的阻塞式提问能力），并等待答案。成功意味着用户在选择 `Proceed` 或 `Cancel` 时仍能看到 preview，且 workflow 会停下等待回答。
+
+如果 preview event 尚未发生，do not invoke the blocking-question capability（不要调用阻塞式提问能力）。如果 harness 没有暴露该 capability 或调用报错，就在 visible chat 中保持同样的 interaction：紧接 preview 展示 numbered `Proceed` / `Cancel` options，并等待用户回复。绝不能省略 preview 或静默继续。
+
+**Non-exhaustive adapters（非穷举适配器）：** Claude Code 使用 `AskUserQuestion`，Codex 使用 `request_user_input`，Antigravity CLI（`agy`）使用 `ask_question`，Pi 使用带 `pi-ask-user` extension 的 `ask_user`。Claude Code 中的 `AskUserQuestion` 应已由 Interactive-mode pre-load step 加载；如果没有，现在用 query `select:AskUserQuestion` 调用 `ToolSearch`。Pending schema load 不是 fallback trigger。
 
 Stem（按 path 调整）：
 
@@ -93,8 +100,6 @@ Options（三种情况都精确为两个）：
 
 - `Proceed` — 按展示执行 plan
 - `Cancel` — 不做任何事，返回 originating question
-
-只有当 `ToolSearch` 明确返回 no match、tool call error，或 platform 没有 blocking question tool 时，才 fallback 到展示 numbered options 并等待用户下一次回复。
 
 ---
 

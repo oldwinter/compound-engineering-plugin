@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `5f3b4494`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `e745e966`。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -65,7 +65,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-strategy`](docs/skills/ce-strategy.md) | *Upstream anchor*：创建并维护 `STRATEGY.md`，由 ideate、brainstorm 和 plan 读取作为 grounding，让 strategy choices 流入每个 feature |
 | [`/ce-product-pulse`](docs/skills/ce-product-pulse.md) | *Outer loop*：给定时间窗口内用户实际经历了什么（usage、performance、errors）的 report，保存到 `docs/pulse-reports/`；follow-ups 反馈到 ideation 和 brainstorming |
 | [`/ce-debug`](docs/skills/ce-debug.md) | 当输入是 bug 而不是 feature 时，替代 brainstorm -> plan -> work：reproduce，trace root cause，fix，然后在必要时 polish/review 并 handoff 给 PR |
-| [`/ce-pov`](docs/skills/ce-pov.md) | *On demand, before you commit*：对是否采用、切换或重新评估外部 technology、library、pattern、platform 给出 decisive、project-grounded verdict；支持 cold 或 mid-session，并基于 verdict 提议下一步（`/ce-plan`、`/ce-brainstorm` 或 spike） |
+| [`/ce-pov`](docs/skills/ce-pov.md) | *On demand, before you commit*：给出 decisive、project-grounded adoption verdict、holistic document take 或针对既有 approaches 的立场；可由 named peers 或 `oracle` 做 cross-check，并明确区分 Cursor default 与 Composer |
 | [`/ce-explain`](docs/skills/ce-explain.md) | *On demand, to keep learning*：把 concept、diff、idea 或 “what did I do this week?” 变成写给你个人的 dense visual explainer，可选 check-in（diff 的 predict-then-reveal、corrected exercises）让内容留下来 |
 
 完整 catalog 和 skill chaining 见 [docs/skills](docs/skills/README.md)。完整 inventory 见[下方](#full-skill-inventory)。
@@ -131,7 +131,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 |-------|---------|
 | [`/ce-strategy`](docs/skills/ce-strategy.md) | 创建或维护 `STRATEGY.md` |
 | [`/ce-ideate`](docs/skills/ce-ideate.md) | 生成并严格评估 grounded ideas |
-| [`/ce-pov`](docs/skills/ce-pov.md) | 对外部输入形成 decisive、project-grounded verdict |
+| [`/ce-pov`](docs/skills/ce-pov.md) | 对 adoption、document 或 approach set 形成 decisive、project-grounded POV |
 | [`/ce-explain`](docs/skills/ce-explain.md) | 将 concept、diff、idea 或你自己的一段 work 解释成个人学习 artifact |
 | [`/ce-brainstorm`](docs/skills/ce-brainstorm.md) | 探索 requirements 并写出尺寸合适的 requirements doc |
 | [`/ce-plan`](docs/skills/ce-plan.md) | 创建 structured implementation plans |

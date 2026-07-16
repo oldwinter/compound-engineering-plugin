@@ -40,6 +40,8 @@ Compound-engineering 的 shipping chain 是 `/ce-work -> /ce-commit-push-pr -> (
 - **Delegation，不重复实现**：Comments 交给 `/ce-resolve-pr-feedback`，真实 CI failures 交给 `/ce-debug`；每个新 failure signature 只 dispatch 一次，不会每次 poll 都 dispatch。Inline CI logic 只做低成本 flaky-vs-real classification，以决定调用哪个 skill。
 - **Settle window**：只有 GitHub 报告 PR mergeable（`mergeStateStatus == CLEAN`）、没有 open threads，并且 PR 在最短 quiet time 内未变化，才报告 “looks ready”。Late reviewer 会重置 clock。它是 cooling-off signal，不是 merge guarantee。
 - **Self-sustaining in-session watch（default）**：Token-free background change detector（`pr-snapshot watch`）仅在发生 actionable change 时唤醒 agent，并保留 conversation 中的所有 decisions。不支持 background-and-wake 的 harness fallback 到 checkpoint：执行一个 tick 并输出精确 resume command。
+- **单一 authoritative watcher**：较新的 invocation 会取消仍在 preflight 的旧 invocation，但只有自己的首次 snapshot 成功后才接管 active ownership，并立即停止 prior watcher。Wake 会携带 persisted generation，因此被 supersede process 延迟发出的 notifications 会基于 fresh snapshot 合并，不会重置 session 或 settle clocks。
+- **完整分页的 source of truth**：`pr-snapshot` 会把 review-thread connection 翻到最后一页。`reviewThreads(first:50)` 之类的 one-shot diagnostic query 永远不能覆盖 canonical snapshot。
 - **High-level final summary**：Outcome-first，按组计数，不输出 receipts。
 
 ---
@@ -129,7 +131,7 @@ Snapshot 不会因为“观察到 item”就将它标记为 handled。只有 age
 | `<PR number or URL>` | 指定 PR |
 | `watch` / `checkpoint` | 强制 execution mode |
 
-`scripts/pr-snapshot` 是 deterministic snapshot + state helper：它 fetch 两条 event stream，在 lock 下 atomic read/write state，并输出每个 tick 的 actionable set 和 settle window 所需的 `quiet_seconds`。其 `watch` subcommand 是支持 in-session loop 的 token-free change detector；它 poll 相同的 fetch -> diff，仅在 actionable change 或 stop condition 出现时输出一个 `BABYSIT_WAKE` sentinel。`references/watch-loop.md` 记录 watch 如何维持自身、state schema、dedup identities、settle window 和 edge cases。
+`scripts/pr-snapshot` 是 deterministic snapshot + state helper：它完整分页 review threads、fetch 两条 event stream，在 lock 下 atomic read/write state，并输出每个 tick 的 actionable set 和 settle window 所需的 `quiet_seconds`。其 `watch` subcommand 是支持 in-session loop 的 token-free change detector。Watch ownership 采用 latest-valid-wins：成功 prefetch 的 replacement 会记录新的 `watch_generation`、终止 predecessor，并成为唯一可 persist polls 或发出 `BABYSIT_WAKE` 的 process。旧 generation 的 queued wakes 只是触发 refresh 的 stale hints，不是独立工作；handoff 会保留原来的 session 和 settle clocks。`references/watch-loop.md` 记录 watch 如何维持自身、state schema、dedup identities、settle window 和 edge cases。
 
 ---
 

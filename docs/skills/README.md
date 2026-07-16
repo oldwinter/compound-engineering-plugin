@@ -63,7 +63,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`skil
 
 | Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-pov`](./ce-pov.md) | 对外部输入（framework、library、CVE、pattern）形成 decisive、project-grounded verdict：dual-grounding floors、cold 或 warm（mid-session）调用、带 reasoned handoff 的 Adopt/Trial/Hold/Reject/Not-our-problem 分级 |
+| [`/ce-pov`](./ce-pov.md) | 以 adoption verdict、holistic document take 或既有 approaches 立场的形式形成 decisive、project-grounded POV；支持具备 repository grounding、bounded debate 的 named/`oracle` panel，并明确区分 Cursor default 与 Composer route |
 | [`/ce-explain`](./ce-explain.md) | 把 concept、diff、idea 或你最近一段 work 转成写给你个人的 dense visual explainer；可选 check-in（diff 的 predict-then-reveal、corrected exercises）和 capability-detected destination ask |
 | [`/ce-debug`](./ce-debug.md) | 系统找出 root causes：causal chain gate、predictions、post-fix polish/review、PR handoff |
 | [`/ce-code-review`](./ce-code-review.md) | 使用 skill-local reviewer personas、confidence-gated findings 和四种 modes 的 structured code review |
