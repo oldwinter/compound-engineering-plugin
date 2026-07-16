@@ -124,7 +124,8 @@ Prediction 成立。Skill 用 file:line references 呈现 root cause、proposed 
 
 - **Called from `/ce-plan`**：当 planning prompt 是 bug-shaped（error message、"fix the bug where X"、regression），`ce-plan` 会在做 structural planning 前把 `ce-debug` 作为 route-out option
 - **Escalates to `/ce-brainstorm`**：当 investigation 揭示 design problem，而不是 logic error，skill 会建议先 rethink 再 implement
-- **Hands off to `/ce-commit-push-pr`**：当 skill-created branch 上成功 fix 后，skill 默认 commit-and-PR，不再额外 prompt（如果 repo 的 `AGENTS.md` 另有 explicit override path，则遵守）
+- **Runs post-fix quality checks**：non-trivial fixes 在 shipping 前运行 `/ce-simplify-code` 和 `/ce-code-review`；tiny mechanical fixes 会说明原因后 skip
+- **Hands off to `/ce-commit-push-pr branding:on`**：当 skill-created branch 上成功 fix 后，skill 会显式标记 CE provenance，并默认 commit-and-PR，不再额外 prompt（如果 repo 的 `AGENTS.md` 另有 explicit override path，则遵守）
 
 PR 打开后，skill 可选提供 `/ce-compound` 来捕获 learning，但只在 bug 可 generalize 时（3+ recurrence、对 shared dependency 的 wrong assumption）。Localized mechanical fixes 会 silently skip，避免用 one-off entries 弄乱 `docs/solutions/`。
 

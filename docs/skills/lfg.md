@@ -30,6 +30,7 @@
 
 `lfg` 将 sequence 做成 explicit and gated：
 
+- Step 1 从 conversation 组合一份 transient settled-decisions brief：每个 decision 都带 class、rejected alternative 和 reason，并按 feature topic 限定 scope；它会把 brief 交给 `/ce-plan`，确保用户已作出的 decisions 被携带而不是重问。没有 settled decision 时完全跳过 brief
 - `/ce-plan` 必须在 work 开始前产出 implementation-ready code plan
 - `/ce-work` 以 return-to-caller mode 运行，使 pipeline 在 implementation 后重新获得控制
 - Behavior-changing implementation 必须从 `/ce-work` 返回 verification evidence；若缺失，`lfg` 会重试 `/ce-work` 一次以补齐 evidence，然后 blocked stop，而不是盲目 ship
@@ -37,8 +38,9 @@
 - `/ce-code-review` 报告 findings，然后 `lfg` 应用 eligible fixes 并 commit
 - Residual review findings 会在 PR body 或 fallback tracked file 中持久化
 - `/ce-test-browser` 以 pipeline mode 运行
-- 有 remote 时，`/ce-commit-push-pr` ship remaining changes
+- 有 remote 时，`/ce-commit-push-pr mode:pipeline branding:on` ship remaining changes，并显式标记 CE provenance
 - Open PR 上最多 watch CI 并 repair 三轮
+- Planning 或 review 暴露 invalidating settlement conflict 时，pipeline 会在 shipping 前停止，而不是静默覆盖已经达成的约定；不会阻断的 flagged conflicts 会成为 durable residuals，并进入 PR body
 
 Pipeline 也有 local-only path：如果 repo 没有 git remote，就只在本地 commit，并跳过 push、PR creation 和 CI watch，而不是重试不可能的 network steps。
 

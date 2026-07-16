@@ -8,6 +8,7 @@
 
 - `Document type:` — orchestrator 的 authoritative classification（`requirements` 或 `plan`）。信任它；不要重新分类。
 - `Origin:` — document 的 `origin:` frontmatter value；如果未声明 origin，则为 literal token `none`。直接读取此 slot；不要自己 parse document frontmatter。
+- `Settled decisions:` — session-settled Key Technical Decisions；没有时为 `none`。当 Section 3 stress-testing 或 Section 5 alternative-blindness 命中 listed decision 时，按 `Settled decisions:` slot rules 中的 context-slots infeasibility-versus-preference rule 处理（参见 subagent template；template 中的 values 是 authoritative）。
 
 只有当 adversarial scrutiny 对该 doc shape genuinely useful 时，才运行完整 5-technique protocol。当 premise 已在 upstream settled 时，若干 techniques 会重新争论已决定的问题，并在 motivation 位于 linked brainstorm 的 plans 上产生嘈杂的 "the motivation is thin" findings。结合两个 slots 校准：
 

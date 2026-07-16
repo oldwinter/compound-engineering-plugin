@@ -1,16 +1,16 @@
 ---
 name: ce-explain
-description: "Turn a concept, a diff, an idea, or a window of your own recent work into a dense, visual explainer written for you personally — with an optional check-in (predict-then-reveal for diffs, corrected exercises) that makes the material stick. For learning, not repo docs or verdicts."
+description: "Create a durable, visual teaching artifact — plus an optional check-in (predict-then-reveal for diffs, corrected exercises) that makes it stick — for something worth learning: a concept, a diff, an idea, or a window of your own recent work. Use when the user wants to be taught, wants a deep explainer, wants to understand a substantial change, or wants a work recap built for retention. Not for ordinary Q&A, brief 'why?' follow-ups, operational diagnosis, status updates, or a concise trade-off answer that belongs inline in chat. For learning, not repo docs or verdicts."
 argument-hint: "[a concept, a diff ref, an idea, or 'what happened this week?'] — or invoke bare to be asked"
 ---
 
 # Explain It To Me
 
+**中文导读：** 只有用户明确想学习、需要 deep explainer 或希望保留 durable teaching artifact 时才运行完整流程。普通 Q&A、operational diagnosis、status update 或简短 trade-off 应直接在 chat 回答；只有背后确有值得学习的 concept 时，才另行提议生成 visual explainer。下方英文内容是 canonical executable contract，必须按原文执行。
+
 Teach the user one thing well: a concept, a change, an idea, or a window of their own recent work. Agent-driven development removed the learning that writing code by hand used to provide; this skill is the replacement — the human keeps learning while agents do the writing.
 
-<explain_request> #$ARGUMENTS </explain_request>
-
-*(If `$ARGUMENTS` above appears as a literal token rather than the user's words — it was not substituted on this host — use the user's actual request from the conversation as the input.)*
+What to explain is the input this skill was invoked with, present in the current prompt or conversation (whether the user asked directly or a calling skill passed it).
 
 **Note: The current year is 2026.** Use this when weighting external sources and dating artifacts.
 
@@ -39,6 +39,8 @@ Read `references/intake.md` now and classify the request into one of the four in
 
 **Bare invocation** (no input at all): ask one blocking question — "What should I explain?" — offering a shortcut option for a recap of recent work in this repo alongside free-text. Do not produce a default artifact unprompted.
 
+**Operational-question gate.** Not every *concept by inference* wants the teaching flow this skill runs — many just want a direct answer. When such a request (no `diff:`/`since:` token, no wording that plainly asks to learn or build like "teach me how X works") reads as one better answered in chat — e.g. diagnosing or operating current behavior ("why is X doing Y", "is X configured right") — answer it directly. Then offer to teach it only when a real underlying concept sits behind the question that the user would plausibly want to learn — not as a reflexive add-on to every answer — phrased plainly, e.g. "Want me to actually walk you through how this works? I can build you a visual explainer to keep." Create the run directory and profile the repo only if they take it. A request that plainly wants to learn, or that carries a build signal, skips the gate and is taught in full.
+
 ### Phase 2: Ground
 
 Match grounding to the input shape. Create the run directory first — every run gets one, before any artifact exists:
@@ -52,7 +54,7 @@ echo "$RUN_DIR"
 **Repo-touching inputs** (a concept with footprint in this repo, a diff, a recap): resolve the question-agnostic project profile from the shared cache instead of re-deriving it. Set `SKILL_DIR` to this skill's directory and run the helper (full protocol in `references/repo-profile-cache.md`):
 
 ```bash
-SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
+SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
 python3 "$SKILL_DIR/scripts/repo-profile-cache.py" get
 ```
 

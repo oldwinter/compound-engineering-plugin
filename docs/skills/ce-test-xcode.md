@@ -215,5 +215,6 @@ Skill 捕获 build errors 并报告具体细节。Build failed 时不会继续 i
 ## 另见
 
 - [`ce-code-review`](./ce-code-review.md) - 可为 iOS-touching PRs spawn 此 skill 作为 verification step
-- [`ce-test-browser`](./ce-test-browser.md) - 通过 agent-browser 做 web-app testing 的 sibling skill
+- [`ce-test-browser`](./ce-test-browser.md) - 通过 host-native browser 或 `agent-browser` fallback 做 web-app testing 的 sibling skill
+- [`ce-commit-push-pr`](./ce-commit-push-pr.md) - 可在 PR description 中加入 user-supplied evidence 或 summarize validation
 - [`ce-work`](./ce-work.md) - Phase 3 verification 中可能调用此 skill 的 orchestrator

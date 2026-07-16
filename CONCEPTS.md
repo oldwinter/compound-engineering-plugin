@@ -79,6 +79,17 @@ A bulk evidence artifact — verbatim quotes with source pointers, gathered by a
 ### Load stub
 The inline remnant left in a Skill when load-bearing content moves to a reference file: a load instruction that names what the reference contains and the failure mode of skipping it, while keeping no detail an agent could improvise from — making the load structurally necessary rather than advisory.
 
+### Detached job（脱离式任务）
+Delegated worker process 会在自己的 session 中启动，因此能活过发起它的 shell tool call。它的状态（status word、log、identity 和 result）保存在 durable job directory 中；orchestrator 在 turns 之间轮询该目录，而不是原地等待。
+
+Job 一经创建，launching call 就立即返回。Supervision（idle/hard limits、process-tree reaping）在 detached worker 内运行；caller 维护自己的 aggregate deadline，超时后会在没有该 job 的情况下继续。每个 job 只会 atomic 地发布一条 terminal record，detached path 中的任何环节都不得请求用户输入。
+
+### Cross-model pass（跨模型 pass）
+一种 additive delegated run：把 host workflow 的 review 或 judgment brief 交给不同的 model-provider route，再把 structured result 合并回 host 的 synthesis。Peer 无法运行时该 pass 保持 non-blocking；只有 serving model family 得到验证、而不是仅仅被 request 时，它才算 independent corroboration。
+
+### Model identity receipt（模型身份回执）
+Serving backend 对“实际由哪个 model 处理 delegated run”的自有报告。它与 requested model 一同记录，因此两者不一致时会明确显示。只有这种 receipt 才能验证 run 的 model identity；request parameters 或 model 自己生成的文本都不能作为验证依据。没有 receipt 的 output 会标为 requested-but-unverified；为 cross-model agreement 加权的 logic 依据 receipt，而不是 request。
+
 ## Review and workflow vocabulary
 
 ### Reviewer persona
@@ -92,6 +103,12 @@ The classification of a review finding by how safely its proposed fix can be app
 
 ### Headless mode
 An explicit opt-in mode that runs a Skill unattended, with no user prompts — it produces a written report as its deliverable and conservatively defers genuinely ambiguous decisions rather than guessing.
+
+### Session-settled decision（会话中已确定的决策）
+用户在触发会话中审视并选定的 decision，也就是 tradeoff 或 alternative 已被明确展示，随后由用户作出选择。它会作为带 provenance label 的 constraint 贯穿 Pipeline（annotation stem 为 `session-settled:`，classes 为 `user-directed` 和 `user-approved`）；下游 skills 可以补充，但绝不重复询问，且只有 evidence 才能与其冲突。未经审视的 assertion 属于 directive，而不是 settled decision，只会在 pipeline 中接受一次 challenge；agents 绝不为自己未经审视的 proposals 添加该标签。
+
+### Settlement test（已定决策判定）
+Writer skill（ce-plan、ce-brainstorm）对 conversation 中携带的 decisions 所作的 classification judgment：若 decision 在 conversation record 中经受过审视，则标记为 settled；若只是 assertion，则属于 directive；若始终只是 agent inference，则不加标签。Test 的 outcome rules 属于 protocol，具体 classification 则由 agent judgment 决定。
 
 ### Feedback source
 A configured origin of customer or user feedback — a Slack channel, a GitHub Issues repo, an email inbox — declared once in the shared local config under a generic key so any Skill can read the list. Each source entry has its own identity and ingestion cursor; the Skill that ingests from it owns the per-item state, not the source declaration.

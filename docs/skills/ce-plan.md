@@ -97,6 +97,10 @@ Universal planning 还区分两种 **dispositions**。*Plan-seeking* tasks（tri
 
 面对 hard problem，`ce-plan` 可以上提一层回答：先产出 grounded **approach-plan**，也就是 *deliverable 将如何被制作* 的 plan，并在 checkpoint 停住，再决定是否 commit 到 deliverable。这让用户获得 structure 和 certainty，而不是 zero-shot 一个脆弱结果。入口可以是 explicit（"plan for a plan"、"don't write it yet -- plan how you'd approach it"），也可以很少见地 proactive offer：只有当 method 真的未定且搞错成本很高时才触发，所以不会变成 nag。对提供的 inputs 做 light recon（skim，不 deep-read）后，它在 chat 中给出 approach；file-optional，也可 deepen。Checkpoint 时，用户选择现在执行或保存到以后。它划出的边界是 **code vs. knowledge-work**，不是 plan vs. execute：code 仍进入 `ce-work` 正常路径；non-code deliverable 会标记为 `execution: knowledge-work`，并通过 `ce-work` 的 lightweight carve-out 运行（或交给任何 agent；plan 保持 portable）。`ce-plan` 自己永远不 execute；它产出 approach-plan 并 hand off。
 
+### 9. Session-settled decisions：继承，不再重复询问
+
+当某个 decision 已在触发会话中被审视并由用户选定，或已经提炼进 caller brief，`ce-plan` 会在对应 Key Technical Decision 上记录可见的 `(session-settled: user-directed|user-approved — chosen over X: reason)` annotation，并且不再重复询问。Scoping synthesis 会把它呈现为 `Carrying forward:` 行，而不是要求再次确认的 fork。Research 可以补充 settled decision；只有 evidence 才能与其冲突，并按 severity ladder 路由：未发现问题时静默继续；suboptimal-but-workable 时仍按 settled decision 推进，并在 KTD 上附加 conflict call-out；invalidating evidence（不可行、解决了错误问题或具有破坏性）会停止运行，pipeline mode 下返回 `settled-decision-invalidated` blocked report。未经审视的 assertion 不属于 settled decision；它只会在 planning 阶段接受一次 challenge，结果会记录到 plan 中，而不是交给下游反复争论。
+
 ---
 
 ## 快速示例

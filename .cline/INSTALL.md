@@ -23,13 +23,13 @@ Clone 本 repository 后运行：
 
 该 script 会创建 symlink，让 Cline 直接读取 checkout 中的 skill 目录。执行 `git pull` 后，如果 skill 目录名称发生变化，请重新运行 script 以刷新 links。它只会创建或替换 CE 自有的 symlink（即 target 位于当前 checkout 的 `skills/` tree 下）；如果已有 `~/.cline/skills/<name>` 指向你自己的 skill、某个 fork 或其他 checkout，则不会触碰。默认安装也只会移除 CE 自有的 manual-only symlink。
 
-标记为 `disable-model-invocation: true` 的 skills（例如 `lfg`、`ce-dogfood`、`ce-polish`）默认**不会**建立 symlink。Cline 会根据 description 匹配自动激活 skill，且没有 manual-only gate，因此 link 这些 skills 可能导致意外触发。你需要显式启用，才能使用对应的 slash commands：
+标记为 `disable-model-invocation: true` 的 skills（例如 `ce-dogfood`、`ce-polish`、`ce-setup`）默认**不会**建立 symlink。Cline 会根据 description 匹配自动激活 skill，且没有 manual-only gate，因此 link 这些 skills 可能导致意外触发。你需要显式启用，才能使用对应的 slash commands：
 
 ```bash
 ./compound-engineering-plugin/.cline/scripts/install-skills.sh --global --include-manual
 ```
 
-`--include-manual` 会为 manual-only skills 建立 symlink，从而启用 `/lfg` 等 commands；但请注意，description 匹配时 Cline 仍可能自动激活它们。如果你不需要在 Cline 中使用这些 workflows，请省略该 flag。
+`--include-manual` 会为 manual-only skills 建立 symlink，从而启用 `/ce-polish` 等 commands；但请注意，description 匹配时 Cline 仍可能自动激活它们。如果你不需要在 Cline 中使用这些 workflows，请省略该 flag。
 
 ## 固定 release 版本
 

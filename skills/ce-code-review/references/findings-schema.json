@@ -1,17 +1,17 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Code Review Findings（code review findings）",
-  "description": "用于 code review sub-agents 的 structured output schema",
+  "title": "Code Review Findings",
+  "description": "Structured output schema for code review sub-agents",
   "type": "object",
   "required": ["reviewer", "findings", "residual_risks", "testing_gaps"],
   "properties": {
     "reviewer": {
       "type": "string",
-      "description": "生成此 output 的 persona name（例如 'correctness'、'security'）"
+      "description": "Persona name that produced this output (e.g., 'correctness', 'security')"
     },
     "findings": {
       "type": "array",
-      "description": "此字段包含 code review findings 的列表。未发现 issues 时为空数组。",
+      "description": "List of code review findings. Empty array if no issues found.",
       "items": {
         "type": "object",
         "required": [
@@ -30,108 +30,72 @@
         "properties": {
           "title": {
             "type": "string",
-            "description": "简短、具体的 issue title。10 words or fewer。",
+            "description": "Short, specific issue title. 10 words or fewer.",
             "maxLength": 100
           },
           "severity": {
             "type": "string",
             "enum": ["P0", "P1", "P2", "P3"],
-            "description": "此 issue 的 severity level"
+            "description": "Issue severity level"
           },
           "file": {
             "type": "string",
-            "description": "相对于 repository root 的 file path"
+            "description": "Relative file path from repository root"
           },
           "line": {
             "type": "integer",
-            "description": "此 issue 的 primary line number",
+            "description": "Primary line number of the issue",
             "minimum": 1
           },
           "why_it_matters": {
             "type": "string",
-            "description": "影响和 failure mode -- 不是 'what is wrong'，而是 'what breaks'"
+            "description": "Impact and failure mode -- not 'what is wrong' but 'what breaks'"
           },
           "autofix_class": {
             "type": "string",
             "enum": ["gated_auto", "manual", "advisory"],
-            "description": "这是 review 后给 caller 的 routing hint（此 skill 不 apply fixes）。gated_auto = 已提出 concrete suggested_fix，caller 判断后 apply；manual = 需要 design 或 cross-cutting decisions；advisory = report-only。"
+            "description": "Routing hint for the caller after review (this skill does not apply fixes). gated_auto = concrete suggested_fix proposed; caller applies after judgment. manual = needs design or cross-cutting decisions. advisory = report-only."
           },
           "owner": {
             "type": "string",
             "enum": ["downstream-resolver", "human", "release"],
-            "description": "说明 synthesis 后谁应负责此 finding 的 next action"
+            "description": "Who should own the next action for this finding after synthesis"
           },
           "requires_verification": {
             "type": "boolean",
-            "description": "此 finding 的任何 fix 是否必须用 targeted tests 或 follow-up review pass 重新验证"
+            "description": "Whether any fix for this finding must be re-verified with targeted tests or a follow-up review pass"
           },
           "suggested_fix": {
             "type": ["string", "null"],
-            "description": "这是 reviewer 能从 diff 和 surrounding code 中 defend 的 concrete minimal fix。只要 review context 中能触达任何 defensible code change（parallel patterns、framework conventions 或 cited code itself），就提出一个。信息不完整不是省略理由 -- 基于你能看到的内容提出最 defensible default，说明你的 assumption，并允许 user override。'I need <specific input> to commit' 是 soft punt：真正的问题是 '如果现在必须选择，我会提出什么 code change?'，请提出它并说明 assumption。只有在确实没有 code-level change 可提出时才省略 -- 例如 finding 是 question 而非 fix（'what is the intended SLA here?'），或 resolution 纯属 organizational action 且没有 code component（legal sign-off、business policy decision）。这些情况在 code review 中很少见。糟糕 suggestion 仍比没有 suggestion 更差，但 soft punt 正是此 field 要防止的 failure mode。"
+            "description": "Concrete minimal fix the reviewer can defend from the diff and surrounding code. Propose one whenever any defensible code change is reachable from review context (parallel patterns, framework conventions, or the cited code itself). Imperfect information is not grounds for omission -- propose the most defensible default given what you can see, name any assumption you are making, and let the user override. 'I need <specific input> to commit' is a soft punt: the right question is 'what code change would I propose if I had to choose now?' and propose that, with the assumption named. Omit only when there is genuinely no code-level change to propose -- e.g., the finding is a question rather than a fix ('what is the intended SLA here?'), or the resolution is purely an organizational action with no code component (legal sign-off, business policy decision). These cases are rare in code review. A bad suggestion is still worse than none, but a soft punt is the failure mode this field is designed to prevent."
           },
           "confidence": {
             "type": "integer",
             "enum": [0, 25, 50, 75, 100],
-            "description": "锚定式 confidence score。必须准确使用 0、25、50、75、100 之一。每个 anchor 都有 reviewer 必须诚实 self-apply 的 behavioral criterion。0：Not confident。这是 false positive，经不起轻度检查，或是此 PR 未引入的 pre-existing issue。25：Somewhat confident。可能是真 issue，也可能是 false positive；reviewer 仅凭 diff 和 surrounding code 无法 verify。50：Moderately confident。reviewer 已验证这是真 issue，但可能只是 nitpick、narrow edge case，或 practical impact 很小。相对于 diff 的其他 concerns，它不太重要。Style preferences 和 subjective improvements 属于这里。75：Highly confident。reviewer 已 double-check diff，并确认 issue 会在 normal usage 中影响 users、downstream callers 或 runtime behavior。bug、vulnerability 或 contract violation 清晰存在且 actionable。100：Absolutely certain。issue 可直接从 code 本身验证 -- compile error、type mismatch、definitive logic bug，或带可引用 rule 的 explicit project-standards violation。无需 interpretation。"
+            "description": "Anchored confidence score. Use exactly one of 0, 25, 50, 75, 100. Each anchor has a behavioral criterion the reviewer must honestly self-apply. 0: Not confident. This is a false positive that does not stand up to light scrutiny, or a pre-existing issue this PR did not introduce. 25: Somewhat confident. Might be a real issue but could also be a false positive; the reviewer could not verify from the diff and surrounding code alone. 50: Moderately confident. The reviewer verified this is a real issue but it may be a nitpick, narrow edge case, or have minimal practical impact. Relative to the diff's other concerns, it is not very important. Style preferences and subjective improvements land here. 75: Highly confident. The reviewer double-checked the diff and confirmed the issue will affect users, downstream callers, or runtime behavior in normal usage. The bug, vulnerability, or contract violation is clearly present and actionable. 100: Absolutely certain. The issue is verifiable from the code itself -- compile error, type mismatch, definitive logic bug, or an explicit project-standards violation with a quotable rule. No interpretation required."
           },
           "evidence": {
             "type": "array",
-            "description": "Code-grounded evidence: snippets, line references, or pattern descriptions. At least 1 item. For any finding at confidence anchor 75 or 100, the first item MUST be the verbatim motivating line(s) with file:line -- the exact code text that makes the finding true (the quote-the-line gate). A finding whose triggering line cannot be quoted must step down to anchor 50.",
+            "description": "Code-grounded evidence: snippets, line references, or pattern descriptions. At least 1 item. For any finding at confidence anchor 75 or 100, the first item MUST be the verbatim motivating line(s) with file:line -- the exact code text that makes the finding true (the quote-the-line gate). A finding whose triggering line cannot be quoted must step down to anchor 50. When the finding's claim depends on line history (pre_existing, intentional design, introduced-by-this-diff, or P0/P1 confidence that depends on authorship/age), include one additional concise provenance line from targeted git blame/log (short hash, author, date/subject) -- never replace the quote-the-line item, never dump full-file blame, omit when the finding is justified from the diff alone.",
             "items": { "type": "string" },
             "minItems": 1
           },
           "pre_existing": {
             "type": "boolean",
-            "description": "如果此 issue 存在于与 current diff 无关的 unchanged code 中，则为 true"
+            "description": "True if this issue exists in unchanged code unrelated to the current diff"
           }
         }
       }
     },
     "residual_risks": {
       "type": "array",
-      "description": "这是 reviewer 注意到但无法确认成 findings 的 risks",
+      "description": "Risks the reviewer noticed but could not confirm as findings",
       "items": { "type": "string" }
     },
     "testing_gaps": {
       "type": "array",
-      "description": "这是 reviewer 识别出的 missing test coverage",
+      "description": "Missing test coverage the reviewer identified",
       "items": { "type": "string" }
-    }
-  },
-
-  "_meta": {
-    "confidence_anchors": {
-      "description": "此处的 confidence 是 5 个 discrete anchors 之一（0、25、50、75、100），每个 anchor 都绑定 reviewer 可诚实 self-apply 的 behavioral criterion。Float values（例如 0.73）无效 -- model 无法在更细 granularity 上 meaningful calibrate，discrete anchors 可防止 false-precision gaming。",
-      "0": "False positive 或 pre-existing -- 不 report",
-      "25": "Speculative；无法 verify -- 不 report",
-      "50": "已 verify 为真实但 minor 或 stylistic -- 仅当 P0，或 synthesis route 到 advisory/soft buckets 时 report",
-      "75": "Highly confident，会在 normal usage 中影响 users 或 runtime -- report",
-      "100": "仅凭 code 即可 verify（compile error、type mismatch、definitive logic bug、quoted standards violation）-- report"
-    },
-    "confidence_thresholds": {
-      "suppress": "低于 anchor 75 -- 不 report。例外：anchor 50+ 的 P0 findings 可以 report（critical-but-uncertain issues 不能被 silently dropped）。",
-      "report": "Anchor 75 或 100 -- 带 full evidence include。"
-    },
-    "severity_definitions": {
-      "P0": "Critical breakage、exploitable vulnerability、data loss/corruption。merge 前必须 fix。",
-      "P1": "High-impact defect，normal usage 中很可能触发，breaking contract。应 fix。",
-      "P2": "有 meaningful downside 的 moderate issue（edge case、perf regression、maintainability trap）。如果 straightforward 就 fix。",
-      "P3": "Low-impact、narrow scope、minor improvement。由 user discretion 决定。"
-    },
-    "autofix_classes": {
-      "gated_auto": "已提出 concrete suggested_fix。caller 可在 judgment 后 apply -- 不是由此 skill apply。",
-      "manual": "需要 design decisions 或 cross-cutting changes 的 actionable issue。",
-      "advisory": "仅用于 report 的 informational 或 operational item。"
-    },
-    "owners": {
-      "downstream-resolver": "Caller 或 human 应在 review 后 act。",
-      "human": "implementation 前需要 judgment。",
-      "release": "Operational 或 rollout follow-up。"
-    },
-    "return_tiers": {
-      "description": "Finding fields are split into two tiers. The full schema (with all required fields) applies to the artifact file on disk. The compact return to the orchestrator omits detail-tier fields. Both are valid uses of this schema in different contexts.",
-      "merge_tier": "Returned to orchestrator: title, severity, file, line, confidence, autofix_class, owner, requires_verification, pre_existing, suggested_fix (optional), first_evidence (required for anchor 75/100; the verbatim first evidence line, used to enforce the quote-the-line gate in-band). Plus top-level reviewer, residual_risks, testing_gaps.",
-      "detail_tier": "Required in artifact file, omitted from compact return: why_it_matters, and the full evidence array (the compact return carries only first_evidence). The artifact file must pass full schema validation including all required fields. Headless output depends on why_it_matters and evidence being present in the artifact."
     }
   }
 }

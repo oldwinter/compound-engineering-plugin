@@ -88,23 +88,31 @@ Phase 2 会浮现 2-3 个 concrete approaches，其中至少一个是 **non-obvi
 
 写 doc 前，`ce-brainstorm` 会发出 **scoping synthesis**，形状像两个 product collaborators 在写 PRD 前会确认的内容。它浮现正在 build 的东西、对话产生的 key trade-offs、deferred 内容，以及用户应 weigh in 的真实 forks。每个 section 只有在有内容时才渲染；不会为了 ceremony 填空 bucket。当上游对话 short-circuited（Phase 0.2 fast path、requirements 已清楚、没有 questions）时，scoping synthesis 会压缩为一个 forward-looking sentence，并保留 end-of-turn interrupt window。
 
-### 6. 会向下游流动的 stable identifiers
+### 6. Synthesis Summary：落笔前最后一次低成本纠偏
+
+写文档前，`ce-brainstorm` 会输出一份 **scoping synthesis**，形状类似两位 product collaborators 在写 PRD 前确认的内容：要构建什么、对话产生的关键 trade-offs、哪些内容已 deferred，以及真正需要用户表态的 forks。只有有内容的 sections 才会 render，不会为了 ceremony 填充 empty buckets。只有未提出 blocking questions 的 Lightweight brainstorm 才会压缩为一句 forward-looking summary，并在 turn end 留出 interrupt window；其他情况（Standard、Deep，或提出过 blocking question 的任意 tier）都会给出完整 synthesis 和 explicit confirmation gate，包括无需对话、但已预加载充分 substance 的 Phase 0.2 fast path。
+
+### 7. 会向下游流动的 stable identifiers
 
 Requirements doc 携带 plan-feeding identifiers：R-IDs（Requirements）、A-IDs（Actors）、F-IDs（Key Flows）、AE-IDs（Acceptance Examples）。`ce-plan` 会消费这些，并把每个 implementation unit 和 test scenario trace 回它们。Origin scope boundaries（尤其是 "Outside this product's identity"）会原样向下游流动。
 
-### 7. 面向 non-software 的 universal brainstorming
+### 8. 面向 non-software 的 universal brainstorming
 
 构建 software feature？Standard flow。命名 product？选择 vacation？决定 career move？`ce-brainstorm` 会路由到 domain-agnostic facilitator，同时保留 one-question-at-a-time discipline 和 right-sized output。
 
-### 8. 默认把 implementation 排除在 requirements doc 之外
+### 9. 默认把 implementation 排除在 requirements doc 之外
 
 Requirements 描述从用户视角期待的 **what** behavior。默认不描述 libraries、schemas、endpoints、file layouts 或 code structure，除非 brainstorm 本身就是 technical 或 architectural decision。这让 planning 的工作保持干净：发明 **how**，而不是 **what**。
 
-### 9. 陌生领域的 Blindspot pass
+### 10. 陌生领域的 Blindspot pass
 
 Interview 机制假设你能评估它问的内容，而当你要在不熟悉的领域里划定 scope 时，这个假设恰好会失效。当你表明自己不熟悉（例如 "I know nothing about the auth modules" 或 "I don't know what color grading is"），或者连续回答显示你是 *无法权衡 options* 而不是只是还没决定时，`ce-brainstorm` 会在继续追问该领域前提供 **blindspot pass**：一张 grounded map，列出 3-7 个你尚不知道该问的 decisions 和 hazards，并说明它们为何与你的 topic 相关、有哪些 realistic options，以及 recommended default。你选择要逐一走过哪些；其余项采用 default，并记为 explicit assumptions。它把 unknown unknowns 转成 known unknowns，让 interview 提取的是 choices 而非 guesses。Software 和 non-software routes 都适用。
 
-### 10. Grounding 和 verification 嵌入你的思考时间
+### 11. 把 session-settled decisions 带入 requirements
+
+Requirements 阶段会运行相同的 settlement test：用户在对话中已经检查并选择的 decision（trade-off 已明确，用户在知情后作出选择）会写成带标签的 Key Decision，例如 `session-settled: user-directed` 或 `user-approved`，同时注明它取代了哪个 alternative；后续对话不会重复询问。`ce-plan` enrichment 会继承标签及 rejected-alternative provenance，因此这里已经作出的选择不会在 requirements 转为 implementation-ready plan 时被重新争论。
+
+### 12. Grounding 和 verification 嵌入你的思考时间
 
 On Standard and Deep brainstorms, a cheap extraction-tier scout is dispatched in the background while you answer the first question. It writes a grounding dossier — verbatim quotes with `file:line` pointers — to scratch storage and hands back a short gist, so the dialogue stays lean while the evidence stays available on demand. Before the requirements-only unified plan is written, a fresh-context verifier (a mid-tier model that never saw the dialogue) checks the Product Contract's repo claims — absence claims, file references — against the codebase, running while you review the synthesis confirmation. Refuted claims are corrected before the plan lands; unverifiable ones become explicit assumptions. The dossier path is handed to `ce-plan` so planning starts from verified quotes instead of re-scanning. On platforms without per-agent model selection, both run on the inherited model with the same read budgets; with no subagent support at all, the skill falls back to inline scanning and verification.
 

@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `7f86be9d`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `e745e966`。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -16,6 +16,8 @@
 ```
 
 安装后，runtime 会加载这个 fork 中的 `skills/*/SKILL.md` 及各 skill 自带的 `references/`；这些是中文本地化的实际执行入口。下方保留的 `EveryInc/compound-engineering-plugin` 命令指向上游英文版，不应当作中文版安装命令。
+
+**使用其他编辑器或 CLI？** Claude Code、Cursor、Codex、Kimi Code CLI、Cline、Grok Build CLI、Devin CLI、GitHub Copilot、Factory Droid、Qwen Code、OpenCode、Pi 和 Antigravity CLI 均受支持，详见[更多安装方式](#更多安装方式)。
 
 ## Philosophy（理念）
 
@@ -63,7 +65,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-strategy`](docs/skills/ce-strategy.md) | *Upstream anchor*：创建并维护 `STRATEGY.md`，由 ideate、brainstorm 和 plan 读取作为 grounding，让 strategy choices 流入每个 feature |
 | [`/ce-product-pulse`](docs/skills/ce-product-pulse.md) | *Outer loop*：给定时间窗口内用户实际经历了什么（usage、performance、errors）的 report，保存到 `docs/pulse-reports/`；follow-ups 反馈到 ideation 和 brainstorming |
 | [`/ce-debug`](docs/skills/ce-debug.md) | 当输入是 bug 而不是 feature 时，替代 brainstorm -> plan -> work：reproduce，trace root cause，fix，然后在必要时 polish/review 并 handoff 给 PR |
-| [`/ce-pov`](docs/skills/ce-pov.md) | *On demand, before you commit*：对是否采用、切换或重新评估外部 technology、library、pattern、platform 给出 decisive、project-grounded verdict；支持 cold 或 mid-session，并基于 verdict 提议下一步（`/ce-plan`、`/ce-brainstorm` 或 spike） |
+| [`/ce-pov`](docs/skills/ce-pov.md) | *On demand, before you commit*：给出 decisive、project-grounded adoption verdict、holistic document take 或针对既有 approaches 的立场；可由 named peers 或 `oracle` 做 cross-check，并明确区分 Cursor default 与 Composer |
 | [`/ce-explain`](docs/skills/ce-explain.md) | *On demand, to keep learning*：把 concept、diff、idea 或 “what did I do this week?” 变成写给你个人的 dense visual explainer，可选 check-in（diff 的 predict-then-reveal、corrected exercises）让内容留下来 |
 
 完整 catalog 和 skill chaining 见 [docs/skills](docs/skills/README.md)。完整 inventory 见[下方](#full-skill-inventory)。
@@ -121,7 +123,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 安装后，在任意 project 中运行 `/ce-setup`。它会检查 repo-local config、报告 optional tool capabilities，并帮助把 machine-local CE settings 安全地放进 gitignore。
 
-`compound-engineering` plugin 当前包含 29 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
+`compound-engineering` plugin 当前包含 30 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
 
 ### Full Skill Inventory（完整 Skill 清单）
 
@@ -129,7 +131,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 |-------|---------|
 | [`/ce-strategy`](docs/skills/ce-strategy.md) | 创建或维护 `STRATEGY.md` |
 | [`/ce-ideate`](docs/skills/ce-ideate.md) | 生成并严格评估 grounded ideas |
-| [`/ce-pov`](docs/skills/ce-pov.md) | 对外部输入形成 decisive、project-grounded verdict |
+| [`/ce-pov`](docs/skills/ce-pov.md) | 对 adoption、document 或 approach set 形成 decisive、project-grounded POV |
 | [`/ce-explain`](docs/skills/ce-explain.md) | 将 concept、diff、idea 或你自己的一段 work 解释成个人学习 artifact |
 | [`/ce-brainstorm`](docs/skills/ce-brainstorm.md) | 探索 requirements 并写出尺寸合适的 requirements doc |
 | [`/ce-plan`](docs/skills/ce-plan.md) | 创建 structured implementation plans |
@@ -146,6 +148,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-resolve-pr-feedback`](docs/skills/ce-resolve-pr-feedback.md) | Resolve PR review feedback |
 | [`/ce-commit`](docs/skills/ce-commit.md) | 创建带清晰 message 的 git commit |
 | [`/ce-commit-push-pr`](docs/skills/ce-commit-push-pr.md) | Commit、push 并 open PR，同时讲解本次 change 新引入的任何 concept |
+| [`/ce-babysit-pr`](docs/skills/ce-babysit-pr.md) | 持续 watch open PR，根据新到达的 review comments 和 CI 状态推动它走向 merge-ready |
 | [`/ce-worktree`](docs/skills/ce-worktree.md) | 确保 work 在 isolated git worktree 中进行 |
 | [`/ce-promote`](docs/skills/ce-promote.md) | Draft user-facing announcement copy |
 | [`/ce-test-browser`](docs/skills/ce-test-browser.md) | 对 PR-affected pages 运行 browser tests |
@@ -159,7 +162,9 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 ---
 
-## Install
+## 更多安装方式
+
+中文 fork 的 Claude Code 安装方式位于[文档顶部](#安装中文版)。以下命令均指向上游英文版，上游对这些平台提供同等支持。
 
 ### Claude Code
 
@@ -227,6 +232,28 @@ CODEX_HOME="$HOME/.codex/profiles/work" codex plugin add compound-engineering@co
 ```
 
 The marketplace step only makes the plugin available; the plugin install is what activates the native CE skills for that profile.
+
+#### 移除旧版 Codex tool map（native plugin 推出前的安装）
+
+如果你曾在 native Codex plugin 支持推出前，通过 Bun `convert` / `install --to codex` CLI 安装 Compound Engineering，该路径可能在你的**全局** Codex instructions file 中插入过一个 managed block：
+
+`<!-- BEGIN COMPOUND CODEX TOOL MAP -->` … `<!-- END COMPOUND CODEX TOOL MAP -->`
+
+它位于 `$CODEX_HOME/AGENTS.md`（默认 `~/.codex/AGENTS.md`）。这个 Claude-compat tool map 已经过时，因为 CE skills 会直接在内部指明 Codex tools；其中一行还错误地要求 Codex 把 subagent dispatch 收缩到 main thread。Native plugin 安装**不会**添加该 block。
+
+把以下 prompt 粘贴给 Codex（或任何可访问 home directory 的 agent）即可移除：
+
+```text
+从我的 Codex home AGENTS.md 中移除过时的 Compound Engineering Codex tool-map block。
+
+1. 如果设置了 CODEX_HOME，检查 `$CODEX_HOME/AGENTS.md`；否则检查 `~/.codex/AGENTS.md`。如果我使用 Codex profiles，还要检查 `~/.codex/profiles/*/AGENTS.md`。
+2. 查找精确 sentinels：`<!-- BEGIN COMPOUND CODEX TOOL MAP -->` 和 `<!-- END COMPOUND CODEX TOOL MAP -->`。
+3. 如果两者都存在，只删除从 BEGIN 行到 END 行（含首尾两行）的内容，其他 user content 保持不变。除非 project/repo AGENTS.md 中也出现了这两个精确 sentinels，否则不要编辑它。
+4. 如果移除后文件为空，则删除该文件。
+5. 简短展示修改前后的摘要；如果 block 原本就不存在，也请说明。不要添加 replacement tool map。
+```
+
+重新运行面向 Codex 的 Bun convert/install CLI，也会移除仍然存在的 block；新版 CLI 不再插入它。
 
 ### Kimi Code CLI
 

@@ -6,14 +6,15 @@ It also contains:
 - the Bun/TypeScript CLI that converts Claude Code plugins into other agent platform formats
 - shared release and metadata infrastructure for the CLI, marketplace, and plugin
 
-`AGENTS.md` is the canonical repo instruction file. Root `CLAUDE.md` exists only as a compatibility shim for tools and conversions that still look for it.
+`AGENTS.md` is the canonical repo instruction file. Root `CLAUDE.md` is a symlink to `AGENTS.md` so Claude Code and other tools that look for `CLAUDE.md` still find it at the expected path. Keep that symlink (do not replace it with a regular file): a real root `CLAUDE.md` makes `claude plugin validate --strict` fail because this checkout is also the plugin root.
 
 ## Quick Start
 
 ```bash
 bun install
-bun test                  # full test suite
-bun run release:validate  # check plugin/marketplace consistency
+bun test                  # full test suite (also runs in CI)
+bun run release:validate  # plugin/marketplace consistency (also runs in CI)
+bun run plugin:validate   # Claude marketplace + plugin schema (also runs in CI; needs `claude` on PATH)
 ```
 
 ## Working Agreement
@@ -21,7 +22,7 @@ bun run release:validate  # check plugin/marketplace consistency
 - **Branching:** Create a feature branch for any non-trivial change. If already on the correct branch for the task, keep using it; do not create additional branches or worktrees unless explicitly requested.
 - **Merge policy:** All changes to `main` go through pull requests. Direct pushes and direct merges are not allowed; branch protection on `main` enforces this by requiring the `test` status check to pass. The direct path bypasses `release:validate`, the test suite, and PR title validation — past direct merges have caused version drift requiring multi-PR recovery (see `docs/solutions/workflow/release-please-version-drift-recovery.md`).
 - **Safety:** Do not delete or overwrite user data. Avoid destructive commands.
-- **Testing:** Run `bun test` after changes that affect parsing, conversion, or output.
+- **Testing:** Run `bun test` after changes that affect parsing, conversion, output, skill conventions, or other mechanical guards. Local `bun test` is the same suite CI runs — there is no separate local-only unit-test lane.
 - **Release versioning:** Releases are prepared by release automation, not normal feature PRs. The repo has one root plugin/package release component (`compound-engineering`) plus marketplace components (`marketplace`, `cursor-marketplace`). GitHub release PRs and GitHub Releases are the canonical release-notes surface for new releases; root `CHANGELOG.md` is only a pointer to that history. Use conventional titles such as `feat:` and `fix:` so release automation can classify change intent, but do not hand-bump release-owned versions or hand-author release notes in routine PRs.
 - **Output Paths:** Keep OpenCode output at `opencode.json` and `.opencode/{agents,skills,plugins}`. For OpenCode, commands go to `~/.config/opencode/commands/<name>.md`; `opencode.json` is deep-merged (never overwritten wholesale).
 - **Scratch Space:** Default to OS temp. Use `.context/` only when explicitly justified by the rules below.
@@ -88,7 +89,40 @@ cat .claude-plugin/plugin.json | jq .
 
 ## Runtime vs Authoring Context
 
-`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` are authoring context for this source repository. Skills are installed into end-user environments, where they run against the user's local instruction files, not this repo's. Behavioral rules that must affect a skill at runtime belong in that skill's `SKILL.md` or files under its own `references/` directory.
+`AGENTS.md`, `CLAUDE.md` (symlink to `AGENTS.md`), and `GEMINI.md` are authoring context for this source repository. Skills are installed into end-user environments, where they run against the user's local instruction files, not this repo's. Behavioral rules that must affect a skill at runtime belong in that skill's `SKILL.md` or files under its own `references/` directory.
+
+## Cross-Model Skill Authoring
+
+This repository authors each skill once and distributes it across multiple agent models and harnesses. Before creating, materially revising, or reviewing a skill or skill-local persona, read `docs/solutions/skill-design/portable-agent-skill-authoring.md`.
+
+That field guide is the canonical reasoning layer for outcome-first authoring, model and harness portability, protocol versus judgment, proportional authority, tool adapters, evidence-backed review, and targeted behavioral evaluation. It is not a template: apply only the sections relevant to the skill. The repository-specific rules elsewhere in this file supplement the guide and take precedence where they are more specific.
+
+### Skill Prose Admission Rules
+
+- Keep a line only when it states a falsifiable constraint, counters a known default tendency or observed shortcut, or supplies domain knowledge that materially changes a decision.
+- Do not keep vague effort or quality language such as "be thorough" or "produce high-quality work" as a standalone instruction. Replace it with an observable rule, or retain a targeted effort cue only when it counters a documented runtime tendency and has been evaluated there.
+- Do not append motivational rationale to a directive that already stands on its own.
+- Repeat an instruction only at a demonstrated drift point where placement changes whether it fires. Protect genuinely required always-loaded duplicates with a parity test.
+
+### Applying Feedback to Skills
+
+Applying review, peer, or eval feedback to a skill is a material revision governed by the authoring guide. An item is not addressed because a sentence landed; it is addressed when a demonstrated gap is closed at its owning layer by the smallest mechanism. Before editing:
+
+1. **Evidence** — classify each item as Change, Verify, or Consider using the guide's evidence rules. Do not edit the skill for Verify or Consider items.
+2. **Owning layer** — for each Change, identify its owning layer: activation contract, outcome spine or skill boundary, runtime protocol, loading or placement, deterministic enforcement, or shared authoring rule.
+3. **Mechanism** — fix the gap at its owning layer. Add prose only when it is the smallest mechanism that closes the gap, and then only the smallest falsifiable unit per the Skill Prose Admission Rules.
+4. **Reconcile** — reread the affected block; remove or rewrite text the change makes conflicting, duplicated, or obsolete. Resolve conflicting feedback items rather than stacking both.
+
+When evidence shows the same cause across skills, fix the shared guide, rule, or mechanism unless the skills' contracts materially differ.
+
+For a multi-item round, record one line per item in the existing PR body or work note: `item -> Change|Verify|Consider | owning layer | mechanism - why`. A single-item fix still follows the steps above; the written line is optional. Reviewer wording is a hypothesis about mechanism, not authority over it — the reviewer's one-line prose fix is sometimes exactly right.
+
+### Skill Loading Supplements
+
+- Keep every load-bearing action, route, and reference-load instruction inline at the point where it must fire (`docs/solutions/skill-design/post-menu-routing-belongs-inline.md`).
+- Do not inline a summary complete enough to suppress loading the authoritative reference.
+- Extract a block to `references/` when it is conditional or late-sequence and a meaningful share of the skill (~20%+). Replace it with a 1-3 line condition and backtick path.
+- Never use `@` for an extracted block; it inlines at load time and defeats extraction.
 
 ## Referencing Project Conventions in Skills
 
@@ -117,36 +151,41 @@ Behavioral changes to a plugin skill or skill-local persona (anything under `ski
 
 - **Do NOT edit `~/.claude/plugins/cache/` or `~/.claude/plugins/marketplaces/` to try to force a reload.** Those paths are user machine state, not repo-managed. Modifying them does not reliably bypass the in-session cache (it didn't, in observed behavior), risks being silently overwritten by plugin updates, and is the wrong layer to test from. The skill-creator pattern is the proper approach; if you genuinely need fresh-loaded behavior of the typed-agent dispatch path, restart the Claude Code session — but skill-creator is preferred for fast iteration.
 
+- **A version-matched cache is not automatically stale — confirm by content, not by version.** When this working tree is the local marketplace source, a session (re)start re-copies it into `~/.claude/plugins/cache/.../compound-engineering/<version>/` (a plain copy, no `.git`; `<version>` is the working tree's `.claude-plugin/plugin.json` version), so the loaded plugin can be identical to — and as current as — your edits. Do not assume the running copy is stale just because it lives under the cache path; equally, do not assume a matching `<version>` means it includes your latest change. Version match is necessary but not sufficient: edits within a release do not bump the version, so a matching segment proves only that the cache was built from this release, not that it captured your most recent edit. To know which copy is actually loaded, diff the specific cache file against the working-tree file — identical means the running plugin is your current edit and you can trust it; differing means the session predates the edit, so restart (or use skill-creator). Never infer "stale" or "current" from the version segment alone.
+
 - **Mechanical changes do not have this restriction.** Skill scripts (e.g., `extract-metadata.py`), parser logic, conversion code, and anything `bun test` exercises always run the current source. The caching issue only affects LLM-driven skill prose behavior dispatched through the plugin loader.
 
-## Writing Skill Instructions
+## CI and Quality Gates
 
-Every line of skill prose must change agent behavior. Before keeping a line, apply the deletion test: if removing it would not change the output, it is a no-op — delete it. Agents already write detailed commit messages, try to be thorough, and aim for readable code by default, so generic exhortations to do those things ("be thorough", "be comprehensive", "write clean/readable code", "think carefully", "world-class", "high quality") are no-ops that only add tokens and noise.
+PR CI (`.github/workflows/ci.yml`) is the merge gate. It runs, in order: PR-title lint (PRs only), `bun run release:validate`, `bun run plugin:validate`, and `bun test`. Do not invent a parallel local-only mechanical suite — if a check is deterministic and should block merges, put it in one of those steps (usually `bun test`).
 
-A line earns its place when it does one of these:
+### What belongs where
 
-- States a falsifiable constraint: a threshold, format, path, schema, or ordering.
-- Counters a known default tendency: a negative constraint ("do NOT add comments", "never push to main", "stop after X") or a guard against a shortcut the model would otherwise take.
-- Supplies domain knowledge the agent would not otherwise have.
+| Kind of check | Where it lives | Notes |
+|---|---|---|
+| Deterministic invariants (frontmatter, parity, path safety, script behavior, converter/writer output, greppable skill contracts) | `bun test` / `release:validate` / `plugin:validate` | Must pass in CI |
+| Skill *prose behavior* (routing judgment, restraint, cross-model peer outcomes) | `skill-creator` eval, local / PR evidence | Not a CI job; non-deterministic and needs a model |
 
-An adjective is fine **only** when immediately operationalized by a concrete rule (e.g., "keep outputs concise — only enough detail to support the next decision"). The adjective alone is framing; the operationalization is the instruction. Do not append motivational rationale ("the quality of everything depends on this") to a directive that already stands on its own, and do not restate an instruction the same file already gives unless it is deliberate spaced repetition placed where drift occurs.
+That split is intentional. See `docs/solutions/skill-design/portable-agent-skill-authoring.md` ("Evaluate proportionally"). Mechanical checks belong in CI; behavioral agent evals are best-effort evidence, not an exhaustive CI matrix.
 
-### Inline the Trigger, Not the Content
+### Right-size new mechanical guards
 
-SKILL.md loads at session start; references load on demand. That asymmetry sets what belongs where, and the resolution is *what* you inline, not *how much*.
+When a review bot or human finds a greppable invariant that `bun test` missed:
 
-A **load-bearing instruction** — one that MUST fire reliably: the action, the bare routing that invokes the next step, the instruction to load the reference itself — belongs inline at the top of its phase, because an agent that never opened the reference would otherwise stop or guess (`docs/solutions/skill-design/post-menu-routing-belongs-inline.md`).
+1. Prefer **tightening an existing guard** over adding a new suite (e.g. widen a regex that already documents the rule).
+2. Pin the **smallest falsifiable unit** — a token, enum, path, heading, or one fixture that would have failed on the regressing diff. Do not snapshot whole skill bodies or pin incidental wording.
+3. If the failure needs an LLM to judge, keep it in skill-creator; do not fake it as a brittle string test.
 
-But do **not** inline a *summary of what the reference contains*. It backfires twice:
+### Maintaining `plugin:validate`
 
-- **Drift.** The two copies diverge silently and the agent follows whichever one loaded. When a load-bearing block genuinely must appear in two always-loaded places, guard the copies with a parity test rather than trusting them to stay in sync.
-- **Suppressed load.** A paraphrase suppresses the very load it sits beside — an agent that already has a workable inline version judges it "has enough" and never opens the file, so the reference's templates, shaping rules, and examples never reach it. For a reference that should always load, keep the inline alternative strictly load-instruction-only.
+- `package.json` `plugin:validate` must validate **both** the marketplace catalog and the plugin manifest, with `--strict` on each. Paths: `.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json`. Do **not** use `claude plugin validate .` — that resolves this repo as a marketplace only (because `.claude-plugin/marketplace.json` exists with `source: "./"`) and skips plugin-root checks.
+- CI pins `@anthropic-ai/claude-code` for reproducible schema rules. Bump the pin deliberately when adopting new upstream rules; do not float `@latest`.
+- Root `CLAUDE.md` must remain a **symlink** to `AGENTS.md` (path stays at the repo root where contributors expect it). Upstream warns on a regular-file plugin-root `CLAUDE.md` because it is not loaded as end-user project context; the symlink avoids that warning so `--strict` can stay on. Do not replace the symlink with a regular `@AGENTS.md` shim or relocate the file just for validators.
+- If `--strict` starts failing again on `CLAUDE.md` after an upstream bump, check whether the symlink was materialized into a regular file (Windows/`core.symlinks=false` checkouts) or whether the validator started following symlinks — fix the layout or pin, do not silently drop `--strict`.
 
-Test: if the inline text is complete enough to act on without the reference, the agent will — so inline only what is incomplete by design ("act, then read X"). The inline part should create demand for the reference, not substitute for it.
+### When CI comments look "stale"
 
-### Extract Conditional and Late-Sequence Blocks
-
-Skill content carried from trigger time rides in every subsequent message — every tool call, agent dispatch, and response — so the cost compounds across a session, and more for skills that orchestrate many calls. Extract a block to `references/` when it is **conditional** (executes only under specific conditions) or **late-sequence** (needed only after many prior calls) *and* is a meaningful share of the skill (~20%+). Replace it with a 1-3 line stub stating the condition and a backtick path (e.g., "Read `references/deepening-workflow.md`"). Never use `@` for an extracted block — `@` inlines at load time and defeats the extraction. The always-on trigger from "Inline the Trigger, Not the Content" stays inline; only the conditional substance moves.
+If CI claims a deferred warning or a missing gate, reproduce with the **pinned** `claude` version against `.claude-plugin/plugin.json` before treating the comment as current. Marketplace-only validation can hide plugin warnings.
 
 ## Coding Conventions
 
@@ -222,7 +261,7 @@ If two skills need the same supporting file, duplicate it into each skill's dire
 
 ## Shared Repo-Grounding Profile Cache
 
-Repo-grounding skills (`ce-pov`, `ce-plan`, `ce-optimize`, `ce-ideate`, `ce-brainstorm`, `ce-code-review`, plus lighter consumers `ce-compound` — which still derives **and persists** on a miss — and `ce-debug`, which only opportunistically reads `conventions.testing` and never derives/persists) reuse one cached **question-agnostic project profile** (stack, deps, conventions, structure) instead of each re-deriving it. The profile is git-keyed and stored at `/tmp/compound-engineering/repo-profile/<root-sha>/<head-sha>.json`.
+Repo-grounding skills (`ce-pov`, `ce-plan`, `ce-optimize`, `ce-ideate`, `ce-brainstorm`, `ce-code-review`, plus lighter consumers `ce-compound` — which still derives **and persists** on a miss — and `ce-debug`, which only opportunistically reads `conventions.testing` and never derives/persists) reuse one cached **question-agnostic project profile** (stack, deps, conventions, structure) instead of each re-deriving it. The profile is git-keyed and stored at `/tmp/compound-engineering/repo-profile/<root-sha>/<inputs-digest>.json` (`inputs-digest` = sha256 of profile-input path+blob pairs at `HEAD`, so commits that do not touch those inputs share one entry).
 
 The mechanism is three **byte-duplicated** assets per consuming skill (the plugin has no cross-skill import — see "File References in Skills"):
 
@@ -251,9 +290,11 @@ How a bundled-file reference resolves depends on *who* resolves it and whether a
 
 ```
 # set inline in the SAME command (shell state does not persist between Bash calls):
-SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>"
+SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
 bash "$SKILL_DIR/scripts/my-script.sh" ARG
 ```
+
+**Keep the trailing `;` on the assignment line.** Some hosts (observed on Codex) flatten a fenced multi-line block into a single line by replacing the newline with a space before executing it. Without the `;`, `SKILL_DIR="…"` + newline + `bash "$SKILL_DIR/…"` collapses to the env-var-prefix form `SKILL_DIR="…" bash "$SKILL_DIR/…"`, where the shell expands `$SKILL_DIR` *before* the prefix assignment takes effect — so it expands to empty and the script path becomes `/scripts/my-script.sh` (`No such file or directory`). The trailing `;` makes the assignment a complete statement that survives flattening; it is load-bearing, not a style choice, so do not remove it.
 
 An existence guard (`if [ -f "$SKILL_DIR/scripts/my-script.sh" ]; then … else echo "not found — re-check the SKILL.md path"; fi`) is optional — useful when there's a real fallback, but see the permission caveat below before guarding a pinned call.
 
@@ -265,17 +306,11 @@ So: a skill's *core* behavior **can** live in a bundled script across hosts — 
 
 **Permission caveat (Claude Code).** Claude Code's permission checker evaluates every subcommand of a compound command, and a bare `[ -f … ]` test is not pre-approved — so wrapping a pinned `bash "…sh"` call in an `if … then … fi` guard defeats a narrow `Bash(bash *…sh)` allow-rule and prompts on every run. If a bundled-script call must stay auto-approved via such a pin, keep it a single pinned command rather than guarding it inline. Note the model-filled `SKILL_DIR` anchor produces a *dynamic* absolute path that won't match a static `Bash(bash /…/scripts/x.sh)` pin regardless of guarding — so for the anchor, expect a one-time approval prompt per distinct command (or use a broader allow-rule); the static-pin trick mainly applies to the fixed `${CLAUDE_SKILL_DIR}` form.
 
-**When a platform variable is unavoidable:** Use the pre-resolution pattern (`!` backtick syntax) and include explicit fallback instructions in the skill content, so the agent knows what to do if the value is empty, literal, or an error:
+**Do not use `!` load-time pre-resolution in skills.** The `!`cmd`` SKILL.md syntax runs `cmd` at skill load and inlines its stdout, but it is banned here (enforced by `tests/skill-shell-safety.test.ts`) for two unfixable reasons: it runs **only on Claude Code** — on Codex, Cursor, Gemini, and Grok the line is inert literal text — and on Claude Code a command that exits **non-zero aborts skill load** with a user-facing error. Every real use was git context (`git rev-parse …`, `gh pr view …`) whose non-zero exit is a *normal* state (no PR yet, no `origin/HEAD`, detached HEAD, not a repo), so the ordinary case broke the skill. The POSIX guards that force exit 0 (`2>/dev/null || echo SENTINEL`) then fail to parse under Windows PowerShell 5.1, which broke skill load there instead (issue #1066). No single command string both exits 0 on the expected-failure states and parses under both POSIX sh and PowerShell, so the construct cannot be made safe.
 
-```
-**Plugin version (pre-resolved):** !`jq -r .version "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json"`
+**Gather context at runtime instead.** Have the agent run one argv-style command per shell tool call (`git …`, `gh …`) — no `;`, `&&`, `||`, pipes, `$(…)`, or redirects — and interpret each exit status as control flow. This parses identically under POSIX sh and PowerShell because it is a single external-program invocation, and a non-zero exit becomes data the agent reads rather than a load-time abort. See `ce-commit` / `ce-commit-push-pr` for the pattern.
 
-If the line above resolved to a semantic version (e.g., `2.42.0`), use it.
-Otherwise (empty, a literal command string, or an error), use the versionless fallback.
-Do not attempt to resolve the version at runtime.
-```
-
-This applies equally to any platform's variables — a skill converted from Codex, Gemini, or any other platform will have the same problem if it assumes platform-only variables exist without a fallback.
+**When a platform variable is unavoidable:** resolve it at runtime with a single shell tool call and include explicit fallback instructions, so the agent knows what to do if the value is empty, a literal command string, or an error — e.g. run `jq -r .version "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json"`; if it resolved to a semantic version use it, otherwise fall back to the versionless behavior. This applies equally to any platform's variables — a skill converted from Codex, Gemini, or any other platform will have the same problem if it assumes platform-only variables exist without a fallback.
 
 ## Repository Docs Convention
 
