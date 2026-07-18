@@ -1,10 +1,12 @@
 ---
 name: ce-compound
 description: Document a recently solved problem or durable project vocabulary in docs/solutions/ or CONCEPTS.md. Use when capturing a learning after work.
-argument-hint: "[optional: brief context] [mode:headless] "
+argument-hint: "[optional: brief context] [mode:headless] [depth:lightweight|full]"
 ---
 
 # /ce-compound
+
+**中文导读：** 一次只把一条已经解决并验证的 learning 写入 `docs/solutions/`，必要时同步项目 vocabulary 到 `CONCEPTS.md`。Interactive mode 会自动在 Full 与 Lightweight 间选择；automation 可用 `mode:headless depth:lightweight|full` 显式选择开销和验证深度。Lightweight 会保留 deterministic check，但跳过 subagent research、overlap detection 与 semantic validator。下方英文内容是 canonical executable contract，必须按原文执行。
 
 Coordinate multiple subagents working in parallel to document a recently solved problem.
 
@@ -21,9 +23,11 @@ Captures problem solutions while context is fresh, creating structured documenta
 /ce-compound [brief context]            # Provide additional context hint
 /ce-compound mode:headless              # Non-interactive run for automations
 /ce-compound mode:headless [context]    # Non-interactive run with context hint
+/ce-compound mode:headless depth:lightweight [context] # Lower-overhead non-interactive run
+/ce-compound mode:headless depth:full [context]        # Full non-interactive run
 ```
 
-**每次 run 只处理一个 learning。** Workflow 的 grounding、overlap detection 和 cross-referencing 都假设只有一个已解决问题。当一个 session 产生多个 distinct learnings 时，对每个 learning 按顺序分别运行一次该 skill；每次 run 都重新对照 tree 做 grounding。不要在一次 run 中批量处理多个 learnings，也不要事后在 drafts 之间缝合 cross-references；本规则要防止的 failure，就是 drafting-context numbering（例如 "Learning 3"）泄漏到 written docs。
+**One learning per run.** The workflow's grounding, overlap detection, and cross-referencing all assume a single solved problem. When a session produced multiple distinct learnings, run the skill once per learning, sequentially — each run grounds fresh against the tree. Do not batch several learnings through one run and stitch cross-references between the drafts afterward; drafting-context numbering ("Learning 3") leaking into written docs is the failure this rule prevents.
 
 ## CONCEPTS.md bootstrap requests
 
@@ -31,14 +35,16 @@ If invoked specifically to create or bootstrap `CONCEPTS.md` from scratch rather
 
 ## Mode Detection
 
-Enter headless mode when **either** holds: the arguments you were invoked with contain the `mode:headless` token, **or** the invocation makes non-interactive intent unmistakable — a caller or standing instruction asking to run `ce-compound` "headless", "non-interactively", "unattended", or "without prompts/questions". The token is the explicit form; a clear natural-language request for a non-interactive run is equivalent. Bare "automatically" or "auto-run" is **not** on its own a headless signal — it speaks to *invoking* the skill, not to suppressing its prompts — so an ambiguous or absent signal defaults to interactive. Tokens starting with `mode:` are flags, not context — strip `mode:headless` from arguments before treating the remainder as the brief context hint.
+Enter headless mode when **either** holds: the arguments you were invoked with contain the `mode:headless` token, **or** the invocation makes non-interactive intent unmistakable — a caller or standing instruction asking to run `ce-compound` "headless", "non-interactively", "unattended", or "without prompts/questions". The token is the explicit form; a clear natural-language request for a non-interactive run is equivalent. Bare "automatically" or "auto-run" is **not** on its own a headless signal — it speaks to *invoking* the skill, not to suppressing its prompts — so an ambiguous or absent signal defaults to interactive. Tokens starting with `mode:` or `depth:` are flags, not context — strip them before treating the remainder as the brief context hint.
+
+Depth is an explicit headless-only selector. In headless mode, accept at most one depth token: `depth:lightweight` routes directly to Lightweight Mode, while `depth:full` routes to Full Mode with its automatic session-history probe. `mode:headless` without a `depth:` token remains backward compatible and runs Full Mode. Headless lightweight asks no blocking questions and launches no subagents. If the invocation contains an unknown `depth:` token, multiple `depth:` tokens, or a `depth:` token without headless intent, do not guess; emit the headless failure report with the reason and end with `Documentation skipped`.
 
 | Mode | When | Behavior |
 |------|------|----------|
 | **Interactive** (default) | No headless token or clear non-interactive intent | Auto-pick Full vs Lightweight and report the choice; run session history as an automatic probe (Full only); prompt for Discoverability Check consent; end with a plain summary (no "What's next?" menu) |
-| **Headless** | `mode:headless` token present, or the invocation makes non-interactive intent unmistakable | No blocking questions. Run **Full mode**, including the automatic session-history probe (it never prompts, so it preserves headless's non-interactive contract). If the Discoverability Check finds a gap, report it under `Instruction-file edit: gap noted, not applied` — never edit instruction files (headless is for skill-to-skill / automation handoffs; amending the repo's operating contract needs interactive consent). Skip Phase 3 specialized reviews. End with a structured terminal report — no "What's next?" menu. |
+| **Headless** | `mode:headless` token present, or the invocation makes non-interactive intent unmistakable | No blocking questions. Run the explicitly requested depth, defaulting to **Full mode** with the automatic session-history probe. If the Discoverability Check finds a gap, report it without editing instruction files. Skip Phase 3 specialized reviews. End with a structured terminal report — no "What's next?" menu. |
 
-Headless mode is intended for automations and skill-to-skill invocation where no human is present to answer questions. The doc itself is identical to what an interactive Full run would produce — classification work (track, category, overlap) follows the same rules and writes nothing extra into the artifact. Once detected, headless mode applies for the entire run.
+Headless mode is intended for automations and skill-to-skill invocation where no human is present to answer questions. Once detected, headless mode applies for the entire run.
 
 ## Session context
 
@@ -55,27 +61,27 @@ These files are the durable contract for the workflow. Read them on-demand at th
 - `references/yaml-schema.md` — category mapping from problem_type to directory (read when classifying)
 - `references/concepts-vocabulary.md` — CONCEPTS.md format and inclusion rules (read in Phase 2.4 when domain terms surface)
 - `references/agents/session-historian.md` — skill-local synthesis prompt for optional session-history compounding context (read only when the user opts into session history)
-- `references/grounding-validation.md` — grounding-validation protocol：flag adjudication rules 和 semantic validator prompt（在 Phase 2.45 读取）
+- `references/grounding-validation.md` — grounding-validation protocol: flag adjudication rules and the semantic validator prompt (read in Phase 2.45)
 - `assets/resolution-template.md` — section structure for new docs (read when assembling)
 - `scripts/session-history/` — session discovery and extraction scripts bundled into this skill so session-history support is fully self-contained
 - `scripts/validate-frontmatter.py` — frontmatter parser-safety validator (run in Phase 2 step 8 through the existence guard documented there; resolves only on Claude Code via `${CLAUDE_SKILL_DIR}`, with a manual-checklist fallback elsewhere)
-- `scripts/validate-doc-claims.py` — mechanical claims validator：cited paths、commit SHAs、relative links、dangling drafting scaffold（在 Phase 2.45 通过 `SKILL_DIR` anchor 运行）
+- `scripts/validate-doc-claims.py` — mechanical claims validator: cited paths, commit SHAs, relative links, dangling drafting scaffold (run in Phase 2.45 via the `SKILL_DIR` anchor)
 
 When spawning subagents, pass the relevant file contents into the task prompt so they have the contract without needing cross-skill paths.
 
 ## Execution Strategy
 
-`ce-compound` 不会询问用户要运行哪种模式，也不会询问是否搜索 session history。这两项决策都更适合由 agent 作出：模式取决于 agent 可以观察到的 context budget；session history 是否有价值则是双方都无法预先知道的（真正有用的信息可能来自当前 agent 从未参与过的另一段早期 session），因此应通过低成本 probe 来判断，而不是提问。整个 workflow 唯一的 interactive prompt 是请求用户同意 Discoverability Check，因为这一步会编辑 tracked instruction file。
+`ce-compound` does not ask the user which mode to run or whether to search session history. Both are decisions the agent is better positioned to make: mode depends on context budget the agent can observe, and session-history value is unknowable a priori to *either* party (the payoff is an unrelated earlier session the current agent was never in), so it is resolved by a cheap probe rather than a question. The only interactive prompt in the whole workflow is the Discoverability Check consent, because that one edits a tracked instruction file.
 
-**模式选择（Full 或 Lightweight）——直接判断，不要询问。**
+**Mode selection (Full vs Lightweight) — decide it, don't ask it.**
 
-- 默认选择 **Full**：执行完整 workflow（research、cross-referencing、overlap detection、grounding validation）。几乎所有值得记录的 learning 都应该使用此模式；与产出该 learning 的工程工作相比，它消耗的 token 很少，而一份能够持续复利的文档价值远高于这点成本。
-- 只有在确实存在 context 压力时才选择 **Lightweight**（single-pass、无 subagents；参见 Lightweight Mode）：session 已接近 context limit，或者修复足够简单，cross-referencing 不会带来任何价值。这些条件 agent 能观察到、用户却无法观察到，正因如此才不应向用户提问。
-- 将所选模式和一行理由放在 completion output 的第一行（例如 "Ran Full mode." / "Ran Lightweight mode — session context was tight."）。如果 Lightweight 不符合用户偏好，重新运行只是少见且低成本的修正；这比每次运行都用 prompt 打断用户更划算。
+- Default to **Full**: the complete workflow (research, cross-referencing, overlap detection, grounding validation). This is the right choice for essentially every documented learning — its token cost is small next to the engineering work that produced the learning and is dwarfed by the value of a doc that compounds.
+- Choose **Lightweight** (single-pass, no subagents — see Lightweight Mode) ONLY under real context pressure: the session is near its context limit, or the fix is trivial enough that cross-referencing would add nothing. These are conditions the agent can observe and the user cannot, which is exactly why this is not a question.
+- State the chosen mode and a one-line reason as the first line of the completion output (e.g., "Ran Full mode." / "Ran Lightweight mode — session context was tight."). If Lightweight was the wrong call for the user's taste, re-running is a rare, cheap correction — cheaper than taxing every run with a prompt.
 
-**In headless mode**, skip mode selection entirely and run **Full Mode**, including the automatic session-history probe (Phase 1 step 4) — it is non-interactive by construction. Proceed straight to research.
+**In headless mode**, skip automatic mode selection. Run the depth selected during Mode Detection: `depth:lightweight` enters Lightweight Mode; `depth:full` or no depth token enters Full Mode, including the automatic session-history probe (Phase 1 step 4).
 
-**Session history — an automatic probe in Full mode, never a question.** The point of searching prior sessions is that an *unrelated* earlier session may hold related problem-solving; neither the agent nor the user can know that a priori, so asking is pointless. Instead, Full mode always runs the cheap discovery+metadata probe (Phase 1 step 4) — it runs in parallel with the research subagents, so it is near-free on wall-clock — and escalates to the expensive extraction+synthesis only when the probe surfaces genuinely relevant candidate sessions. Lightweight mode skips session history entirely; headless runs the same automatic probe, since it prompts for nothing and so keeps headless non-interactive. This support exists only inside the compounding workflow; there is no standalone session-history product surface.
+**Session history — an automatic probe in Full mode, never a question.** The point of searching prior sessions is that an *unrelated* earlier session may hold related problem-solving; neither the agent nor the user can know that a priori, so asking is pointless. Instead, Full mode always runs the cheap discovery+metadata probe (Phase 1 step 4) — it runs in parallel with the research subagents, so it is near-free on wall-clock — and escalates to the expensive extraction+synthesis only when the probe surfaces genuinely relevant candidate sessions. Lightweight mode skips session history entirely; headless Full runs the same automatic probe, since it prompts for nothing and so keeps headless non-interactive. This support exists only inside the compounding workflow; there is no standalone session-history product surface.
 
 ---
 
@@ -84,7 +90,7 @@ When spawning subagents, pass the relevant file contents into the task prompt so
 <critical_requirement>
 **The primary deliverable is ONE file - the final documentation.**
 
-Phase 1 subagents write their full structured output to a per-run scratch artifact under `/tmp/compound-engineering/ce-compound/<run-id>/` and return only a compact confirmation containing the artifact path. The orchestrator Reads those artifacts back in Phase 2 assembly. This is scratch space, identical in spirit to `ce-code-review`'s per-reviewer run artifacts; it does not make the scratch files additional deliverables. **Only the orchestrator writes product files** — the final solution doc and the maintenance side effects below. Subagents must not touch `docs/`, project instruction files, or any tracked path. Beyond the Phase 2 solution doc, the orchestrator may also write maintenance side effects — not additional deliverables, and creating one when absent is expected, not a violation of this rule. There are three write-target classes; only the first two are unconditional:
+Phase 1 subagents write their full structured output to a per-run scratch artifact under `<run-dir>/` and return only a compact confirmation containing the artifact path. The orchestrator Reads those artifacts back in Phase 2 assembly. This is scratch space, identical in spirit to `ce-code-review`'s per-reviewer run artifacts; it does not make the scratch files additional deliverables. **Only the orchestrator writes product files** — the final solution doc and the maintenance side effects below. Subagents must not touch `docs/`, project instruction files, or any tracked path. Beyond the Phase 2 solution doc, the orchestrator may also write maintenance side effects — not additional deliverables, and creating one when absent is expected, not a violation of this rule. There are three write-target classes; only the first two are unconditional:
 - **`docs/solutions/...`** — the primary deliverable (always).
 - **`CONCEPTS.md`** — create or update in Phase 2.4 (Vocabulary Capture) when a qualifying domain term surfaces (Full mode; every mode that reaches vocabulary capture may refine an existing file).
 - **A project instruction file** (AGENTS.md or CLAUDE.md) — a small edit when the Discoverability Check finds a gap, **only in interactive Full mode after consent**. Headless and lightweight never apply this edit (they report or tip instead). Callers that hand off headless after an approval gate must not see an unreviewed change to the repo's operating contract.
@@ -122,31 +128,27 @@ Launch research subagents. Each writes its full output to a per-run scratch arti
 **Run ID and run dir (before dispatching any subagent):** generate a unique run identifier and create the run directory. This scopes every Phase 1 artifact file to the same directory so the orchestrator can Read them back in Phase 2.
 
 ```bash
-RUN_ID=$(date +%Y%m%d-%H%M%S)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' ')
-mkdir -p "/tmp/compound-engineering/ce-compound/$RUN_ID"
+SCRATCH_ROOT="/tmp/compound-engineering-$(id -u)";
+if [ -L "$SCRATCH_ROOT" ]; then echo "unsafe scratch root symlink: $SCRATCH_ROOT" >&2; exit 1; fi;
+install -d -m 700 "$SCRATCH_ROOT" || exit 1;
+if [ -L "$SCRATCH_ROOT" ] || [ ! -O "$SCRATCH_ROOT" ]; then echo "scratch root is not owned by the current user: $SCRATCH_ROOT" >&2; exit 1; fi;
+chmod 700 "$SCRATCH_ROOT" || exit 1;
+RUN_ID=$(date +%Y%m%d-%H%M%S)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' ');
+RUN_DIR="$SCRATCH_ROOT/ce-compound/$RUN_ID";
+(umask 077; mkdir -p "$RUN_DIR") || exit 1; chmod 700 "$RUN_DIR" || exit 1;
+echo "$RUN_DIR";
 ```
 
-**Resolve the agnostic project orientation from the shared cache (before dispatching subagents).** The question-agnostic orientation the Context Analyzer and Related Docs Finder rely on — the project's `CONCEPTS.md` vocabulary and the root instruction-file conventions/digests — is identical whenever committed profile inputs match, so reuse it instead of re-deriving. Set `SKILL_DIR` to this skill's directory and run the helper (full protocol in `references/repo-profile-cache.md`):
+**Resolve current vocabulary and conventions before dispatching subagents.** Use the project's active instructions and conventions already in your context. If `CONCEPTS.md` exists, read its relevant terms and pass them to the Context Analyzer.
 
-```bash
-SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
-python3 "$SKILL_DIR/scripts/repo-profile-cache.py" get
-```
+**CRITICAL — glob `docs/solutions/` fresh every run.** The current vocabulary and conventions above do not substitute for the live-tree search in step 3.
 
-- On `HIT`: load the profile JSON and use its `vocabulary` (CONCEPTS canonical terms) and `conventions` (root instruction/convention digests) as the agnostic orientation; do not re-derive them.
-- On `MISS`: dispatch a generic subagent seeded with `references/agents/repo-profiler.md` to derive the profile, write its JSON to a file, then persist with `python3 "$SKILL_DIR/scripts/repo-profile-cache.py" put <file>` (re-set `SKILL_DIR` in that call — shell vars don't persist between Bash invocations).
-- On `NO-CACHE` (no git repo or no writable cache): derive the orientation inline this run and skip `put`.
+Pass `{run_id}` and the resolved absolute `{run_dir}` into every Phase 1 subagent prompt. Each subagent **writes its full structured output** to its own file under `{run_dir}/`, **confirms the write succeeded** (the file exists and is non-empty), and then **returns only a one-line confirmation containing the artifact path** — not the prose body inline. Artifact filenames by subagent:
 
-The cache is an optimization, never a correctness dependency — if the helper errors or returns nothing usable, fall back to deriving the orientation inline and continue. Pass the resolved vocabulary/conventions into the Context Analyzer (for vocabulary and instruction-file convention grounding) so it does not re-derive them.
-
-**CRITICAL — the `docs/solutions/` enumeration is NEVER cached; the Related Docs Finder must glob it FRESH every run.** `ce-compound` *writes* new learnings into `docs/solutions/`, so a cached index would miss a doc added moments ago (even an uncommitted one). The cached profile supplies only the agnostic orientation above; the `docs/solutions/` search in step 3 always runs against the live tree.
-
-Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent prompt. Each subagent **writes its full structured output** to its own file under `/tmp/compound-engineering/ce-compound/{run_id}/`, **confirms the write succeeded** (the file exists and is non-empty), and then **returns only a one-line confirmation containing the artifact path** — not the prose body inline. Artifact filenames by subagent:
-
-- **Context Analyzer** → `/tmp/compound-engineering/ce-compound/{run_id}/context.json` (frontmatter skeleton, category path, filename, track)
-- **Solution Extractor** → `/tmp/compound-engineering/ce-compound/{run_id}/solution.md` (the full doc-body prose sections)
-- **Related Docs Finder** → `/tmp/compound-engineering/ce-compound/{run_id}/related.json` (links, refresh candidates, overlap assessment)
-- **Session History** synthesis subagent (when run) → `/tmp/compound-engineering/ce-compound/{run_id}/session-history.md` (prose findings)
+- **Context Analyzer** → `{run_dir}/context.json` (frontmatter skeleton, category path, filename, track)
+- **Solution Extractor** → `{run_dir}/solution.md` (the full doc-body prose sections)
+- **Related Docs Finder** → `{run_dir}/related.json` (links, refresh candidates, overlap assessment)
+- **Session History** synthesis subagent (when run) → `{run_dir}/session-history.md` (prose findings)
 
 **Return the full output inline whenever the artifact write did not succeed.** This covers both cases where the orchestrator's Phase 2 inline fallback would otherwise have nothing to read: (a) `{run_id}` is empty or did not resolve (non-Claude-Code platforms where the pre-resolution failed), so there is no path to write to; and (b) `{run_id}` resolved but the write itself failed — tool permission denied, absolute-path writes unavailable, disk error, or the post-write existence check came back empty. In either case the subagent must return its complete structured output inline instead of a path, because the path would point at a file that does not exist. Return only the bare path when — and only when — the write is confirmed on disk. The artifact pattern is a reliability improvement, not a hard requirement; the orchestrator handles a missing artifact in Phase 2 by using the inline return.
 
@@ -175,8 +177,8 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
    - Adapts output structure based on the problem_type track
    - **Writes the full doc-body prose** (all track-appropriate sections below) to `solution.md` and returns only the artifact path. This is the subagent most prone to the issue #956 summary-collapse, so its prose must land on disk rather than only in the inline return.
    - Incorporates auto memory excerpts (if provided by the orchestrator) as supplementary evidence -- conversation history and the verified fix take priority; if memory notes contradict the conversation, note the contradiction as cautionary context
-   - **让 code-behavior claims 以 source 为 grounding，而不是 conversation memory。** 在断言 code 如何运作（enum values、status semantics、limits、defaults）之前，读取 current tree 中的 defining line，并在 claim 旁引用 `file:line`。无法对照 tree 验证的 claim 必须软化或归因（例如 "per this session's conclusion…"），绝不得作为事实陈述
-   - **以经得起时间的方式编写 merge-state claims。** 引用 PR numbers，而不是 bare commit SHAs；SHAs 会被 rebase/squash merges 重写，也可能不存在于其他 checkouts。"fixed in X" claim 要求 fix 从 current tree reachable；否则写成 pending，例如 "fix opened in #1608, unmerged as of this writing"
+   - **Grounds code-behavior claims in source, not conversation memory.** Before asserting how code behaves (enum values, status semantics, limits, defaults), Read the defining line at the current tree and cite `file:line` alongside the claim. A claim that cannot be verified against the tree is softened or attributed ("per this session's conclusion…"), never stated as fact
+   - **Writes merge-state claims for time.** Cite PR numbers rather than bare commit SHAs — SHAs are rewritten by rebase/squash merges and may not exist on other checkouts. A "fixed in X" claim requires the fix to be reachable from the current tree; otherwise phrase it as pending ("fix opened in #1608, unmerged as of this writing")
 
    **Bug track output sections:**
 
@@ -251,9 +253,9 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
    - Returns: structured digest of findings from prior sessions, or "no relevant prior sessions" if none found.
    - **Session history is the final Phase 1 input, not a workflow stop.** When it returns, proceed directly to Phase 2 with its output as the last input — do not emit a summary and do not pause for the user. A "no relevant prior sessions" return is still a valid input; the documentation gets written without session context.
 
-   **Script resolution。** 将 `SKILL_DIR` 设为刚才读取的 SKILL.md 所在目录的 absolute path，并从 `"$SKILL_DIR/scripts/session-history/"` 运行 bundled scripts。在下面的每个 bash block 中 inline 设置 `SKILL_DIR`（shell state 不会在 commands 之间保留）。如果磁盘上的 `"$SKILL_DIR/scripts/session-history/"` 下确实不存在 bundled scripts，则用以下精确文本明确说明并跳过 session history："Session history bundled scripts were not found in this skill's directory; skipping the session-history probe for this run." 随后在没有 session context 的情况下继续 Phase 2。
+   **Script resolution.** Set `SKILL_DIR` to the absolute path of the directory containing the SKILL.md you just read, and run the bundled scripts from `"$SKILL_DIR/scripts/session-history/"`. Set `SKILL_DIR` inline in each bash block below (shell state does not persist between commands). If the bundled scripts are genuinely not present on disk under `"$SKILL_DIR/scripts/session-history/"`, skip session history visibly with: "Session history bundled scripts were not found in this skill's directory; skipping the session-history probe for this run." Continue Phase 2 without session context.
 
-   **Discovery pipeline。** 根据 problem topic 推断 scan window，初始值为 7 days。运行 discovery 和 metadata extraction：
+   **Discovery pipeline.** Infer the scan window from the problem topic, starting with 7 days. Run discovery and metadata extraction:
 
    ```bash
    SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
@@ -262,7 +264,7 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
 
    Pi sessions are included when present under `~/.pi/agent/sessions/`; they carry `cwd` like Codex but no git branch. If `_meta.files_processed` is `0`, return `no relevant prior sessions`. If the first pass finds no relevant branch matches, or if processing Codex or Pi sessions, derive 2-4 keywords from the topic and re-run metadata extraction with `--keyword K1,K2,...`. Keep at most 5 sessions across Claude Code, Codex, Cursor, and Pi, ranked by branch match, keyword match count, file size over 30KB, and recency. Exclude the current session.
 
-   **Escalation gate。** 上面的 discovery+metadata pass 是低成本 probe，在 Full mode 中始终运行。只有至少一个保留的 candidate 达到 relevance bar 时，才升级到下面的 extraction 和 synthesis stages：匹配 current branch，或命中 ≥2 个 topic keywords。如果没有 candidate 达标（包括 `_meta.files_processed` 为 `0` 的情况），就在此停止，将 `no relevant prior sessions` 记录为 session-history input，并跳过 extraction 和 synthesis。正是这个 gate 让 always-on probe 保持低成本：只有 prior session 确实相关时，才付出高成本 synthesis 的开销。
+   **Escalation gate.** The discovery+metadata pass above is the cheap probe and always runs in Full mode. Escalate to the extraction and synthesis stages below **only** when at least one retained candidate clears the relevance bar: a current-branch match, or ≥2 topic-keyword matches. If no candidate clears the bar (including the `_meta.files_processed` is `0` case), stop here, record `no relevant prior sessions` as the session-history input, and skip extraction and synthesis. This gate is what keeps the always-on probe cheap — the expensive synthesis is paid for only when a prior session is genuinely relevant.
 
    **Extraction pipeline.** Create `SCRATCH=$(mktemp -d -t ce-compound-sessions-XXXXXX)`. For each selected session, write extracted content to scratch files:
 
@@ -281,17 +283,17 @@ Pass `{run_id}` (the resolved `$RUN_ID` value) into every Phase 1 subagent promp
    - the output schema above
    - the filter rule above
 
-   The subagent reads only the scratch paths, **writes its prose findings to `/tmp/compound-engineering/ce-compound/{run_id}/session-history.md`, and returns only that artifact path once the write is confirmed** (same #956 reliability rationale — session-history findings are long-form prose prone to summary-collapse). If `{run_id}` did not resolve or the artifact write failed, it returns the prose inline instead (per the inline-fallback rule above). If synthesis fails, note the failure and continue without session context.
+   The subagent reads only the scratch paths, **writes its prose findings to `{run_dir}/session-history.md`, and returns only that artifact path once the write is confirmed** (same #956 reliability rationale — session-history findings are long-form prose prone to summary-collapse). If `{run_id}` did not resolve or the artifact write failed, it returns the prose inline instead (per the inline-fallback rule above). If synthesis fails, note the failure and continue without session context.
 
 ### Phase 2: Assembly & Write
 
 <sequential_tasks>
 
-**继续之前，等待所有 Phase 1 inputs 完成**——包括三个 parallel subagents，以及 Full mode 中的内部 session-history flow（它可能在 probe 阶段以 `no relevant prior sessions` 停止）。Session history 虽然在 orchestrator 内运行，而不是作为 public skill 运行，但仍然是 Phase 1 input。
+**WAIT for all Phase 1 inputs to complete before proceeding** — the three parallel subagents and, in Full mode, the internal session-history flow (which may have stopped at the probe with `no relevant prior sessions`). Session history is a Phase 1 input even though it runs in the orchestrator rather than as a public skill.
 
 The orchestrating agent (main conversation) performs these steps:
 
-1. **Collect Phase 1 results from the run artifacts.** For each Phase 1 subagent, `Read` its artifact file under `/tmp/compound-engineering/ce-compound/{run_id}/` (`context.json`, `solution.md`, `related.json`, and `session-history.md` when session history ran). The artifact holds the subagent's full output. **Fall back to the subagent's inline return only when its artifact file is absent or empty** (e.g., `{run_id}` did not resolve, or the subagent failed to write). The artifact is authoritative when present — this is what makes the workflow resilient to the issue #956 summary-collapse, where the inline return is only an executive summary.
+1. **Collect Phase 1 results from the run artifacts.** For each Phase 1 subagent, `Read` its artifact file under `{run_dir}/` (`context.json`, `solution.md`, `related.json`, and `session-history.md` when session history ran). The artifact holds the subagent's full output. **Fall back to the subagent's inline return only when its artifact file is absent or empty** (e.g., `{run_id}` did not resolve, or the subagent failed to write). The artifact is authoritative when present — this is what makes the workflow resilient to the issue #956 summary-collapse, where the inline return is only an executive summary.
 2. **Check the overlap assessment** from the Related Docs Finder before deciding what to write:
 
    | Overlap | Action |
@@ -341,7 +343,7 @@ When creating a new doc, preserve the section order from `assets/resolution-temp
 
 Then, applying those criteria, scan the new doc **and** the surrounding conversation for qualifying domain terms. If `CONCEPTS.md` exists at repo root, add missing qualifying terms and refine existing entries when new precision surfaced. If it does not exist and at least one qualifying term surfaced, create it.
 
-**写入前先对照 source 验证 behavior assertions。** 当 entry 断言 code 如何运作（states、transitions、limits、semantics）时，先读取 current tree 中的 defining source。从 session-level summary 起草 entry，正是错误 semantics 进入 glossary 的方式。Phase 2.45 会重新检查这些 entries，但最便宜的 fix 是一开始就不写入错误。
+**Verify behavior assertions against source before writing them.** When an entry asserts how code behaves (states, transitions, limits, semantics), Read the defining source at the current tree first — an entry drafted from a session-level summary is exactly how wrong semantics enter the glossary. Phase 2.45 re-checks these entries, but the cheap fix is to not write the error.
 
 **Seed the learning's area at creation — don't write a lone term.** When `CONCEPTS.md` does not yet exist, alongside the surfaced term also seed the core domain nouns of the area this learning touched, following the **Seed goal** and **Scope of a seed** rules in `references/concepts-vocabulary.md`. The seed is scoped to the learning's area (the modules and domain the fix touched) and defines only terms investigated here — it does not reach for repo-wide nouns. This anchors the surfaced term so it does not dangle against undefined siblings. A repo-wide concept map is `ce-compound-refresh`'s bootstrap path, not this one.
 
@@ -357,20 +359,20 @@ If no terms qualified after applying the reference's criteria, record that outco
 
 **Apply edits silently in every mode — no user prompt in interactive, lightweight, or headless.** Vocabulary capture is a side effect of compounding, not a decision the user makes per run. Lightweight mode reaches this through its own single-pass step (see Lightweight Mode), and runs an **update-only** version — it refines an existing `CONCEPTS.md` but defers creation/seeding to a Full run.
 
-### Phase 2.45：Grounding Validation
+### Phase 2.45: Grounding Validation
 
-Doc（以及 Phase 2.4 中的任何 `CONCEPTS.md` entries）即将变成持久、可信任的 knowledge。在它 compound 前，先对照 tree 验证 claims。**立即读取 `references/grounding-validation.md`**；该文件包含 adjudication rules 和 validator prompt，下方 steps 只负责触发。
+The doc (and any `CONCEPTS.md` entries from Phase 2.4) is about to become permanent, trusted knowledge. Validate its claims against the tree before it compounds. **Read `references/grounding-validation.md` now** — it holds the adjudication rules and the validator prompt; the steps below are only the trigger.
 
-1. **Mechanical claims check（每种 mode，包括 headless）。** 可选先运行 `git fetch --quiet`（best-effort；offline 时静默跳过；network 绝不是 correctness dependency）。然后对 written doc 运行 bundled validator：
+1. **Mechanical claims check (every mode, including headless).** Optionally run `git fetch --quiet` first (best-effort — skip silently offline; the network is never a correctness dependency). Then run the bundled validator against the written doc:
 
    ```bash
    SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
    python3 "$SKILL_DIR/scripts/validate-doc-claims.py" <doc-path>
    ```
 
-   Exit 0 表示没有 flag。Exit 1 表示需要 **adjudicate，而不是 auto-fix** 的 flags；按 reference 的 adjudication table，对每个 flagged path、SHA、link 或 scaffold pattern 进行修正、标注为 historical，或确认为 intentional。Doc 可能合理地引用一个恰好被其记录的 fix 删除的 path；flag 是问题，不是 failure。如果当前 platform 无法 resolve script，应用 reference 的 manual checklist，并在 output 中说明；绝不静默跳过。
+   Exit 0 means nothing flagged. Exit 1 means flags to **adjudicate, not auto-fix** — each flagged path, SHA, link, or scaffold pattern is fixed, annotated as historical, or confirmed intentional per the reference's adjudication table. A doc may legitimately cite a path deleted by the very fix it documents; a flag is a question, not a failure. If the script cannot be resolved on this platform, apply the reference's manual checklist and say so in the output — never silently skip.
 
-2. **Semantic grounding validator（Full 和 headless；lightweight 跳过）。** 使用 reference 中的 prompt template 构建并 dispatch 一个 read-only generic subagent，覆盖 written doc，以及本次 run 新增或编辑的任何 `CONCEPTS.md` entries。它通过引用 defining source line 验证 code-behavior claims，对照 remote truth（`gh` primary，git reachability fallback）验证 merge-state claims，并验证 countable assertions 的 internal completeness。按 reference 应用 verdicts：用 quoted evidence 修正 contradicted claims，软化或删除 unverifiable claims，把 offline merge-state checks 标记为 degraded。如果 body 改变，再次运行 mechanical check。
+2. **Semantic grounding validator (Full mode, including headless Full; lightweight skips it).** Dispatch one read-only generic subagent built from the prompt template in the reference, covering the written doc plus any `CONCEPTS.md` entries added or edited this run. It verifies code-behavior claims by quoting the defining source line, merge-state claims against remote truth (`gh` primary, git reachability fallback), and internal completeness of countable assertions. Apply its verdicts per the reference (fix contradicted claims from the quoted evidence; soften or drop unverifiable ones; mark offline merge-state checks as degraded), then re-run the mechanical check if the body changed.
 
 ### Phase 2.5: Selective Refresh Check
 
@@ -453,7 +455,7 @@ After the learning is written and the refresh decision is made, check whether th
 
       `docs/solutions/` — documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
       ```
-   c. In full interactive mode, explain to the user why this matters — agents working in this repo (including fresh sessions, other tools, or collaborators without the plugin) won't know to check `docs/solutions/` unless the instruction file surfaces it. Show the proposed change and where it would go, then use the platform's blocking question tool to get consent before making the edit: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting the proposal in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question. In lightweight mode, output a one-liner note and move on. In headless mode, **do not edit instruction files** — surface the gap in the terminal report as `Instruction-file edit: gap noted, not applied` (headless scope is documentation capture, not project-config edits; a human-invoked interactive run applies the edit with consent)
+   c. In full interactive mode, explain to the user why this matters — agents working in this repo (including fresh sessions, other tools, or collaborators without the plugin) won't know to check `docs/solutions/` unless the instruction file surfaces it. Show the proposed change and where it would go, then use the platform's blocking question tool to get consent before making the edit: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting the proposal in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question. In lightweight mode (interactive or headless), output a one-liner note and move on. In full headless mode, **do not edit instruction files** — surface the gap in the terminal report as `Instruction-file edit: gap noted, not applied` (headless scope is documentation capture, not project-config edits; a human-invoked interactive run applies the edit with consent)
 
 5. **If `CONCEPTS.md` exists at repo root, run a parallel discoverability check for it.** Assess whether the instruction file would lead an agent to discover the project's shared domain vocabulary. Use the same workflow as the `docs/solutions/` check above: same target file, same edit-placement judgment, same consent-then-edit interaction shape per mode. A line in an existing section is almost always better than a new headed section. Example calibration when nothing else fits:
 
@@ -486,26 +488,31 @@ Based on problem type, optionally dispatch generic subagents seeded with local p
 ### Lightweight Mode
 
 <critical_requirement>
-**Single-pass alternative — same documentation, fewer tokens.**
+**Single-pass alternative — same artifact type, reduced research and validation.**
 
-This mode skips parallel subagents entirely. The orchestrator performs all work in a single pass, producing the same solution document without cross-referencing or duplicate detection.
+This mode skips parallel subagents entirely. The orchestrator performs all work in a single pass and writes the same solution-doc artifact type, but omits cross-referencing, duplicate detection, session-history research, and semantic grounding validation.
 
-Headless mode forces Full and does not enter Lightweight — automations get the cross-reference and overlap detection benefits without the interactive overhead.
+Headless mode enters Lightweight only when explicitly invoked with `depth:lightweight`; otherwise it defaults to Full for backward compatibility.
 </critical_requirement>
 
 The orchestrator (main conversation) performs ALL of the following in one sequential pass:
 
-1. **Extract from conversation**: Identify the problem and solution from conversation history. Also scan the "user's auto-memory" block injected into your system prompt, if present (Claude Code only) -- use any relevant notes as supplementary context alongside conversation history. Tag any memory-sourced content incorporated into the final doc with "(auto memory [claude])". 在断言 code 如何运作（enum values、status semantics、limits、defaults）前，读取 current tree 中的 defining line；无法验证的 claim 必须软化或归因。优先引用 PR numbers，而不是 bare commit SHAs；将 unmerged fixes 表述为 pending
+1. **Extract from conversation**: Identify the problem and solution from conversation history. Also scan the "user's auto-memory" block injected into your system prompt, if present (Claude Code only) -- use any relevant notes as supplementary context alongside conversation history. Tag any memory-sourced content incorporated into the final doc with "(auto memory [claude])". Before asserting how code behaves (enum values, status semantics, limits, defaults), Read the defining line at the current tree — soften or attribute any claim you cannot verify. Cite PR numbers over bare commit SHAs, and phrase unmerged fixes as pending
 2. **Classify**: Read `references/schema.yaml` and `references/yaml-schema.md`, then determine track (bug vs knowledge), category, and filename
-3. **Write minimal doc**: Create `docs/solutions/[category]/[filename].md` using the appropriate track template from `assets/resolution-template.md`, with:
+3. **Write minimal doc**: Before writing, check whether the exact proposed `docs/solutions/[category]/[filename].md` path exists. If it exists, read it: update it only when it covers the same problem, preserving its path and frontmatter structure and adding `last_updated: YYYY-MM-DD`; otherwise choose a distinct, descriptive filename and re-check that exact path is absent before writing. This is exact-path collision handling only — do not run Full mode's semantic overlap research or dispatch subagents. Create or update the doc using the appropriate track template from `assets/resolution-template.md`, with:
    - YAML frontmatter with track-appropriate fields, applying the YAML-safety quoting rule for array items (see `references/yaml-schema.md` > YAML Safety Rules)
    - Bug track: Problem, root cause, solution with key code snippets, one prevention tip
    - Knowledge track: Context, guidance with key examples, one applicability note
-4. **Vocabulary capture (update-only)**: if `CONCEPTS.md` exists at repo root, read `references/concepts-vocabulary.md`, then scan the new doc and the conversation for qualifying terms and add/refine entries silently (same criteria as Phase 2.4). Do **not** bootstrap or seed in lightweight mode — if `CONCEPTS.md` does not exist, defer creation to a Full run, which owns seeding. Record the outcome in the output (e.g., "Vocabulary: 1 entry refined" or "scanned, no qualifying terms"). If you refined `CONCEPTS.md` and a quick read of `AGENTS.md`/`CLAUDE.md` shows it isn't surfaced there, add the discoverability tip to the output below — lightweight **tips**, it does not edit instruction files (an interactive Full run owns that edit after consent; headless Full also tips/reports only).
-5. **Mechanical claims check**: run `scripts/validate-doc-claims.py` against the written doc exactly as in Phase 2.45 step 1 (same `SKILL_DIR` anchor, same adjudicate-not-auto-fix rule — read `references/grounding-validation.md` for the adjudication table when it flags anything). Lightweight skips only the semantic validator subagent, not this deterministic check.
-6. **Skip specialized agent reviews** (Phase 3) and the semantic grounding validator (Phase 2.45 step 2) to conserve context
+4. **Vocabulary capture (update-only)**: if `CONCEPTS.md` exists at repo root, read `references/concepts-vocabulary.md`, then scan the new doc and the conversation for qualifying terms and add/refine entries silently (same criteria as Phase 2.4). Do **not** bootstrap or seed in lightweight mode — if `CONCEPTS.md` does not exist, defer creation to a Full run, which owns seeding. Record the outcome in the output (e.g., "Vocabulary: 1 entry refined" or "scanned, no qualifying terms"). If you refined `CONCEPTS.md` and the project's active instructions and conventions already in your context do not surface it, add the discoverability tip to the output below — lightweight **tips**, it does not edit instruction files (an interactive Full run owns that edit after consent; headless Full also tips/reports only).
+5. **Read-only discoverability check**: Using the project's active instructions and conventions already in your context, assess whether they surface `docs/solutions/` against the three criteria under **Discoverability Check** above. Do not open, offer to edit, or edit instruction files; Lightweight only reports the result. Record one of:
+   - `no gap` when active project instructions surface the knowledge store
+   - `gap noted — instruction-file tip emitted` when active project instructions exist but do not surface it
+   - `not applicable — no active project instructions` when no project instructions are active; emit no discoverability tip
+6. **Mechanical claims check**: run `scripts/validate-doc-claims.py` against the written doc exactly as in Phase 2.45 step 1 (same `SKILL_DIR` anchor, same adjudicate-not-auto-fix rule — read `references/grounding-validation.md` for the adjudication table when it flags anything). Lightweight skips only the semantic validator subagent, not this deterministic check.
+7. **Frontmatter parser-safety check**: validate the written doc exactly as in Phase 2 step 8, using the same bundled-script existence guard and manual fallback checklist. Fix any violation and repeat the check; do not report success until the written frontmatter is parser-safe.
+8. **Skip specialized agent reviews** (Phase 3) and the semantic grounding validator (Phase 2.45 step 2) to conserve context
 
-**Lightweight output:**
+**Lightweight completion output:** In headless Lightweight, do not emit this interactive block; use the depth-specific report under `Success Output` > `Headless mode` instead. In interactive Lightweight, emit:
 ```
 ✓ Documentation complete (lightweight mode)
 
@@ -587,20 +594,39 @@ Knowledge track:
 
 | ❌ Wrong | ✅ Correct |
 |----------|-----------|
-| Subagents write product files into `docs/` or edit tracked paths | Subagents write only scratch artifacts under `/tmp/compound-engineering/ce-compound/<run-id>/` and return the path; orchestrator writes the one final doc |
+| Subagents write product files into `docs/` or edit tracked paths | Subagents write only scratch artifacts under `<run-dir>/` and return the path; orchestrator writes the one final doc |
 | Subagent returns a long prose body only as its inline response | Subagent writes full output to its run artifact; orchestrator Reads it back (inline return is fallback only) |
 | Research and assembly run in parallel | Research completes → then assembly runs |
 | Multiple files created during workflow | One solution doc written or updated: `docs/solutions/[category]/[filename].md` (plus optional maintenance writes: a `CONCEPTS.md` create/update from Phase 2.4, and — interactive Full only, after consent — a small instruction-file edit for discoverability) |
-| Headless Discoverability Check edits AGENTS.md/CLAUDE.md | Headless reports `Instruction-file edit: gap noted, not applied`; only interactive Full applies the edit after consent |
+| Headless Discoverability Check edits AGENTS.md/CLAUDE.md | Headless Full reports `Instruction-file edit: gap noted, not applied`; headless Lightweight emits a discoverability tip; only interactive Full applies the edit after consent |
 | Creating a new doc when an existing doc covers the same problem | Check overlap assessment; update the existing doc when overlap is high |
-| 从 conversation memory 断言 code behavior 或 merge-state | 断言前读取 defining source line；优先引用 PR numbers 而不是 SHAs；软化 unverifiable claims（Phase 1 extractor rules，并在 Phase 2.45 重新检查） |
-| 在一次 run 中批量处理多个 learnings，并在 drafts 间缝合 cross-references | 每次 run 只处理一个 learning；对其他 learnings 按顺序分别运行 skill |
+| Asserting code behavior or merge-state from conversation memory | Read the defining source line before asserting; cite PR numbers over SHAs; soften unverifiable claims (Phase 1 extractor rules, re-checked in Phase 2.45) |
+| Batching several learnings through one run and stitching cross-references between drafts | One learning per run; run the skill sequentially for each additional learning |
 
 ## Success Output
 
 ### Headless mode
 
 Emit a structured terminal report and end the turn. No "What's next?" question, no blocking prompt. End with `Documentation complete` as the terminal signal so callers can detect completion.
+
+For `depth:lightweight`, use this lower-overhead report after the Lightweight Mode workflow:
+
+```
+✓ Documentation complete (headless lightweight mode)
+
+File: docs/solutions/<category>/<filename>.md  (created | updated)
+Track: <bug | knowledge>
+Category: <category>
+Grounding: <mechanical check clean | N flags adjudicated>
+Discoverability: <no gap | gap noted — instruction-file tip emitted | not applicable — no active project instructions>
+CONCEPTS.md: <not present | scanned, no qualifying terms | updated — N added, N refined>
+CONCEPTS.md discoverability: <not checked — CONCEPTS.md not refined | no gap | gap noted — instruction-file tip emitted | not applicable — no active project instructions>
+Refresh recommendation: <none | scope hint for /ce-compound-refresh>
+
+Documentation complete
+```
+
+For `depth:full` or backward-compatible headless calls with no depth token, use the Full report:
 
 ```
 ✓ Documentation complete (headless mode)
@@ -660,7 +686,7 @@ issues occur in the Email Processing or Brief System modules.
 Refresh recommendation: none
 ```
 
-**输出摘要后结束当前 turn——`ce-compound` 不显示 "What's next?" 菜单。** 文档已经写入，workflow 找到的所有 cross-references 也已经包含在其中。Cross-doc maintenance（修复*其他*文档中的 references、执行 consolidation）应通过上面的 `Refresh recommendation` 行交给专门处理此任务的 `ce-compound-refresh`，而不是在这里自动应用；否则会超出唯一 deliverable 的边界，编辑更多 tracked docs。如果用户想查看文件或执行 follow-up action，他们会主动提出。（仅 interactive mode。）
+**End the turn after the summary — `ce-compound` does not present a "What's next?" menu.** The doc is written and any cross-references the workflow found are already in it. Cross-doc maintenance (fixing references in *other* docs, consolidation) is deferred to `ce-compound-refresh` via the `Refresh recommendation` line above — the skill designed for it — not auto-applied here, which would edit tracked docs beyond the one deliverable. If the user wants to view the file or take a follow-up action, they will ask. (Interactive mode only.)
 
 **Alternate interactive output (when updating an existing doc due to high overlap):** in headless mode, this case is communicated via the `Overlap: high — existing doc updated` line of the headless terminal report above, not as a separate output block.
 

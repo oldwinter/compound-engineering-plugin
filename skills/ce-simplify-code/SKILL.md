@@ -6,6 +6,8 @@ argument-hint: "[blank to simplify current branch changes, or describe what to s
 
 Simplify recently changed code for clarity, reuse, quality, and efficiency while preserving exact behavior. Prioritize readable, explicit code over compact code — fewer lines is not the goal.
 
+**中文导读：** 对当前 branch diff 或明确指定的 code surface 做 behavior-preserving refinement，优先提升 clarity、reuse 和 maintainability，并通过现有 tests 与 relevant checks 证明没有改变行为。不要越过 plan 中的 structure pins，也不要把 unrelated cleanup 混入本次 simplification。下方英文内容是 canonical executable contract，必须按原文执行。
+
 ## Step 1: Identify scope
 
 Resolve the simplification scope in this order:
@@ -17,6 +19,8 @@ Resolve the simplification scope in this order:
 If none of the above produces a non-empty scope, stop and ask the user what to simplify rather than guessing. Use the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
 
 **Preflight — skip a no-yield scope before spending reviewers.** The three reviewers hunt for reuse, quality, and efficiency issues in *code*. If the resolved scope contains no substantive human-authored code — it is documentation- or Markdown-only, or only generated, vendored, dependency/lockfile, or purely mechanical (formatting, lint autofix, mass rename) churn — stop here with a one-line note that there is nothing to simplify, and do **not** dispatch the reviewers. On a mixed diff that includes both real code and these no-yield changes, narrow the scope to the code files and continue. This preflight gates on the *kind* of change only, never on size or count: an explicit user-named scope is authoritative and still runs even when small. (Callers that already gate on size — `ce-work`, `/lfg` — and any standing "run this automatically" instruction own the size/cost policy; this preflight is only the no-code safety net.)
+
+After this preflight passes, use the platform's task-tracking capability when available to show a short user-facing view derived from the remaining workflow. Track the meaningful review, apply, and verification outcomes rather than creating one task per reviewer or mirroring every step; add conditional work only when its gate fires. If no task-tracking capability is available, continue normally without simulating a task list in chat.
 
 ## Step 2: Launch 3 review agents in parallel
 

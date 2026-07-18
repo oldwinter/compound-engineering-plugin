@@ -1,8 +1,10 @@
 # Apply Code Review Findings (after `ce-code-review`)
 
+**中文导读：** 本 reference 是所属 skill 的 load-bearing execution detail。请先阅读对应 `SKILL.md` 的中文导读；下方英文内容是 canonical executable contract，命令、字段、阶段顺序和安全边界必须按原文执行。
+
 Load this reference when `ce-code-review` has finished and **ce-work** (or another caller) should apply fixes before the Residual Work Gate.
 
-`ce-code-review` is invoked here with `mode:agent`, so it is **review-only** in this context — it reports findings and writes artifacts and does not mutate the checkout, commit, push, or file tickets. **The caller owns apply/fix policy.** (In its own default/interactive mode the review applies safe fixes itself; that path does not apply here.)
+`ce-code-review` is invoked here with `mode:agent`, so it is **review-only** in this context — it reports findings and writes artifacts and does not mutate the checkout, commit, push, or file tickets. **The caller owns apply/fix policy.** Standalone review is also report-only unless local apply was explicitly authorized.
 
 ## Consume the completed review (do not re-run it)
 
@@ -11,7 +13,7 @@ This reference loads **after** review has run. In the ce-work shipping flow, ste
 Reuse the review output already in hand:
 
 - Parsed JSON (`status`, `actionable_findings`, `findings`, `artifact_path`, `run_id`) **or** the markdown Actionable Findings summary captured by the caller
-- Run artifact dir: `/tmp/compound-engineering/ce-code-review/<run-id>/` (`review.json`, per-reviewer JSON for `why_it_matters`)
+- Run artifact dir: `<artifact-path>/` (`review.json`, per-reviewer JSON for `why_it_matters`)
 
 If `status` is `failed`, stop shipping and surface `reason`. If `degraded`, note partial reviewer coverage before applying anything.
 
@@ -30,7 +32,7 @@ ce-code-review mode:agent plan:<plan-path> base:<merge-base-or-ref>
 - `base:` — when the diff base is already resolved on the current checkout; omit when reviewing a PR number/URL or standalone current branch.
 - Do **not** pass deprecated `mode:autofix`.
 
-For human / interactive shipping, invoke `ce-code-review` without `mode:agent` if markdown tables are preferred. Capture the same JSON / Actionable Findings and artifact dir listed above before applying.
+For human-facing shipping, invoke `ce-code-review` without `mode:agent` if markdown tables are preferred. It still reports only unless the invocation explicitly authorizes local apply. Capture the Actionable Findings and artifact dir before caller-owned apply.
 
 ## Inputs for apply
 

@@ -6,6 +6,8 @@ argument-hint: "[path to optimization spec YAML, or describe the optimization go
 
 # Iterative Optimization Loop
 
+**中文导读：** 以可量化 baseline、分层 evaluation 和 bounded experiments 驱动 iterative optimization。每轮都要保持 comparison 公平、记录 result，并只保留经过验证的改进；不要把一次偶然跑分或未经验证的重写当作优化完成。下方英文内容是 canonical executable contract，必须按原文执行。
+
 Run metric-driven iterative optimization. Define a goal, build measurement scaffolding, then run parallel experiments that converge toward the best solution.
 
 ## Interaction Method
@@ -373,14 +375,7 @@ Read the code within `scope.mutable` to understand:
 - Obvious improvement opportunities
 - Constraints and dependencies between components
 
-Optionally read `references/agents/repo-research-analyst.md` and dispatch a generic subagent seeded with that local prompt for deeper codebase analysis if the scope is large or unfamiliar. Do not dispatch a standalone agent by type/name. When you do, resolve the question-agnostic project profile from the shared cache first (set `SKILL_DIR` to this skill's directory; protocol in `references/repo-profile-cache.md`):
-
-```bash
-SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
-python3 "$SKILL_DIR/scripts/repo-profile-cache.py" get
-```
-
-On `HIT` load the profile JSON; on `MISS` derive it via `references/agents/repo-profiler.md` and `put` the result; on `NO-CACHE` derive inline. Pass the profile to `repo-research-analyst` and request only the question-specific scopes (e.g. `patterns`) so it skips re-deriving the agnostic stack/architecture/conventions.
+Optionally read `references/agents/repo-research-analyst.md` and dispatch a generic subagent seeded with that local prompt for deeper codebase analysis if the scope is large or unfamiliar. Do not dispatch a standalone agent by type/name. Pass the active project and optimization context, request only question-specific scopes such as `patterns`, and go directly to current owning code. If the optimization cannot be scoped, allow one targeted root or workspace probe.
 
 ### 2.2 Generate Hypothesis List
 

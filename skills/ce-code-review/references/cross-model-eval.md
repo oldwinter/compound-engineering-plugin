@@ -1,5 +1,7 @@
 # Cross-Model Adversarial Pass — Skill-Creator Eval Spec
 
+**中文导读：** 本 reference 是所属 skill 的 load-bearing execution detail。请先阅读对应 `SKILL.md` 的中文导读；下方英文内容是 canonical executable contract，命令、字段、阶段顺序和安全边界必须按原文执行。
+
 This is the load-bearing behavioral eval for ce-code-review's cross-model
 adversarial pass. Deterministic route tests cover the worker; these cases cover
 the SKILL.md/reference orchestration that only a fresh agent can execute. Inject
@@ -36,7 +38,7 @@ and Codex with fake peer CLIs first on PATH.
    apply authority.
 
 5. **Failures are additive and non-blocking.** A missing CLI means no job starts;
-   an interactive review reports the pass as not run. A started timeout, failure,
+   a human-facing markdown review reports the pass as not run. A started timeout, failure,
    or unusable return is named in Coverage and the in-process review completes.
    The worker never changes recipients internally; any recipient-changing retry
    requires a new disclosure and sanction.
@@ -53,7 +55,7 @@ and Codex with fake peer CLIs first on PATH.
    continues, reaps at the aggregate deadline, reads owned results and skip logs,
    names non-`done` terminal states, and removes private scratch.
 
-8. **Mode-specific disclosure is honest.** Interactive default mode announces
+8. **Mode-specific disclosure is honest.** Human-facing default mode announces
    the fixed route and egress before dispatch and calls it independent only when
    serving families differ attestably. Receiptless routes say "requested
    <model>; serving model unverified on this route." `mode:agent` emits no

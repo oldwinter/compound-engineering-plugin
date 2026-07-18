@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `e745e966`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `d1bff966`。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -50,7 +50,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-plan`](docs/skills/ce-plan.md) | 将 feature ideas 或 requirements-only plans enrich 为 implementation-ready plans |
 | [`/ce-work`](docs/skills/ce-work.md) | 使用 worktrees 和 task tracking 执行 implementation-ready plans |
 | [`/ce-simplify-code`](docs/skills/ce-simplify-code.md) | 在 review 前 refinement 新写的 code，提升 clarity 和 reuse |
-| [`/ce-code-review`](docs/skills/ce-code-review.md) | 合并前按 plan 进行 multi-agent review |
+| [`/ce-code-review`](docs/skills/ce-code-review.md) | 合并前按 plan 进行 report-only multi-agent review；本地应用修复必须显式授权 |
 | [`/ce-compound`](docs/skills/ce-compound.md) | 把 learning 捕获到 `docs/solutions/`，让下一轮 loop 更聪明 |
 
 每个 cycle 都会 compound：`/ce-compound` 写下 learnings，下一次 `/ce-brainstorm` 和 `/ce-plan` 会读取它们作为 grounding。Brainstorms sharpen plans，plans inform future plans，reviews catch more issues，patterns get documented。这个 return arrow 就是重点。
@@ -65,7 +65,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-strategy`](docs/skills/ce-strategy.md) | *Upstream anchor*：创建并维护 `STRATEGY.md`，由 ideate、brainstorm 和 plan 读取作为 grounding，让 strategy choices 流入每个 feature |
 | [`/ce-product-pulse`](docs/skills/ce-product-pulse.md) | *Outer loop*：给定时间窗口内用户实际经历了什么（usage、performance、errors）的 report，保存到 `docs/pulse-reports/`；follow-ups 反馈到 ideation 和 brainstorming |
 | [`/ce-debug`](docs/skills/ce-debug.md) | 当输入是 bug 而不是 feature 时，替代 brainstorm -> plan -> work：reproduce，trace root cause，fix，然后在必要时 polish/review 并 handoff 给 PR |
-| [`/ce-pov`](docs/skills/ce-pov.md) | *On demand, before you commit*：给出 decisive、project-grounded adoption verdict、holistic document take 或针对既有 approaches 的立场；可由 named peers 或 `oracle` 做 cross-check，并明确区分 Cursor default 与 Composer |
+| [`/ce-pov`](docs/skills/ce-pov.md) | *On demand, before you commit*：给出 decisive、project-grounded adoption verdict、holistic document take 或针对既有 approaches 的立场；可由 named peers 或 `oracle` 通过 blind initial round 和 bounded reconciliation 做 cross-check |
 | [`/ce-explain`](docs/skills/ce-explain.md) | *On demand, to keep learning*：把 concept、diff、idea 或 “what did I do this week?” 变成写给你个人的 dense visual explainer，可选 check-in（diff 的 predict-then-reveal、corrected exercises）让内容留下来 |
 
 完整 catalog 和 skill chaining 见 [docs/skills](docs/skills/README.md)。完整 inventory 见[下方](#full-skill-inventory)。
@@ -123,7 +123,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 安装后，在任意 project 中运行 `/ce-setup`。它会检查 repo-local config、报告 optional tool capabilities，并帮助把 machine-local CE settings 安全地放进 gitignore。
 
-`compound-engineering` plugin 当前包含 30 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
+`compound-engineering` plugin 当前包含 31 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
 
 ### Full Skill Inventory（完整 Skill 清单）
 
@@ -154,6 +154,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-test-browser`](docs/skills/ce-test-browser.md) | 对 PR-affected pages 运行 browser tests |
 | [`/ce-test-xcode`](docs/skills/ce-test-xcode.md) | 在 simulator 上 build 和 test iOS apps |
 | [`/ce-setup`](docs/skills/ce-setup.md) | Diagnose optional tool capabilities 和 project config |
+| [`/ce-handoff`](docs/skills/ce-handoff.md) | 在默认临时存储或指定位置创建 session handoff，并从选定来源恢复上下文 |
 | [`/ce-simplify-code`](docs/skills/ce-simplify-code.md) | Simplify recent code changes |
 | [`/ce-polish`](docs/skills/ce-polish.md) | 启动 dev server 并迭代 UX polish |
 | [`/ce-proof`](docs/skills/ce-proof.md) | 创建、编辑和分享 Proof documents |
@@ -491,24 +492,48 @@ For active development, load this checkout directly in the harness you want to t
 claude --plugin-dir "$PWD"
 ```
 
-**Codex App**
-
-In the app's **Add plugin marketplace** form, use this checkout as the source:
-
-| Field | Value |
-| --- | --- |
-| Source | `/path/to/compound-engineering-plugin` |
-| Git ref | current branch, or leave blank for a local folder |
-| Sparse paths | leave blank |
-
-**Codex CLI**
+**Cursor Agent CLI**
 
 ```bash
-codex plugin marketplace add "$PWD"
-codex plugin add compound-engineering@compound-engineering-plugin
+cursor-agent --plugin-dir "$PWD"
 ```
 
-Use a separate `CODEX_HOME` when you want to keep local testing isolated from your normal Codex profile. The Codex marketplace entry points at the public Git plugin source so root-shaped plugin repos install correctly; use a temporary marketplace catalog with a `source.url` plus `ref` when testing unpublished plugin-content changes end to end.
+**Codex**
+
+常规、接近生产环境的 plugin 安装请使用上方 [Codex App](#codex-app) 或 [Codex CLI](#codex-cli) 说明。下面的流程仅供贡献者测试某个精确 checkout 或 linked worktree 中尚未发布的文件。
+
+<details>
+<summary><strong>高级：在 Codex 中测试当前 checkout</strong></summary>
+
+把当前 worktree 选为 Codex 的 active development source：
+
+```bash
+bun run codex:dev -- local
+```
+
+该命令会在 `$CODEX_HOME/skills/compound-engineering-local`（默认 `~/.codex/skills/compound-engineering-local`）创建一个指向当前 worktree `skills/` 目录的 collection symlink。它还会通过 Codex CLI 移除已安装的 Compound Engineering plugin variants，避免 marketplace cache 遮蔽或重复加载本地 skills。它不会复制 skills、修改 checkout、执行 `git pull`，也不会触碰 `$CODEX_HOME/skills` 下无关条目。
+
+这个 link 会暴露所选 worktree 中的精确内容，包括 modified 和 untracked skills。普通编辑无需重装；当前 Codex 版本会自动检测直接的 skill 变更。切换 local/remote 安装模式后请启动新 session；普通 skill 修改未出现时，重启 Codex。
+
+检查和切换模式：
+
+```bash
+bun run codex:dev -- status
+bun run codex:dev -- refresh
+bun run codex:dev -- remote
+bun run codex:dev -- remove
+```
+
+- `status` 报告 local、remote、mixed、drifted 或 absent 状态，以及 linked checkout、worktree 类型、branch、commit SHA 和 dirty counts。
+- `refresh` 是幂等的 `local` alias，用于修复误装的 plugin；live link 已会直接反映文件变化。
+- `remote` 刷新官方 Git marketplace，安装并验证 `compound-engineering@compound-engineering-plugin`，然后移除 local link，用于模拟已发布版本的用户体验。
+- `remove` 移除 Compound Engineering plugin variants 和 managed link，保留 checkout 与其他用户 skills。
+
+脚本会自动推导 repository path，因此可用于任意位置的 checkout，包括带空格的路径。它继承当前 `CODEX_HOME`；测试隔离 profile 时，在命令上设置 `CODEX_HOME`。所有模式必须针对启动 Codex 时使用的同一 `CODEX_HOME` 运行。
+
+不要把 `codex plugin marketplace add "$PWD"` 当作本地开发捷径。仓库提交的 `.agents/plugins/marketplace.json` 会刻意把 Compound Engineering 指回公开 Git repository，因此从该 marketplace 安装仍可能缓存远端内容。Manifest version 相同也不能证明 cache 与 worktree 一致。
+
+</details>
 
 **Kimi Code CLI**
 

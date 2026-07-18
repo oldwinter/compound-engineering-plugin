@@ -60,6 +60,9 @@ Guidance generalized from several Learnings into a broader rule. Higher-leverage
 ### Explainer
 A dense, visual teaching artifact written for the developer personally — explaining a concept, a change, an idea, or a window of their own recent work — so the human keeps learning when agents do the writing. The complement of a Learning: a Learning teaches the repo's future work; an explainer teaches the human.
 
+### Session handoff（会话 handoff）
+一种 immutable continuity artifact，让新 agent 无需 prior session transcript，也能恢复 objective、decisions、current state 和 unfinished work。CE 创建的 handoff 默认使用 managed temporary Markdown，并指向 authoritative project artifacts，而不是替代它们。Receiving agent 也可以从用户选定、具有足够 continuity context 的任意 source resume；selection 只提供 context，不授予自动继续的 authority。
+
 ### Check-in
 The active-recall step that can follow an explainer in the same session: the developer predicts or answers first and the explanation confirms or corrects — predict-then-reveal for changes, checked exercises for concepts. Skippable when the material does not warrant retention work.
 
@@ -101,8 +104,8 @@ A discrete, self-scored confidence value on a fixed small scale, each level tied
 ### Autofix class
 The classification of a review finding by how safely its proposed fix can be applied: applied silently, applied only after user confirmation, left for a human to resolve, or recorded as advisory with no action.
 
-### Headless mode
-An explicit opt-in mode that runs a Skill unattended, with no user prompts — it produces a written report as its deliverable and conservatively defers genuinely ambiguous decisions rather than guessing.
+### Headless mode（无交互模式）
+一种 explicit opt-in mode：Skill 无人值守运行，不向用户提问，以 written report 作为 deliverable；真正 ambiguous 的 decisions 会 conservatively defer，而不是猜测。当 automation 需要显式 coverage tradeoff 时，Skill 可以在 headless mode 内额外提供独立的 depth selector；non-interactive contract 与 work depth 始终是两个不同 decisions。
 
 ### Session-settled decision（会话中已确定的决策）
 用户在触发会话中审视并选定的 decision，也就是 tradeoff 或 alternative 已被明确展示，随后由用户作出选择。它会作为带 provenance label 的 constraint 贯穿 Pipeline（annotation stem 为 `session-settled:`，classes 为 `user-directed` 和 `user-approved`）；下游 skills 可以补充，但绝不重复询问，且只有 evidence 才能与其冲突。未经审视的 assertion 属于 directive，而不是 settled decision，只会在 pipeline 中接受一次 challenge；agents 绝不为自己未经审视的 proposals 添加该标签。

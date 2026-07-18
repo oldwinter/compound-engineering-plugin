@@ -6,7 +6,13 @@ argument-hint: "[feature description]"
 
 CRITICAL: You MUST execute every step below IN ORDER. Do NOT skip any required step. Do NOT jump ahead to coding or implementation. The plan phase (step 1) MUST be completed and verified BEFORE any work begins. Violating this order produces bad output.
 
+**中文导读：** 这是完整 autonomous shipping pipeline，会按固定顺序 plan、implement、simplify、review、apply fixes、commit、push、open PR 并 watch CI 到 green；只有用户明确要求端到端 autonomous ship 或直接调用 `lfg` 时才使用。它会产生外部写入，不能用于希望逐步确认的 in-the-loop work。下方英文内容是 canonical executable contract，步骤顺序、gates 与 shipping authority 必须按原文执行。
+
 When invoking any skill referenced below, resolve its name against the available-skills list the host platform provides and use that exact entry. Some platforms list skills under a plugin namespace (e.g., `compound-engineering:ce-plan`); others list the bare name. Invoking a short-form guess that isn't in the list will fail — always match a listed entry verbatim before calling the Skill/Task tool.
+
+## Task Visibility
+
+Before step 1, use the platform's task-tracking capability when available to publish a short stage-level view of the remaining pipeline. Derive it from the user-meaningful outcomes below rather than mirroring all ten steps or exposing internal gates. Before invoking a child skill, replace or clear LFG's view so only the child skill's task surface is visible; after it returns, recreate or refresh LFG's remaining pipeline work before invoking the next child. Add conditional work only when its gate fires. If no task-tracking capability is available, continue normally without simulating a task list in chat.
 
 1. Invoke the `ce-plan` skill with the arguments you were invoked with.
 

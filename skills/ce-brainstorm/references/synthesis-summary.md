@@ -1,5 +1,7 @@
 # Synthesis Summary
 
+**中文导读：** 本 reference 是所属 skill 的 load-bearing execution detail。请先阅读对应 `SKILL.md` 的中文导读；下方英文内容是 canonical executable contract，命令、字段、阶段顺序和安全边界必须按原文执行。
+
 **Synthesis ≠ unified plan artifact.** The synthesis is NOT a preview, draft, or substitute for the requirements-only unified plan — it's the scope checkpoint that doc-write consumes as input. The Product Contract itself is written in Phase 3 from the confirmed synthesis. Both the synthesis and the Product Contract stay scope-only — implementation detail (file paths, code shapes, exact error wording) is downstream (ce-plan's job), not the Product Contract.
 
 **Two-stage shape: internal draft, then chat-time scoping synthesis.** The synthesis is composed in two stages. Stage 1 is an internal three-bucket draft (Stated / Inferred / Out of scope) the agent uses to think comprehensively about scope. Stage 2 is the scoping synthesis presented to the user — shaped like what two product collaborators would confirm before writing a PRD, not like a comprehensive audit and not like a one-line preview. The user only sees stage 2. The internal draft still informs the doc body via the doc-shape routing below; it just doesn't reach the user verbatim. This split exists because the comprehensive audit shape produced too much detail for the user to actually weigh in on, even when the granularity rules were followed.
@@ -46,7 +48,11 @@ Each section answers a different question:
 - **What did we cut?** → deferred items a reader would expect to see acknowledged
 - **Where might you redirect?** → residual forks: post-dialogue consequences, silent inferences, late-cycle bets
 
-Then the confirmation: *"Confirm and I'll write the requirements-only plan next, drawing on our dialogue and this synthesis. Or tell me what to change."* The phrasing sets the expectation that confirm -> artifact-write, so the user knows what's about to happen and can interrupt without ambiguity.
+Then the confirmation, which names **what actually happens next** so the user knows what is coming and can interrupt without ambiguity. When a doc is expected — the common case — that is the artifact write: *"Confirm and I'll write the requirements-only plan next, drawing on our dialogue and this synthesis. Or tell me what to change."*
+
+When a doc is already ruled out — the user declined one, or `brainstorm-sections.md`'s "Decide whether a doc is warranted at all" criteria plainly hold — name where the decisions actually go instead, which is whichever of that rule's alternatives *this run* established (`ce-plan`, the user's commit message, `docs/solutions/`): *"Confirm and we're done here — the scope above carries straight into [the destination the dialogue established]. Or tell me what to change."* When the dialogue named none, drop the clause rather than picking one: *"Confirm and we're done here — no doc, as you asked. Or tell me what to change."*
+
+Do not hardcode a destination. This phase writes no commit message and hands off at Phase 4, so asserting a downstream action the run will not take is the same overreach as promising the doc. Phase 3, not this phase, owns the doc-warranted decision, so promising the write here makes a user who already declined a doc decline it a second time.
 
 ### Path A vs Path B: the gate that fires the confirmation question
 
@@ -157,7 +163,7 @@ Based on our dialogue, here's the scope I'm proposing for the Product Contract:
 - [scope-level fork or non-obvious consequence the user can affirm or redirect]
 - [same]
 
-Confirm and I'll write the requirements-only plan next, drawing on our dialogue and this synthesis. Or tell me what to change — even something I captured correctly earlier is fair game to revise (you may have changed your mind or want to correct an unstated assumption).
+[Closing line — name what actually happens next, per "the confirmation" above. Doc expected (the common case):] Confirm and I'll write the requirements-only plan next, drawing on our dialogue and this synthesis. Or tell me what to change — even something I captured correctly earlier is fair game to revise (you may have changed your mind or want to correct an unstated assumption). [Doc already ruled out — user declined one, or the skip criteria plainly hold:] Confirm and we're done here — the scope above carries straight into [the destination this run established; drop this clause when none was named]. Or tell me what to change — even something I captured correctly earlier is fair game to revise.
 ```
 
 ### Path A template (no questions were asked — typically Phase 0.2 short-circuit)

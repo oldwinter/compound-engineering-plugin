@@ -6,6 +6,8 @@ argument-hint: "[issue reference, error message, test path, or description of br
 
 # Debug and Fix
 
+**中文导读：** 面向真实 bug、failed test、regression 或错误行为，先复现并沿完整 causal chain 找到 root cause，再决定是否实施 test-first fix。不要把症状猜测当原因，也不要在没有 evidence 的情况下连续试补丁；验证必须覆盖用户实际遇到的 surface。下方英文内容是 canonical executable contract，必须按原文执行。
+
 Find root causes, then fix them. This skill investigates bugs systematically — tracing the full causal chain before proposing a fix — and optionally implements the fix with test-first discipline.
 
 The **bug description** is the input this skill was invoked with — the failure to diagnose, present in the current prompt or conversation, whether the user provided it directly or a calling skill passed it (e.g. `ce-babysit-pr` / `lfg` in `mode:pipeline`, which pass the failing jobs and log tails as the argument). It may be a description of the failure, a `mode:` token, or an issue reference (`#123`, `org/repo#123`, or an issue URL). The rest of this skill refers to it as `<bug_description>`; if nothing was provided, treat `<bug_description>` as blank.
@@ -74,14 +76,7 @@ Confirm the bug exists and understand its behavior. Run the test, trigger the er
 - **Manual setup required:** If reproduction needs specific conditions the agent cannot create alone (data states, user roles, external services, environment config), document the exact setup steps and guide the user through them. Clear step-by-step instructions save significant time even when the process is fully manual.
 - **Does not reproduce after 2-3 attempts:** Read `references/investigation-techniques.md` for intermittent-bug techniques.
 - **Cannot reproduce at all in this environment:** Document what was tried and what conditions appear to be missing.
-- **Writing the reproduction test:** Orient on the project's testing conventions before authoring the failing test. Resolve them from the shared repo-grounding cache first — set `SKILL_DIR` to this skill's directory and run the helper (full protocol in `references/repo-profile-cache.md`):
-
-  ```bash
-  SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
-  python3 "$SKILL_DIR/scripts/repo-profile-cache.py" get
-  ```
-
-  On `HIT`, use the cached profile's `conventions.testing` field as the testing-convention orientation — do not re-read the *root* instruction files for it. (If the bug lives under a subdirectory with its own scoped `AGENTS.md`/`CLAUDE.md` testing rules, still read those fresh — subdirectory-scoped instructions are excluded from the cache.) **But if that field is empty or null** (the profile recorded no explicit testing guidance), still fall back to the inline check below — in particular, look for a clear style across the project's existing tests. On `MISS` or `NO-CACHE` (or any error), fall back to deriving it inline as today: if the project has testing-conventions guidance — a dedicated testing skill, an `AGENTS.md`/`CLAUDE.md` testing section, or a clear style across existing tests — apply it. The cache is purely an orientation convenience here; never block on it, and do not derive or persist a full profile just for this lookup. Either way, inspect existing tests before adding coverage: use an existing failing test when it already captures the bug, update an existing test when it owns the contract but has the wrong expectation, strengthen an over-mocked test when it should have caught the bug, or add a new minimal isolated test only when no existing test is the right home. The chosen test must fail on the current bug and pass once the corrected behavior lands; name it descriptively so the failure message itself explains the bug.
+- **Writing the reproduction test:** Use the active project instructions and any applicable subdirectory-scoped instructions; always inspect existing tests before adding coverage. Use an existing failing test when it already captures the bug, update an existing test when it owns the contract but has the wrong expectation, strengthen an over-mocked test when it should have caught the bug, or add a new minimal isolated test only when no existing test is the right home. The chosen test must fail on the current bug and pass once the corrected behavior lands; name it descriptively so the failure message itself explains the bug.
 
 #### 1.2 Verify environment sanity
 

@@ -1,5 +1,7 @@
 # Shipping Workflow
 
+**中文导读：** 本 reference 是所属 skill 的 load-bearing execution detail。请先阅读对应 `SKILL.md` 的中文导读；下方英文内容是 canonical executable contract，命令、字段、阶段顺序和安全边界必须按原文执行。
+
 This file contains the shipping workflow (Phase 3-4). It is loaded when all Phase 2 tasks are complete and execution transitions to quality check.
 
 ## Phase 3: Quality Check
@@ -40,7 +42,7 @@ This file contains the shipping workflow (Phase 3-4). It is loaded when all Phas
 
 4. **Residual Work Gate** (REQUIRED when `ce-code-review` ran and left actionable residuals)
 
-   After code review and review-findings followup, inspect the **Actionable Findings** summary (or read the run artifact at `/tmp/compound-engineering/ce-code-review/<run-id>/` if the summary was truncated). If one or more actionable `downstream-resolver` findings were not applied in followup, do not proceed to Final Validation until they are resolved or durably recorded.
+   After code review and review-findings followup, inspect the **Actionable Findings** summary (or read the absolute `<artifact-path>` returned by `ce-code-review` if the summary was truncated). If one or more actionable `downstream-resolver` findings were not applied in followup, do not proceed to Final Validation until they are resolved or durably recorded.
 
    **Non-interactive / autonomous sessions (no human can answer — e.g. an `lfg`-style pipeline or a headless run):** do **not** call the blocking tool — that would hang the pipeline. After step 3b auto-applied every mechanically-eligible finding, take the `Accept and proceed` path automatically: record the remaining actionable residuals verbatim to the durable Known Residuals sink (the PR description's Known Residuals section, or `docs/residual-review-findings/<branch-or-head-sha>.md` on the no-PR path) and continue to Final Validation. Residuals are recorded, never dropped — this keeps autonomous shipping unblocked without losing findings.
 

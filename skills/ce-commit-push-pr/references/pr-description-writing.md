@@ -1,5 +1,7 @@
 # PR Description Writing
 
+**中文导读：** 本 reference 是所属 skill 的 load-bearing execution detail。请先阅读对应 `SKILL.md` 的中文导读；下方英文内容是 canonical executable contract，命令、字段、阶段顺序和安全边界必须按原文执行。
+
 ## The core principle
 
 The diff is already visible on GitHub. The description exists to explain what the diff cannot show: what was impossible before and is now possible, what was broken and is now fixed, what shape changed. Cut any sentence a reader could reconstruct from the diff itself.
@@ -10,6 +12,10 @@ The diff is already visible on GitHub. The description exists to explain what th
 If the lead sentence describes what was moved, renamed, or added rather than what's now possible or fixed, rewrite it. This applies to every section, not just the opening — restating the diff is the failure mode this skill exists to prevent.
 
 For user-facing bugs, run an extra before/after pass before writing the mechanism: name what the user would have seen before and what they now see instead. Only then mention the technical cause or fix, and only if it helps the reviewer understand risk. A lead like "Playback hooks now ignore late async responses" is still too mechanical if the visible bug was "old videos, thumbnails, or errors could appear after switching selections."
+
+## Project PR-body contract
+
+Before composing, resolve PR-body requirements from the project's active instructions and conventions already in context, then check the standard repository PR-template locations (the repository root, `docs/`, `.github/`, and `.github/PULL_REQUEST_TEMPLATE/`) and any contribution guidance they reference. Required headings, fields, order, checklists, and boilerplate define the structural contract. Treat a template as a minimum unless the project explicitly requires an exact/template-only body or forbids additions; only then add no sections beyond those the project permits. Within every permitted section, apply this reference's value-first, decision-cost, evidence, and editing rules. When those defaults conflict with the project's PR-body contract, the project contract wins.
 
 ---
 
@@ -55,11 +61,11 @@ Note in the user-facing summary when the API fallback was used.
 
 ## Step A: Size the description
 
-**中文摘要：** Description 的大小取决于 reviewer 的 decision cost，而不是 diff 行数、file extension 或是否有视觉 surface。先找出 diff 自身无法证明的 material claims，只补足帮 reviewer 做决定所需的 context、evidence 和 residual uncertainty。
-
 **Size by decision cost, not diff shape.** What a description must cover is set by how much a reviewer cannot establish from the diff alone — not changed-line count, file extension, or visual surface. A 5-line edit to ranking logic or a deploy manifest can carry more reviewer uncertainty than a 500-line mechanical rename.
 
-Before sizing, name the change's **material claims** — what became possible, what was fixed, what risk changed, what design decision the reviewer must assess — and which of them the diff alone can't establish. Surface those; let the rest stay implicit. **Classify each changed file by runtime purpose, not extension** when you judge this: markdown or YAML may be inert docs and examples, or runtime agent instructions, configuration, product content, or production deployment behavior — a "docs-only" diff that is really runtime instruction carries real claims and is not auto-sized to one line.
+Before composing anything, build a compact internal **scope map** from the **complete oneline commit list and final three-dot diff**. Use the oneline subjects for full-range coverage; use the final diff to merge overlaps, discard fix-up-only work, and correct stale or misleading subjects; consult the fuller messages only when a subject remains opaque or conflicts with the diff. Group the remaining work into material outcome clusters (one is fine), name one umbrella outcome that covers them, and identify each cluster's **material claims** — what became possible, what was fixed, what risk changed, or what design decision the reviewer must assess. Derive this map from the full range, never from the latest commit, tracker title, branch name, or original request. The map is internal: do not expand the body to enumerate clusters the umbrella already covers. **Classify each changed file by runtime purpose, not extension** when you judge this: markdown or YAML may be inert docs and examples, or runtime agent instructions, configuration, product content, or production deployment behavior — a "docs-only" diff that is really runtime instruction carries real claims and is not auto-sized to one line.
+
+Surface the material claims the diff alone cannot establish; let the rest stay implicit.
 
 Decision cost sets **what you surface, not how long you run** — it raises the content floor, not the length ceiling. A high-uncertainty *small* diff earns a sharper lead and at most a one-line validation caveat, not a multi-section essay; reviewer uncertainty moves a change at most one size row, and only when the diff genuinely can't carry the claim. Fold risk and residual uncertainty into the narrative rather than spawning dedicated `##` sections unless the PR is already large. The one-rule replacement for "shorter is safer":
 
@@ -77,6 +83,8 @@ Subtract fix-up commits (review fixes, lint, rebase resolutions) when sizing —
 | Large or architecturally significant | Narrative frame + 3-5 design-decision callouts + brief test summary. Target ~100 lines, cap ~150. For PRs with many mechanisms, use a Summary table; do not create an H3 per mechanism. |
 | Performance improvement | Include before/after measurements as a markdown table. |
 
+A project PR-body contract sets the structural floor; this table sizes the content within it, never against it.
+
 For small + simple PRs, the value-led sentence is the entire description.
 For small + non-trivial bugfixes, the 3-5 sentence target still needs a user-visible before/after lead when the bug affected UI, CLI output, workflow output, or any other user-observable behavior. Concision is not a reason to skip the visible symptom.
 
@@ -88,7 +96,7 @@ For small + non-trivial bugfixes, the 3-5 sentence target still needs a user-vis
 
 - Type by intent, not file extension. When `fix` and `feat` both seem to fit, default to `fix` — adding code to remedy missing behavior is `fix`. Reserve `feat` for capabilities the user could not previously accomplish. Use `refactor`/`docs`/`chore`/`perf`/`test` when more precise.
 - Scope (optional): narrowest useful label. Omit when no single label adds clarity.
-- Description: imperative, lowercase, under 72 chars, no trailing period.
+- Description: derive it from the scope map's umbrella outcome, not one outcome cluster or implementation mechanism. It need not enumerate every cluster, but it must not make another material outcome sound incidental. Keep it imperative, lowercase, under 72 chars, with no trailing period.
 - Match repo conventions visible in recent commits.
 - **Never use `!` or `BREAKING CHANGE:` without explicit user confirmation** — they trigger automated major-version bumps.
 
@@ -127,8 +135,6 @@ Closing references can live in the opening paragraph when the body is tiny. Non-
 ---
 
 ## Step B2: Judge new concepts
-
-**中文摘要：** 先从 diff 中找最多两个 concept candidates，再对照 base ref，而不是 working tree，判断其是否对该 codebase 真的新颖。只有同时具备新颖性和可迁移性时才教学；absence is the common case。一旦生成，`## New concepts` section 必须说清它是什么、为何在这里选它、本 PR 中的一个 example，以及什么时候不该用。
 
 Decide whether the change introduces a concept — a pattern, technique, library, or domain idea — that a reader of this repo would plausibly not know. Skip this step entirely when the skill's concept teaching gate is off (SKILL.md Step 4).
 
@@ -174,9 +180,9 @@ Lead with the point, then the mechanism, then the caveat. Dense is good; long is
 
 ## Step C: Assemble the body
 
-In order: opening → body sections that earn their keep → related references when they need their own block → test plan if non-obvious → session-settled provenance sentence when a labeled plan is in hand → New concepts section when Step B2 produced one → evidence block if one exists → branding block when Step D calls for one.
+When a project PR-body contract supplies headings or order, preserve that structure and place the applicable elements below within the sections it permits. Otherwise, assemble in order: opening → body sections that earn their keep → related references when they need their own block → test plan if non-obvious → session-settled provenance sentence when a labeled plan is in hand → New concepts section when Step B2 produced one → evidence block if one exists → branding block when Step D calls for one.
 
-The opening goes under `## Summary` if the body uses any `##` headings; bare paragraph otherwise. No orphaned opening paragraphs above the first heading.
+When the project PR-body contract supplies a heading or location for the opening, place it there without inventing or renaming a heading. Otherwise, the opening goes under `## Summary` if the body uses any `##` headings; bare paragraph otherwise. No orphaned opening paragraphs above the first heading.
 
 **Session-settled provenance:** when a plan for this change is in hand — a path passed by the caller (e.g., a pipeline threads it) or a plan already known from the conversation — and that plan contains `session-settled:`-labeled KTDs, include one static sentence naming the settled decisions and their classes, e.g. "Session-settled decisions carried from planning: X (user-directed, over Y); Z (user-approved)." Only when the caller's run flagged proceed-under-conflict notes, add a clause noting each such decision proceeded under a flagged concern. This is a point-in-time description element: never an outstanding-items ledger, never updated after the PR opens, no checklist. When no plan is in hand or it has no labeled KTDs, omit the element entirely — standalone runs without a plan simply never fire it; do not hunt for plans.
 
@@ -208,10 +214,10 @@ Branding alone is never a reason to rewrite a PR description. If branding is the
 
 ## Step E: Pre-apply coverage audit
 
-**中文摘要：** 返回 body 前，用 Step A 的 material claims 做最后 coverage audit：补上 diff 无法自证的 claims，删除 diff 已明示的重复转述，区分 demonstrated results、assumptions 与 mixed/negative outcomes，并删去任何不会降低 reviewer confidence 的句子或 section。
+Before returning the title and body, check them against the scope map and material claims from Step A and revise if any answer is wrong:
 
-Before returning the body, check it against the material claims from Step A and revise if any answer is wrong:
-
+- Does the title express the umbrella outcome rather than one cluster or implementation mechanism?
+- Is every material outcome represented by the umbrella framing or body, or intentionally omitted because it is supporting-only?
 - Is every claim the diff can't establish present — and is any claim the diff *does* show restated needlessly?
 - Is decision-changing evidence stated as a result rather than collapsed into an unexplained "tests passed", with demonstrated results kept distinct from assumptions and from mixed or negative outcomes?
-- Can any sentence or section of the *description* be cut without lowering reviewer confidence? If so, cut it. For a new PR with branding enabled, retain the Step D footer; it is intentional attribution rather than descriptive content. Likewise retain the session-settled provenance sentence when Step C included one; it carries decision provenance the diff cannot show.
+- Can any sentence or section of the *description* be cut without lowering reviewer confidence? If so, cut it, except for headings, fields, checklists, or boilerplate the project's PR-body contract requires. For a new PR with branding enabled, retain the Step D footer; it is intentional attribution rather than descriptive content. Likewise retain the session-settled provenance sentence when Step C included one; it carries decision provenance the diff cannot show.

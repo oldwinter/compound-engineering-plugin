@@ -1,5 +1,7 @@
 # Visual Probes
 
+**中文导读：** 本 reference 是所属 skill 的 load-bearing execution detail。请先阅读对应 `SKILL.md` 的中文导读；下方英文内容是 canonical executable contract，命令、字段、阶段顺序和安全边界必须按原文执行。
+
 Use visual probes when a brainstorm decision is faster to judge by seeing a rough artifact than by reading prose. A visual probe is a disposable decision sketch, not a prototype, implementation plan, UI spec, or design deliverable.
 
 ## Trigger
@@ -72,14 +74,26 @@ Start (detached):
 
 ```bash
 SKILL_DIR="<absolute path of the ce-brainstorm skill directory>";
-node "$SKILL_DIR/scripts/visual-probe-server.js" start --root /tmp/compound-engineering/ce-brainstorm-visual/<run-id>
+SCRATCH_ROOT="/tmp/compound-engineering-$(id -u)";
+if [ -L "$SCRATCH_ROOT" ]; then echo "unsafe scratch root symlink: $SCRATCH_ROOT" >&2; exit 1; fi;
+install -d -m 700 "$SCRATCH_ROOT" || exit 1;
+if [ -L "$SCRATCH_ROOT" ] || [ ! -O "$SCRATCH_ROOT" ]; then echo "scratch root is not owned by the current user: $SCRATCH_ROOT" >&2; exit 1; fi;
+chmod 700 "$SCRATCH_ROOT" || exit 1;
+PROBE_DIR="$SCRATCH_ROOT/ce-brainstorm-visual/<run-id>"; (umask 077; mkdir -p "$PROBE_DIR") || exit 1; chmod 700 "$PROBE_DIR" || exit 1;
+node "$SKILL_DIR/scripts/visual-probe-server.js" start --root "$PROBE_DIR"
 ```
 
 Append `--foreground` to that `start` command for foreground mode. Status and stop take the same anchor — and because `SKILL_DIR` does not persist between Bash invocations, each must re-set it in its own call rather than reuse the `start` block's value:
 
 ```bash
 SKILL_DIR="<absolute path of the ce-brainstorm skill directory>";
-node "$SKILL_DIR/scripts/visual-probe-server.js" status --root /tmp/compound-engineering/ce-brainstorm-visual/<run-id>
+SCRATCH_ROOT="/tmp/compound-engineering-$(id -u)";
+if [ -L "$SCRATCH_ROOT" ]; then echo "unsafe scratch root symlink: $SCRATCH_ROOT" >&2; exit 1; fi;
+install -d -m 700 "$SCRATCH_ROOT" || exit 1;
+if [ -L "$SCRATCH_ROOT" ] || [ ! -O "$SCRATCH_ROOT" ]; then echo "scratch root is not owned by the current user: $SCRATCH_ROOT" >&2; exit 1; fi;
+chmod 700 "$SCRATCH_ROOT" || exit 1;
+PROBE_DIR="$SCRATCH_ROOT/ce-brainstorm-visual/<run-id>"; (umask 077; mkdir -p "$PROBE_DIR") || exit 1; chmod 700 "$PROBE_DIR" || exit 1;
+node "$SKILL_DIR/scripts/visual-probe-server.js" status --root "$PROBE_DIR"
 # stop: the same command with `stop` in place of `status` (re-set SKILL_DIR again)
 ```
 
@@ -136,7 +150,7 @@ The user's chat response is authoritative. The visual artifact is supporting con
 Use OS temp by default because visual probes are disposable scratch:
 
 ```text
-/tmp/compound-engineering/ce-brainstorm-visual/<run-id>/
+<scratch-root>/ce-brainstorm-visual/<run-id>/
   screens/
     001-<decision>.html
   state/

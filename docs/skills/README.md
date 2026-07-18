@@ -63,7 +63,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`skil
 
 | Skill | Description（说明） |
 |-------|-------------|
-| [`/ce-pov`](./ce-pov.md) | 以 adoption verdict、holistic document take 或既有 approaches 立场的形式形成 decisive、project-grounded POV；支持具备 repository grounding、bounded debate 的 named/`oracle` panel，并明确区分 Cursor default 与 Composer route |
+| [`/ce-pov`](./ce-pov.md) | 以 adoption verdict、holistic document take 或既有 approaches 立场的形式形成 decisive、project-grounded POV；支持 blind initial round、bounded evidence-based reconciliation 和 user-extensible checkpoint 的 named/`oracle` panel |
 | [`/ce-explain`](./ce-explain.md) | 把 concept、diff、idea 或你最近一段 work 转成写给你个人的 dense visual explainer；可选 check-in（diff 的 predict-then-reveal、corrected exercises）和 capability-detected destination ask |
 | [`/ce-debug`](./ce-debug.md) | 系统找出 root causes：causal chain gate、predictions、post-fix polish/review、PR handoff |
 | [`/ce-code-review`](./ce-code-review.md) | 使用 skill-local reviewer personas、confidence-gated findings 和四种 modes 的 structured code review |
@@ -126,6 +126,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`skil
 | [`/ce-test-browser`](./ce-test-browser.md) | 采用 host-native browser 优先、`agent-browser` fallback 的层级，对 PR / branch 影响的 pages 做 end-to-end browser tests |
 | [`/ce-test-xcode`](./ce-test-xcode.md) | 用 XcodeBuildMCP 在 simulator 上 build 和 test iOS apps：screenshots、logs、human verification |
 | [`/ce-setup`](./ce-setup.md) | 诊断 optional tool capabilities，并 bootstrap safe project-local config |
+| [`/ce-handoff`](./ce-handoff.md) | 在默认临时存储或指定位置创建 session handoff，再从选定来源发现并恢复上下文；不会自动继续执行 |
 
 ---
 

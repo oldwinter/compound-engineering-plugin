@@ -25,7 +25,7 @@
 |----------|--------|
 | 它做什么？ | 基于真实材料 grounding，把 topic 分解为 orthogonal axes，跨六种 conceptual frames 生成 candidates，adversarially critique，展示 5-7 个 survivors，每个都带 tagged basis |
 | 何时使用 | Greenfield exploration、big-picture thinking、codebase audits、surprise-me runs、naming、decisions、business strategy；任何想要 qualified candidate set 而不是 refined idea 的 domain |
-| 产出什么 | Ranked ideation artifact；默认写成单个 self-contained HTML file（面向 human readers，丰富且可在 browser 打开）。传入 `output:md` 可写成 markdown。存在 `docs/ideation/` 时自动写入那里，否则写到已 announce 的 `/tmp/compound-engineering/` 临时路径 |
+| 产出什么 | Ranked ideation artifact；默认写成单个 self-contained HTML file（面向 human readers，丰富且可在 browser 打开）。传入 `output:md` 可写成 markdown。存在 `docs/ideation/` 时自动写入那里，否则写到已 announce 的 `/tmp/compound-engineering-<effective-uid>/` 临时路径 |
 | 下一步 | 对选中的 survivor 运行 `/ce-brainstorm`，先 iterate 某个 idea，或保留已保存文件后结束 |
 
 ---

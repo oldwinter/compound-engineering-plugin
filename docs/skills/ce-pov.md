@@ -74,13 +74,15 @@ Skill 会将 decision 分类为 one-way 或 two-way door，并按此调整 effor
 
 Adoption verdict 保留同一套五级 grades（Adopt / Trial / Hold / Reject / Not-our-problem）和固定 schema。Document take 以 bottom line、strengths 与 risks 开头。Approach-set position 会选择并解释一个 supplied option；如果两者都可行，则明确说明 “Either is viable” 及 material tradeoffs，而不是强行用 scoreboard 选 winner。
 
-### 8. Offer-first cross-model panels
+### 8. Independent、bounded cross-model panels
 
-Peer 永远不会取代 ce-pov 自己的 judgment。可以指定一个或多个 providers 直接 cross-check，使用 `oracle` fan out 到最多两个可达的 different-model peers，或在 correction cost 明显的 decision 上接受 proactive offer。Named peers 会被精确遵守且不受数量上限约束。任何 project context 离开 host 前，ce-pov 都会说明将发送什么，以及可能接收它的每个 provider/intermediary。
+Peer 永远不会取代 ce-pov 自己的 judgment。可以指定一个或多个 providers 直接 cross-check，用普通语言要求其他 models 提供 independent opinions，使用 `oracle` 作为 shorthand fan out 到最多两个可达的 different-model peers，或在 correction cost 明显的 decision 上接受 proactive offer。Named peers 会被精确遵守且不受数量上限约束。Skill 会说明 selected peers 并以 read-only 方式继续；只有 retry 引入意外 recipient/intermediary，或 active instruction 要求单独批准时才会询问。
 
-Peers 默认以 read-only 方式检查 repository root。Caller 可以缩小 scope；同一个 normalized boundary 会传给每个 peer，ce-pov 会说明各 adapter 是强制执行还是依赖 cooperative compliance。每轮绑定到同一个 repository snapshot。Reconciliation 前，ce-pov 会验证有争议且会改变 decision 的 project claims，并向每个 voice 提供同一份 classified evidence delta（`verified`、`contradicted` 或 `unverifiable`）。
+Peers 会直接检查 shared working tree。Project 中已有 proposal 或 document 时，ce-pov 会把 peer 指向它，不再构建重复 review packets。Initial independent round 包含 subject，但不透露 ce-pov 的 conclusion 或其他 voice 的 judgment；若请求 critique 某个 position，该 position 本身就是 subject，因此会提供给 peer。
 
-当 voices 出现 material disagreement 时，最多进行两次 fresh reconcile exchanges；每次都会提供完整 original subject，以及彼此的 positions、reasoning 和简洁 sourced evidence。每个 peer 必须显式报告自己是 `moved` 还是 `held`。ce-pov 仍是 decision-maker，而不是 vote counter。它会诚实报告 convergence；stalemate 时会指出差距属于 factual 还是 judgment-based，并基于真实依据给出 recommendation，或陈述诚实的 toss-up。Peer failure 或 timeout 永远不会 block solo POV。
+当 voices 出现 material disagreement 时，默认最多进行两次 reconciliation exchanges。每次 exchange 前，ce-pov 会验证有争议且会改变 decision 的 project claims，并向每个 voice 提供同一份 evidence delta（`verified`、`contradicted` 或 `unverifiable`）和已经形成的 positions。每个 peer 必须显式报告自己是 `moved` 还是 `held`；用户预先给出的 pass/round limit 会覆盖默认值。
+
+达到 effective limit 后，automatic dispatch 停止，ce-pov 会展示 convergence 或 stalemate。只有当它能说清 unresolved question、新 evidence/framing 以及额外 exchange 可能改变立场的原因时，才会推荐一次 bounded extension；除非用户预先给了更大 limit，否则继续需要用户批准。ce-pov 仍是 decision-maker，而不是 vote counter；peer failure 或 timeout 永远不会 block solo POV。
 
 Target names 会区分 model 与 harness。**Cursor** 表示由 `cursor-agent` 使用 configured default/Auto model；**Composer** 表示经 Cursor 使用 Composer model；**Grok** 优先使用 Grok CLI，也可以使用 sanctioned Grok-via-Cursor route。除非存在 serving-model receipt，否则 Cursor Auto 会标记为 unverified，且不能算作 independent cross-model corroboration。
 
@@ -166,7 +168,7 @@ Skip `ce-pov` when:
 | `<a selection question>` | 从 bounded field 中选择；若 field 无法 bound，route 到 `/ce-ideate` |
 | `<a document or supplied approach set>` | 返回 holistic take，或以该 subject 的形状给出 project-grounded position |
 | `compare/cross-check with <peers>` | 先形成 ce-pov 自己的 POV，再咨询每个 named peer |
-| `oracle` | 使用最多两个可达的 different-model peers 做 cross-check |
+| `oracle` | 先用最多两个可达的 different-model peers 进行 blind initial cross-check，必要时再做 bounded evidence-based reconciliation |
 
 `Cursor` 会选择 Cursor configured default/Auto model；`Composer` 会经 Cursor 选择 Composer model。这两个名称有意不互作 alias。
 

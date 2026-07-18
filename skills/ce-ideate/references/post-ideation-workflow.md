@@ -1,5 +1,7 @@
 # Post-Ideation Workflow
 
+**中文导读：** 本 reference 是所属 skill 的 load-bearing execution detail。请先阅读对应 `SKILL.md` 的中文导读；下方英文内容是 canonical executable contract，命令、字段、阶段顺序和安全边界必须按原文执行。
+
 Read this file after Phase 2 ideation agents return and the orchestrator has merged and deduped their outputs into a master candidate list. Do not load before Phase 2 completes.
 
 ## Phase 3: Adversarial Filtering
@@ -53,7 +55,7 @@ The ideation artifact is produced **automatically** — persistence is not opt-i
    - Extension follows `OUTPUT_FORMAT` (`.html` default, `.md` on override).
    - **Repo mode:** ensure `docs/ideation/` exists (create if absent).
    - **Elsewhere mode with `docs/ideation/` already present:** use it.
-   - **Otherwise (no repo, or elsewhere with no `docs/ideation/`):** write into the run's CE temp area — the `<scratch-dir>` resolved in Phase 1 (`/tmp/compound-engineering/ce-ideate/<run-id>/`). Do **not** write into the user's current working directory, and do **not** create a `docs/ideation/` tree for a subject unrelated to the repo. Announce the absolute path and note it is temporary (`/tmp` is cleared on reboot — move it to keep it).
+   - **Otherwise (no repo, or elsewhere with no `docs/ideation/`):** write into the run's CE temp area — the `<scratch-dir>` resolved in Phase 1 (`<scratch-root>/ce-ideate/<run-id>/`). Do **not** write into the user's current working directory, and do **not** create a `docs/ideation/` tree for a subject unrelated to the repo. Announce the absolute path and note it is temporary (`/tmp` is cleared on reboot — move it to keep it).
 2. **Choose the file path:** `<dir>/YYYY-MM-DD-<topic>-ideation.<ext>` (or `<dir>/YYYY-MM-DD-open-ideation.<ext>` when no focus exists).
 3. **Load the section contract and rendering reference** (deferred from Phase 0.0): read `references/ideation-sections.md` and the format-rendering reference matching `OUTPUT_FORMAT` — `references/markdown-rendering.md` for `md`, `references/html-rendering.md` for `html`.
 4. **Write the document** per those references. `ideation-sections.md` defines the section contract (metadata, Grounding Context, Topic Axes, Ranked Ideas with per-idea fields, Rejection Summary); the rendering reference defines how the resolved format presents it. Content is identical across formats; only presentation differs.
