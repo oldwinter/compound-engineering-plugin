@@ -19,6 +19,26 @@
 
 ---
 
+## 调用示例
+
+```text
+# 发布本地 Markdown 文档，并保持该文件为 canonical source
+/ce-proof share docs/plans/notification-mute.md to Proof
+
+# 阅读或协作编辑现有 Proof 文档
+/ce-proof https://www.proofeditor.ai/d/example?token=example
+
+# 发布刚刚编辑的 Markdown 文件
+/ce-proof share this to Proof
+
+# 以独立、显式 action 把当前 Proof 内容拉取到本地文件
+/ce-proof pull this Proof document to docs/reviews/notification-mute.md
+```
+
+默认发布是单向的。把远端内容拉回磁盘是独立操作，因为它会改变本地 source of truth。
+
+---
+
 ## 问题
 
 Sharing markdown drafts for review 比看起来更难：

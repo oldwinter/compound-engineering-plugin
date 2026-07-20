@@ -21,6 +21,28 @@
 
 ---
 
+## 调用示例
+
+```text
+# 结束当前 session，并在 managed temporary storage 中创建 handoff
+/ce-handoff
+
+# 创建 handoff，并为 receiving agent 指定重点
+/ce-handoff create finish the authentication migration
+
+# 按 topic 查找可能的 handoffs，在读取正文前先选择
+/ce-handoff resume authentication migration
+
+# 已知 source 时直接 resume
+/ce-handoff resume /path/to/authentication-migration.md
+/ce-handoff resume https://example.com/authentication-migration-handoff
+
+# 让另一台机器或 container 能访问 handoff
+/ce-handoff create a handoff and publish it to ht-ml.app
+```
+
+---
+
 ## 问题
 
 高效的 agent session 不只包含改过的文件。它还积累了用户意图、决策、被拒绝的替代方案、约束、失败尝试、验证结果，以及脆弱 local state 的知识。换到另一个 model 或 harness 后，新 agent 不能假设原 session history 仍然可用。
@@ -52,14 +74,7 @@ Receiving session 能看到同一 host filesystem 时，automatic managed-store 
 
 ## 创建与恢复的使用方式
 
-方向由意图决定：
-
-```text
-/ce-handoff
-/ce-handoff create focus on the failing integration test
-```
-
-两种写法都会创建新的 handoff；bare form 始终表示 create。
+方向由意图决定。Bare invocation 始终表示 create；`create <focus>` 会明确下一 session 的 intended objective。
 
 创建以接收会话中所需的确切命令结束：
 
@@ -69,13 +84,7 @@ Receiving session 能看到同一 host filesystem 时，automatic managed-store 
 
 在命令之前，create response 会简要总结 handoff 捕获的内容，让用户无需打开文件也能确认其实质。随后 skill 会把这条 compact command 作为 source of truth，而不是生成更长的 launch prompt。
 
-```text
-/ce-handoff resume https://example.com/team/auth-migration-handoff
-/ce-handoff resume authentication migration
-Find the handoff about the authentication migration
-```
-
-这些调用会从 explicit source resume，或发现可能的 candidates。Selected source 可以是 local file、text file、URL/page、pasted handoff 或其他 readable artifact；它可以来自任何人、agent 或系统，不需要 CE frontmatter，甚至不必最初就作为正式 handoff 创建。新 session 中使用 “handoff” 一词显得方向不自然时，natural language 也能避免强迫用户记命令语法。
+Resume intent 会读取 explicit source，或发现可能的 candidates。Selected source 可以是 local file、text file、URL/page、pasted handoff 或其他 readable artifact；它可以来自任何人、agent 或系统，不需要 CE frontmatter，甚至不必最初就作为正式 handoff 创建。新 session 中使用 “handoff” 一词显得方向不自然时，类似 “Find the handoff about the authentication migration” 的 natural language 也能避免强迫用户记命令语法。
 
 ## 安全发现
 

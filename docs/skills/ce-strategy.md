@@ -19,6 +19,26 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 ---
 
+## 调用示例
+
+```text
+# 不存在 STRATEGY.md 时，通过完整 interview 创建它
+/ce-strategy
+
+# 只重新审视一个 section，不重开完整 strategy
+/ce-strategy approach
+
+# 围绕具体问题更新某个 section
+/ce-strategy metrics for retention
+
+# 已有 strategy 时无参数调用，interactive 选择 sections
+/ce-strategy
+```
+
+Targeted maintenance 最好提供 section 或 scope hint；`STRATEGY.md` 已存在时，无参数调用会有意采用更宽 scope。
+
+---
+
 ## 问题
 
 多数 teams 要么没有 strategy doc，要么有一份太长以至没人读。Failure shapes：

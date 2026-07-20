@@ -19,6 +19,23 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 ---
 
+## 调用示例
+
+```text
+# 捕获当前 conversation 中已经验证的 solution
+/ce-compound
+
+# Session 包含多个已解决问题时，指定捕获重点
+/ce-compound the email digest race condition we fixed
+
+# 由 automation 或 standing instructions 调用时，以无人值守方式捕获
+/ce-compound mode:headless the verified caching fix
+```
+
+只有后续 decision 应由 caller 负责时才使用 headless mode；普通 interactive capture 仍可在修改 project guidance 前提问。
+
+---
+
 ## 问题
 
 多数 teams 会把同一个问题解决两次，有时甚至是同一个人，因为第一次 solution 只存在于 conversation、chat history 或 teammate 的脑中。常见 failure shapes：

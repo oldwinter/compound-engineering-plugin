@@ -8,6 +8,25 @@
 | **Invocation** | 手动（`/ce-sweep`）或定时（`/ce-sweep mode:headless`）；绝不 model-invoked |
 | **Position** | Around the loop，从 customer feedback 供给 `/lfg` 和 `ce-plan` |
 
+## 调用示例
+
+```text
+# 首次运行：配置 sources、approvals、state location 和 scheduling
+/ce-sweep
+
+# 后续运行：fetch、acknowledge、analyze、verify 并 reconcile plan
+/ce-sweep
+
+# Scheduled 或 unattended run：把 ambiguous decisions 延后到 plan
+/ce-sweep mode:headless
+
+# 重新进入 setup，增加或编辑 feedback sources
+/ce-sweep reconfigure
+
+# 通过 autonomous pipeline 交付已经 reconcile 的 open items
+/lfg docs/plans/feedback-sweep-plan.md
+```
+
 ## 问题
 
 Feedback triage 往往变成每个 repo 自己的 ritual：扫描上次之后的 Slack channel，react 表示已看到，下载并观看 screen recordings，判断某件事是否已经修复，再维护一份私有 open list。每个 project 都手工重建这套流程，state 活在某个人脑中或一次性文件里，而 “fixed” claims 常常没有证据就被相信。
@@ -25,17 +44,6 @@ Feedback triage 往往变成每个 repo 自己的 ritual：扫描上次之后的
 3. **Fix verification trusts only merge evidence.** Thread claims 永不关闭 item；只有 verified merge 到 default branch 才能关闭，并记录 merge SHA。
 4. **The plan is a view, not a log.** 一个稳定路径上的 rolling plan 每次 run reconcile：新 items append，verified-fixed items drain，human-owned notes region 保持 untouched。如果 `/lfg` 已经就地 enrich plan，sweep 会 archive 它并开始 fresh view，而不是 clobber execution state。
 5. **Headless-safe by contract.** `mode:headless` 永不 prompt：ambiguous product calls deferred 到 plan 的 outstanding questions；当 cursor 看起来错误导致 ack volume 过大时，circuit-breaker 会 defer，而不是 mass-react。
-
-## 快速示例
-
-```text
-/ce-sweep                    # first run: interactive setup (sources, approvals, state location, schedule offer)
-/ce-sweep                    # subsequent runs: sweep, acknowledge, analyze, verify, reconcile plan
-/ce-sweep mode:headless      # scheduled/unattended run - defers decisions into the plan
-/ce-sweep reconfigure        # re-enter setup to add or edit sources
-```
-
-Sweep 后：`/lfg docs/plans/feedback-sweep-plan.md` 会 ship open items。
 
 ## 何时使用
 

@@ -17,6 +17,25 @@
 
 ---
 
+## 调用示例
+
+```text
+# 分析完整的 Riffrec capture bundle
+/ce-riffrec-feedback-analysis riffrec-2026-05-04-checkout-flow.zip
+
+# 通过同一 router 分析视频、音频或文字 feedback
+/ce-riffrec-feedback-analysis demo.mp4
+/ce-riffrec-feedback-analysis voice-memo.m4a
+/ce-riffrec-feedback-analysis meeting-notes.md
+
+# 尚无录制内容时获取 capture setup 帮助
+/ce-riffrec-feedback-analysis how do I install and use Riffrec?
+```
+
+短小的单一问题输入会变成简洁 bug report；更长或包含多个问题的输入会产出 structured analysis，并 hand off 给 `ce-brainstorm`。
+
+---
+
 ## 问题
 
 Raw user-feedback recordings 不会自动变成 structured input：

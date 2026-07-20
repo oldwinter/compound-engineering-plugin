@@ -20,6 +20,24 @@
 
 ---
 
+## 调用示例
+
+```text
+# Dogfood 当前 feature branch 的 diff
+/ce-dogfood
+
+# Dogfood 指定 pull request 或 branch
+/ce-dogfood 847
+/ce-dogfood feature/new-dashboard
+
+# 复用已经在自定义端口运行的 dev server
+/ce-dogfood --port 5000
+```
+
+如果想要的是 bounded route test，而不是探索式、体验导向的 QA，请改用 `ce-test-browser`。
+
+---
+
 ## 问题
 
 Branch 可以通过 static review 和 unit tests，却在 browser 中 broken 或 rough。发现这些通常需要人工 click-through，而且常有这些问题：

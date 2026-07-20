@@ -19,6 +19,23 @@
 
 ---
 
+## 调用示例
+
+```text
+# 在 isolation 中开始新工作；会先检测现有 isolation
+/ce-worktree for the account-notifications feature
+
+# 隔离现有 branch，而不是创建新 branch
+/ce-worktree isolate feature/account-notifications
+
+# 隔离 pull request，且不扰动当前 checkout
+/ce-worktree isolate PR 1234
+```
+
+如果当前 checkout 已经是 isolated worktree，所有调用形式都会原地工作，不再嵌套另一个 worktree。
+
+---
+
 ## 问题
 
 要求 agent "make a worktree" 越来越常常是*错误默认值*，因为 agent 通常已经在 worktree 里：

@@ -30,6 +30,38 @@
 
 ---
 
+## 调用示例
+
+```text
+# 生成以证据为基础的 product 或 codebase opportunities
+/ce-ideate what should we improve in this repository?
+
+# 聚焦某个特定 product surface
+/ce-ideate onboarding improvements for new team administrators
+
+# 从 open GitHub issues 的模式中寻找 solution opportunities
+/ce-ideate what product opportunities do you see across our open GitHub issues?
+
+# 根据可访问 Linear project 中的 open work 展开 ideation
+/ce-ideate find solution opportunities across https://linear.app/acme/project/customer-onboarding-1234
+
+# 不指定主题，要求非显而易见的方向
+/ce-ideate surprise me
+
+# 把同一引擎用于非软件 ideation
+/ce-ideate names for a neighborhood coffee shop
+
+# 要求 Markdown，而不是默认的自包含 HTML artifact
+/ce-ideate developer experience improvements, and write the artifact in Markdown
+
+# 可重复 automation 中的等价简写
+/ce-ideate developer experience improvements output:md
+```
+
+候选项已经明确、需要判断时使用 `ce-pov`；需要确定某个候选项的 scope 时使用 `ce-brainstorm`。
+
+---
+
 ## 问题
 
 问 AI "what's worth exploring here?" 通常会得到：

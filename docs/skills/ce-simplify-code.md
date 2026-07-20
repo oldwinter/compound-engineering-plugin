@@ -23,6 +23,26 @@ The compound-engineering ideation chain is `/ce-ideate → /ce-brainstorm → /c
 
 ---
 
+## 调用示例
+
+```text
+# 在 review 或创建 PR 前简化当前 branch diff
+/ce-simplify-code
+
+# 把检查范围限制到单个文件
+/ce-simplify-code app/services/notification_dispatcher.rb
+
+# 仅靠 path 无法准确表达时，用自然语言描述 scope
+/ce-simplify-code the changes I made to NotificationDispatcher
+
+# 在 agent 刚生成的代码变成 review noise 前清理它
+/ce-simplify-code the authentication code from the last implementation step
+```
+
+用户指定的 scope 是 authoritative。无参数调用会依次优先选择 branch diff、staged 或 unstaged work，以及 conversation 中最近编辑的文件。
+
+---
+
 ## The Problem
 
 After writing a feature, the code usually has refinement debt that's easy to miss in the moment:

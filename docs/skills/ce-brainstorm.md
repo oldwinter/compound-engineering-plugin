@@ -28,6 +28,30 @@
 
 ---
 
+## 调用示例
+
+```text
+# 在承诺具体计划前，先塑造一个有挑战性的功能或项目
+/ce-brainstorm 为企业客户设计一个自助迁移平台
+
+# 把粗略的功能想法转成 requirements artifact
+/ce-brainstorm 增加一种让用户暂停通知的方式
+
+# 不预设解决方案，先探索问题
+/ce-brainstorm support agents 会因为非紧急事件在夜间被呼叫
+
+# 用同样的 scope 和 decision discipline 讨论非软件工作
+/ce-brainstorm 规划一场为期两天的客户顾问研讨会
+
+# 用自然语言要求输出自包含 HTML artifact
+/ce-brainstorm 增加账户级通知设置，并把 artifact 做成自包含 HTML 页面
+
+# 可重复 automation 中的等价简写
+/ce-brainstorm 增加账户级通知设置 output:html
+```
+
+---
+
 ## 问题
 
 从 vague idea 直接进入 implementation 会产生：

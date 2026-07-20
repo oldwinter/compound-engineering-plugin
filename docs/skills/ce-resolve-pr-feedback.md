@@ -19,6 +19,23 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 ---
 
+## 调用示例
+
+```text
+# 解决当前 branch PR 上所有新增 actionable feedback
+/ce-resolve-pr-feedback
+
+# 解决指定 PR 上所有新增 actionable feedback
+/ce-resolve-pr-feedback 1234
+
+# 只处理一个 review thread，其他 thread 保持不动
+/ce-resolve-pr-feedback https://github.com/acme/widgets/pull/1234#discussion_r5678901
+```
+
+需要 surgical follow-up 时使用 discussion URL。PR number 或无参数调用会运行完整 unresolved-feedback workflow。
+
+---
+
 ## 问题
 
 大规模处理 PR feedback 会以可预测方式失败：

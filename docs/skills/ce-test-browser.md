@@ -17,6 +17,24 @@
 
 ---
 
+## 调用示例
+
+```text
+# 测试当前 branch 影响的 routes；dev server 由用户负责
+/ce-test-browser
+
+# 从已在本地 checkout 的 PR 或 branch 推导 routes，并测试其 running server
+/ce-test-browser 847
+/ce-test-browser feature/new-dashboard
+
+# 在 manual mode 中连接自定义端口上的现有 server
+/ce-test-browser --port 5000
+```
+
+PR 和 branch 参数只选择用来推导 routes 的 diff，不会切换本地 checkout。调用前请 checkout 目标代码并启动其 server。没有 server 运行时，skill 会停止并给出正确的启动命令。
+
+---
+
 ## 问题
 
 End-to-end browser testing 常被工具碎片化，也很容易跳过：

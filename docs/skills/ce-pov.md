@@ -21,6 +21,35 @@
 
 ---
 
+## 调用示例
+
+```text
+# 判断 external tool 是否适合此 project
+/ce-pov should we adopt Drizzle ORM here?
+
+# 对文档给出 holistic bottom line
+# 需要逐项 findings 时改用 ce-doc-review
+/ce-pov what do you think of docs/plans/new-checkout.md?
+
+# 在已经提出的 approaches 之间选择
+/ce-pov for this service, should we use polling or webhooks?
+
+# 只提供 link，让 ce-pov 先提出可能的问题
+/ce-pov https://example.com/tool
+
+# 让 independent panel pressure-test 当前 conversation 中已有的 proposal
+/ce-pov oracle that proposal
+
+# 围绕明确问题请求 independent cross-model check
+/ce-pov ask an independent panel whether we should adopt this auth provider
+/ce-pov compare your take on docs/plans/new-checkout.md with Grok and Composer
+
+# 在 session 中途调用，获得针对当前方向、带 grounding 的 second opinion
+/ce-pov
+```
+
+---
+
 ## 问题
 
 Bare agent 被问 “what's your POV on X?” 时，会以可预测方式失败：
@@ -142,19 +171,7 @@ Skip `ce-pov` when:
 
 ## 单独使用
 
-- **Adoption**：`/ce-pov should we adopt Drizzle ORM here?`
-- **Migration**：`/ce-pov should we migrate off Moment to Temporal?`
-- **Selection**：`/ce-pov what should we use for feature flags?`
-- **Comparison**：`/ce-pov how does Biome compare to our ESLint + Prettier setup?`
-- **Exposure**：`/ce-pov does CVE-2026-1234 in tar affect us?`
-- **Revisit**：`/ce-pov we passed on tRPC last year — still the right call?`
-- **Bare link**：只贴 URL；intake gate 会提出 framings
-- **Warm**：在 brainstorm 中输入 `/ce-pov` 要 second opinion
-- **Document take**：`/ce-pov what do you think of docs/plans/new-checkout.md?`
-- **Approach set**：`/ce-pov for this service, should we use polling or webhooks?`
-- **Named cross-check**：`/ce-pov compare your take with Grok and Composer`
-- **Cursor default**：`/ce-pov compare your take with Cursor`
-- **Oracle**：`/ce-pov oracle: should we adopt this auth provider?`
+顶部示例覆盖了主要 subject shapes 和 panel routes。其他实用 prompts 包括 migration decision、bounded technology selection、CVE exposure、重新审视过去的 decision，以及 Cursor-default cross-check。
 
 ---
 

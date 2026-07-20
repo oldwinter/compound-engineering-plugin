@@ -21,6 +21,27 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 ---
 
+## 调用示例
+
+```text
+# 从 failing test 开始
+/ce-debug spec/models/notification_subscription_spec.rb
+
+# 从 issue 或 ticket 开始，并纳入完整 discussion
+/ce-debug https://github.com/acme/widgets/issues/1234
+/ce-debug ABC-456
+
+# 没有 ticket 时，从已观察到的 behavior 开始
+/ce-debug the digest job sends duplicate emails after a retry
+
+# Error 是最佳 evidence 时，先调用再粘贴 stack trace
+/ce-debug
+```
+
+描述可观察到的故障，而不是你猜测的 fix；该 skill 会在修改代码前验证 causal chain。
+
+---
+
 ## 问题
 
 常见 debugging anti-patterns：

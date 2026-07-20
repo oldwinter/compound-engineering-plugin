@@ -19,6 +19,26 @@
 
 ---
 
+## 调用示例
+
+```text
+# 从当前 project 推导已发布内容，并为默认 channels 起草文案
+/ce-promote
+
+# Repository context 不足时，直接提供已交付价值
+/ce-promote announce one-click CSV export for account reports
+
+# 要求同一 channel 的多个备选方案
+/ce-promote 3 tweet options for the new one-click CSV export
+
+# 起草协调一致的 cross-channel launch set
+/ce-promote a launch across X, LinkedIn, and email for one-click CSV export
+```
+
+需要特定 distribution shape 时请明确 channels；否则 skill 会选择一小组默认 channels。它只起草，绝不发布。
+
+---
+
 ## 问题
 
 Messaging 通常要等单独的 marketing pass，因此落后于 ship；而最了解 user value 的 engineer 往往不是写 copy 的人。当 announcement copy 临时写出来时，又容易带着 AI tells（"We're thrilled to announce..."）、hashtag spam，以及 implementation-speak，而不是用户价值。

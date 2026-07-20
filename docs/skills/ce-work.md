@@ -30,6 +30,21 @@
 
 ---
 
+## 调用示例
+
+```text
+# 执行指定的 implementation-ready plan，并负责 shipping tail
+/ce-work docs/plans/notification-mute.md
+
+# 不先写 plan，直接实现边界清晰的 small 或 medium task
+/ce-work extract a shared duration formatter from the notification views
+
+# 恢复 docs/plans 中最新的 eligible plan
+/ce-work
+```
+
+---
+
 ## 问题
 
 要求 agent "implement this plan" 常以可预测方式出错：

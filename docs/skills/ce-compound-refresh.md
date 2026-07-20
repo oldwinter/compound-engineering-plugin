@@ -15,7 +15,27 @@
 | 它做什么？ | 用当前 codebase review `docs/solutions/` 中的 learnings，并应用五种 outcomes 之一：Keep、Update、Consolidate、Replace、Delete |
 | 何时使用？ | Significant refactors 后；`ce-compound` 标记旧 doc 被 superseded 时；learnings 开始 drift 时；周期性 hygiene sweeps |
 | 产出什么？ | Updated、consolidated、replaced 或 deleted docs，外加 maintenance report |
-| 模式 | **Interactive**（default）和 **Autofix**（`mode:autofix`） |
+| 模式 | **Interactive**（default）和 **Headless**（`mode:headless`） |
+
+---
+
+## 调用示例
+
+```text
+# Refresh 与某个 module 或 topic 有关的 learnings
+/ce-compound-refresh authentication
+
+# Review 一篇已知的 learning 或 pattern 文档
+/ce-compound-refresh plugin-versioning-requirements
+
+# 没有 narrow scope 时，检查完整 learning set
+/ce-compound-refresh
+
+# 无需 interactive decisions，直接应用明确的维护操作
+/ce-compound-refresh authentication mode:headless
+```
+
+最好提供 topic、module、category 或 filename hint；无 scope 运行时必须先 triage 整个 learning set。
 
 ---
 
@@ -52,9 +72,9 @@ Skill 先调查（Phase 1 用当前 codebase 读取每篇 doc），再执行 doc
 
 多数 "review the docs" prompts 会塌缩成 "is this still right?"，答案也很模糊。Five-outcome model 强制每篇 doc 做具体 decision 和具体 action：Keep 不做事，Update 做 in-place fixes，Consolidate 合并并删除，Replace 写 successor，Delete 移除文件。每个 outcome 都有自己的 evidence bar。
 
-### 2. Two modes：Interactive default，`mode:autofix` 开启 Autofix
+### 2. Two modes：Interactive default，`mode:headless` 开启 Headless
 
-**Interactive**（default）对 ambiguous cases 一次问一个问题，并先给 recommendation。**Autofix** 在没有用户交互的情况下处理所有 docs，应用所有 unambiguous actions，并把 ambiguous cases 标为 stale（frontmatter 中加入 `status: stale`、`stale_reason`、`stale_date`），供之后 human review。Autofix report 有两个 sections：**Applied**（成功写入的内容）和 **Recommended**（无法应用的写入，例如 permission denied，带完整 rationale，方便 human 应用）。
+**Interactive**（default）对 ambiguous cases 一次问一个问题，并先给 recommendation。**Headless** 在没有用户交互的情况下处理所有 docs，应用所有 unambiguous actions，并把 ambiguous cases 标为 stale（frontmatter 中加入 `status: stale`、`stale_reason`、`stale_date`），供之后 human review。Headless report 有两个 sections：**Applied**（成功写入的内容）和 **Recommended**（无法应用的写入，例如 permission denied，带完整 rationale，方便 human 应用）。
 
 ### 3. Document-set analysis：捕获 per-doc review 看不到的问题
 
@@ -98,7 +118,7 @@ Deleted docs 会被删除，而不是移动到 `_archived/`。Git history 保留
 
 ### 10. Discoverability check 也会延续
 
-与 `ce-compound` 一样，每次 refresh 都检查 `AGENTS.md`/`CLAUDE.md` 是否暴露 `docs/solutions/`。每次都跑这个检查：knowledge 只有被 agents 找到才会 compound value。在 autofix mode 中，recommendation 会出现在 report 里，而不是被应用（autofix scope 是 doc maintenance，不是 project config）。
+与 `ce-compound` 一样，每次 refresh 都检查 `AGENTS.md`/`CLAUDE.md` 是否暴露 `docs/solutions/`。每次都跑这个检查：knowledge 只有被 agents 找到才会 compound value。在 headless mode 中，recommendation 会出现在 report 里，而不是被应用（headless scope 是 doc maintenance，不是 project config）。
 
 ---
 
@@ -158,7 +178,7 @@ Skill 直接通过 scope hint 调用，用于缩小 review：
 - **Module/component（模块 / 组件）**：`/ce-compound-refresh payments`
 - **Category（类别）**：`/ce-compound-refresh performance-issues`
 - **Pattern topic（模式主题）**：`/ce-compound-refresh critical-patterns`
-- **Autofix mode**：`/ce-compound-refresh auth mode:autofix`（无用户交互；report 是 deliverable）
+- **Headless mode**：`/ce-compound-refresh auth mode:headless`（无用户交互；report 是 deliverable）
 - **Broad sweep**（少见）：不带 scope 运行 `/ce-compound-refresh`，处理所有内容
 
 没有 scope hint 时，skill 会 discover candidate set，做 broad-scope triage（按 module/component 分组，识别 highest-impact clusters），并在 deep investigation 前推荐 starting area。
@@ -173,7 +193,7 @@ Skill 直接通过 scope hint 调用，用于缩小 review：
 | `<directory>` | 例如 `performance-issues`；按 category 缩小 |
 | `<filename slug>` | 例如 `plugin-versioning-requirements`；按 file 缩小 |
 | `<module/keyword>` | 例如 `auth`、`payments`；按 content/frontmatter 缩小 |
-| `mode:autofix` | 附加到任意参数；无用户交互运行，应用所有 unambiguous actions，将 ambiguous 标为 stale |
+| `mode:headless` | 附加到任意参数；无用户交互运行，应用所有 unambiguous actions，将 ambiguous 标为 stale |
 
 ---
 
@@ -185,11 +205,11 @@ Update 修复 drift，同时保留 core solution（renamed file、moved class、
 **为什么 skill 不问 code changes 是否 intentional？**
 Stay-in-your-lane discipline。Skill 的职责是 doc accuracy：让 doc 匹配 current code。Code change 是对是错属于 code-review concern；如果用户认为 code 错了，那是另一个 workflow。
 
-**什么时候用 autofix mode？**
-用于 periodic sweeps、scheduled maintenance runs，或 large-scope reviews；这些场景里为每个问题停下来询问不现实。Autofix 会把 ambiguous cases 标为 stale，而不是错误解决，因此 deliverable 是 human 可 review 的 self-contained report。
+**什么时候用 headless mode？**
+用于 periodic sweeps、scheduled maintenance runs，或 large-scope reviews；这些场景里为每个问题停下来询问不现实。Headless mode 会把 ambiguous cases 标为 stale，而不是错误解决，因此 deliverable 是 human 可 review 的 self-contained report。
 
 **如果 skill 想 delete 一篇我认为应保留的 doc 怎么办？**
-Interactive mode 中，delete 前你会看到带 evidence 的 recommendation。拒绝后 doc 保留。Autofix mode 中 auto-delete safety conditions 很保守；substantive citations 会自动降级为 stale-marking。
+Interactive mode 中，delete 前你会看到带 evidence 的 recommendation。拒绝后 doc 保留。Headless mode 中 auto-delete safety conditions 很保守；substantive citations 会自动降级为 stale-marking。
 
 **为什么 delete，而不是 archive？**
 Archive folders 会积累并污染 search results，没人阅读，还会制造 "we'll come back to this" 的假象却没有实际行动。Git history 保留每个 deleted file。`git log --diff-filter=D -- docs/solutions/` 可以找到需要恢复的任何内容。

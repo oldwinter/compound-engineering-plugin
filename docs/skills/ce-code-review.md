@@ -19,6 +19,24 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 ---
 
+## 调用示例
+
+```text
+# 深度 review 当前 branch；相关 plan 和 session context 会自动发现
+/ce-code-review
+
+# Review 指定 PR，但不 checkout
+/ce-code-review https://github.com/acme/widgets/pull/1234
+
+# Review 当前 branch，并在此 checkout 中修复已验证 findings
+/ce-code-review review this branch and fix eligible findings locally
+
+# 完整 multi-agent review 没有必要时，要求更轻量的检查
+/ce-code-review give this branch a quick review
+```
+
+---
+
 ## 问题
 
 Generalist code review prompts 常以可预测方式塌缩：

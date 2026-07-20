@@ -20,6 +20,24 @@
 
 ---
 
+## 调用示例
+
+```text
+# 最常见：先确定有挑战性功能的 requirements，再基于该 context 交付
+/ce-brainstorm design account-level notification controls for enterprise teams
+/lfg
+
+# 直接交付边界已经很清晰的软件任务
+/lfg add a CSV export button to the account reports page
+
+# 在 customer items 对齐后，交付现有 feedback-sweep plan
+/lfg docs/plans/feedback-sweep-plan.md
+```
+
+最常见的 handoff 是 `/ce-brainstorm` -> `/lfg`：brainstorm 确定 requirements 和 scenarios，`lfg` 再把这些 context 转成 plan，并一路推进 implementation、review、PR 和 CI。Task 已经同样清晰时可直接调用 `lfg`。希望自行检查或批准各 stage 时，请使用各个独立 skill。
+
+---
+
 ## 问题
 
 正常 CE workflow 刻意 staged：plan、work、simplify、review、ship。当你想检查每一步时这很有用；但任务边界清晰、希望 agent 一路 carry 时，handoff 太多。

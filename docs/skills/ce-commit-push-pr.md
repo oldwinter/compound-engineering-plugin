@@ -21,6 +21,24 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 ---
 
+## 调用示例
+
+```text
+# Commit 当前工作、push branch 并打开 PR
+/ce-commit-push-pr
+
+# 起草 PR description，但不实际应用
+/ce-commit-push-pr draft a PR description for this branch
+
+# 以特定重点重写当前 PR description
+/ce-commit-push-pr update the PR description to include benchmark results
+
+# 根据完整 branch scope 描述另一个 PR
+/ce-commit-push-pr https://github.com/acme/widgets/pull/1234
+```
+
+---
+
 ## 问题
 
 从 "code written" 到 "PR open" 本应一步完成，但常以可预测方式失败：

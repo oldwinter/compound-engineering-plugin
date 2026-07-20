@@ -30,6 +30,39 @@
 
 ---
 
+## 调用示例
+
+```text
+# 根据当前 conversation 制定 plan，包括已经完成的 ce-brainstorm
+/ce-plan
+
+# 把仅有 requirements 的 brainstorm artifact 丰富成 implementation-ready plan
+/ce-plan docs/plans/notification-mute.md
+
+# 直接根据 issue 或 PRD 制定 plan
+/ce-plan https://github.com/acme/widgets/issues/1234
+/ce-plan docs/product/account-notifications-prd.md
+
+# 从清晰的粗略想法启动 planning
+/ce-plan add a background email digest at 8am UTC
+
+# 重新审视并深化现有 plan
+/ce-plan deepen docs/plans/auth-rewrite.md
+
+# 规划非软件的多步骤项目
+/ce-plan organize a two-day customer advisory workshop
+
+# 用自然语言要求输出自包含 HTML artifact
+/ce-plan turn the notification mute requirements into an implementation-ready plan and make it a self-contained HTML page
+
+# 可重复 automation 中的等价简写
+/ce-plan turn the notification mute requirements into an implementation-ready plan output:html
+```
+
+Product shape 尚未确定时先使用 `ce-brainstorm`；预期 outcome 已经清楚时，direct planning 效果最好。
+
+---
+
 ## 问题
 
 Humans（或没有 structure 的 AI）写的 plans 往往以可预测方式失败：

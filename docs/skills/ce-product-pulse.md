@@ -19,6 +19,26 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 ---
 
+## 调用示例
+
+```text
+# 使用已配置的默认窗口；未配置时使用 24 小时
+/ce-product-pulse
+
+# Review 一周窗口
+/ce-product-pulse 7d
+
+# 运行较窄的 launch check，同时仍考虑 ingestion delay
+/ce-product-pulse 1h
+
+# 重新运行 source 与 metric setup interview
+/ce-product-pulse reconfigure
+```
+
+选择能回答问题的最短窗口：launch check 和每周 operating review 不应使用同一时间跨度。
+
+---
+
 ## 问题
 
 多数 "how are we doing?" reports 以可预测方式失败：

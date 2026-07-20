@@ -19,6 +19,18 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 ---
 
+## 调用示例
+
+```text
+# 以 interactive 方式 review 指定 requirements 或 plan 文档
+/ce-doc-review docs/plans/notification-mute.md
+
+# 让 skill 查找最新的 planning 文档
+/ce-doc-review
+```
+
+---
+
 ## 问题
 
 Document review 比 code review 在几个方面更难：
