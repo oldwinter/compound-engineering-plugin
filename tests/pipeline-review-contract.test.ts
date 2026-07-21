@@ -6,6 +6,12 @@ async function readRepoFile(relativePath: string): Promise<string> {
   return readFile(path.join(process.cwd(), relativePath), "utf8")
 }
 
+async function readCeWorkImplementationContract(): Promise<string> {
+  const skill = await readRepoFile("skills/ce-work/SKILL.md")
+  const implementationLoop = await readRepoFile("skills/ce-work/references/implementation-loop.md").catch(() => "")
+  return `${skill}\n${implementationLoop}`
+}
+
 describe("ce-work review contract", () => {
   test("requires code review before shipping", async () => {
     const content = await readRepoFile("skills/ce-work/SKILL.md")
@@ -62,15 +68,14 @@ describe("ce-work review contract", () => {
   })
 
   test("includes per-task testing deliberation in execution loop", async () => {
-    const content = await readRepoFile("skills/ce-work/SKILL.md")
+    const content = await readCeWorkImplementationContract()
 
     // Testing deliberation exists in the execution loop
-    expect(content).toContain("Assess testing coverage")
+    expect(content).toContain("评估 testing coverage")
 
-    // Deliberation is between "Run tests after changes" and "Mark task as completed"
-    const runTestsIdx = content.indexOf("Run tests after changes")
-    const assessIdx = content.indexOf("Assess testing coverage")
-    const markDoneIdx = content.indexOf("Mark task as completed")
+    const runTestsIdx = content.indexOf("修改后运行 tests")
+    const assessIdx = content.indexOf("评估 testing coverage")
+    const markDoneIdx = content.indexOf("将 task 标为 completed")
     expect(runTestsIdx).toBeLessThan(assessIdx)
     expect(assessIdx).toBeLessThan(markDoneIdx)
   })
@@ -172,11 +177,11 @@ describe("ce-plan testing contract", () => {
 
 describe("ce-work testing evidence contract", () => {
   test("requires evidence strategy before behavior changes and evidence in return-to-caller", async () => {
-    const content = await readRepoFile("skills/ce-work/SKILL.md")
+    const content = await readCeWorkImplementationContract()
 
-    expect(content).toContain("Choose the evidence strategy for this task before changing behavior")
-    expect(content).toContain("default to test-first or characterization-first")
-    expect(content).toContain("Do not add a duplicate regression test")
+    expect(content).toContain("在改变 behavior 前为 task 选择 evidence strategy")
+    expect(content).toContain("默认 test-first 或 characterization-first")
+    expect(content).toContain("不要新增重复 regression test")
     expect(content).toContain("verification_evidence")
     expect(content).toContain("existing_tests_inspected")
     expect(content).toContain("Return `status: complete` only when behavior-bearing work has verification evidence")
@@ -196,9 +201,9 @@ describe("verification_evidence seam parity (ce-work <-> lfg)", () => {
   const EVIDENCE_FACTS: Array<{ fact: string; ceWork: string; lfg: string }> = [
     { fact: "field name", ceWork: "verification_evidence", lfg: "verification_evidence" },
     { fact: "behavior-change signal", ceWork: "behavior_changed", lfg: "behavior_change: true" },
-    { fact: "existing tests inspected", ceWork: "existing_tests_inspected", lfg: "existing tests inspected" },
-    { fact: "tests added/changed", ceWork: "tests_added_or_changed", lfg: "tests added/changed" },
-    { fact: "red/characterization evidence", ceWork: "red failure or characterization", lfg: "red failure or characterization" },
+    { fact: "existing tests inspected", ceWork: "existing_tests_inspected", lfg: "检查过的 existing tests" },
+    { fact: "tests added/changed", ceWork: "tests_added_or_changed", lfg: "添加/修改" },
+    { fact: "red/characterization evidence", ceWork: "red failure or characterization", lfg: "red failure 或 characterization evidence" },
     { fact: "verification run", ceWork: "verification commands/results", lfg: "verification run" },
     { fact: "deliberate exception", ceWork: "exception reason", lfg: "deliberate test exception" },
   ]
@@ -233,7 +238,7 @@ describe("verification_evidence seam parity (ce-work <-> lfg)", () => {
     // Scope to the step-2 gate block, between invoking ce-work and step 3.
     const gate = sliceSection(
       lfg,
-      "2. Invoke the `ce-work` skill with `mode:return-to-caller",
+      "2. 没有 scalar transient carrier 时，用 `mode:return-to-caller",
       "3. Invoke the `ce-simplify-code`"
     )
 
@@ -242,26 +247,83 @@ describe("verification_evidence seam parity (ce-work <-> lfg)", () => {
     }
 
     // The gate only demands evidence when behavior changed, and defers test-strategy to ce-work.
-    expect(gate).toContain("When `behavior_change: true`, also require `verification_evidence`")
-    expect(gate).toContain("Do NOT decide the test strategy inside LFG")
+    expect(gate).toContain("当 `behavior_change: true` 时，还要要求 `verification_evidence`")
+    expect(gate).toContain("不要在 LFG 内决定 test strategy")
   })
 
   test("lfg retries ce-work exactly once for evidence, then blocks rather than ships", async () => {
     const lfg = await readRepoFile("skills/lfg/SKILL.md")
     const gate = sliceSection(
       lfg,
-      "2. Invoke the `ce-work` skill with `mode:return-to-caller",
+      "2. 没有 scalar transient carrier 时，用 `mode:return-to-caller",
       "3. Invoke the `ce-simplify-code`"
     )
 
-    // One-shot retry on the same plan path (idempotency backfill), no user prompt.
-    expect(gate).toContain(
-      "invoke `ce-work` one more time with the same `mode:return-to-caller <plan-path-from-step-1>` argument"
-    )
-    expect(gate).toContain("Do not prompt the user and do not alter the plan path argument")
+    // One-shot recovery on the same plan and engine binding, with the returned durable run id.
+    expect(gate).toContain("以 recovery mode 再调用 `ce-work` 一次")
+    expect(gate).toContain("`implementation_engine:<compact-json>` carrier 时复用")
+    expect(gate).toContain("implementation_run:<safe-id>")
+    expect(gate).toContain("不 prompt，不改变 plan path/engine carrier")
+    expect(gate).toContain("`actual_route` 为 `native` 且 `run_id` 为 `null`")
+    expect(gate).toContain("不带 `implementation_run:` 重复 original ce-work invocation 一次")
+    expect(gate).toContain("Non-native return 没有 safe run id 时保持 blocked")
     // Second still-missing return stops blocked instead of continuing to ship.
-    expect(gate).toContain("stop as blocked and report the missing fields")
-    expect(gate).toContain("instead of continuing to simplify/review/ship")
+    expect(gate).toContain("blocked stop 并报告 missing fields")
+    expect(gate).toContain("不继续 simplify/review/ship")
+  })
+})
+
+describe("cross-model execution receipt seam parity (ce-work <-> lfg)", () => {
+  const ROUTE_RECEIPT_FIELDS = [
+    "implementation_engine_binding",
+    "requested_route",
+    "actual_route",
+    "requested_model",
+    "actual_model",
+    "fallback_reason",
+    "run_id",
+    "unit_receipts",
+    "plan_checkpoint",
+    "blockers",
+    "recovery_path",
+  ]
+
+  function sliceSection(content: string, startAnchor: string, endAnchor: string): string {
+    const start = content.indexOf(startAnchor)
+    expect(start, `start anchor not found: ${startAnchor}`).toBeGreaterThanOrEqual(0)
+    const end = content.indexOf(endAnchor, start + startAnchor.length)
+    expect(end, `end anchor not found: ${endAnchor}`).toBeGreaterThan(start)
+    return content.slice(start, end)
+  }
+
+  test("lfg requires every route receipt exposed by ce-work", async () => {
+    const ceWork = await readRepoFile("skills/ce-work/SKILL.md")
+    const lfg = await readRepoFile("skills/lfg/SKILL.md")
+    const returned = sliceSection(ceWork, "## Return-to-Caller Mode", "Engine selection (")
+    const gate = sliceSection(
+      lfg,
+      "2. 没有 scalar transient carrier 时，用 `mode:return-to-caller",
+      "3. Invoke the `ce-simplify-code`",
+    )
+
+    for (const field of ROUTE_RECEIPT_FIELDS) {
+      expect(returned, `ce-work must return ${field}`).toContain(`\`${field}\``)
+      expect(gate, `lfg must gate on ${field}`).toContain(`\`${field}\``)
+    }
+  })
+
+  test("lfg keeps the binding out of plan and review inputs", async () => {
+    const lfg = await readRepoFile("skills/lfg/SKILL.md")
+    const carrier = sliceSection(
+      lfg,
+      "## Implementation-only routing carrier",
+      "1. 用上述 sanitized feature request 调用 `ce-plan`",
+    )
+    expect(carrier).toContain("移除 implementation-routing directive")
+    expect(carrier).toContain("绝不将")
+    expect(carrier).toContain("`ce-plan`")
+    expect(carrier).toContain("`ce-code-review`")
+    expect(carrier).toContain("product content")
   })
 })
 

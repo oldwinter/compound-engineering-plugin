@@ -1,7 +1,7 @@
 ---
 name: lfg
 description: "Run the full autonomous shipping pipeline end-to-end, hands-off with no check-ins: plan, implement, review and fix, commit, push a branch, open a PR, and watch CI to green. Use only when the user explicitly asks to build or ship something autonomously all the way to an open PR, or invokes lfg directly — it pushes and opens a PR without stopping. Not for in-the-loop work where the user reviews each step: use ce-plan to plan, ce-work to implement a plan, ce-debug to fix a bug, or ce-commit-push-pr to commit and open a PR for existing changes."
-argument-hint: "[feature description]"
+argument-hint: "[feature description；可选：把 implementation 指定给某个 model 或 harness]"
 ---
 
 CRITICAL: You MUST execute every step below IN ORDER. Do NOT skip any required step. Do NOT jump ahead to coding or implementation. The plan phase (step 1) MUST be completed and verified BEFORE any work begins. Violating this order produces bad output.
@@ -14,7 +14,22 @@ When invoking any skill referenced below, resolve its name against the available
 
 Before step 1, use the platform's task-tracking capability when available to publish a short stage-level view of the remaining pipeline. Derive it from the user-meaningful outcomes below rather than mirroring all ten steps or exposing internal gates. Before invoking a child skill, replace or clear LFG's view so only the child skill's task surface is visible; after it returns, recreate or refresh LFG's remaining pipeline work before invoking the next child. Add conditional work only when its gate fires. If no task-tracking capability is available, continue normally without simulating a task list in chat.
 
-1. Invoke the `ce-plan` skill with the arguments you were invoked with.
+## Implementation-only routing carrier（仅实现路由载体）
+
+Step 1 前，判断 invoking conversation 是否表达了**将 implementation stage 分配给其他 harness/model 的 semantic intent**。这依赖 judgment，不做 keyword/prompt-token matching：“use Codex for implementation”这类 explicit instruction 会创建 binding；feature content、quoted material、comparison text 或 filename 中普通提到 Codex/Composer/其他 model 不会。Default 为 preference；“only use Composer for implementation”语义上拒绝 native fallback，因此是 requirement-strength，但应根据完整 instruction 推断，不依赖单一词。
+
+Intent 命名一个 implementation candidate 时，从进入 planning 的 feature request 中移除 implementation-routing directive，并保留恰好含以下四个 fields 的 transient `implementation_engine` object：
+
+- `mode`：`prefer` 或 `require`
+- `target`：`codex`、`claude`、`grok`、`cursor` 或 `composer`
+- `model`：明确指定的 model，否则为 `null`
+- `source`：caller-visible provenance，用于标识当前 LFG instruction
+
+若 current instruction 命名 ordered fallback list，不要 truncate 为 scalar carrier。仍从 product request 移除 directive，将完整 ordered assignment 保留为 current-task implementation intent，不传 `implementation_engine:` object。在 CE Work seam，still-active current-task assignment 优先于 config，并按顺序 normalize/preflight。这是 stage-scoped context，不是 plan content；host 无法跨 skill invocation 保留时，以 routing-carrier blocker 停止，不要静默丢 later candidates。
+
+绝不将该 object/removed directive 传给 `ce-plan`、`ce-doc-review`、`ce-code-review`、settled-decisions brief 或任何 planning/review input。Carrier 是 stage-scoped authority，不是 product content/settled product decision。Sanitized feature request 其余部分不变。不要在这里根据 standing config 构建 carrier：无 explicit implementation binding 时，由 `ce-work` 解析 still-applicable session/project intent 与 standing per-checkout config。
+
+1. 用上述 sanitized feature request 调用 `ce-plan`；无 implementation directive 时使用 unchanged invoked arguments。
 
    Before invoking, compose a **settled-decisions brief** from the invoking conversation and pass it with those arguments: direction (1-2 lines); settled decisions, each with four required fields — the decision, its provenance class (`user-directed` or `user-approved`), the rejected alternative, and a one-line reason; open areas; and a standing report-conflicts line. An entry whose rejected alternative cannot be stated demotes to a directive or open area. Scope topically — only decisions about the feature being shipped; when in doubt, demote (re-litigation is the safe floor; importing stale settlements is not). If the conversation contains no settled decisions, skip composition entirely and invoke `ce-plan` exactly as above — no empty-brief ceremony. The brief is transient: once ce-plan writes the plan, the plan's labeled KTDs are canonical.
 
@@ -22,11 +37,19 @@ Before step 1, use the platform's task-tracking capability when available to pub
 
    Read the plan metadata before continuing. If the plan has `artifact_contract: ce-unified-plan/v1`, proceed only when it has `artifact_readiness: implementation-ready` and `execution: code`. Stop the pipeline for `artifact_readiness: requirements-only`, any unrecognized readiness value, `execution: knowledge-work`, approach-plan outputs, answer-seeking/universal outputs, or invalid progress-like readiness values. LFG never launches `/goal` directly; when goal-mode or dynamic workflows are appropriate, `ce-work` owns that implementation engine choice and must return control to LFG afterward.
 
-2. Invoke the `ce-work` skill with `mode:return-to-caller <plan-path-from-step-1>`.
+2. 没有 scalar transient carrier 时，用 `mode:return-to-caller <plan-path-from-step-1>` 调用 `ce-work`，包括 context 中 retained ordered current-task assignment 仍 active 的情况。有 scalar carrier 时，使用 exact string-host form `mode:return-to-caller implementation_engine:<compact-json> <plan-path-from-step-1>`。
 
-   GATE: STOP. Verify that implementation work was performed - files were created or modified beyond the plan. Read the structured return and require `status: complete`, the same plan path, changed files, U-IDs attempted/completed when present, verification results, blocker list, behavior-change signal, and `standalone_shipping_skipped: true`. When `behavior_change: true`, also require `verification_evidence` that names the relevant units/tasks, existing tests inspected, tests added/changed or used unchanged, red failure or characterization evidence when applicable, verification run, and any deliberate test exception. Do NOT decide the test strategy inside LFG; the evidence is ce-work's contract. Also read `settled_decision_conflicts` from the return: blocker-routed entries arrive as `status: blocked` and stop the pipeline; **record any proceeded-and-flagged entries** — they must reach step 6's durable residual record and step 8's PR-description context, since later review may not rediscover them.
+   Scalar transient carrier 存在时，将 exact `implementation_engine.{mode,target,model,source}` data 作为 compact JSON 放在 `implementation_engine:` prefix 后（例如 `implementation_engine:{"mode":"prefer","target":"codex","model":null,"source":"lfg-current-turn"}`）。这是 portable string envelope 中 structured caller data，不属于 plan path/implementation prompt。不存在时不传 empty carrier。`ce-work` 先解析 retained ordered current-task assignment，否则解析 applicable session/project intent 与 standing per-checkout config。LFG 是 automatic、headless caller：绝不 prompt 以弱化 requirement-strength route。
 
-   If `behavior_change: true` but `verification_evidence` is missing or too vague to tell how behavior was protected, invoke `ce-work` one more time with the same `mode:return-to-caller <plan-path-from-step-1>` argument. Do not prompt the user and do not alter the plan path argument. The retry relies on ce-work's idempotency path to inspect the already-implemented work, fill the missing evidence, and return without reimplementing. If the second return still lacks coherent verification evidence, stop as blocked and report the missing fields instead of continuing to simplify/review/ship.
+   Optional `implementation_run:<safe-id>` carrier 仅用于 recovery。Initial step-2 call 绝不包含。下方唯一 evidence-reconciliation recovery 中，若 engine carrier 曾存在，run carrier 放在同一 engine carrier 之后、unchanged plan path 之前：`mode:return-to-caller implementation_run:<safe-id> <plan-path-from-step-1>` 或 `mode:return-to-caller implementation_engine:<compact-json> implementation_run:<safe-id> <plan-path-from-step-1>`。Safe id 匹配 `^[A-Za-z0-9._-]{1,128}$` 且至少一个非句点字符。Malformed/duplicate run/engine carrier 应拒绝，不启动 work。
+
+   GATE: STOP。继续前读取 structured return。`status: blocked`/`status: failed` 会停止 pipeline。Unavailable `require` route 尤其不得 prompt、fallback 或启动 native work。Completed `prefer` fallback 在向用户醒目披露 requested/actual route/model 与 `fallback_reason` 后，可以恰好继续 step 3 一次；fallback 不是重新调用 implementation 的理由。
+
+   对 `status: complete`，验证 implementation work 确实发生：plan 之外有 files created/modified。要求 same plan path、changed files、存在时 attempted/completed U-IDs、verification results、behavior-change signal、`standalone_shipping_skipped: true`。还要求 route-aware receipt fields：`implementation_engine_binding`、`requested_route`、`actual_route`、`requested_model`、`actual_model`、`fallback_reason`、`run_id`、`unit_receipts`、`plan_checkpoint`、`blockers`、`recovery_path`。即使 native execution 令部分值为 `null`，仍都必需；它们共同携带 binding provenance、requested/actual identity、fallback、durable run、per-unit process/integration/verification/commit state、checkpoint disclosure、blockers、recovery。Resumed return 必须携带同一 `run_id`；绝不能把 resume 当成启动 new unit/第二条 LFG tail 的许可。
+
+   当 `behavior_change: true` 时，还要要求 `verification_evidence`，其中点明相关 units/tasks、检查过的 existing tests、添加/修改或原样使用的 tests、适用时的 red failure 或 characterization evidence、verification run，以及任何 deliberate test exception。不要在 LFG 内决定 test strategy；该 evidence 属于 ce-work contract。还要读取返回中的 `settled_decision_conflicts`：路由到 blocker 的 entries 以 `status: blocked` 到达并停止 pipeline；**记录所有 proceeded-and-flagged entries**，因为后续 review 可能不会重新发现它们，它们必须进入 step 6 的 durable residual record 和 step 8 的 PR-description context。
+
+   `behavior_change: true` 但 `verification_evidence` 缺失/过于含糊时，以 recovery mode 再调用 `ce-work` 一次。曾有 `implementation_engine:<compact-json>` carrier 时复用，并保持 same plan path。`run_id` safe/non-null 时，增加第一份 return exact value 的 `implementation_run:<safe-id>`。`actual_route` 为 `native` 且 `run_id` 为 `null` 时，不带 `implementation_run:` 重复 original ce-work invocation 一次，保留既有 native idempotency/evidence-reconciliation path。Non-native return 没有 safe run id 时保持 blocked，不尝试 discovery/第二次 implementation。不 prompt，不改变 plan path/engine carrier；这是 evidence reconciliation，不是 fresh dispatch。Recovery 依赖 ce-work reconciliation path 检查已实现 work、补 missing evidence，并不 reimplement 地返回。Second return 仍缺 coherent verification evidence 时，blocked stop 并报告 missing fields，不继续 simplify/review/ship。
 
 3. Invoke the `ce-simplify-code` skill on the branch diff.
 
@@ -88,7 +111,11 @@ Before step 1, use the platform's task-tracking capability when available to pub
 
     If step 8 recorded a `New concepts:` trailer, first echo one line per concept: `New concept introduced: <name> — run /ce-explain <name> to go deeper.`
 
-    If an open PR exists, add one line pointing the user to the interactive watch-to-merge (pipeline mode stopped at "CI decided," not "merged"): `PR is moving — run /ce-babysit-pr <pr-url> to watch it through review to merge.` Then output the DONE promise.
+    如果存在 open PR，增加一行引导用户使用 interactive watch-to-merge（pipeline mode 停在 "CI decided"，不是 "merged"）：`PR 正在推进；运行 /ce-babysit-pr <pr-url>，持续跟进 review 直至 merge。`
+
+    DONE promise 前，检查 step 1 canonical plan 是否有 semantic role `work-relationships`。该 role 存在，或 older unmarked Product Contract 看似命名 plan-owned area、future separately planned areas 及其 relationships 时，加载 `references/next-work-handoff.md`；reference 负责谨慎 legacy semantic fallback、candidate selection、opt-in offer contract。不要匹配 exact visible heading、把 ordinary non-goals 当 future work，或在用户明确接受 offer 前调用 `ce-handoff`。两种 semantic signal 都不存在时，不加载 reference，也不做 next-work offer。
+
+    然后输出 DONE promise。
 
     **中文说明：** `New concepts:`、`New concept introduced:` 和 `run /ce-explain` 是与上游 skill 对齐的精确 seam contract，必须保持原样。
 

@@ -61,9 +61,16 @@ and Codex with fake peer CLIs first on PATH.
    <model>; serving model unverified on this route." `mode:agent` emits no
    user-facing prose but retains the worker's stderr audit record.
 
+9. **Oversized diffs 无需巨型 prompt 即可恢复。** 超过 inline token 或 file-count
+   限制的 fixture 只向 peer 发送 orchestrator 的精简 semantic review map 和私有
+   exact-diff path，绝不发送完整 diff。Worker 不拆分 semantic shards，也不臆造
+   risk divisions；这些由 orchestrator 负责，而 adversarial agent 会读取有边界的
+   ranges 并进一步收窄，而不是只返回 progress note 或静默省略该 pass。正常大小的
+   fixture 仍使用 direct diff path。
+
 ## Pass criteria
 
-All eight cases pass on the current on-disk source on Claude Code and Codex. The
+所有九个 cases 都要在 Claude Code 和 Codex 的当前 on-disk source 上通过。该
 negative activation cases launch no peer, the fixed-route cases perform no
 worker-internal recipient fallback, and only `independence_verified: true`
 artifacts can promote agreement.

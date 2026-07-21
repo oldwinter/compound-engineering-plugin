@@ -25,6 +25,14 @@ GH_HOST=<host> bash "$SKILL_DIR/scripts/get-thread-for-comment" PR_NUMBER COMMEN
 
 This fetches thread IDs and their first comment IDs (minimal fields, no bodies) and returns the matching thread with full comment details.
 
+**Step 3** -- 开始任何工作前，检查自己是否有尚未提交的 review。当你持有这种 review 时，发布的 reply 会被吸收到该 draft：调用会像成功一样返回 comment ID 和 URL，但 draft 提交前 reviewer 看不到任何内容。Full Mode 可从 `get-pr-comments` 直接获得此信息；targeted mode 不会调用该 script，因此要直接检查（PENDING reviews 只对 author 可见，所以任何命中都属于你）：
+```bash
+GH_HOST=<host> gh api --paginate repos/OWNER/REPO/pulls/PR_NUMBER/reviews --jq '.[] | select(.state == "PENDING") | .id'
+```
+必须使用 `--paginate`：该 endpoint 按时间顺序排列，每页 30 项，因此 draft 可能排到第 1 页之后。输出 IDs 而不是 count；`--jq` 会逐页运行，因此 count 每页输出一个数字，而 IDs 只会依次拼接，并在没有 draft 时保持为空。（`--slurp` 不可用；与 `--jq` 同时使用时 `gh` 会拒绝。）
+
+如果输出了任何内容，就停止。告诉用户该 PR 上有一个尚未提交的 review，必须先提交或丢弃，skill 才能回复。不要自行提交或丢弃；draft review 是尚未发送的人工内容。
+
 ## 2. Judge, Fix, Reply, Resolve
 
 **Judge first (the gate).** Apply the rubric in `references/evaluation-rubric.md` to this one thread, in your own context. Account for `isOutdated` and the location fields (`line`, `originalLine`, `startLine`, `originalStartLine`) -- targeted threads can be outdated too and need the same relocation handling. The cross-item reasoning in the rubric is a no-op for a single thread, but the read-depth and divert logic apply in full: deep-read (callers, invariants, `git blame`/PR rationale for author intent) before accepting a contestable finding or overriding code that looks deliberate. This is the legitimacy check — don't fix on the reviewer's authority alone.

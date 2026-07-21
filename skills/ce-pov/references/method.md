@@ -61,7 +61,7 @@ Name the few strengths and risks that actually determine the bottom line; do not
 
 ## Approach-set position contract
 
-An approach-set POV judges only the options the user or conversation supplied; generating a new option field belongs to `ce-ideate` or `ce-brainstorm`. Lead with a plain-language **Position**. Name each supplied approach by a short distinguishing gloss on first mention in the Position and Tradeoffs — never a bare label like "Option A" that only the original list defines — so the block stands alone for a reader who never saw that list. Then state:
+Approach-set POV 只判断用户或 conversation 提供的 options；生成新的 option field 属于 `ce-ideate` 或 `ce-brainstorm`。先用直白语言给出 **Position**，然后说明：
 
 `Why` · `Tradeoffs by supplied approach` · `Verified facts (project + load-bearing external claims, kept distinct)` · `Conversation hypotheses (unverified — warm only)` · `Conditions` · `Handoff (optional separate continuation)`
 
@@ -69,7 +69,13 @@ Choose an approach and recommend it when verified project facts and the material
 
 ## Output economy
 
-`ce-pov` writes no document, so the chat block *is* the whole deliverable — make it a tight POV, not a transcript of the investigation. Lead with the grade for an external-adoption question and with the bottom line or position for the other shapes. Keep each schema field to one line or a few bullets. The `Verified facts` field **cites** from the dossiers (`file:line`, issue/PR number, url) rather than reproducing them, and the dossiers themselves are never printed to chat. For adoption subjects, length is governed by the tier, not by how much was found:
+`ce-pov` 不写文档，因此 chat block *就是*完整 deliverable；把它写成精炼 POV，而不是 investigation transcript。
+
+External-adoption question 先给 grade；其他形状先给 bottom line 或 position。每个 schema field 保持一行或少量 bullets。`Verified facts` field 从 dossiers **引用**（`file:line`、issue/PR number、url），而不是复述内容；dossiers 本身绝不打印到 chat。
+
+**说明 identifiers 指代的内容。** 当 POV 引用由 subject 而非 reader 定义的 identifier，例如用户提供的 option label "Option A"，或文档 requirement / unit ID `R8`、`U3`，首次出现时要配上简短、可区分的解释（使用 `R8 (elevated-call read access)`，而不是 bare `R8`），使从未见过 option list 或未打开文档的读者也能独立理解 block。保留 identifier；解释保持几个词。从已经在 context 中的材料解析解释，例如用户提供的 list 或 `ce-pov` 读取的文档。该规则适用于整个 delivered block，包括 reconciliation 中纳入的任何 peer position：peer 写了 bare label，不代表可以原样转述。
+
+对于 adoption subjects，长度由 tier 决定，而不是由找到多少内容决定：
 
 - **Tier 1** — one screen: the grade, the incumbent, 1-2 project + 1-2 external cited facts, the conditions, the handoff. No reversal trigger, no alternatives walk-through.
 - **Tier 2/3** — fuller (alternatives, the reversal trigger, deeper conditions), but still leads with the grade and keeps evidence to cited bullets, never walls of quoted text.

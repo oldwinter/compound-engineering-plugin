@@ -16,7 +16,7 @@
 | 何时使用？ | 已 ready for autonomous implementation 的 software tasks |
 | 产出什么？ | Code changes、commits、通常还有 PR；无法完全解决时留下 durable residual notes |
 | 下一步 | Review PR，ready 后 merge；若有 reusable learning，运行 `/ce-compound` 捕获 |
-| Distinguishing | Hard ordering gates、return-to-caller execution、review-fix persistence、browser test pass、bounded CI autofix loop |
+| Distinguishing | Hard ordering gates、implementation-only cross-model routing、return-to-caller execution、review-fix persistence、browser test pass、bounded CI autofix loop |
 
 ---
 
@@ -48,19 +48,22 @@
 
 `lfg` 将 sequence 做成 explicit and gated：
 
-- Step 1 从 conversation 组合一份 transient settled-decisions brief：每个 decision 都带 class、rejected alternative 和 reason，并按 feature topic 限定 scope；它会把 brief 交给 `/ce-plan`，确保用户已作出的 decisions 被携带而不是重问。没有 settled decision 时完全跳过 brief
+- Step 1 从 conversation 组合 transient settled-decisions brief：每个 decision 都带 class、rejected alternative 和 reason，并按 feature topic 限定 scope；将 brief 交给 `/ce-plan`，确保用户已作出的 decisions 被携带而不是重问。没有 settled decision 时完全跳过 brief
 - `/ce-plan` 必须在 work 开始前产出 implementation-ready code plan
-- `/ce-work` 以 return-to-caller mode 运行，使 pipeline 在 implementation 后重新获得控制
-- Behavior-changing implementation 必须从 `/ce-work` 返回 verification evidence；若缺失，`lfg` 会重试 `/ce-work` 一次以补齐 evidence，然后 blocked stop，而不是盲目 ship
+- `/ce-work` 以 return-to-caller mode 运行，使 pipeline 在 implementation 后重新获得控制；requested implementation target 只跨这一 seam 携带
+- Behavior-changing implementation 必须从 `/ce-work` 返回 verification evidence；缺失时，`lfg` 会重试 `/ce-work` 一次补齐 evidence，然后 blocked stop，而不是盲目 ship
 - `/ce-simplify-code` 在 review 前运行，除非 change 是 docs-only 或 trivial
 - `/ce-code-review` 报告 findings，然后 `lfg` 应用 eligible fixes 并 commit
-- Residual review findings 会在 PR body 或 fallback tracked file 中持久化
+- Residual review findings 在 PR body 或 fallback tracked file 中持久化
 - `/ce-test-browser` 以 pipeline mode 运行
 - 有 remote 时，`/ce-commit-push-pr mode:pipeline branding:on` ship remaining changes，并显式标记 CE provenance
 - Open PR 上最多 watch CI 并 repair 三轮
-- Planning 或 review 暴露 invalidating settlement conflict 时，pipeline 会在 shipping 前停止，而不是静默覆盖已经达成的约定；不会阻断的 flagged conflicts 会成为 durable residuals，并进入 PR body
+- Planning/review 暴露 invalidating settlement conflict 时，pipeline 在 shipping 前停止，而不是静默覆盖已达成的约定；non-halting flagged conflicts 成为 durable residuals 并进入 PR body
+- Closeout 时，eligible multi-area plan 可以产出对下一个单独规划 area 的 justified recommendation；`lfg` 拥有该选择，并提供 opt-in `/ce-handoff`，而不是自动继续
 
 Pipeline 也有 local-only path：如果 repo 没有 git remote，就只在本地 commit，并跳过 push、PR creation 和 CI watch，而不是重试不可能的 network steps。
+
+Next-work offer 受 gate 控制：completed plan 必须明确描述一组更大的 separately planned work，且至少一个受支持 future area 尚未规划。Gate 通过后，`lfg` 根据 current evidence 选择并解释最佳 next area。只有你明确接受 offer 后才调用 `/ce-handoff`；该 handoff 用于 fresh session 将一个 coherent area brainstorm 成单独 requirements-only plan，不扩展或编辑刚 ship 的 plan。没有 eligible area 时，`lfg` 结束且不 offer。
 
 ---
 
@@ -99,6 +102,29 @@ Skip `lfg` when:
 
 Direct invocation 适合清晰 software tasks，但给 planner 的 product context 更少。
 
+## 只路由 Implementation Stage
+
+你可以让 `lfg` 使用另一个 model/harness author implementation，同时 `lfg` 保留 planning、review、PR creation 和 CI ownership：
+
+```text
+/lfg 使用 Codex 实施；添加 account-level notification mute settings
+/lfg 实施已确定的 plan，但只使用 Composer
+```
+
+`lfg` 从整条 instruction 识别 intent，而不是匹配单一 keyword。Planning 前从 product request 移除 routing direction；只在调用 `ce-work` 时，在 `mode:return-to-caller` 旁携带恰好包含 `mode`、`target`、`model`、`source` 的 transient object。String-only host 上，该 seam 为 `mode:return-to-caller implementation_engine:<compact-json> <plan-path>`；例如 `implementation_engine:{"mode":"prefer","target":"codex","model":null,"source":"lfg-current-turn"}`。Object 绝不会成为 plan content、settled product decision 或 review input（The object never becomes plan content）。Feature text、quoted material、comparison 或 filename 中普通 model mention 不激活 routing。
+
+Four-field carrier 刻意保持 scalar。若当前 LFG instruction 指定 ordered fallback list，LFG 将完整 list 保留为 stage-scoped current-task context，不传 truncated carrier；CE Work 按顺序解析并 preflight retained list。Host 无法跨 skill invocation 保留 current-task context 时，LFG 会 block，而不是静默丢失 later candidates。Standing ordered config 不需要 carrier，仍是建立 reusable matrix 最 portable 的方式。
+
+第一个示例是 preference-strength。若 work 开始前 Codex route unavailable，`ce-work` native implement，并返回 requested route、actual route/model、fallback reason；`lfg` 披露 fallback，继续唯一 shipping tail。第二个是 requirement-strength。由于 `lfg` 是 headless，required route unavailable 时直接 block，不询问或静默切到 native work。
+
+Target `cursor` 表示使用 configured default model 的 Cursor harness。Target `composer` 表示经 Cursor 请求 Composer-family model。Model pin 可选。Route substitution 保持在 requested target/model family 内并披露；fixed-recipient、unattended write adapter qualified 且 locally available 前不使用 route。Cross-model engine 的 launch floor 是至少一个真实 non-native route 通过 qualification matrix；failing candidates 保持 unavailable，不会变成 guessed production commands。
+
+Prompt 没有 implementation instruction 时，`lfg` 不传 empty binding。`ce-work` 先考虑 context 中 applicable session/project instructions，再考虑 gitignored per-checkout `work_engine_mode` 与 ordered `work_engine_preferences` list。每个 config candidate 指定 `harness` 与可选 `model`；省略则使用 harness configured default。Config `prefer` 在 automatic flow 中生效，只在 ordered candidates 用尽后 native fallback；config `require` 在没有 qualified candidate 时 block。Current-task implementation instruction 优先于这些 defaults。
+
+共享 config shape 及其与 harness-loaded instructions 的关系，参见 [Compound Engineering 配置](./configuration.md#implementation-routing)。
+
+Long external run 通过 `ce-work` return contract 保持 observable：run id、requested/actual identity、unit/job state、activity/elapsed time、checkpoint、verification/commit state、blockers、recovery path。若 `lfg` 为 reconcile missing verification evidence 重试一次，会使用同一 binding/run id；不会 dispatch implementation 或运行 shipping tail 两次。Egress disclosure、private run state、detached-worktree containment、transactional fold-in、timeouts、resume/reap/cleanup、fallback 与 parallel-wave behavior 参见 [`ce-work`](./ce-work.md#choose-the-implementation-author)。
+
 ---
 
 ## Reference
@@ -107,6 +133,7 @@ Direct invocation 适合清晰 software tasks，但给 planner 的 product conte
 |----------|--------|
 | _(empty)_ | 从当前 context plan，然后在 plan eligible 时运行 pipeline |
 | `<feature description>` | 将 description 传给 `/ce-plan`，然后运行 pipeline |
+| `<feature description + implementation assignment>` | 从 planning 移除 assignment，只将其作为 `prefer` 带给 `ce-work`；除非 instruction 明确要求该 target |
 
 Output：code changes、commits，通常还有 PR。没有 configured git remote 时，output 只有 local commits。如果 CI 在 bounded repair loop 后仍 red，unresolved failures 会在 run 结束前持久化记录。
 

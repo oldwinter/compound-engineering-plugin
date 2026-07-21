@@ -39,6 +39,8 @@ Brainstorm complete.
 
 Plan artifact: <absolute path to requirements-only unified plan>  # omit line if no artifact was created
 
+Planning 和 shipping 会把此 artifact 作为构建内容的定义。  # 未创建 artifact 时省略此行
+
 What would you like to do next? (Pick a number or describe what you want.)
 ```
 

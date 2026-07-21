@@ -37,7 +37,9 @@ artifact contract:
 A requirements-only unified plan is kept **light and standalone-readable**. It
 includes:
 
-- `## Goal Capsule` with objective, product authority, and open blockers.
+- `## Goal Capsule`，包含 objective、product authority 和 open blockers。当
+  coherent-work gate 拆分了更大的请求时，objective 要点明当前领域，product
+  authority 要说明周边领域不属于 active scope。
 - `## Product Contract` containing the brainstorm sections below.
 
 Do **not** emit a `## Goal Launch Block` or `## Reader Index`: the launch prompt
@@ -125,10 +127,31 @@ standing, and don't keep superseded prose as strikethrough. Version control
 holds the history. Stacked question/resolution strata double the reading surface
 and hide which text is live.
 
-**Named test, run before the doc is declared written:** could a reader find a
-contradiction in each section in one pass? A sentence carrying more than one
-parenthetical, or a requirement specifying two outcomes, fails the test — split
-it or defer it.
+## 规划就绪检查
+
+在宣布 artifact 已写入或给出 Phase 4 handoff 前，对已写入的 artifact 执行以下检查：
+
+1. **Complete** — 不留 placeholder、`TBD` 或未写完的 section；每个 Outstanding
+   Question 都归类为 `Resolve Before Planning` 或 `Deferred to Planning`。当
+   coherent-work gate 拆分了更大的请求时，必须存在 `work-relationships`
+   section，并带有对应输出格式的 marker：Markdown 使用
+   `<!-- ce-section: work-relationships -->`，HTML 则在外层 `<section>` 上使用
+   `data-ce-section="work-relationships"`。
+2. **Consistent** — Goal Capsule、Requirements、Key Flows、Acceptance Examples、
+   Scope Boundaries 与 `work-relationships` section 之间不得矛盾。读者能否在一次
+   通读中找出每个 section 的矛盾？一句话含有多个括号补充，或一条 requirement
+   规定了两个 outcomes，就无法通过此检查；拆开它，或推迟这个分叉。
+3. **Focused** — Product Contract 只负责一个连贯 work unit。周边工作只能作为
+   context、deferred work 或明确的 non-goal 出现；不得渗入 active Requirements、
+   Flows 或 Acceptance Examples。
+4. **Usable by planning** — `ce-plan` 无需臆造 product behavior、scope、actors 或
+   success criteria，就能决定如何构建当前工作。
+
+如果修正能保留已确定的 intent，就地修复失败项，然后重新运行失败的检查。如果
+修正会选择或改变 product behavior 或 scope，提出一个有针对性的问题，并在得到
+回答后更新 artifact。如果用户不在场，让 artifact 保持 blocked，不要让 planning
+臆造答案。不要把这份 checklist 输出到 Product Contract；修正后的 artifact 才是
+输出。
 
 ## Product Contract hard floor
 
@@ -175,6 +198,23 @@ worse than omitting it.
   tradeoff surfaced; the user assented). An agent never labels its own
   unexamined proposal. `ce-plan` enrichment inherits these labels into
   plan KTDs.
+
+- **How This Work Fits Together** — 当 coherent-work gate 拆分了更大的请求时必需；
+  否则，仅当本 plan 属于一组分别规划的更大工作，且这种关系能实质帮助冷启动读者
+  定位时才包含。为此 section 指定语义角色 `work-relationships`；即使可见 heading
+  改名，该角色也保持稳定：Markdown 中把
+  `<!-- ce-section: work-relationships -->` 放在 heading 前；HTML 中把
+  `data-ce-section="work-relationships"` 放在外层 `<section>` 上。该角色标识语义
+  而不是措辞，是 downstream discovery contract。先说明本 plan 负责的唯一领域，
+  并声明更广泛的拆分只是当前理解，不是已承诺的 roadmap。然后用浅层缩进 bullet
+  list 列出后续领域，并明确使用 `Depends on`、`Enables`、`Shares`、
+  `Can proceed independently of`、`Still to decide` 等关系短语；缩进只用于组织
+  文本，不能单独承载关系。未来领域只是 contextual candidates，绝不是 Requirements
+  或隐含的 Implementation Units。后续 plan 可以修改、拆分、合并或放弃这些领域，
+  并用 repo-relative path 引用早期 plan；不要创建或同步独立 master map。Scope
+  Boundaries 仍是本 plan 排除内容的权威来源，不要在那里重复完整关系列表。默认不使用
+  diagram；仅当非线性 cross-links、fan-in 或 fan-out 会让嵌套列表产生误导时才添加，
+  且即使没有 diagram，bullet 文本也必须信息完整。
 
 - **Actors** — include when the proposed thing has multi-party behavior
   (multiple humans, agents, or systems meaningfully involved). Skip for

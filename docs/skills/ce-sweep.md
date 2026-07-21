@@ -35,6 +35,8 @@ Feedback triage 往往变成每个 repo 自己的 ritual：扫描上次之后的
 
 `ce-sweep` 把 sweep 做成 repeatable skill。Sources 在共享 `feedback_sources` config 中声明一次。每次运行会 fetch 每个 source cursor 之后的新 items，在 source 侧 acknowledge（Slack emoji reaction、GitHub Issues label），并行 subagents 分析 attached recordings，在关闭任何 item 前验证 claimed fixes 是否真的 merge 到 main branch，然后 reconcile 一个 `/lfg` 可直接执行的 rolling plan。
 
+[配置参考](./configuration.md)列出了 first-run setup 写入的 feedback-source 与 sweep coordination keys。
+
 每个 item 的 lifecycle 都存在 durable YAML state file 中，schema versioned，因此 runs 可以干净恢复，peer agents 可以共享 state，崩溃的 run 不会对 customer message double-acknowledge。
 
 ## 新颖之处

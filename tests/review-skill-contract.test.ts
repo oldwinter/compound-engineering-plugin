@@ -1123,7 +1123,32 @@ describe("cross-model peer skip legibility", () => {
       // to classify a quota/usage-limit exhaustion (harness-agnostic reasoning).
       expect(referenceSrc).toContain("peer skip evidence:")
       expect(referenceSrc).toMatch(/quota|usage-limit/i)
-      expect(referenceSrc).toMatch(/more than once in this session/i)
+      expect(referenceSrc).toMatch(/本 session 出现超过一次/i)
+    })
+  }
+
+  // A restricted host sandbox (e.g. a Codex task with network disabled) denies
+  // the spawned peer CLI network/keychain, producing the exact same
+  // `Not logged in` signal as a genuine account logout. The classifier surfaces
+  // that string verbatim, so each cross-model reference must scope an
+  // auth-shaped peer failure to the peer's execution context and forbid the
+  // account-logout / run-login conclusion — otherwise the agent misreports the
+  // user as logged out. This is harness-agnostic prose (no Codex-only
+  // mechanism), so it must hold across code review, doc review, and pov alike.
+  const authScopeRefs = [
+    "skills/ce-code-review/references/cross-model-review.md",
+    "skills/ce-doc-review/references/cross-model-review.md",
+    "skills/ce-pov/references/cross-model-panel.md",
+  ]
+  for (const reference of authScopeRefs) {
+    test(`${reference} scopes an auth-shaped peer failure to execution context`, async () => {
+      // Collapse whitespace: ce-pov hard-wraps prose, so the anchor phrases can
+      // straddle a line break while the code-review/doc-review bullets do not.
+      const src = (await readRepoFile(reference)).replace(/\s+/g, " ")
+      expect(src).toContain("只描述 peer 的 execution context")
+      expect(src).toContain(
+        "绝不要据此报告用户 account 已退出登录",
+      )
     })
   }
 

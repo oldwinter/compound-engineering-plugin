@@ -6,7 +6,7 @@ Runs the **adversarial** review through one separately routed model target in a 
 
 This pass is **adversarial-only**. No other persona gets a cross-model twin, and there is no whole-diff generalist peer. Cost stays gated on the existing Stage 3 adversarial selection.
 
-The host resolves and sanctions one concrete route before egress; `scripts/cross-model-adversarial-review.sh` enforces that fixed route, applies read-only controls, captures schema-shaped JSON, and records identity receipts. A failed route writes no artifact and never switches recipients internally.
+Host 在 egress 前解析并批准一条具体 route；`scripts/cross-model-adversarial-review.sh` 强制使用该固定 route、应用 read-only controls、捕获符合 schema 的 JSON，并记录 identity receipts。分派前，它会保守估算 diff tokens 和 file count。Oversized diffs 不会 inline：worker 向 peer 提供 orchestrator 的精简 semantic review map，并把 exact diff 保留为私有、可选择读取的 artifact。Tool-limited routes 会把该 temp directory 作为额外 read root；Codex 在现有 read-only sandbox 下选择性调用 `git diff <base> -- <path>`。失败的 route 不写入 artifact，也绝不在内部切换 recipients。
 
 ## Gates — run only when all hold
 
@@ -43,7 +43,7 @@ Preferred mappings run first. Only after an observed unavailable, obsolete, or i
 
 ## Step 2 — Provider model + reasoning tier (owned by the script)
 
-The peer runs on **one editorially selected model and reasoning tier per provider**. The concrete model IDs and route effort flags live in one mapping in `scripts/cross-model-adversarial-review.sh`; this reference does not duplicate them. Claude Opus and native Grok currently use high, Codex uses medium; cursor-agent routes use their model-implied tier or ceiling. Users choose the peer target, not an arbitrary model/effort matrix. Never inherit a harness-configured default model. A lower tier is adopted only after a discriminating effectiveness eval, never from cost alone.
+Peer 按 **每个 provider 一个经审慎选择的 model 和 reasoning tier** 运行。具体 model IDs 和 route effort flags 集中在 `scripts/cross-model-adversarial-review.sh` 的单一 mapping 中；本 reference 不重复定义。目前 Claude Opus 和 native Grok 使用 high，Codex 使用 extra-high；cursor-agent routes 使用其 model 隐含的 tier 或 ceiling。用户选择 peer target，而不是任意 model/effort matrix。绝不继承 harness 配置的默认 model。只有在有区分度的 effectiveness eval 之后才能采用较低 tier，绝不能仅凭成本决定。
 
 The script always uses the adversarial persona brief; fold-in forces `reviewer` to `adversarial-<provider>`.
 
@@ -61,6 +61,15 @@ The ce-code-review invocation authorizes the selected configured/allowlisted rou
 
 The script is a CLI shell-out, not a subagent, so it doesn't consume the subagent concurrency budget. **Never hold a tool call open for the peer's runtime** — some harnesses kill long tool calls, which silently vanishes the pass. At the Stage 3d routing boundary, start it as a **detached, supervised job** through the bundled runner in one short Bash call (prints the job id in under ~2s). Only after that call returns may the host finalize the local roster and enter Stage 4. The detached worker still overlaps the local reviewers; binding it first prevents the host from accidentally dispatching the in-process adversarial fallback too.
 
+`start` 前，orchestrator 写入 `<run-dir>/adversarial-review-brief.md`。内容保持精简（最多 32 KiB）且聚焦语义：
+
+- Stage 2 intent summary；
+- 从当前 file inventory 和 diff 中选出的 2-8 个 material risk divisions，每个附一行 reason 和代表性 paths 或 path prefixes；
+- 哪些 divisions 属于明确的 generated repetition，应通过 generator inputs、manifests、tests 和 representative outputs 覆盖；
+- adversarial lens 必须测试的任何 cross-division interaction。
+
+该 map 是 agent judgment，不是确定性的 directory taxonomy。不要把完整 file list、diff hunks 或按扩展名机械拆分的结果复制进去。简单 change 只需一个 division。存在该 brief 时，worker 会把它嵌入 peer prompt。其 transport preflight 只在 prompt 外测量并暂存 exact diff；绝不拆分 semantic shards，也不选择或改写 orchestrator 的 divisions。
+
 Invoke via the skill-dir anchor — set `SKILL_DIR` to the absolute directory of **this** skill's `SKILL.md` (the Bash tool's CWD is the user's project, not the skill dir, on every host):
 
 ```bash
@@ -74,7 +83,7 @@ CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>
 - `<base-ref>` = the Stage 1 `BASE` (the diff base the peer reviews via `git diff <base-ref>`).
 - `<run-dir>` = the absolute Stage 4 run dir. The script writes `adversarial-<provider>.json` there **only after** forcing `reviewer` to `adversarial-<provider>` and downgrading peer `safe_auto` → `gated_auto`.
 
-**Single-reap finish.** The runner detaches the worker into its own supervised session. Capture the epoch time right after `start` (`date +%s`) and do not poll while local reviewers are active. After local returns are collected, check status once. If still running and the shared 610s deadline leaves time, issue one bounded `wait` sized to the remaining deadline (cap the wait at 240s); do not start repeated short polling turns. Fold in the artifact when terminal. At the deadline, `reap <job-id>` and perform one final `wait --max-secs 10` because reap is asynchronous. The script self-bounds (idle timeout 180s; hard backstop 600s), so deadline reaping is exceptional. Done detection stays presence-keyed: the worker publishes `<run-dir>/adversarial-<provider>.json` only after normalization. The script reads the persona brief and schema from the skill dir and reviews the current work tree against `<base-ref>`.
+**Single-reap finish。** Runner 把 worker 分离到独立的受监督 session。`start` 后立即捕获 epoch time（`date +%s`），local reviewers 活跃期间不要轮询。收集完 local returns 后检查一次 status。如果仍在运行且共享 610s deadline 还有时间，执行一次与剩余 deadline 相称的 bounded `wait`（上限 480s；Luna xhigh run 合理情况下可能耗时约 419s，较低上限可能在健康 peer 返回前结束）；不要反复进行短轮询。进入 terminal 后纳入 artifact。达到 deadline 时运行 `reap <job-id>`，并执行最后一次 `wait --max-secs 10`，因为 reap 是异步的。Script 自带边界（idle timeout 480s；hard backstop 600s），所以 deadline reaping 应属例外。Done detection 仍以文件是否存在为准：worker 只在 normalization 后发布 `<run-dir>/adversarial-<provider>.json`。Script 从 skill dir 读取 persona brief 和 schema，并依据 `<base-ref>` review 当前 work tree。Large-diff preflight 只处理 transport：它在 prompt 外测量并暂存 exact diff；orchestrator 选择 semantic divisions，reviewer 在其中选择 representatives 和 evidence。
 
 The `start` command's returned job ID is the successful-start receipt. Do not immediately call `status`, inspect `--help`, or otherwise verify that receipt; persist it and continue to local dispatch. Status collection begins only after the local wave completes.
 
@@ -97,7 +106,7 @@ If it is still running and time remains, use the documented single `wait`; do no
 - **Ran but produced no usable output** — the job reached `done` (or any terminal state) yet no `adversarial-<provider>.json` exists (the peer ran and egressed but returned nothing schema-shaped — unparseable output, empty findings the script dropped). Distinct from not-run: note "cross-model pass: peer ran, no usable output" in human-facing markdown Coverage. Never fail the review.
 - **Started but not `done`** — the final status read reports `failed`, `timeout`, or `died-without-result` (a job reaped at the 610s deadline records `timeout`, with the reap noted in its reason) → still non-blocking, but never silent: name the peer and its terminal state in Coverage (e.g. "cross-model adversarial peer: timeout"). Silent absence stays correct only for passes that never started or were skipped.
 - Empty `findings` → note "cross-model pass: no additional issues" in Coverage.
-- **Classify the skip reason before deleting.** Read `out.log` before cleanup, including bounded lines prefixed `peer skip evidence:`, and name observed quota, authentication, or capability failure. After the same quota or usage-limit evidence appears more than once in this session, do not retry that route automatically. A retry uses a newly resolved, disclosed, and sanctioned fixed route; never silently continue to another recipient.
+- **删除前先归类 skip reason。** Cleanup 前读取 `out.log`，包括以 `peer skip evidence:` 为前缀的有界行，并指出观察到的 quota、authentication 或 capability failure。Authentication-shaped peer failure（`not logged in`、`please log in`、401 或提示登录的 CLI 文本）只描述 peer 的 execution context：sandboxed host，例如限制 spawned commands 访问 network 或 keychain 的 Codex task，会产生与真实 account logout 完全相同的 signal。因此应归类为 cross-model execution-context authentication failure；绝不要据此报告用户 account 已退出登录，或提示用户运行 login command。Cross-model pass 是附加项，local review 仍已完成；要获取该 pass，需要 peer CLI 可访问 network 的 context（例如 restricted sandbox 之外）。同一 quota 或 usage-limit evidence 在本 session 出现超过一次后，不要自动重试该 route。重试必须使用新解析、已披露且获批准的固定 route；绝不静默转向另一个 recipient。
 - After fold-in (or after deadline reaping), delete the consumed job directory (`<run-dir>/jobs/<job-id>/`) — its log and result are review content and must not outlive their use.
 - A finding sharing a fingerprint with in-process `adversarial` promotes only when the artifact records `independence_verified: true`. Cursor-default artifacts default false; an unattested host skips automatic dispatch.
 

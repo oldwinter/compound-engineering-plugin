@@ -48,6 +48,10 @@
 
 # 可重复 automation 中的等价简写
 /ce-brainstorm 增加账户级通知设置 output:html
+
+# Session 继续使用 Opus 等 model，只把 approaches 交给 Fable 生成，
+# 仅在 heavy reasoning step 精准使用强但昂贵的 model
+/ce-brainstorm 增加账户级通知设置, use fable
 ```
 
 ---
@@ -75,7 +79,9 @@
 - **2-3 个 concrete approaches**，列出 tradeoffs 并明确 recommendation
 - **Opt-in visual probes** 用于那些通过粗略 sketch 比 prose 更快做出判断的 decisions
 - **Synthesis Summary** 作为 doc 落地前最后一次纠正 scope 的机会
-- **Fresh-context claim verification** 在 doc 落地前检查其 repo claims
+- **Fresh-context claim verification** 在 doc 落地前检查 repo claims
+- **每个 artifact 一个 coherent work unit**，并用 plain language 说明单独规划的 work 当前如何配合
+- **Ready for Planning Check** 在 handoff 前修复 completeness、consistency、focus 和 planning-readiness defects
 - **Right-sized Product Contract** 内置于 unified plan，并使用会流入 planning 的 stable identifiers（R/A/F/AE）
 
 ---
@@ -219,8 +225,8 @@ Phase 4 handoff 提供 planning、agent doc review、publish to Proof、lightwei
 | _(empty)_ | 询问 feature description |
 | `<feature idea>` | Open-ended brainstorm |
 | `<problem>` | 通过 product pressure test 路由 |
-| Existing `*-requirements.md` path or topic | Resume offer |
-| `output:html` | 将 requirements doc 写成单个 self-contained HTML file，而不是 markdown。互斥：doc 是 `.md` 或 `.html`，绝不两者同时生成。Default 是 markdown。设置 `.compound-engineering/config.local.yaml` 中的 `brainstorm_output: html` 可让 HTML 成为 default。Pipeline mode（LFG、`disable-model-invocation`）始终强制 markdown，以便 downstream automation 获得 stable text shape。 |
+| Existing requirements-only plan path、legacy `*-requirements.md` path 或 topic | Resume offer |
+| `output:html` | 将 requirements-only unified plan 写成单个 self-contained HTML file，而不是 markdown。互斥：artifact 是 `.md` 或 `.html`，绝不同时生成。Default 为 markdown。在 `.compound-engineering/config.local.yaml` 设置 `brainstorm_output: html` 可令 HTML 成为 default。Pipeline mode（LFG、`disable-model-invocation`）始终强制 markdown，使 downstream automation 获得 stable text shape。参见[配置参考](./configuration.md)。 |
 
 ---
 
@@ -246,9 +252,11 @@ Agent 在呈现 scoping synthesis 前，会把 internal draft 分成三类（Sta
 
 ---
 
-## Fable elevation（仅 Claude Code）
+## Model elevation（模型提升）
 
-即使当前 session 使用较便宜的 model，`ce-brainstorm` 仍可用更强的 reasoning model 生成 approaches：它通过 subagent 把 approach generation 分派给 Fable，因此无需切换整个 session 就能得到更锐利、更不 generic 的 options。可在每次运行的 prompt 中说 "use fable" 来 opt in，或在 `.compound-engineering/config.local.yaml` 中设置 `brainstorm_use_fable: true`。Mechanical host gate 会让它在所有非 Claude Code harness（Codex、Cursor）上静默 no-op。详见 `references/reasoning-elevation.md`。
+需要为 heavy reasoning step 指定 model 时，`ce-brainstorm` 可以用你选择的 model 而非 session model 生成 approaches。它只把 approach generation dispatch 给该 model，并提供 read access 以验证 brief；skill 其余部分留在 session model。可以在 prompt 中为单次 run 指定 model（“use fable”“have opus generate these”），或在 `.compound-engineering/config.local.yaml` 中用 `brainstorm_model: <model>` 设置 default。Prompt request 会覆盖 config key。
+
+这适用于任何 harness：host 能原生提供 chosen model 时走原生，否则调用已安装并认证的 Claude CLI，再否则在 session model 上运行该 step，并说明未满足的 precondition。**因此，设置 `brainstorm_model` 会在每个运行 `ce-brainstorm` 的 harness 中生效**，不只 Claude Code。详见 `references/reasoning-elevation.md`。
 
 ---
 

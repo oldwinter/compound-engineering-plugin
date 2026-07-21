@@ -18,6 +18,14 @@
 
 ---
 
+## Withdrawal 重新验证（组成 plan 前）
+
+Walk-through 的 withdrawal rule（`references/walkthrough.md` 中“撤回已被用户先前回答解决的 findings”）不只适用于逐项 loop，而是适用于此 preview 即将处理的每个 finding。把 findings 分入 Applying / Appending / Skipping buckets 前，要根据已经确定的 decisions 判断每个 in-scope finding：对 `Auto-resolve with best judgment on the rest` 路径（option D），使用用户在先前 walk-through 中给出的回答；对任何路径，也要考虑同一 plan 中被另一个 finding 的 Apply 解决的 finding。已经被这些 decisions 解决或否定的 finding 不属于 action bucket；它应被 withdrawn，而不是 applied、deferred 或 skipped。
+
+把每个此类 finding 路由到 `Withdrawing (N):` bucket。由 staged Apply 触发的 withdrawal 在这里也仍是 provisional：如果该 Apply 位于同一 plan，且后续执行失败，按 walk-through 的 provisional rule 恢复 withdrawal。不要静默丢弃 withdrawn finding；该 bucket 会向用户展示哪些 earlier answers 已使它们退出，以便 agent 理解有误时用户可以 Cancel。
+
+---
+
 ## Preview structure（预览结构）
 
 Preview 按 agent 打算执行的 action 分组。Bucket headers 只在对应 bucket 非空时出现。
@@ -34,6 +42,9 @@ Appending to Open Questions (N):
 
 Skipping (N):
   [P2] <section> — <one-line plain-English summary>
+
+Withdrawing (N):
+  [P2] <section> — resolved by <earlier decision>
 ```
 
 Routing option B（top-level best-judgment）的 worked example：
@@ -70,10 +81,10 @@ Skipping (2):
 
 每行使用 subagent template 中 framing-quality guidance 的 compressed form（observable-consequence-first，除非定位需要，否则不使用 internal section numbering）。One-line summary 从 persona 产出的 `why_it_matters` 中取第一句；当第一句对 preview width 来说太长时，紧凑 paraphrase 以适配。
 
-- **Shape（形状）:** `[<severity>] <section> — <one-line summary>`
-- **Width target（宽度目标）:** 将 lines 保持在约 80 columns，让 preview 在 narrow terminals 中 clean render。必要时用 ellipsis truncate。
+- **Shape（形状）：** `[<severity>] <section> — <one-line summary>`
+- **Width target（宽度目标）：** 行宽保持在约 80 columns，使 preview 在 narrow terminals 中清晰渲染。必要时用 ellipsis 截断。
 - **No section numbering**，除非 reader 需要它定位 issue（多个 findings 命中同名 section 时）。
-- **Self-contained identifiers**：当 one-line summary 引用 document-defined identifier（例如 requirement/unit ID `R4`、`U3`）时，首次出现必须配上从 document 提取的简短 plain-language handle（例如 `R4 (the auth-token requirement)`），绝不能只显示 bare ID；遵循 `references/synthesis-and-presentation.md` 中 self-contained-rendered-lines rule。
+- **Self-contained identifiers** — 当 one-line summary 引用文档定义的 identifier（例如 requirement 或 unit ID `R4`、`U3`）时，首次出现必须配上从文档提取的简短 plain-language handle（例如 `R4 (the auth-token requirement)`）；绝不能让 bare identifier 成为 summary 对其含义的唯一说明。保留 ID 本身。遵循 `references/synthesis-and-presentation.md` 的 self-contained-rendered-lines rule。
 
 当某个 finding 没有可用的 `why_it_matters`（罕见，只在 persona output malformed 时），直接 fallback 到 finding title。如果这影响同一 run 中不止少数 findings，在 completion report 的 Coverage section 中注明 gap。
 
@@ -117,9 +128,10 @@ Options（三种情况都精确为两个）：
 
 当用户选择 `Proceed`：
 
-- **Routing option B（top-level best-judgment）：** 对 plan 中每个 finding 执行 recommended action。Apply findings 进入 Apply set，供单次 end-of-batch document-edit pass 使用（Apply batching rules 见 `walkthrough.md`）。Defer findings 通过 `references/open-questions-defer.md` 路由。Skip findings 记录为 no-action。所有 actions 完成后，emit unified completion report（见 `walkthrough.md`）。
-- **Routing option C（top-level Append-to-Open-Questions）：** 每个 finding 都通过 `references/open-questions-defer.md` 路由，做 Open Questions append。不应用 document edits（除了 Open Questions section additions 本身）。所有 appends 完成（或失败）后，emit unified completion report。
-- **Walk-through `Auto-resolve with best judgment on the rest`：** 与 routing option B 相同，但 scope 限于用户尚未 decide 的 findings。Apply findings 与用户在 walk-through 中已选择的 findings 一起加入 in-memory Apply set；全部在单次 end-of-walk-through Apply pass 中一起 dispatch。
+- **Routing option B（top-level best-judgment）：** 对 plan 中每个 finding 执行 recommended action。Apply findings 进入 Apply set，供单次 end-of-batch document-edit pass 使用（Apply batching rules 见 `walkthrough.md`）。Defer findings 通过 `references/open-questions-defer.md` 路由。Skip findings 记录为 no-action。所有 actions 完成后，输出 unified completion report（见 `walkthrough.md`）。
+- **Routing option C（top-level Append-to-Open-Questions）：** 每个 finding 都通过 `references/open-questions-defer.md` 路由，执行 Open Questions append。不应用 document edits（Open Questions section additions 本身除外）。所有 appends 完成或失败后，输出 unified completion report。
+- **Walk-through `Auto-resolve with best judgment on the rest`：** 与 routing option B 相同，但 scope 限于用户尚未决定的 findings。Apply findings 与用户在 walk-through 中已经选择的 findings 一起进入 in-memory Apply set；全部在单次 end-of-walk-through Apply pass 中一并分派。
+- **Withdrawing bucket（任何路径）：** 该 bucket 中每个 finding 都在 decision list 中记录为 `withdrawn`，并注明由哪个 decision 使其退出；不执行 document edit，也不 append Open Questions。它会进入 completion report 的 Withdrawn bucket，并遵循与 walk-through withdrawal 相同的 durability rule（由尚未落地的 staged Apply 使其退出时为 provisional）。
 
 `Proceed` 期间的 failure（例如 batch Defer 中某个 finding 的 Open Questions append 失败）遵循 `references/open-questions-defer.md` 定义的 failure path：inline 展示 failure，并提供 Retry / Fall back / Convert to Skip；继续处理 plan 剩余部分，并在 completion report 的 failure section 中捕获该 failure。
 
@@ -127,8 +139,8 @@ Options（三种情况都精确为两个）：
 
 ## Edge cases（边缘情况）
 
-- **Bucket 中 zero findings:** 省略 bucket header。只有 Apply 和 Skip 的 preview 不显示空的 `Appending to Open Questions (0):` line。
-- **所有 findings 在同一 bucket:** Preview 仍显示 bucket header；仍提供 Proceed / Cancel。这是 routing option C 的常见情况（每个 finding 都在 `Appending to Open Questions` 下）。
-- **N=1 preview（scope 中只有一个 finding）：** Preview 仍使用 grouped format，只是 bucket 只有一行。`Proceed` / `Cancel` 仍适用。
-- **Open Questions append unavailable**（document read-only，append flow reports no-go）：upstream 不提供 routing option C（见 `references/open-questions-defer.md` unavailability handling）。Best-judgment（option B）和 walk-through `Auto-resolve with best judgment on the rest` 仍可运行；它们可能包含 synthesis 给出的 per-finding Defer recommendations。在 render 任何 best-judgment-shaped preview 前，如果 session cached append-availability 为 false，将每个 Defer recommendation downgrade 为 Skip，并在 preview 本身 surface downgrade（例如 `Skipping — append unavailable (N):` bucket，或 header note：`N Defer recommendations downgraded to Skip — document is read-only.`）。
-- **Walk-through `Auto-resolve with best judgment on the rest` with zero remaining findings:** Walk-through 自身逻辑会在 N=1 和其他情况下 suppress `Auto-resolve with best judgment on the rest` option，因此 preview 不应以 zero remaining findings 被调用。如果发生，render `Auto-resolve plan — 0 remaining findings`，并 fall through 到 no-op 的 Proceed。
+- **Bucket 中 zero findings：** 省略 bucket header。只有 Apply 和 Skip 的 preview 不显示空的 `Appending to Open Questions (0):` line；`Withdrawing (0):` 同样省略，因为没有 earlier decision 确定任何 remaining finding 时通常就是这种情况。
+- **所有 findings 位于同一 bucket：** preview 仍显示 bucket header，并仍提供 Proceed / Cancel。这是 routing option C 的常见情况（每个 finding 都位于 `Appending to Open Questions` 下）。
+- **N=1 preview（scope 中只有一个 finding）：** preview 仍使用 grouped format，只是 bucket 仅有一行。`Proceed` / `Cancel` 仍然适用。
+- **Open Questions append unavailable**（document read-only，append flow 报告 no-go）：upstream 不提供 routing option C（见 `references/open-questions-defer.md` 的 unavailability handling）。Best-judgment（option B）和 walk-through `Auto-resolve with best judgment on the rest` 仍可运行；它们可能包含 synthesis 给出的 per-finding Defer recommendations。在渲染任何 best-judgment-shaped preview 前，如果 session cached append-availability 为 false，把每个 Defer recommendation 降级为 Skip，并在 preview 本身展示 downgrade（例如 `Skipping — append unavailable (N):` bucket，或 header note：`N Defer recommendations downgraded to Skip — document is read-only.`）。
+- **Walk-through `Auto-resolve with best judgment on the rest` 没有 remaining findings：** walk-through 自身逻辑会在 N=1 及其他情况下 suppress `Auto-resolve with best judgment on the rest` option，因此不应以 zero remaining findings 调用 preview。如果确实发生，渲染 `Auto-resolve plan — 0 remaining findings`，并进入 no-op 的 Proceed。

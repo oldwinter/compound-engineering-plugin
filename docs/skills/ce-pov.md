@@ -109,13 +109,11 @@ Peer 永远不会取代 ce-pov 自己的 judgment。可以指定一个或多个 
 
 Peers 会直接检查 shared working tree。Project 中已有 proposal 或 document 时，ce-pov 会把 peer 指向它，不再构建重复 review packets。Initial independent round 包含 subject，但不透露 ce-pov 的 conclusion 或其他 voice 的 judgment；若请求 critique 某个 position，该 position 本身就是 subject，因此会提供给 peer。
 
-当 voices 出现 material disagreement 时，默认最多进行两次 reconciliation exchanges。每次 exchange 前，ce-pov 会验证有争议且会改变 decision 的 project claims，并向每个 voice 提供同一份 evidence delta（`verified`、`contradicted` 或 `unverifiable`）和已经形成的 positions。每个 peer 必须显式报告自己是 `moved` 还是 `held`；用户预先给出的 pass/round limit 会覆盖默认值。
+Voices 出现 material disagreement 时，默认最多进行两次 reconciliation exchanges，所以完整 default run **最多共三次 exchange**：一次 blind independent round，加最多两次 reconciliation。每次 exchange 前，ce-pov 会验证有争议且会改变 decision 的 project claims，并向每个 voice 提供同一 evidence delta（`verified`、`contradicted` 或 `unverifiable`）与已形成 positions。每个 peer 报告自己是 `moved` 还是 `held`。用户提供的 pass/round limit 会覆盖 default。
 
-达到 effective limit 后，automatic dispatch 停止，ce-pov 会展示 convergence 或 stalemate。只有当它能说清 unresolved question、新 evidence/framing 以及额外 exchange 可能改变立场的原因时，才会推荐一次 bounded extension；除非用户预先给了更大 limit，否则继续需要用户批准。ce-pov 仍是 decision-maker，而不是 vote counter；peer failure 或 timeout 永远不会 block solo POV。
+**为什么是两次，而不是五次。** 三次 total exchanges 后，debate 的收益停止：cross-model agreement 通常在两到三轮内收敛，之后 marginal accuracy gain 持平甚至下降，cost 与 latency 却继续上升。Extra rounds 还会削弱 panel 的真实任务：training 相关的 models 更倾向彼此收敛，而不是接受 new evidence，因此高 round count 主要制造看似 confidence 的 agreement。多数 run 本就不会到达 cap：convergence 是 ce-pov 的 reasoned confidence，不是 vote tally；POV 已 settled 或所有 peer 都 hold 时立即结束。
 
-Target names 会区分 model 与 harness。**Cursor** 表示由 `cursor-agent` 使用 configured default/Auto model；**Composer** 表示经 Cursor 使用 Composer model；**Grok** 优先使用 Grok CLI，也可以使用 sanctioned Grok-via-Cursor route。除非存在 serving-model receipt，否则 Cursor Auto 会标记为 unverified，且不能算作 independent cross-model corroboration。
-
-Concrete model IDs 与 CLI flags 是 preferred adapter defaults，不是永久 product promises。如果 landscape 变化，ce-pov 会先尝试 declared mapping，再在同一 requested target 与 hard safety/egress boundaries 内发现最接近的 compatible equivalent。Substitution 与 actual route 必须披露；显式指定的 model 或新增接收内容的 intermediary 永远不能静默变化。
+**Cap 是 checkpoint，不是 ceiling。** 两次只限制 *automatic* spend，不限制 debate。到 effective limit 时，automatic dispatch 停止，ce-pov 展示 convergence/stalemate。只有能说清 unresolved question、new evidence/framing，以及另一次 exchange 为何可能改变 position 时，才会推荐 specific bounded extension；除非预先提供更大 limit，否则继续需要用户批准。这样，少数真正需要第四次 exchange 的 decision 可以凭 reasoning 获得它，而不必让每个 routine run 预付成本。ce-pov 仍是 decision-maker，不是 vote counter；peer failure/timeout 不会 block solo POV。
 
 ### 9. Reasoned, tier-gated follow-up
 
@@ -187,7 +185,19 @@ Skip `ce-pov` when:
 | `compare/cross-check with <peers>` | 先形成 ce-pov 自己的 POV，再咨询每个 named peer |
 | `oracle` | 先用最多两个可达的 different-model peers 进行 blind initial cross-check，必要时再做 bounded evidence-based reconciliation |
 
-`Cursor` 会选择 Cursor configured default/Auto model；`Composer` 会经 Cursor 选择 Composer model。这两个名称有意不互作 alias。
+### Peer target names（Peer target 名称）
+
+Target names 会区分 model 与 harness，且有意不互作 alias：
+
+| 名称 | 解析结果 |
+|------|-------------|
+| `Cursor` | `cursor-agent` 使用 configured default/Auto model |
+| `Composer` | 经 Cursor 使用 Composer model |
+| `Grok` | 优先 Grok CLI；否则使用 sanctioned Grok-via-Cursor route |
+
+除非存在 serving-model receipt，否则 Cursor Auto 标为 unverified；没有该 proof 时不算 independent cross-model corroboration。
+
+Concrete model IDs 与 CLI flags 是 preferred adapter defaults，不是永久 product promises。如果 landscape 变化，ce-pov 先尝试 declared mapping，再在同一 requested target 与 hard safety/egress boundaries 内发现最接近的 compatible equivalent。Substitution 与 actual route 必须披露；显式命名的 model 或新增接收内容的 intermediary 绝不静默变化。
 
 ---
 
@@ -199,7 +209,9 @@ Skip `ce-pov` when:
 
 **它和 `ce-doc-review` 有什么不同？** “What do you think of this doc?” 使用 `ce-pov`，得到包含 strengths、risks 的 holistic bottom line；“review this doc” 或 “find the issues” 使用 `ce-doc-review`，得到 structured findings 与 remediation。
 
-**它总会写文档吗？** 不。默认是 compact chat verdict。完整 shareable write-up 和 durable `ce-compound` capture 都是 opt-in：提供，但不强迫。
+**为什么只有两次 reconciliation rounds，而不是五次？** 两次是 *automatic* spend 的 cap，不是 debate 的上限。Default run 最多三次 exchanges（一次 blind independent round 加两次 reconciliations），cross-model debate 通常在这里收敛；超过后 marginal gain 持平，而 cost、latency 与 correlated-model false consensus 都会上升。多数 run 会更早结束，因为 ce-pov 依据 reasoned confidence，而不是 round count。Decision 确实需要更多时，limit 是 checkpoint：ce-pov 会针对 specific unresolved question 提出 bounded extension；你也可以预先提供更大 limit。
+
+**它总会写文档吗？** 不。默认是 compact chat POV。完整 shareable write-up 和 durable `ce-compound` capture 都是 opt-in：提供，但不强迫。
 
 **它会一直追问 clarify 吗？** 只有 intent 真正 ambiguous 时，例如 bare link 或未说明 intent。清晰 question 得到一行 inferred frame 后直接继续。
 

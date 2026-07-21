@@ -120,11 +120,11 @@ Before classifying mode or dispatching any grounding, check whether the subject 
 - Questions exist only to supply what sub-agents need to operate: an identifiable subject (this phase) and enough context for the agent to say something specific about it (0.4, elsewhere modes only). Nothing else.
 - Never ask about solution direction, constraints, audience, tone, success criteria, or anything that characterizes the subject — those belong to `ce-brainstorm`.
 - Always keep "Surprise me" (letting the agent decide the focus) as a real option, not a fallback for when the user can't name a subject. Ideation is allowed to be greenfield by design.
-- Stop as soon as the subject is identifiable or the user has delegated to "Surprise me." More than 3 total questions across 0.2 and 0.4 is a smell that ideation is not the right workflow — consider suggesting `ce-brainstorm`.
+- 一旦 subject 可识别，或用户已委托给 "Surprise me"，就停止提问。0.2、0.3（mode confirmation）、0.4 和 Phase 1 issue-scoping gate 合计超过 3 个问题，说明 ideation 可能不是合适的 workflow；考虑建议使用 `ce-brainstorm`。
 
 **Detection — issue-tracker intent (repo mode only; subject-identifying).**
 
-Issue-tracker intent requires an explicit reference to the tracker or to reports filed in it. Trigger only when the prompt uses phrases like `github issues`, `open issues`, `issue patterns`, `issue themes`, `what users are reporting`, or `bug reports` — the subject is "issues in the tracker." Proceed to 0.3 with issue-tracker intent flagged.
+Issue-tracker intent 要求明确提到 tracker 或其中提交的 reports。仅当 prompt 使用 `open issues`、`issue patterns`、`issue themes`、`what users are reporting`、`bug reports`，或点名 tracker（`github issues`、`linear issues`、`jira tickets`）时触发；此时 subject 是 "issues in the tracker"。该 lens 使用任何可访问的 tracker（GitHub、Linear、Jira），不得强制要求 GitHub。标记 issue-tracker intent 后进入 0.3。
 
 Do NOT trigger on arguments that merely mention bugs as a focus: `bug in auth`, `fix the login issue`, `the signup bug`, `top 3 bugs in authentication` — these are focus hints on regular ideation, not requests to analyze the issue tracker. A bare `bugs` with no tracker phrasing is handled by the vagueness check below, not here.
 
@@ -227,13 +227,13 @@ Use reasonable interpretation rather than formal parsing.
 
 #### 0.6 Cost Transparency Notice
 
-Before dispatching Phase 1, surface the agent count and cost shape for the inferred mode in one short line so multi-agent cost is not invisible. Compute the count from the actual dispatch decision: 1 grounding-context agent (codebase scan in repo mode; user-context synthesis in elsewhere) + 1 learnings (skip in elsewhere-non-software) + 1 web researcher + evidence scouts (repo mode only, one per Phase 1.5 axis, max 5, extraction tier) + user-research distillers (one per user-supplied research artifact needing distillation, extraction tier, all modes) + the ideation fleet (5 agents default: 3 generation-tier + 2 ceiling-tier; 6 all-ceiling in surprise-me or `go deep`; 4 in issue-tracker mode) + 1 basis verifier (generation tier). When issue-tracker intent triggers (repo mode only): add 1 for the issue-intelligence agent. Add 1 if the user opted into Slack research. Subtract 1 if the user issued a web-research skip phrase or V15 reuse will fire. In **surprise-me mode**, note "(surprise-me mode: deeper exploration per agent)". Phase 2's axis-coverage check may dispatch up to 2 additional recovery sub-agents when generation leaves any topic axis empty (skipped in surprise-me mode); when not in surprise-me, append "(+up to 2 if axis-coverage requires recovery)" to the count line.
+分派 Phase 1 前，用一行简短文字显示推断 mode 的 agent 数量和成本构成，避免隐藏 multi-agent 成本。按实际分派决策计算：1 个 grounding-context agent（repo mode 扫描 codebase；elsewhere 合成 user context）+ 1 个 learnings（elsewhere-non-software 跳过）+ 1 个 web researcher + evidence scouts（仅 repo mode，Phase 1.5 每个 axis 一个，最多 5 个，extraction tier）+ user-research distillers（每份需要提炼的用户 research artifact 一个，所有 mode，extraction tier）+ ideation fleet（默认 5 个：3 个 generation-tier + 2 个 ceiling-tier；surprise-me 或 `go deep` 时 6 个且全部为 ceiling；issue-tracker mode 时 4 个）+ 1 个 basis verifier（generation tier）。当 issue-tracker intent 触发时（仅 repo mode），为 issue-intelligence 的 scan 和 cluster 两次调用加 2（scan 在 ideation fleet 前运行；cluster 可能增加一个 scoping question）。如果用户选择 Slack research，加 1；如果用户给出跳过 web research 的短语或将触发 V15 reuse，减 1。在 **surprise-me mode** 中注明 "(surprise-me mode: deeper exploration per agent)"。如果 generation 后任何 topic axis 为空，Phase 2 的 axis-coverage 检查最多可再分派 2 个 recovery sub-agents（surprise-me mode 跳过）；非 surprise-me 时，在数量行追加 "(+up to 2 if axis-coverage requires recovery)"。
 
 Examples (defaults, no skips, no opt-ins):
 
 - **Repo mode, specified subject:** "Will dispatch ~13 agents, most on cheap tiers: codebase scan + learnings + web research + up to 5 evidence scouts (cheap) + 5 ideation (3 mid-tier, 2 top-tier) + 1 basis verifier (mid-tier). Skip phrases: 'no external research', 'no slack'."
 - **Repo mode, surprise-me:** "Will dispatch ~10 agents (surprise-me mode: deeper exploration per agent): codebase scan + learnings + web research + 6 ideation (top-tier) + 1 basis verifier. Skip phrases: 'no external research', 'no slack'."
-- **Repo mode, issue-tracker intent:** "Will dispatch ~13 agents: codebase scan + learnings + web research + issue intelligence + up to 5 evidence scouts + 4 ideation + 1 basis verifier. Skip phrases: 'no external research', 'no slack'." Reflects the successful-theme path; if issue intelligence returns insufficient signal (see Phase 1), ideation falls back to the default 5-agent fleet.
+- **Repo mode, issue-tracker intent：** "将分派约 14 个 agents：codebase scan + learnings + web research + issue intelligence（scan + cluster）+ 最多 5 个 evidence scouts + 4 个 ideation + 1 个 basis verifier。跳过短语：'no external research'、'no slack'。" 这表示 theme 成功生成的路径；如果 issue scan 返回的 signal 不足（见 Phase 1），则跳过 cluster 调用，ideation 回退到默认的 5-agent fleet。
 - **Elsewhere-software:** "Will dispatch ~9 agents: context synthesis + learnings + web research + 5 ideation + 1 basis verifier. Skip phrases: 'no external research'."
 - **Elsewhere-non-software:** "Will dispatch ~8 agents: context synthesis + web research + 5 ideation + 1 basis verifier. Skip phrases: 'no external research'."
 
@@ -298,11 +298,16 @@ Use the project's active instructions already in context. Send the codebase scan
 
 3. **Web research** (always-on; see "Web research" subsection below for skip-phrase and V15 cache handling).
 
-4. **Issue intelligence** (conditional) — if issue-tracker intent was detected in Phase 0.3, read `references/agents/issue-intelligence-analyst.md` and dispatch a generic subagent seeded with that local prompt plus the focus hint. Run in parallel with the other subagents.
+4. **Issue intelligence**（条件触发、由 orchestrator 把关的两次调用 protocol）— 如果 Phase 0.3 检测到 issue-tracker intent，按下述方式运行 issue lens。与其他 grounding agents 不同，它**不能**作为 fire-and-forget parallel：它可能需要一个 scoping question，而 subagent 无法阻塞等待用户输入，因此两次 analyst 调用之间的问题由你（orchestrator）负责。
 
-   If the agent returns an error (gh not installed, no remote, auth failure), log a warning to the user ("Issue analysis unavailable: {reason}. Proceeding with standard ideation.") and continue with the remaining grounding.
+   **a. Scan 调用。** 读取 `references/agents/issue-intelligence-analyst.md`，分派一个 generic subagent，并传入该 prompt、focus hint、Phase 1 前面创建的 `<scratch-dir>`，以及它处于 **SCAN mode** 的指令。它按 capability 探测 tracker 访问能力（GitHub / Linear / Jira，而不是假设某个 binary 存在），执行一次有边界的 fetch，把结果集持久化到 `<scratch-dir>/issue-scan.json`，并返回 distribution、signal 数量和 ambiguity assessment；它**不**执行 cluster。
 
-   If the agent reports fewer than 5 total issues, note "Insufficient issue signal for theme analysis" and proceed with default ideation frames in Phase 2.
+   - 如果**第一行是 `Issue analysis unavailable:` marker**（没有可访问的 tracker），记录警告（"{该消息}。继续执行 standard ideation。"），然后继续其余 grounding；不调用 cluster。
+   - 如果报告的 eligible issues 少于 5 个，注明 "Insufficient issue signal for theme analysis"，并在 Phase 2 使用默认 ideation frames；不提出 scoping question，也不调用 cluster。
+
+   **b. Scoping gate（由你决定，最多问一个问题）。** 阅读 scan 的 ambiguity assessment。默认**静默**执行 auto-scope，按 focus hint → priority（如有）→ workflow-state → recency 组成 scope。**仅当** scan 报告不可消解的 ambiguity 时，才按 Interaction Method 提出**一个** blocking scoping question：存在两个或更多连贯、实质不同的 scopes，且单个刻意多样化的 sample 无法公平代表它们。选项由 scan distribution 派生的 slices 加一个始终存在的 "analyze a representative sample of everything" 组成，让用户可以拒绝收窄。如果 slices 加 representative-sample 选项超过平台 blocking tool 的选项上限（例如 Codex `request_user_input` 明确选项为 2-3 个，而 `AskUserQuestion` 为 4 个），展示容得下的最高 mass slices，并把其余内容并入 representative-sample 选项；或按 Interaction Method 回退到编号 chat list。绝不能删除 representative-sample 选项。这是一个 **grounding / subject-scoping** 问题，与 Phase 0.2 subject gate（"agent 应处理什么"）同类，**不是** Phase 0.4 solution-constraint 问题；它计入 ≤3 个问题的粒度，且 "Surprise me" 仍需保留。scan 无歧义时完全跳过。
+
+   **c. Cluster 调用。** 以 **CLUSTER mode** 再次分派 analyst，传入已确定的 scope **以及同一个 `<scratch-dir>`**，使其复用 scan 持久化的 `issue-scan.json`，而不是重新 fetch。它返回按 leverage 排序的 themes 和 coverage accounting。scan 调用可以与其他 grounding agents 同时运行，但必须 **await** cluster 调用以及依赖其 themes 的 consolidation 和 Phase 1.5：不要把 issue lens 当成 fire-and-forget，也不要在 cluster 结果返回前结束 consolidation。
 
 **Elsewhere mode dispatch (skip the codebase scan; user-supplied context is the primary grounding):**
 
@@ -351,7 +356,7 @@ Consolidate all dispatched results into a short grounding summary using these se
 - **User-named references** *(repo mode, when the focus hint named root-level `*.md` files)* — full content from directive files the user explicitly named in their prompt or focus (research artifacts route through `User-supplied research` instead). Phase 2 treats these as constraint
 - **Additional context** *(repo mode, when other root-level markdown was discovered but not named)* — one-line gists per file. Phase 2 treats these as background, not direction
 - **Past learnings** — relevant institutional knowledge from `docs/solutions/`
-- **Issue intelligence** *(when present, repo mode only)* — theme summaries with titles, descriptions, issue counts, and trend directions
+- **Issue intelligence** *（存在时，仅 repo mode）* — theme summaries，包含 titles、descriptions、issue counts、leverage 和 trend directions，**再加上 cluster 调用的 coverage accounting**（fetched / eligible / analyzed / excluded / unknown-remainder，以及任何 `>N` 下界），使非穷尽 coverage disclosure 能进入 Phase 2 ideation 和 Phase 4 artifact，而不是在这里丢失
 - **External context** *(when web research ran)* — prior art, adjacent solutions, market signals, cross-domain analogies. Note "(reused from earlier dispatch)" when V15 reuse fired
 - **User-supplied research** *(when the user provided research artifacts)* — dossier gists with paths, or inline content for small artifacts; kept distinct from External context so source provenance stays visible
 - **Slack context** *(when present)* — organizational context

@@ -21,8 +21,10 @@ These hold regardless of which skill produced the artifact.
 - **Repo-relative paths for file references.** Always. Never absolute paths
   — they break portability across machines, worktrees, teammates.
 - **No HTML mixed in.** Keep the markdown pure. No `<div>`, no `<details>`,
-  no inline `<style>`. If a layout idea only works as HTML, defer it to the
-  HTML rendering. Markdown stays markdown.
+  不使用 inline `<style>`。唯一例外是 contract-defined invisible semantic marker，
+  例如 `<!-- ce-section: work-relationships -->`；它向 downstream agents 传递
+  section 语义，不创建 layout。只能用 HTML 实现的 layout idea，应留给 HTML
+  rendering。Markdown 仍保持纯 Markdown。
 - **No fixed-width line wrapping.** Do not hard-wrap prose to a column (e.g.
   80 chars). Write one sentence per line, or let each paragraph flow as a
   single line. The artifact is read rendered and shared, where fixed wraps add

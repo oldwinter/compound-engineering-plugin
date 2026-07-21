@@ -48,7 +48,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 |-------|---------|
 | [`/ce-brainstorm`](docs/skills/ce-brainstorm.md) | 通过 interactive Q&A 思考 feature 或 problem，并在 planning 前写出 requirements-only unified plan |
 | [`/ce-plan`](docs/skills/ce-plan.md) | 将 feature ideas 或 requirements-only plans enrich 为 implementation-ready plans |
-| [`/ce-work`](docs/skills/ce-work.md) | 使用 worktrees 和 task tracking 执行 implementation-ready plans |
+| [`/ce-work`](docs/skills/ce-work.md) | 原生执行 implementation-ready plans，或通过合格的跨模型 author（qualified cross-model author）实施，同时由 host 保留 verification、commits 和 shipping |
 | [`/ce-simplify-code`](docs/skills/ce-simplify-code.md) | 在 review 前 refinement 新写的 code，提升 clarity 和 reuse |
 | [`/ce-code-review`](docs/skills/ce-code-review.md) | 合并前按 plan 进行 report-only multi-agent review；本地应用修复必须显式授权 |
 | [`/ce-compound`](docs/skills/ce-compound.md) | 把 learning 捕获到 `docs/solutions/`，让下一轮 loop 更聪明 |
@@ -255,6 +255,14 @@ The marketplace step only makes the plugin available; the plugin install is what
 ```
 
 重新运行面向 Codex 的 Bun convert/install CLI，也会移除仍然存在的 block；新版 CLI 不再插入它。
+
+**使用其他 editor 或 CLI？** Kimi Code CLI、Cline、Grok Build CLI、Devin CLI、GitHub Copilot、Factory Droid、Qwen Code、OpenCode、Pi 和 Antigravity CLI 均受支持，参见[更多安装方式](#more-install-options)。
+
+---
+
+### 其他 editor 和 CLI
+
+[Claude Code、Cursor 和 Codex](#install) 的说明在上方；这里列出的平台同样受到支持。
 
 ### Kimi Code CLI
 
