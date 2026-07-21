@@ -6,7 +6,7 @@ argument-hint: "[mode:agent] [apply:local] [blank to review current branch, or p
 
 # Code Review
 
-**中文导读：** 对实际 diff 运行 risk-driven structured review。Bare invocation 与 `mode:agent` 默认都只报告；只有 `apply:local` 或用户显式要求 apply 才授权本地修复。先加载 persona catalog，再按 execution spine 选择并逐个 foreground dispatch reviewers；若 adversarial gate 触发，先启动受控的 cross-model peer，最后必须通过 finish/validator mechanics 合成 Actionable Findings、Coverage 与 Verdict。下方英文内容是 canonical executable contract，必须按原文执行。
+**中文导读：** 对实际 diff 运行 risk-driven structured review。Bare invocation 与 `mode:agent` 默认都只报告；只有 `apply:local` 或用户显式要求 apply 才授权本地修复。先加载 persona catalog，再按 host 的 active-agent 上限以前台并发批次调度 reviewer；异步 host 必须收齐并关闭全部 reviewer 后才能进入合成。若 adversarial gate 触发，先启动受控的 cross-model peer，最后必须通过 finish/validator mechanics 合成 Actionable Findings、Coverage 与 Verdict。下方英文内容是 canonical executable contract，必须按原文执行。
 
 Reviews code changes using dynamically selected reviewer personas. Dispatches bounded specialist subagents that return structured JSON, then merges and deduplicates findings into a single report.
 
