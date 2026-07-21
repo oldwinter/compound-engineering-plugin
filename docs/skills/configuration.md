@@ -1,41 +1,41 @@
-# Compound Engineering configuration
+# Compound Engineering 配置
 
-Compound Engineering keeps optional, checkout-local defaults in `.compound-engineering/config.local.yaml`. The file is shared by every supported harness that opens the same checkout, so a preference set while using Claude Code is also visible when the same checkout is opened in Codex or Cursor.
+Compound Engineering 将可选的 checkout-local 默认值保存在 `.compound-engineering/config.local.yaml` 中。打开同一 checkout 的所有受支持 harness 都会共享此文件，因此在 Claude Code 中设置的偏好，在 Codex 或 Cursor 打开同一 checkout 时也可见。
 
-Run `/ce-setup` to create or repair the file and its `.gitignore` coverage. The committed `.compound-engineering/config.local.example.yaml` lists the available settings; uncomment only the keys you want to change. Do not put credentials, CLI commands, or harness flags in this file.
+运行 `/ce-setup` 创建或修复该文件及其 `.gitignore` 覆盖。已提交的 `.compound-engineering/config.local.example.yaml` 列出了可用设置；只取消注释你要修改的 key。不要在此文件中放置 credential、CLI command 或 harness flag。
 
-## How config relates to instructions
+## Config 与 instructions 的关系
 
-Config is a local default, not another agent-instructions file:
+Config 是 local default，不是另一份 agent-instructions 文件：
 
-- A direct instruction for the current task wins over a conflicting config preference.
-- Active session and project/user instructions already loaded by the harness can override or narrow config. Depending on the harness, project instructions may come from `AGENTS.md`, `CLAUDE.md`, or another native mechanism.
-- Each skill's runtime contract still decides whether a setting applies. For example, pipeline execution forces planning artifacts to markdown, and model elevation takes effect on whichever harness can reach the requested model.
-- Some skills define a more specific preference order for their own routing. Their skill page documents that order.
+- 当前任务的 direct instruction 优先于冲突的 config preference。
+- Harness 已加载的 active session、project/user instructions 可以覆盖或收窄 config。根据 harness 不同，project instructions 可能来自 `AGENTS.md`、`CLAUDE.md` 或其他原生机制。
+- 每个 skill 的 runtime contract 仍负责决定设置是否适用。例如，pipeline execution 会强制 planning artifact 使用 markdown，而 model elevation 会在任何能够访问 requested model 的 harness 上生效。
+- 某些 skill 会为自己的 routing 定义更具体的 preference order；对应 skill 页面会说明该顺序。
 
-Because the file is gitignored and belongs to one checkout, linked worktrees do not automatically inherit it. CE Work resolves delegation before it creates detached worker worktrees, so an already-selected route is carried into that run; a separate interactive session opened directly in another worktree uses that worktree's own config.
+该文件被 gitignore 且属于单个 checkout，因此 linked worktree 不会自动继承它。CE Work 会在创建 detached worker worktree 前解析 delegation，因此已选定 route 会带入该 run；直接在另一个 worktree 中打开的独立 interactive session 则使用该 worktree 自己的 config。
 
-## Options
+## 选项
 
-All settings are optional. Commented examples are documentation, not active values.
+所有设置都是可选的。被注释的示例仅用于文档说明，不会生效。
 
-| Consumer | Options | Purpose and values |
+| Consumer | Options | Purpose 和 values |
 |---|---|---|
-| [`ce-ideate`](./ce-ideate.md), [`ce-brainstorm`](./ce-brainstorm.md), [`ce-plan`](./ce-plan.md) | `ideate_output`, `brainstorm_output`, `plan_output` | Artifact format: `md` or `html`. Defaults are HTML for ideation and markdown for brainstorms/plans. Pipeline contexts force markdown. |
-| [`ce-plan`](./ce-plan.md) | `plan_skip_scoping_confirm` | `true` skips the normal pre-plan scope confirmation; default `false`. It does not suppress genuine blockers or the post-plan menu. |
-| [`ce-plan`](./ce-plan.md), [`ce-brainstorm`](./ce-brainstorm.md) | `plan_model`, `brainstorm_model` | Model elevation: send the reasoning-heavy step to a named model (e.g. `fable`, `opus`) instead of the session model. Value is a model alias; a prompt request overrides it. Takes effect on every harness — natively where the host serves the model, else via the Claude CLI, else inline. No default (elevation off). |
-| [`ce-work`](./ce-work.md), [`lfg`](./lfg.md) | `work_engine_mode`, `work_engine_preferences` | Ordered implementation-author preferences. Mode is `off`, `prefer`, or `require`; each entry has a `harness` and optional `model`. See [Implementation routing](#implementation-routing). |
-| [`ce-code-review`](./ce-code-review.md), [`ce-doc-review`](./ce-doc-review.md) | `cross_model_peer` | Preferred cross-model review target: `codex`, `claude`, `grok`, `cursor`, or `composer`. The review skills still apply host-independence and route-availability gates. |
-| [`ce-commit-push-pr`](./ce-commit-push-pr.md) | `pr_teaching_section`, `pr_teaching_archive`, `auto_babysit` | Toggle PR concept teaching, opt into explainer archival, or opt out of the default babysit handoff. Defaults: `true`, `false`, and `true`. |
-| [`ce-product-pulse`](./ce-product-pulse.md) | `pulse_product_name`, `pulse_lookback_default`, `pulse_primary_event`, `pulse_value_event`, `pulse_completion_events` | Product identity, reporting window, and the events that represent engagement, value, and completion. The setup interview writes these values. |
-| [`ce-product-pulse`](./ce-product-pulse.md) | `pulse_quality_scoring`, `pulse_quality_dimension`, `pulse_analytics_source`, `pulse_tracing_source`, `pulse_payments_source`, `pulse_db_enabled` | Optional quality scoring and read-only data-source routing. |
-| [`ce-product-pulse`](./ce-product-pulse.md) | `pulse_metric_sources`, `pulse_pending_metrics`, `pulse_excluded_metrics` | Per-metric source overrides and strategy metrics that should render as pending or be excluded. |
-| [`ce-promote`](./ce-promote.md) | `ce_promote_spiral_optout` | `true` suppresses the one-time Spiral setup offer; remove the key to enable it again. |
-| [`ce-sweep`](./ce-sweep.md) | `feedback_sources`, `sweep_state_path`, `sweep_ack_cap`, `sweep_lease_ttl_minutes`, `sweep_shared_branch` | Feedback connectors, durable state location, acknowledgment circuit breaker, lease expiry, and optional push-gated shared-branch coordination. The setup interview writes these values. |
+| [`ce-ideate`](./ce-ideate.md)、[`ce-brainstorm`](./ce-brainstorm.md)、[`ce-plan`](./ce-plan.md) | `ideate_output`、`brainstorm_output`、`plan_output` | Artifact format：`md` 或 `html`。Ideation 默认 HTML，brainstorm/plan 默认 markdown；pipeline context 强制 markdown。 |
+| [`ce-plan`](./ce-plan.md) | `plan_skip_scoping_confirm` | `true` 跳过正常的 pre-plan scope confirmation，默认 `false`；不会抑制真实 blocker 或 post-plan menu。 |
+| [`ce-plan`](./ce-plan.md)、[`ce-brainstorm`](./ce-brainstorm.md) | `plan_model`、`brainstorm_model` | Model elevation：将 reasoning-heavy step 交给命名 model（例如 `fable`、`opus`），而非 session model。值为 model alias；prompt request 可覆盖。会在所有 harness 生效：host 原生提供时走原生，否则走 Claude CLI，再否则 inline。无默认值（关闭 elevation）。 |
+| [`ce-work`](./ce-work.md)、[`lfg`](./lfg.md) | `work_engine_mode`、`work_engine_preferences` | 有序 implementation-author preferences。Mode 为 `off`、`prefer` 或 `require`；每项包含 `harness` 和可选 `model`。参见[实现路由](#implementation-routing)。 |
+| [`ce-code-review`](./ce-code-review.md)、[`ce-doc-review`](./ce-doc-review.md) | `cross_model_peer` | 首选 cross-model review target：`codex`、`claude`、`grok`、`cursor` 或 `composer`。Review skills 仍会应用 host-independence 和 route-availability gates。 |
+| [`ce-commit-push-pr`](./ce-commit-push-pr.md) | `pr_teaching_section`、`pr_teaching_archive`、`auto_babysit` | 切换 PR concept teaching、选择 explainer archival，或退出默认 babysit handoff。默认分别为 `true`、`false`、`true`。 |
+| [`ce-product-pulse`](./ce-product-pulse.md) | `pulse_product_name`、`pulse_lookback_default`、`pulse_primary_event`、`pulse_value_event`、`pulse_completion_events` | Product identity、reporting window，以及代表 engagement、value 和 completion 的 events。Setup interview 会写入这些值。 |
+| [`ce-product-pulse`](./ce-product-pulse.md) | `pulse_quality_scoring`、`pulse_quality_dimension`、`pulse_analytics_source`、`pulse_tracing_source`、`pulse_payments_source`、`pulse_db_enabled` | 可选 quality scoring 和 read-only data-source routing。 |
+| [`ce-product-pulse`](./ce-product-pulse.md) | `pulse_metric_sources`、`pulse_pending_metrics`、`pulse_excluded_metrics` | Per-metric source override，以及应显示为 pending 或排除的 strategy metrics。 |
+| [`ce-promote`](./ce-promote.md) | `ce_promote_spiral_optout` | `true` 抑制一次性的 Spiral setup offer；删除该 key 可重新启用。 |
+| [`ce-sweep`](./ce-sweep.md) | `feedback_sources`、`sweep_state_path`、`sweep_ack_cap`、`sweep_lease_ttl_minutes`、`sweep_shared_branch` | Feedback connectors、durable state location、acknowledgment circuit breaker、lease expiry 和可选 push-gated shared-branch coordination。Setup interview 会写入这些值。 |
 
-## Implementation routing
+## 实现路由
 
-The work engine list is host-relative rather than tied to the checkout's usual harness:
+Work engine list 相对于 host，而不是绑定 checkout 通常使用的 harness：
 
 ```yaml
 work_engine_mode: prefer
@@ -47,15 +47,15 @@ work_engine_preferences:
   - harness: claude
 ```
 
-Supported harnesses are `codex`, `claude`, `grok`, and `cursor`. Omitting `model` uses that harness's configured default. Composer is a model family reached through Cursor, so request it with `harness: cursor` and `model: composer`.
+支持的 harness 为 `codex`、`claude`、`grok` 和 `cursor`。省略 `model` 时使用该 harness 的 configured default。Composer 是通过 Cursor 访问的 model family，因此应使用 `harness: cursor` 和 `model: composer` 请求。
 
-`ce-work` walks the list in order and skips an entry equivalent to the current host/default model. A different explicit model in the same harness remains eligible. With `prefer`, an unavailable list falls back to native implementation with disclosure. With `require`, an interactive CE Work run asks before weakening the route, while LFG and other headless callers block.
+`ce-work` 按顺序遍历该列表，并跳过与当前 host/default model 等价的项。同一 harness 中另一个显式 model 仍然 eligible。使用 `prefer` 时，不可用的列表会回退到 native implementation 并披露；使用 `require` 时，interactive CE Work run 会在弱化 route 前询问，而 LFG 和其他 headless caller 会阻塞。
 
-Current-task wording can select a different route for one run without editing config, such as “use Codex for implementation” or “only use Composer for implementation.” The assignment applies to implementation; the host still owns validation, integration, commits, and the rest of the calling workflow.
+当前任务的措辞可以为单次 run 选择其他 route 而不修改 config，例如“use Codex for implementation”或“only use Composer for implementation”。Assignment 仅作用于 implementation；host 仍负责 validation、integration、commit 和调用 workflow 的其余部分。
 
-## Safe maintenance
+## 安全维护
 
-- Keep the file gitignored. It can contain local integration choices and should not be committed as team policy.
-- Put durable team-wide instructions in the project's normal agent-instructions mechanism, not in this file.
-- Prefer per-run instructions for one-off choices; use config for defaults you want across sessions in the same checkout.
-- Re-run `/ce-setup` after plugin upgrades to refresh the committed example and diagnose retired or malformed settings.
+- 保持该文件被 gitignore。它可能包含 local integration choices，不应作为 team policy 提交。
+- 持久化的 team-wide instructions 应写入项目正常的 agent-instructions 机制，而不是此文件。
+- 一次性选择优先使用 per-run instruction；同一 checkout 跨 session 使用的默认值再写入 config。
+- Plugin 升级后重新运行 `/ce-setup`，刷新已提交的示例并诊断 retired 或 malformed settings。

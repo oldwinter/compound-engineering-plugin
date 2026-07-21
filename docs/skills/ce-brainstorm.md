@@ -46,12 +46,12 @@
 # 用自然语言要求输出自包含 HTML artifact
 /ce-brainstorm 增加账户级通知设置，并把 artifact 做成自包含 HTML 页面
 
-# Equivalent shorthand when a repeatable automation needs it
-/ce-brainstorm add account-level notification settings output:html
+# 可重复 automation 中的等价简写
+/ce-brainstorm 增加账户级通知设置 output:html
 
-# Keep your session on a model like Opus, but generate the approaches on Fable --
-# surgical use of a strong-but-expensive model just for the heavy reasoning step
-/ce-brainstorm add account-level notification settings, use fable
+# Session 继续使用 Opus 等 model，只把 approaches 交给 Fable 生成，
+# 仅在 heavy reasoning step 精准使用强但昂贵的 model
+/ce-brainstorm 增加账户级通知设置, use fable
 ```
 
 ---
@@ -71,18 +71,18 @@
 
 `ce-brainstorm` 运行 structured but conversational flow，并以 durable artifact 结束：
 
-- **One question per turn**, even when sub-questions feel related
-- **Right-sized ceremony** — Lightweight / Standard / Deep / Deep-product tiers
-- **Named gap lenses** force rigor on premises before generating approaches
-- **An opt-in blindspot pass** maps the decision surface of territory the user doesn't know before the interview proceeds on it
-- **A background grounding scout** gathers verbatim repo evidence on a cheap model while you answer the opening questions
-- **2-3 concrete approaches** with tradeoffs, then a stated recommendation
-- **Opt-in visual probes** for decisions that are faster to judge as rough sketches than prose
-- **Synthesis Summary** as the last opportunity to correct scope before the doc lands
-- **Fresh-context claim verification** checks the doc's repo claims before it lands
-- **One coherent work unit per artifact** with a plain-language view of how separately planned work currently fits together
-- **Ready for Planning Check** repairs completeness, consistency, focus, and planning-readiness defects before handoff
-- **Right-sized Product Contract** inside a unified plan with stable identifiers (R/A/F/AE) that flow into planning
+- **One question per turn**，即使 sub-questions 看起来相关
+- **Right-sized ceremony**：Lightweight / Standard / Deep / Deep-product tiers
+- **Named gap lenses** 在生成 approaches 前强迫 premises 严谨
+- **Opt-in blindspot pass** 在 interview 继续探讨用户不熟悉的领域前，先映射其 decision surface
+- **Background grounding scout** 在你回答开场问题时，用 cheap model 收集逐字 repo evidence
+- **2-3 个 concrete approaches**，列出 tradeoffs 并明确 recommendation
+- **Opt-in visual probes** 用于那些通过粗略 sketch 比 prose 更快做出判断的 decisions
+- **Synthesis Summary** 作为 doc 落地前最后一次纠正 scope 的机会
+- **Fresh-context claim verification** 在 doc 落地前检查 repo claims
+- **每个 artifact 一个 coherent work unit**，并用 plain language 说明单独规划的 work 当前如何配合
+- **Ready for Planning Check** 在 handoff 前修复 completeness、consistency、focus 和 planning-readiness defects
+- **Right-sized Product Contract** 内置于 unified plan，并使用会流入 planning 的 stable identifiers（R/A/F/AE）
 
 ---
 
@@ -224,9 +224,9 @@ Phase 4 handoff 提供 planning、agent doc review、publish to Proof、lightwei
 |----------|--------|
 | _(empty)_ | 询问 feature description |
 | `<feature idea>` | Open-ended brainstorm |
-| `<problem>` | Routes via the product pressure test |
-| Existing requirements-only plan path, legacy `*-requirements.md` path, or topic | Resume offer |
-| `output:html` | Write the requirements-only unified plan as a single self-contained HTML file instead of markdown. Exclusive — the artifact is `.md` OR `.html`, never both. Default is markdown. Set `brainstorm_output: html` in `.compound-engineering/config.local.yaml` to make HTML the default. Pipeline mode (LFG, `disable-model-invocation`) always forces markdown so downstream automation gets a stable text shape. See the [configuration reference](./configuration.md). |
+| `<problem>` | 通过 product pressure test 路由 |
+| Existing requirements-only plan path、legacy `*-requirements.md` path 或 topic | Resume offer |
+| `output:html` | 将 requirements-only unified plan 写成单个 self-contained HTML file，而不是 markdown。互斥：artifact 是 `.md` 或 `.html`，绝不同时生成。Default 为 markdown。在 `.compound-engineering/config.local.yaml` 设置 `brainstorm_output: html` 可令 HTML 成为 default。Pipeline mode（LFG、`disable-model-invocation`）始终强制 markdown，使 downstream automation 获得 stable text shape。参见[配置参考](./configuration.md)。 |
 
 ---
 
@@ -252,11 +252,11 @@ Agent 在呈现 scoping synthesis 前，会把 internal draft 分成三类（Sta
 
 ---
 
-## Model elevation
+## Model elevation（模型提升）
 
-When you want a specific model for the heavy reasoning step, `ce-brainstorm` can generate approaches on a model you choose instead of your session model. It dispatches only approach generation to that model, with read access so it can verify its brief; the rest of the skill stays on your session model. Choose per run by naming a model in your prompt ("use fable", "have opus generate these"), or set a default with `brainstorm_model: <model>` in `.compound-engineering/config.local.yaml`. A prompt request overrides the config key.
+需要为 heavy reasoning step 指定 model 时，`ce-brainstorm` 可以用你选择的 model 而非 session model 生成 approaches。它只把 approach generation dispatch 给该 model，并提供 read access 以验证 brief；skill 其余部分留在 session model。可以在 prompt 中为单次 run 指定 model（“use fable”“have opus generate these”），或在 `.compound-engineering/config.local.yaml` 中用 `brainstorm_model: <model>` 设置 default。Prompt request 会覆盖 config key。
 
-This works on any harness: the host serves the chosen model natively where it can, otherwise it invokes the Claude CLI (which must be installed and authenticated), otherwise it runs the step on your session model and tells you which precondition was unmet. **Setting `brainstorm_model` therefore takes effect in every harness you run `ce-brainstorm` in**, not just Claude Code. See `references/reasoning-elevation.md`.
+这适用于任何 harness：host 能原生提供 chosen model 时走原生，否则调用已安装并认证的 Claude CLI，再否则在 session model 上运行该 step，并说明未满足的 precondition。**因此，设置 `brainstorm_model` 会在每个运行 `ce-brainstorm` 的 harness 中生效**，不只 Claude Code。详见 `references/reasoning-elevation.md`。
 
 ---
 

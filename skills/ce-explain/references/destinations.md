@@ -4,19 +4,19 @@ Per-destination mechanics for Phase 6. The menu itself and the one-line action p
 
 ## Claude Artifact
 
-Offered for HTML output when the session is Claude Code and its Artifact tool is present. Give the tool the canonical `$RUN_DIR/explainer.html`, follow its current contract, and confirm the returned URL or reference to the user. The tool owns any adaptation needed for its artifact runtime; do not pre-process the HTML for it.
+当 session 位于 Claude Code 且存在 Artifact tool 时，为 HTML output 提供此选项。把 canonical `$RUN_DIR/explainer.html` 交给 tool，遵循其当前 contract，并向用户确认返回的 URL 或 reference。Tool 负责适配其 artifact runtime；不要预处理 HTML。
 
-## Publish publicly to ht-ml.app
+## 公开发布到 ht-ml.app
 
-This is the preferred HTML publisher when the Claude Artifact adapter is not selected. ht-ml.app accepts the complete standalone HTML document and works through ordinary HTTP, independent of the agent harness.
+未选择 Claude Artifact adapter 时，这是首选 HTML publisher。ht-ml.app 接受完整的 standalone HTML document，通过普通 HTTP 工作，不依赖 agent harness。
 
-Before publishing, the destination option itself must state: **the page is public and may be indexed, crawled, copied, or archived**. When the user's initial request explicitly selected ht-ml.app and the menu is skipped, state the same full warning in chat and ask for explicit confirmation after the warning before any publish; “this is public” is not the complete warning, and the initial request itself does not count as confirmation. Only a warned menu selection or explicit post-warning confirmation permits publishing. If confirmation cannot be obtained, do not publish; preserve the canonical `$RUN_DIR/explainer.html` and report its local path. Never publish headlessly or infer consent from the fact that an explainer was requested. If the content is sensitive, route to Local file instead.
+发布前，destination option 本身必须声明：**页面是公开的，可能被索引、爬取、复制或归档**。如果用户的初始请求明确选择了 ht-ml.app，因而跳过菜单，也要在 chat 中给出同样完整的警告，并在任何 publish 前取得警告后的明确确认；“这是公开的”并非完整警告，初始请求本身也不算确认。只有选择了已带警告的菜单选项，或在警告后明确确认，才允许发布。如果无法取得确认，不得发布；保留 canonical `$RUN_DIR/explainer.html` 并报告其 local path。绝不 headlessly 发布，也不要因为用户请求了 explainer 就推断 consent。内容敏感时，改为路由到 Local file。
 
-After the user selects the warned option or explicitly confirms after the warning:
+用户选择已警告的选项，或在警告后明确确认后：
 
-1. Prefer any ht-ml.app or general HTML-publishing capability detected in the current session. When it is a skill, invoke it through the platform's skill-invocation primitive with the canonical `$RUN_DIR/explainer.html` and the user's public-publishing confirmation; otherwise call the detected tool, connector, or browser capability directly. Follow that capability's current contract. Do not assume a particular skill name or installation path.
-2. When no publisher is installed, use a reachable web or HTTP interface to follow ht-ml.app's agent-facing instructions at `https://ht-ml.app/llms.txt` (or its linked API help) and publish the complete canonical HTML. The explainer is already composed; do not select a template or redesign it.
-3. Surface the returned URL. Treat any returned update credential as a secret: do not print it in chat or embed it in the page. On failure, retry once after a short wait, then report the error and fall back to the canonical local-file path.
+1. 优先使用当前 session 检测到的任何 ht-ml.app 或通用 HTML-publishing capability。如果它是 skill，就通过平台的 skill-invocation primitive 调用，传入 canonical `$RUN_DIR/explainer.html` 和用户对公开发布的确认；否则直接调用检测到的 tool、connector 或 browser capability。遵循该 capability 当前 contract。不要假设特定 skill name 或 installation path。
+2. 没有安装 publisher 时，使用可访问的 web 或 HTTP interface，遵循 `https://ht-ml.app/llms.txt`（或其中链接的 API help）面向 agent 的说明，并发布完整 canonical HTML。Explainer 已经组成；不要选择 template，也不要重新设计。
+3. 展示返回的 URL。把任何返回的 update credential 当作 secret：不要在 chat 中打印，也不要嵌入页面。失败时短暂等待后重试一次，然后报告 error，并回退到 canonical local-file path。
 
 ## Local file
 

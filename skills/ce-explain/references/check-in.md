@@ -8,18 +8,18 @@ Offer a check-in when retention is the point: a hard or unfamiliar concept, a gn
 
 The user can always decline the offer, and a decline is final for the run — do not re-offer.
 
-Offer exactly two choices in this order:
+严格按以下顺序提供两个 choices：
 
-1. **Just the explainer (Recommended)** — build the report and skip prediction and exercises.
-2. **Quiz me** — run the applicable prediction or exercise loop.
+1. **Just the explainer (Recommended)** — 构建 report，跳过 prediction 和 exercises。
+2. **Quiz me** — 运行适用的 prediction 或 exercise loop。
 
-Do not mark the quiz as recommended. Most runs want the explainer; active recall is the deliberate opt-in.
+不要把 quiz 标为 recommended。多数 run 需要的是 explainer；active recall 应由用户主动 opt in。
 
 In diff mode, word the offer without describing the change's content or purpose — an offer that summarizes the change pre-leaks the reveal.
 
 ## Predict-then-reveal (diff mode)
 
-Run this section only when the user's exact choice was **Quiz me**. **Just the explainer** skips the prediction and proceeds directly to composition.
+仅当用户的确切选择为 **Quiz me** 时运行此 section。**Just the explainer** 会跳过 prediction，直接进入 composition。
 
 The prediction must come before any interpretation reaches the user, or the mechanic is dead on arrival.
 
@@ -30,7 +30,7 @@ The prediction must come before any interpretation reaches the user, or the mech
 
 ## Exercises (concepts, ideas, dense recaps)
 
-Run this section only when the user's exact choice was **Quiz me**.
+仅当用户的确切选择为 **Quiz me** 时运行此 section。
 
 Two to four exercises, posed in chat one at a time after the artifact is presented. Design them to expose understanding, not recall of the artifact's phrasing:
 

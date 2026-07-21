@@ -25,13 +25,13 @@ GH_HOST=<host> bash "$SKILL_DIR/scripts/get-thread-for-comment" PR_NUMBER COMMEN
 
 This fetches thread IDs and their first comment IDs (minimal fields, no bodies) and returns the matching thread with full comment details.
 
-**Step 3** -- Check for your own unsubmitted review before doing any work. A reply posted while you hold one is absorbed into that draft: the call returns a comment ID and URL as if it succeeded, but the reviewer sees nothing until the draft is submitted. Full Mode gets this free from `get-pr-comments`; targeted mode never calls that script, so check directly (PENDING reviews are only visible to their author, so any hit is yours):
+**Step 3** -- 开始任何工作前，检查自己是否有尚未提交的 review。当你持有这种 review 时，发布的 reply 会被吸收到该 draft：调用会像成功一样返回 comment ID 和 URL，但 draft 提交前 reviewer 看不到任何内容。Full Mode 可从 `get-pr-comments` 直接获得此信息；targeted mode 不会调用该 script，因此要直接检查（PENDING reviews 只对 author 可见，所以任何命中都属于你）：
 ```bash
 GH_HOST=<host> gh api --paginate repos/OWNER/REPO/pulls/PR_NUMBER/reviews --jq '.[] | select(.state == "PENDING") | .id'
 ```
-`--paginate` is required: this endpoint is chronological and pages at 30, so a draft can sort past page 1. Print IDs rather than a count — `--jq` runs per page, so a count emits one number per page, but IDs simply concatenate and stay empty when there is no draft. (`--slurp` is not an option; `gh` rejects it alongside `--jq`.)
+必须使用 `--paginate`：该 endpoint 按时间顺序排列，每页 30 项，因此 draft 可能排到第 1 页之后。输出 IDs 而不是 count；`--jq` 会逐页运行，因此 count 每页输出一个数字，而 IDs 只会依次拼接，并在没有 draft 时保持为空。（`--slurp` 不可用；与 `--jq` 同时使用时 `gh` 会拒绝。）
 
-If this prints anything, stop. Tell the user they have an unsubmitted review on the PR and that it must be submitted or discarded before this skill can reply. Do not submit or discard it yourself; a draft review is unsent human writing.
+如果输出了任何内容，就停止。告诉用户该 PR 上有一个尚未提交的 review，必须先提交或丢弃，skill 才能回复。不要自行提交或丢弃；draft review 是尚未发送的人工内容。
 
 ## 2. Judge, Fix, Reply, Resolve
 

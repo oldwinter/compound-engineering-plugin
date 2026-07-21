@@ -1123,7 +1123,7 @@ describe("cross-model peer skip legibility", () => {
       // to classify a quota/usage-limit exhaustion (harness-agnostic reasoning).
       expect(referenceSrc).toContain("peer skip evidence:")
       expect(referenceSrc).toMatch(/quota|usage-limit/i)
-      expect(referenceSrc).toMatch(/more than once in this session/i)
+      expect(referenceSrc).toMatch(/本 session 出现超过一次/i)
     })
   }
 
@@ -1145,9 +1145,9 @@ describe("cross-model peer skip legibility", () => {
       // Collapse whitespace: ce-pov hard-wraps prose, so the anchor phrases can
       // straddle a line break while the code-review/doc-review bullets do not.
       const src = (await readRepoFile(reference)).replace(/\s+/g, " ")
-      expect(src).toContain("describes only the peer's execution context")
+      expect(src).toContain("只描述 peer 的 execution context")
       expect(src).toContain(
-        "never report it as the user's account being logged out",
+        "绝不要据此报告用户 account 已退出登录",
       )
     })
   }

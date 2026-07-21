@@ -679,7 +679,7 @@ Fires **whenever Phase 0.2 resolved an upstream Product Contract source** — a 
 
 #### 5.2 Write Plan File
 
-**Model elevation.** Before authoring the plan, load `references/reasoning-elevation.md` and follow it. It resolves whether the user chose a model for the interpret-findings-then-author step — from this run's prompt or the `plan_model` config key — and if so dispatches that one step to the chosen model on any harness, with a read-only verifying handoff and transparent fallback to your session model. When no model is chosen it is a no-op; proceed normally. It runs the same on every harness — do not gate it on the host.
+**Model elevation。** 编写 plan 前，加载并遵循 `references/reasoning-elevation.md`。它会从本次 run 的 prompt 或 `plan_model` config key 判断用户是否为 interpret-findings-then-author step 选择了 model；如果已选择，就在任何 harness 上把这一步分派给所选 model，并进行 read-only verifying handoff，在失败时透明回退到 session model。未选择 model 时它是 no-op，正常继续。在所有 harness 上行为相同，不要按 host 设置 gate。
 
 **REQUIRED: Write the plan file to disk before presenting any options.**
 

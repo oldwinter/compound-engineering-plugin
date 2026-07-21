@@ -115,7 +115,7 @@ describe("unified plan artifact contract", () => {
     expect(brainstormSkill).toContain("docs/plans/YYYY-MM-DD-NNN-<type>-<topic>-plan")
     expect(brainstormSkill).toContain("artifact_readiness: requirements-only")
     expect(brainstormSkill).toContain("product_contract_source: ce-brainstorm")
-    expect(brainstormSkill).toContain("Do **not** emit a Goal Launch Block or Reader Index")
+    expect(brainstormSkill).toContain("**不要**输出 Goal Launch Block 或 Reader Index")
     expect(brainstormSkill).toContain("new `ce-brainstorm` outputs do not write there")
     expect(brainstormSkill).toContain("non-software route does **not** write `artifact_contract: ce-unified-plan/v1`")
 
@@ -142,19 +142,19 @@ describe("unified plan artifact contract", () => {
   })
 
   test("brainstorm self-reviews the written artifact before its handoff", () => {
-    expect(brainstormSkill).toContain("Ready for Planning Check")
+    expect(brainstormSkill).toContain("规划就绪检查")
     for (const check of ["Complete", "Consistent", "Focused", "Usable by planning"]) {
       expect(brainstormSections).toContain(`**${check}**`)
     }
-    expect(brainstormSections).toMatch(/Fix a failed check in place.*preserves settled intent/s)
-    expect(brainstormSections).toContain("ask one targeted question")
-    expect(brainstormSections).toMatch(/choose or change product behavior or\s+scope/)
-    expect(brainstormSkill).toContain("Do not declare the artifact written or enter Phase 4 while any check fails")
+    expect(brainstormSections).toMatch(/如果修正能保留已确定的 intent.*就地修复失败项/s)
+    expect(brainstormSections).toContain("提出一个有针对性的问题")
+    expect(brainstormSections).toMatch(/选择或改变 product behavior 或 scope/)
+    expect(brainstormSkill).toContain("只要还有检查失败，就不得宣布 artifact 已写入或进入 Phase 4")
   })
 
   test("brainstorm handoff explains that downstream work consumes the written artifact", () => {
     expect(brainstormHandoff).toContain(
-      "Planning and shipping will use this artifact as the definition of what to build.",
+      "Planning 和 shipping 会把此 artifact 作为构建内容的定义。",
     )
   })
 
@@ -188,7 +188,7 @@ describe("unified plan artifact contract", () => {
     expect(ceWork).toContain("requirements-only` -> stop")
     expect(ceWork).toContain("Any other readiness value")
     expect(ceWork).toContain("Build a section map")
-    expect(ceWork).toContain("Do not send \"read the whole plan\"")
+    expect(ceWork).toContain("不要把“读取整个 plan”作为 worker prompt")
     expect(ceWork).toContain("mode:return-to-caller <plan-path>")
     expect(ceWork).toContain("standalone_shipping_skipped: true")
     expect(ceWork).not.toContain("artifact_readiness: approach-plan")
@@ -202,36 +202,36 @@ describe("unified plan artifact contract", () => {
     expect(lfg).toContain("mode:return-to-caller <plan-path-from-step-1>")
     expect(lfg).toContain("standalone_shipping_skipped: true")
     expect(lfg).toContain("verification_evidence")
-    expect(lfg).toContain("Do NOT decide the test strategy inside LFG")
-    expect(lfg).toContain("invoke `ce-work` one more time in recovery mode")
+    expect(lfg).toContain("不要在 LFG 内决定 test strategy")
+    expect(lfg).toContain("以 recovery mode 再调用 `ce-work` 一次")
     expect(lfg).toContain("implementation_run:<safe-id>")
-    expect(lfg).toContain("When `actual_route` is `native` and `run_id` is `null`")
-    expect(lfg).toContain("repeat the original ce-work invocation once without an `implementation_run:` carrier")
-    expect(lfg).toContain("A non-native return without a safe run id remains blocked")
-    expect(lfg).toContain("stop as blocked and report the missing fields")
+    expect(lfg).toContain("`actual_route` 为 `native` 且 `run_id` 为 `null`")
+    expect(lfg).toContain("不带 `implementation_run:` 重复 original ce-work invocation 一次")
+    expect(lfg).toContain("Non-native return 没有 safe run id 时保持 blocked")
+    expect(lfg).toContain("blocked stop 并报告 missing fields")
     expect(lfg).toContain("ce-code-review` skill with `mode:agent plan:<plan-path-from-step-1>`")
     expect(lfg).not.toContain("artifact_readiness: approach-plan")
   })
 
   test("lfg offers an opt-in fresh-session handoff for separately planned future work", () => {
     expect(lfg).toContain("semantic role `work-relationships`")
-    expect(lfg).toContain("cautious legacy semantic fallback")
+    expect(lfg).toContain("谨慎 legacy semantic fallback")
     expect(lfg).toContain("references/next-work-handoff.md")
-    expect(lfg).toMatch(/older unmarked Product Contract.*area this plan owns.*future separately planned areas/s)
-    expect(lfg).toContain("Do not match an exact visible heading")
-    expect(lfg).toMatch(/do not .*invoke `ce-handoff` before the user explicitly accepts/i)
+    expect(lfg).toMatch(/older unmarked Product Contract.*plan-owned area.*future separately planned areas/s)
+    expect(lfg).toContain("不要匹配 exact visible heading")
+    expect(lfg).toMatch(/用户明确接受 offer 前调用 `ce-handoff`/i)
 
     expect(lfgNextWorkHandoff).toContain("<!-- ce-section: work-relationships -->")
     expect(lfgNextWorkHandoff).toContain('data-ce-section="work-relationships"')
-    expect(lfgNextWorkHandoff).toContain("The visible heading is not part of this protocol")
-    expect(lfgNextWorkHandoff).toMatch(/larger body of separately planned work/i)
-    expect(lfgNextWorkHandoff).toMatch(/already planned, completed, absorbed/i)
-    expect(lfgNextWorkHandoff).toMatch(/Do not choose by document\s+order/)
-    expect(lfgNextWorkHandoff).toContain("One justified winner")
-    expect(lfgNextWorkHandoff).toContain("Real tie")
-    expect(lfgNextWorkHandoff).toContain("No ready candidate")
-    expect(lfgNextWorkHandoff).toContain("Only after explicit acceptance")
-    expect(lfgNextWorkHandoff).toContain("LFG owns the recommendation")
+    expect(lfgNextWorkHandoff).toContain("Visible heading 不属于该 protocol")
+    expect(lfgNextWorkHandoff).toMatch(/一组更大、分开规划的 work/i)
+    expect(lfgNextWorkHandoff).toMatch(/planned、completed、被刚完成 work 吸收/i)
+    expect(lfgNextWorkHandoff).toMatch(/不要根据 document order/)
+    expect(lfgNextWorkHandoff).toContain("存在一个有依据的 winner")
+    expect(lfgNextWorkHandoff).toContain("真正并列")
+    expect(lfgNextWorkHandoff).toContain("没有 ready candidate")
+    expect(lfgNextWorkHandoff).toContain("只有得到明确接受后")
+    expect(lfgNextWorkHandoff).toContain("LFG 负责 recommendation")
 
     for (const field of [
       "Next-session objective",
@@ -245,51 +245,51 @@ describe("unified plan artifact contract", () => {
       "Other candidates not selected",
       "Artifact boundary",
     ]) {
-      expect(lfgNextWorkHandoff).toContain(`**${field}:**`)
+      expect(lfgNextWorkHandoff).toContain(`**${field}：**`)
     }
-    expect(lfgNextWorkHandoff).toMatch(/separate requirements-only unified plan/i)
-    expect(lfgNextWorkHandoff).toMatch(/do not extend or edit the prior plan/i)
+    expect(lfgNextWorkHandoff).toMatch(/单独的 requirements-only unified plan/i)
+    expect(lfgNextWorkHandoff).toMatch(/不扩展或编辑 prior plan/i)
   })
 
   test("lfg carries implementation routing only at the ce-work seam", () => {
     const carrier = sliceSection(
       lfg,
       "## Implementation-only routing carrier",
-      "1. Invoke the `ce-plan` skill",
+      "1. 用上述 sanitized feature request 调用 `ce-plan`",
     )
     expect(carrier).toContain("semantic intent")
-    expect(carrier).toContain("not keyword or prompt-token matching")
-    expect(carrier).toContain("plain mention")
-    expect(carrier).toContain('"use Codex for implementation"')
-    expect(carrier).toContain('"only use Composer for implementation"')
+    expect(carrier).toContain("不做 keyword/prompt-token matching")
+    expect(carrier).toContain("普通提到")
+    expect(carrier).toContain("use Codex for implementation")
+    expect(carrier).toContain("only use Composer for implementation")
     expect(carrier).toContain("implementation_engine")
     for (const field of ["mode", "target", "model", "source"]) {
       expect(carrier).toContain(`\`${field}\``)
     }
-    expect(carrier).toContain("exactly these four fields")
-    expect(carrier).toContain("Never pass")
+    expect(carrier).toContain("恰好含以下四个 fields")
+    expect(carrier).toContain("绝不将")
     expect(carrier).toContain("`ce-plan`")
-    expect(carrier).toContain("planning or review")
+    expect(carrier).toContain("planning/review")
 
     const step2 = sliceSection(
       lfg,
-      "2. Invoke the `ce-work` skill",
+      "2. 没有 scalar transient carrier 时",
       "3. Invoke the `ce-simplify-code` skill",
     )
     expect(step2).toContain("mode:return-to-caller implementation_engine:<compact-json> <plan-path-from-step-1>")
     expect(step2).toContain("mode:return-to-caller implementation_engine:<compact-json> implementation_run:<safe-id> <plan-path-from-step-1>")
     expect(step2).toContain('implementation_engine:{"mode":"prefer","target":"codex","model":null,"source":"lfg-current-turn"}')
     expect(step2).toContain("portable string envelope")
-    expect(step2).toContain("standing per-checkout configuration")
-    expect(carrier).toContain("Do not construct a carrier from standing configuration")
-    expect(step2).toContain("same `implementation_engine:<compact-json>` carrier")
-    expect(step2).toContain("same `run_id`")
+    expect(step2).toContain("standing per-checkout config")
+    expect(carrier).toContain("不要在这里根据 standing config 构建 carrier")
+    expect(step2).toContain("`implementation_engine:<compact-json>` carrier 时复用")
+    expect(step2).toContain("同一 `run_id`")
   })
 
   test("lfg's route-aware return gate preserves its shipping tail", () => {
     const step2 = sliceSection(
       lfg,
-      "2. Invoke the `ce-work` skill",
+      "2. 没有 scalar transient carrier 时",
       "3. Invoke the `ce-simplify-code` skill",
     )
     for (const field of [
@@ -308,11 +308,11 @@ describe("unified plan artifact contract", () => {
       expect(step2).toContain(`\`${field}\``)
     }
     expect(step2).toContain("`prefer`")
-    expect(step2).toContain("continue to step 3 exactly once")
-    expect(step2).toContain("prominently disclosing its requested-versus-actual route/model")
+    expect(step2).toContain("恰好继续 step 3 一次")
+    expect(step2).toContain("醒目披露 requested/actual route/model")
     expect(step2).toContain("`require`")
-    expect(step2).toContain("must not prompt")
-    expect(step2).toContain("stop the pipeline")
+    expect(step2).toContain("不得 prompt")
+    expect(step2).toContain("停止 pipeline")
   })
 
   test("review and publishing skills understand unified artifacts", () => {
@@ -395,17 +395,17 @@ describe("unified plan artifact contract", () => {
   test("ce-work Phase 0 parses the return-to-caller mode token before triage", () => {
     // Codex #972 P1: lfg passes `mode:return-to-caller <plan-path>`; ce-work
     // must strip the mode token, not treat the whole string as a bare prompt.
-    expect(ceWork).toMatch(/begins with `mode:return-to-caller`/i)
+    expect(ceWork).toMatch(/以 `mode:return-to-caller`[^\n]*开头/i)
     // legacy alias still recognized so an old reference doesn't break.
-    expect(ceWork).toMatch(/legacy aliases `mode:caller-owned-tail`/i)
-    expect(ceWork).toMatch(/strip that token/i)
-    expect(ceWork).toMatch(/one compact JSON object prefixed exactly `implementation_engine:`/i)
+    expect(ceWork).toMatch(/legacy alias `mode:caller-owned-tail`/i)
+    expect(ceWork).toMatch(/先 strip token/i)
+    expect(ceWork).toMatch(/以 `implementation_engine:` 为 prefix 的 compact JSON object/i)
     expect(ceWork).toContain("after any mode token is stripped")
   })
 
   test("ce-work surfaces its caller-owned mode in discovery metadata and public docs", () => {
-    expect(ceWork).toMatch(/description:.*outer orchestrators pass `mode:return-to-caller \[implementation_engine:<compact-json>\] \[implementation_run:<safe-id>\] <plan path>`/i)
-    expect(ceWork).toMatch(/argument-hint:.*mode:return-to-caller \[implementation_engine:<compact-json>\] \[implementation_run:<safe-id>\] <plan path> for outer orchestrators/i)
+    expect(ceWork).toMatch(/description:.*outer orchestrators 传入 `mode:return-to-caller \[implementation_engine:<compact-json>\] \[implementation_run:<safe-id>\] <plan path>`/i)
+    expect(ceWork).toMatch(/argument-hint:.*供 outer orchestrators 使用的 mode:return-to-caller \[implementation_engine:<compact-json>\] \[implementation_run:<safe-id>\] <plan path>/i)
     expect(ceWorkDocs).toContain("## Use Beneath an Outer Orchestrator")
     expect(ceWorkDocs).toContain("standalone_shipping_skipped: true")
     expect(ceWorkDocs).toMatch(/does not run the standalone shipping tail/i)
@@ -439,7 +439,7 @@ describe("unified plan artifact contract", () => {
     // instead it carries the PR-precedence line (plan strategy, repo/user override).
     // (Structural no-PR lives only in return-to-caller mode, asserted separately below.)
     expect(ceWorkEngines).toMatch(/plan-agnostic/i)
-    expect(ceWorkEngines).toMatch(/don't hardcode an open-a-PR/i)
+    expect(ceWorkEngines).toMatch(/不 hardcode open\/do-not-open PR directive/i)
     expect(ceWorkEngines).toMatch(/Follow the plan's PR\/landing strategy if it defines one/i)
     // plan-sections no longer prescribes a launch-prompt/Goal Launch Block section.
     expect(planSections).not.toMatch(/evaluator-complete/i)
@@ -499,16 +499,16 @@ describe("unified plan artifact contract", () => {
 
   test("execution engines define a Codex lane, progress-visibility, and compaction recovery", () => {
     // Codex #972-review P1 #3 / P2 #9 / P2 #10
-    expect(ceWorkEngines).toContain("Codex specifically")
+    expect(ceWorkEngines).toContain("Codex 特别说明")
     // Codex exposes a callable goal tool; the skill starts it and does NOT call update_goal.
     expect(ceWorkEngines).toContain("create_goal")
-    expect(ceWorkEngines).toMatch(/skill does NOT call `update_goal`/i)
-    expect(ceWorkEngines).toMatch(/start goal-mode directly, with no copy-paste/i)
+    expect(ceWorkEngines).toMatch(/Skill 自己不调用 `update_goal`/i)
+    expect(ceWorkEngines).toMatch(/直接启动 goal-mode，无需 copy-paste/i)
     // Claude Code has no goal tools → copy-paste only.
-    expect(ceWorkEngines).toMatch(/Claude Code exposes no goal tools/i)
-    expect(ceWorkEngines).toContain("Progress visibility (independent of tail ownership)")
-    expect(ceWorkEngines).toMatch(/must not open any PR/i)
-    expect(ceWorkEngines).toMatch(/draft\*?\*? PR only/i)
+    expect(ceWorkEngines).toMatch(/Claude Code 没有 goal tools/i)
+    expect(ceWorkEngines).toContain("Progress visibility（独立于 tail ownership）")
+    expect(ceWorkEngines).toMatch(/return-to-caller mode 下 `ce-work` 不得 open PR/i)
+    expect(ceWorkEngines).toMatch(/才可 open \*\*draft\*\* PR/i)
     expect(ceWorkEngines).toMatch(/re-open the plan and re-check/i)
     expect(ceWorkEngines).toMatch(/compacted to a summary/i)
   })
@@ -532,15 +532,15 @@ describe("unified plan artifact contract", () => {
     expect(ceWork).toContain("Choose Execution Engine")
     expect(ceWork).toContain("references/execution-engines.md")
     expect(ceWork).toContain("dynamic-workflow")
-    expect(ceWork).toMatch(/prompt-emission only|never invoked from inside this skill/i)
+    expect(ceWork).toMatch(/只能生成 prompt|绝不从该 skill 内调用/i)
 
-    expect(ceWorkEngines).toContain("Probe host capability")
+    expect(ceWorkEngines).toContain("探测 host capability")
     expect(ceWorkEngines).toContain("/goal Implement <plan-path>")
     expect(ceWorkEngines).toContain("ultracode:")
-    expect(ceWorkEngines).toMatch(/Resume the correct tail/i)
+    expect(ceWorkEngines).toMatch(/恢复正确 tail/i)
     expect(ceWorkEngines).toContain("standalone_shipping_skipped: true")
     // No-PR is now structural (return-to-caller only); standalone defers to repo/user conventions.
-    expect(ceWorkEngines).toMatch(/must not open any PR/i)
+    expect(ceWorkEngines).toMatch(/return-to-caller mode 下 `ce-work` 不得 open PR/i)
   })
 })
 
@@ -582,8 +582,8 @@ describe("session-settled decision contract", () => {
   test("lfg brief carries the four required fields, recognizes the blocked token, and retries the brief verbatim", () => {
     const step1 = sliceSection(
       lfg,
-      "1. Invoke the `ce-plan` skill",
-      "2. Invoke the `ce-work` skill",
+      "1. 用上述 sanitized feature request 调用 `ce-plan`",
+      "2. 没有 scalar transient carrier 时",
     )
     for (const field of [
       "the decision",

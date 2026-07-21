@@ -25,7 +25,7 @@ This skill does not implement code. It explores, clarifies, and documents decisi
 5. **Right-size the artifact** - Simple work gets a compact requirements-only unified plan or brief alignment. Larger work gets a fuller Product Contract. Do not add ceremony that does not help planning.
 6. **Apply YAGNI to carrying cost, not coding effort** - Prefer the simplest approach that delivers meaningful value. Avoid speculative complexity and hypothetical future-proofing, but low-cost polish or delight is worth including when its ongoing cost is small and easy to maintain.
 7. **Do not turn coverage into decomposition** - For software brainstorms, treat named devices, providers, and data sources as coverage requirements, not automatically as separate integration workstreams. Split them only when a shared access path cannot satisfy a named requirement. Leave connector selection to planning unless that choice materially changes product scope or behavior.
-8. **Keep one coherent work unit per artifact** - When a request contains independently valuable outcomes that can be planned and delivered separately, choose one as the current focus before deep exploration. Preserve how the surrounding work is currently understood without turning tentative future areas into requirements for this plan.
+8. **每个 artifact 只保留一个连贯 work unit** - 当请求包含可分别规划和交付、各自具有独立价值的 outcomes 时，在深入探索前选择一个作为当前焦点。保留对周边工作的现有理解，但不要把暂定的未来领域变成本 plan 的 requirements。
 
 ## Interaction Rules
 
@@ -136,17 +136,17 @@ Use the feature description plus a light repo scan to classify the work:
 
 If the scope is unclear, ask one targeted question to disambiguate and then proceed.
 
-**Coherent-work gate.** Before entering Phase 1, check whether the request contains more than one independently plannable product outcome: each has its own user value or acceptance boundary and could be delivered without completing the others. Shared actors, one end-to-end outcome, or coverage across named devices/providers do not by themselves justify a split.
+**连贯工作 gate。** 进入 Phase 1 前，检查请求是否包含多个可独立规划的 product outcome：每个 outcome 都有自己的用户价值或验收边界，并且无需完成其他 outcome 即可交付。共享 actors、同一个端到端 outcome，或覆盖多个指定设备/provider，本身都不足以成为拆分理由。
 
-When the gate finds multiple coherent areas:
+当 gate 发现多个连贯领域时：
 
-1. Propose a plain-language breakdown and state only relationships supported now: which areas depend on or enable others, share a product rule, or can proceed independently.
-2. Ask which one area this brainstorm should own. If the user already chose one, carry it forward instead of asking again.
-3. Treat that area as the sole source of Requirements, Flows, Acceptance Examples, and later Implementation Units. Other areas remain contextual candidates, not scope.
-4. Preserve the current broader understanding for Phase 3's **How This Work Fits Together** section. Mark tentative relationships as tentative; later brainstorms may revise, split, merge, or discard them.
-5. Carry the boundary into the Goal Capsule: name the current area in its objective and state that the surrounding areas are not active scope.
+1. 用直白语言提出拆分方式，只陈述当前有依据的关系：哪些领域依赖或支持其他领域、共享 product rule，或可以独立推进。
+2. 询问本次 brainstorm 应负责哪一个领域。如果用户已经选定，就直接沿用，不要重复提问。
+3. 仅把该领域作为 Requirements、Flows、Acceptance Examples 以及后续 Implementation Units 的来源。其他领域只是上下文候选项，不属于 scope。
+4. 为 Phase 3 的 **How This Work Fits Together** section 保留当前的整体理解。把暂定关系标为暂定；后续 brainstorm 可以修改、拆分、合并或放弃它们。
+5. 把这个边界带入 Goal Capsule：在 objective 中点明当前领域，并说明周边领域不属于 active scope。
 
-Keep the work together when the outcomes cannot be independently useful or validated, or when separating them would force this Product Contract to invent the missing shared behavior. This gate narrows the active artifact; it does not create a parent plan or a roadmap.
+如果 outcomes 无法独立产生价值或接受验证，或者拆分会迫使 Product Contract 臆造缺失的共享行为，就应把工作保留在一起。这个 gate 只收窄 active artifact，不创建 parent plan 或 roadmap。
 
 **Deep sub-mode: feature vs product.** For Deep scope, also classify whether the brainstorm must establish product shape or inherit it:
 
@@ -256,7 +256,7 @@ Follow the Interaction Rules above. Use the platform's blocking question tool wh
 
 ### Phase 2: Explore Approaches
 
-**Model elevation.** Before generating approaches, load `references/reasoning-elevation.md` and follow it. It resolves whether the user chose a model for approach generation — from this run's prompt or the `brainstorm_model` config key — and if so dispatches that one step to the chosen model on any harness, with a read-only verifying handoff and transparent fallback to your session model. When no model is chosen it is a no-op; proceed normally. It runs the same on every harness — do not gate it on the host.
+**Model elevation。** 生成 approaches 前，加载并遵循 `references/reasoning-elevation.md`。它会从本次 run 的 prompt 或 `brainstorm_model` config key 判断用户是否为 approach generation 选择了 model；如果已选择，就在任何 harness 上把这一步分派给所选 model，并进行 read-only verifying handoff，在失败时透明回退到 session model。未选择 model 时它是 no-op，正常继续。在所有 harness 上行为相同，不要按 host 设置 gate。
 
 If multiple plausible directions remain, propose **2-3 concrete approaches** based on research and conversation. Otherwise state the recommended direction directly.
 
@@ -319,11 +319,11 @@ When a doc is warranted, compose it using:
 
 Session-settled decisions land in the Product Contract's Key Decisions section carrying their `session-settled:` annotation (shape in `references/settled-decisions.md`), so `ce-plan` enrichment inherits the label into plan KTDs.
 
-**Write tight.** A section being material is not license to pad it. Hold every kept section to the prose-economy discipline in `references/brainstorm-sections.md`: lead with the decision or outcome, one idea per sentence, a requirement is intent plus at most one qualifier, defer forks to Outstanding Questions rather than specifying both arms, resolve superseded text in place rather than stacking strata.
+**精炼写作。** section 内容重要不等于可以填充篇幅。所有保留的 section 都要遵循 `references/brainstorm-sections.md` 的 prose-economy 纪律：先写 decision 或 outcome；每句只表达一个 idea；一条 requirement 只包含 intent 和至多一个 qualifier；把分叉推迟到 Outstanding Questions，而不是同时规定两条路径；就地替换已失效文本，不要层层堆叠。
 
-Write to `docs/plans/YYYY-MM-DD-NNN-<type>-<topic>-plan.<md|html>` — extension follows `OUTPUT_FORMAT`. Include `artifact_contract: ce-unified-plan/v1`, `artifact_readiness: requirements-only`, and `product_contract_source: ce-brainstorm`. Title is `<Name> - Plan` (matching the H1; no conventional-commit prefix). Keep the doc light and standalone-readable: a Goal Capsule (objective, product authority, open blockers) and the Product Contract. Do **not** emit a Goal Launch Block or Reader Index. See `references/brainstorm-sections.md` — which owns the artifact content rules, including repo-relative file paths inside the doc.
+写入 `docs/plans/YYYY-MM-DD-NNN-<type>-<topic>-plan.<md|html>`，扩展名遵循 `OUTPUT_FORMAT`。包含 `artifact_contract: ce-unified-plan/v1`、`artifact_readiness: requirements-only` 和 `product_contract_source: ce-brainstorm`。标题为 `<Name> - Plan`（与 H1 一致，不加 conventional-commit 前缀）。文档保持轻量且可独立阅读：一个 Goal Capsule（objective、product authority、open blockers）和 Product Contract。**不要**输出 Goal Launch Block 或 Reader Index。参见 `references/brainstorm-sections.md`，artifact 内容规则由它负责，包括文档中的 repo-relative file paths。
 
-**Ready for Planning Check.** After writing the actual file, run the four checks in `references/brainstorm-sections.md`: Complete, Consistent, Focused, and Usable by planning. Fix failures in place when the correction preserves settled intent, then rerun the failed checks. If a correction would choose or change product behavior or scope, ask one targeted question, update the artifact after the answer, and rerun the checks. Do not declare the artifact written or enter Phase 4 while any check fails. When confirming in chat after the pass, report the artifact with its absolute path so the reference is clickable.
+**规划就绪检查。** 写入实际文件后，运行 `references/brainstorm-sections.md` 中的四项检查：Complete、Consistent、Focused、Usable by planning。如果修正不会改变已确定的 intent，就地修复失败项并重新检查。如果修正会选择或改变 product behavior 或 scope，提出一个有针对性的问题，得到回答后更新 artifact 并重跑检查。只要还有检查失败，就不得宣布 artifact 已写入或进入 Phase 4。通过后在 chat 中确认时，使用 absolute path 报告 artifact，使引用可点击。
 
 #### Vocabulary Capture — after the requirements-only unified plan (only if CONCEPTS.md already exists)
 

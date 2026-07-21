@@ -1,96 +1,58 @@
-# Next-work handoff
+# 下一工作交接
 
-Use this only at LFG closeout, after the current pipeline has reached its
-terminal state. Its purpose is to offer continuity into a separately planned
-area without silently extending the completed plan or current session.
+仅在 LFG closeout、当前 pipeline 已到达 terminal state 后使用。其目的，是在不静默扩展已完成 plan 或当前 session 的前提下，为一个独立规划的 area 提供连续性。
 
-## Establish whether an offer is warranted
+## 判断是否值得提出 offer
 
-Start from the canonical plan path retained from LFG step 1. Locate a Product
-Contract section carrying the semantic role `work-relationships`:
+从 LFG step 1 保留的 canonical plan path 开始，查找带有 `work-relationships` semantic role 的 Product Contract section：
 
-- Markdown: `<!-- ce-section: work-relationships -->`
-- HTML: `data-ce-section="work-relationships"`
+- Markdown：`<!-- ce-section: work-relationships -->`
+- HTML：`data-ce-section="work-relationships"`
 
-The visible heading is not part of this protocol. For an older unmarked plan,
-use a semantic fallback only when one Product Contract section clearly names
-the area owned by this plan, one or more future areas intended for separate
-planning, and their relationships. Do not infer eligibility from an exact
-heading, a generic list of non-goals, or a roadmap-like wish list. If the
-section's meaning is ambiguous, make no offer.
+Visible heading 不属于该 protocol。对于较旧且无 marker 的 plan，只有某个 Product Contract section 明确指出本 plan 负责的 area、一个或多个准备单独规划的 future areas，以及它们之间的关系时，才使用 semantic fallback。不要根据精确 heading、通用 non-goals list 或类似 roadmap 的 wish list 推断 eligibility。Section 含义有歧义时，不提出 offer。
 
-An offer is warranted only when the completed work is explicitly one part of a
-larger body of separately planned work and at least one future area remains
-unplanned. Exclude an area that is already planned, completed, absorbed into
-the just-finished work, or no longer supported by current evidence. A residual
-implementation, review, PR, or merge task belongs to the current delivery tail;
-it is not a next brainstorm candidate and does not by itself suppress a valid
-future-area offer.
+只有已完成 work 明确属于一组更大、分开规划的 work，且至少一个 future area 尚未规划时，才值得提出 offer。排除已经 planned、completed、被刚完成 work 吸收，或 current evidence 已不再支持的 area。Residual implementation、review、PR 或 merge task 属于当前 delivery tail；它不是下一个 brainstorm candidate，也不会单独抑制有效的 future-area offer。
 
-## Recommend the next area
+## 推荐下一个 area
 
-Reason over the remaining candidates instead of taking the first bullet. Prefer
-the area that, based on the plan and what the pipeline learned:
+对剩余 candidates 做判断，不要直接取第一项。根据 plan 和 pipeline learnings，优先选择：
 
-1. has explicit user or plan priority;
-2. can be meaningfully brainstormed now;
-3. is enabled by the completed work;
-4. unlocks the most downstream work;
-5. reduces foundational uncertainty; or
-6. especially benefits from fresh implementation knowledge.
+1. 有显式 user 或 plan priority；
+2. 现在可以进行有意义 brainstorm；
+3. 由已完成 work 启用；
+4. 能解锁最多 downstream work；
+5. 能减少 foundational uncertainty；或
+6. 特别受益于新鲜 implementation knowledge 的 area。
 
-These are judgment criteria, not a points system. Do not choose by document
-order, apparent ease, wording similarity, or a dependency the plan does not
-support. Recheck the candidate against the current delivery result before
-offering it.
+这些是 judgment criteria，不是计分系统。不要根据 document order、表面难易、措辞相似性或 plan 不支持的 dependency 进行选择。提出 offer 前，根据当前 delivery result 重新检查 candidate。
 
-- **One justified winner:** name it and give the shortest concrete reason it is
-  next.
-- **Real tie:** say current evidence does not justify choosing between the tied
-  areas. Offer a selection-focused handoff whose next session decides which one
-  coherent area to brainstorm.
-- **No ready candidate:** make no offer.
+- **存在一个有依据的 winner：** 命名它，并给出最短的 concrete reason 说明为什么它应当在下一步。
+- **真正并列：** 说明 current evidence 不足以在并列 areas 间选择。提出 selection-focused handoff，让 next session 决定要 brainstorm 的一个 coherent area。
+- **没有 ready candidate：** 不提出 offer。
 
-## Offer, then stop
+## 提出 offer，然后停止
 
-Place the offer before LFG's `<promise>DONE</promise>`. Keep it non-blocking and
-do not invoke `ce-handoff` yet.
+将 offer 放在 LFG 的 `<promise>DONE</promise>` 前。保持 non-blocking，暂时不要调用 `ce-handoff`。
 
-For one winner, use this shape in natural prose:
+存在一个 winner 时，用自然语言表达为：
 
-> The clearest next area is **<area>** because <reason>. If you want to continue
-> it in a fresh agent session, I can create a `ce-handoff` for that brainstorm.
+> 最明确的下一个 area 是 **<area>**，因为 <reason>。如果要在新的 agent session 中继续，我可以为这次 brainstorm 创建一个 `ce-handoff`。
 
-For a real tie, name the tied areas and offer a fresh-session handoff focused on
-choosing the next coherent area. The pipeline still ends with the DONE promise;
-the offer is optional continuity, not another LFG step.
+真正并列时，列出并列 areas，并提出一个专注于选择下一个 coherent area 的 fresh-session handoff。Pipeline 仍以 DONE promise 结束；offer 是可选的连续性，不是另一个 LFG step。
 
-## If the user later accepts
+## 用户稍后接受时
 
-Only after explicit acceptance, resolve `ce-handoff` against the host's
-available-skills list and invoke `create` with a compact, labeled next-work
-brief. LFG owns the recommendation; do not ask `ce-handoff` to rediscover or
-rank candidates. Include:
+只有得到明确接受后，才根据 host 的 available-skills list 解析 `ce-handoff`，并使用 compact、带 label 的 next-work brief 调用 `create`。LFG 负责 recommendation；不要让 `ce-handoff` 重新发现或排序 candidates。包含：
 
-- **Next-session objective:** brainstorm one coherent next area and produce a
-  requirements-only unified plan.
-- **Recommended area:** the winner, or the tied candidate set when the session
-  must choose.
-- **Why next:** the evidence-based selection rationale.
-- **Authoritative prior plan:** the repo-relative canonical plan path.
-- **Relationship to completed work:** the explicit depends-on, enables, shares,
-  or independent relationship.
-- **Actual delivery state:** what finished and what remains in the current tail,
-  such as implemented, PR open, CI decided, or not merged.
-- **Carry-forward decisions:** only prior decisions that constrain the next
-  area.
-- **Assumptions to revalidate:** provisional relationships or facts that the
-  fresh brainstorm must not inherit as settled.
-- **Other candidates not selected:** each alternative and why it was not chosen,
-  when that context prevents repeated selection work.
-- **Artifact boundary:** create a separate requirements-only unified plan for
-  the next area, cite the prior plan, and do not extend or edit the prior plan.
+- **Next-session objective：** brainstorm 一个 coherent next area，并生成 requirements-only unified plan。
+- **Recommended area：** winner；若 session 必须选择，则提供并列 candidate set。
+- **Why next：** 基于 evidence 的 selection rationale。
+- **Authoritative prior plan：** repo-relative canonical plan path。
+- **Relationship to completed work：** 明确的 depends-on、enables、shares 或 independent relationship。
+- **Actual delivery state：** 已完成内容与当前 tail 剩余内容，例如 implemented、PR open、CI decided 或 not merged。
+- **Carry-forward decisions：** 只包含约束 next area 的 prior decisions。
+- **Assumptions to revalidate：** fresh brainstorm 不得当作 settled 继承的 provisional relationships 或 facts。
+- **Other candidates not selected：** 当 context 可防止重复 selection work 时，列出每个 alternative 及未选择原因。
+- **Artifact boundary：** 为 next area 创建单独的 requirements-only unified plan，引用 prior plan，不扩展或编辑 prior plan。
 
-Keep the brief pointer-first. Do not paste the prior Product Contract into it;
-the plan remains authoritative and the handoff explains what the next session
-needs to decide.
+Brief 应保持 pointer-first。不要将 prior Product Contract 粘贴进去；plan 仍是 authoritative source，handoff 只说明 next session 需要决定什么。

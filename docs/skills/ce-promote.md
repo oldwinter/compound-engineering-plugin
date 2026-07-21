@@ -4,9 +4,9 @@
 
 `ce-promote` 是 **post-ship messaging** skill。Feature merge 后，它会判断实际 ship 了什么、选择合适 channels，并起草 announcement copy：X post 或 thread、一行 changelog blurb、LinkedIn post、email、blog intro、short demo script。即使什么都没安装，也能产出好 copy；当 [Spiral CLI](https://www.npmjs.com/package/@every-env/spiral-cli) 已安装且已认证时，会用它生成匹配 brand voice 的 drafts。
 
-Declining the one-time Spiral setup offer is remembered in the checkout-local config; see the [configuration reference](./configuration.md).
+拒绝一次性的 Spiral setup offer 后，该选择会记录在 checkout-local config；参见[配置参考](./configuration.md)。
 
-It drafts only. It never posts, publishes, commits, or opens PRs — shipping the copy is a human action.
+它只起草，不会 post、publish、commit 或 open PR；真正 ship copy 是 human action。
 
 ---
 

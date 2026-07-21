@@ -39,7 +39,7 @@ describe("ce-explain destination and handoff routing", () => {
   test("inline routing exists for every destination option", () => {
     const optionFragments: { name: string; fragment: string }[] = [
       { name: "Claude Artifact", fragment: "Claude Artifact" },
-      { name: "Publish publicly to ht-ml.app", fragment: "Publish publicly to ht-ml.app" },
+      { name: "Publish publicly to ht-ml.app", fragment: "公开发布到 ht-ml.app" },
       { name: "Local file", fragment: "Local file" },
       { name: "Publish to Proof", fragment: "Publish to Proof" },
       { name: "Send to Thinkroom", fragment: "Send to Thinkroom" },
@@ -105,8 +105,8 @@ describe("ce-explain destination and handoff routing", () => {
     // R13: the leak-proof ordering is load-bearing and must not live only in
     // references/check-in.md, which an agent might not load before acting.
     expect(
-      /end the turn/i.test(SKILL_BODY) &&
-        /before the user's prediction turn ends/i.test(SKILL_BODY),
+      /结束 turn/i.test(SKILL_BODY) &&
+        /prediction turn 结束前/i.test(SKILL_BODY),
       "ce-explain SKILL.md must carry the predict-then-reveal ordering rule inline (show raw change only, take the prediction, end the turn).",
     ).toBe(true)
   })
@@ -117,9 +117,9 @@ describe("ce-explain destination and handoff routing", () => {
     expect(explainerChoice).toBeGreaterThan(-1)
     expect(quizChoice).toBeGreaterThan(explainerChoice)
     expect(CHECK_IN_BODY).not.toMatch(/Quiz me \(Recommended\)/i)
-    expect(CHECK_IN_BODY).toMatch(/Just the explainer[^\n]+skip prediction and exercises/i)
-    expect(CHECK_IN_BODY).toMatch(/Predict-then-reveal[\s\S]+Run this section only when the user's exact choice was \*\*Quiz me\*\*/i)
-    expect(CHECK_IN_BODY).toMatch(/Exercises \(concepts, ideas, dense recaps\)[\s\S]+Run this section only when the user's exact choice was \*\*Quiz me\*\*/i)
+    expect(CHECK_IN_BODY).toMatch(/Just the explainer[^\n]+跳过 prediction 和 exercises/i)
+    expect(CHECK_IN_BODY).toMatch(/Predict-then-reveal[\s\S]+仅当用户的确切选择为 \*\*Quiz me\*\* 时运行此 section/i)
+    expect(CHECK_IN_BODY).toMatch(/Exercises \(concepts, ideas, dense recaps\)[\s\S]+仅当用户的确切选择为 \*\*Quiz me\*\* 时运行此 section/i)
   })
 
   test("only the exact Quiz me choice enables prediction and exercises", () => {
@@ -130,45 +130,45 @@ describe("ce-explain destination and handoff routing", () => {
     const phase3 = SKILL_BODY.slice(phase3Start, phase4Start)
     const phase5 = SKILL_BODY.slice(phase5Start, phase6Start)
 
-    expect(phase3).toMatch(/Record the user's exact Phase 3 choice/i)
-    expect(phase3).toMatch(/Only \*\*Quiz me\*\* enables the prediction and exercise mechanics/i)
-    expect(phase3).toMatch(/\*\*Just the explainer\*\* skips both while still composing and presenting the report/i)
-    expect(phase3).toMatch(/Diff mode with Quiz me selected/i)
-    expect(phase5).toMatch(/only when the recorded exact Phase 3 choice was \*\*Quiz me\*\*/i)
-    expect(phase5).toMatch(/choice was \*\*Just the explainer\*\*, skip this phase/i)
+    expect(phase3).toMatch(/把用户 Phase 3 的确切选择记录为/i)
+    expect(phase3).toMatch(/只有 \*\*Quiz me\*\* 启用 prediction 和 exercise mechanics/i)
+    expect(phase3).toMatch(/\*\*Just the explainer\*\* 跳过两者，但仍组成并展示 report/i)
+    expect(phase3).toMatch(/Diff mode 且选择 Quiz me/i)
+    expect(phase5).toMatch(/仅当记录的 Phase 3 确切选择为 \*\*Quiz me\*\*/i)
+    expect(phase5).toMatch(/选择 \*\*Just the explainer\*\* 时跳过本 phase/i)
   })
 
   test("recap evidence is dispatched directly without a main-agent pre-scan", () => {
-    expect(SKILL_BODY).toMatch(/dispatch a generic subagent directly/i)
-    expect(SKILL_BODY).toMatch(/Do not pre-scan, count, or characterize the window/i)
+    expect(SKILL_BODY).toMatch(/直接分派一个 generic subagent/i)
+    expect(SKILL_BODY).toMatch(/不要在主对话中预先扫描、计数或描述 window/i)
   })
 
   test("Claude Artifact owns its adaptation and ht-ml requires post-warning confirmation", () => {
-    expect(DESTINATIONS_BODY).toMatch(/Give the tool the canonical `\$RUN_DIR\/explainer\.html`/i)
-    expect(DESTINATIONS_BODY).toMatch(/tool owns any adaptation needed/i)
-    expect(DESTINATIONS_BODY).toMatch(/do not pre-process the HTML/i)
+    expect(DESTINATIONS_BODY).toMatch(/把 canonical `\$RUN_DIR\/explainer\.html` 交给 tool/i)
+    expect(DESTINATIONS_BODY).toMatch(/Tool 负责适配其 artifact runtime/i)
+    expect(DESTINATIONS_BODY).toMatch(/不要预处理 HTML/i)
     expect(DESTINATIONS_BODY).not.toContain("extract-artifact-fragment.py")
-    expect(DESTINATIONS_BODY).toMatch(/public and may be indexed, crawled, copied, or archived/i)
-    expect(DESTINATIONS_BODY).toMatch(/initial request explicitly selected ht-ml\.app/i)
-    expect(DESTINATIONS_BODY).toMatch(/ask for explicit confirmation after the warning before any publish/i)
-    expect(DESTINATIONS_BODY).toMatch(/initial request itself does not count as confirmation/i)
-    expect(DESTINATIONS_BODY).toMatch(/If confirmation cannot be obtained, do not publish; preserve the canonical `\$RUN_DIR\/explainer\.html` and report its local path/i)
-    expect(SKILL_BODY).toMatch(/pre-warning request does not count as confirmation/i)
-    expect(SKILL_BODY).toMatch(/If confirmation cannot be obtained, do not publish; preserve the canonical HTML and report its local `\$RUN_DIR\/explainer\.html` path/i)
-    expect(SKILL_BODY).toMatch(/Publish publicly to ht-ml\.app[^\n]+read and follow the ht-ml\.app sub-flow in `references\/destinations\.md`/i)
-    expect(DESTINATIONS_BODY).toMatch(/ht-ml\.app or general HTML-publishing capability/i)
+    expect(DESTINATIONS_BODY).toMatch(/页面是公开的，可能被索引、爬取、复制或归档/i)
+    expect(DESTINATIONS_BODY).toMatch(/初始请求明确选择了 ht-ml\.app/i)
+    expect(DESTINATIONS_BODY).toMatch(/在任何 publish 前取得警告后的明确确认/i)
+    expect(DESTINATIONS_BODY).toMatch(/初始请求本身也不算确认/i)
+    expect(DESTINATIONS_BODY).toMatch(/如果无法取得确认，不得发布；保留 canonical `\$RUN_DIR\/explainer\.html` 并报告其 local path/i)
+    expect(SKILL_BODY).toMatch(/警告前的请求不算确认/i)
+    expect(SKILL_BODY).toMatch(/如果无法取得确认，不得发布；保留 canonical HTML，并报告本地 `\$RUN_DIR\/explainer\.html` path/i)
+    expect(SKILL_BODY).toMatch(/公开发布到 ht-ml\.app[^\n]+读取并遵循 `references\/destinations\.md` 的 ht-ml\.app sub-flow/i)
+    expect(DESTINATIONS_BODY).toMatch(/ht-ml\.app 或通用 HTML-publishing capability/i)
     expect(DESTINATIONS_BODY).toMatch(/skill-invocation primitive/i)
-    expect(DESTINATIONS_BODY).toMatch(/tool, connector, or browser capability directly/i)
-    expect(DESTINATIONS_BODY).toMatch(/Do not assume a particular skill name or installation path/i)
+    expect(DESTINATIONS_BODY).toMatch(/直接调用检测到的 tool、connector 或 browser capability/i)
+    expect(DESTINATIONS_BODY).toMatch(/不要假设特定 skill name 或 installation path/i)
     expect(DESTINATIONS_BODY).toContain("https://ht-ml.app/llms.txt")
     expect(DESTINATIONS_BODY).not.toContain("scripts/publish-ht-ml.sh")
-    expect(DESTINATIONS_BODY).toMatch(/never publish headlessly/i)
+    expect(DESTINATIONS_BODY).toMatch(/绝不 headlessly 发布/i)
   })
 
   test("HTML output pins stable metadata and preserves baseline constraints", () => {
-    expect(HTML_REFERENCE_BODY).toMatch(/exact field labels `Date`, `Input shape`, and `Subject`/)
-    expect(HTML_REFERENCE_BODY).toMatch(/exactly one of `concept`, `diff`, `idea`, or `recap`/)
-    expect(HTML_REFERENCE_BODY).toMatch(/`Subject` names the topic, ref, or recap window/)
+    expect(HTML_REFERENCE_BODY).toMatch(/精确 field labels `Date`、`Input shape`、`Subject`/)
+    expect(HTML_REFERENCE_BODY).toMatch(/`Input shape` 必须是 `concept`、`diff`、`idea` 或 `recap` 之一/)
+    expect(HTML_REFERENCE_BODY).toMatch(/`Subject` 点明 topic、ref 或 recap window/)
     expect(HTML_REFERENCE_BODY).toMatch(/No companion `\.css`, `\.js`, or `\.svg` files/)
     expect(HTML_REFERENCE_BODY).toMatch(/No external requests of any kind/)
     expect(HTML_REFERENCE_BODY).toMatch(
@@ -192,15 +192,15 @@ describe("ce-explain predict-then-reveal parity between SKILL.md and references/
   const invariants: { name: string; pattern: RegExp }[] = [
     {
       name: "the prediction question (what the change does, and why it was made)",
-      pattern: /what do(?:es)?\s+(?:you think\s+)?this change do(?:es)?\b[\s\S]{0,40}?why (?:was it|it was) made/i,
+      pattern: /(?:what do(?:es)?\s+(?:you think\s+)?this change do(?:es)?\b[\s\S]{0,40}?why (?:was it|it was) made|这项 change 做了什么[，,]\s*为什么要这样改)/i,
     },
     {
       name: "the turn-end rule (end the turn after the prediction prompt)",
-      pattern: /end the turn/i,
+      pattern: /(?:end the turn|结束 turn)/i,
     },
     {
       name: "the never-same-message rule (no explanation in the prediction-prompt message)",
-      pattern: /same message as the prediction prompt/i,
+      pattern: /(?:same message as the prediction prompt|prediction prompt 的同一条消息)/i,
     },
   ]
 

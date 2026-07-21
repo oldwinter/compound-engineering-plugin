@@ -4,7 +4,7 @@
 
 Runtime behavior 和 contributor reference 以每个 skill source folder（`skills/`）下的 `SKILL.md` 为准。
 
-Checkout-local defaults shared across skills are documented in [Compound Engineering configuration](./configuration.md).
+Skills 共享的 checkout-local defaults 记录在 [Compound Engineering 配置](./configuration.md)中。
 
 ---
 
@@ -98,7 +98,7 @@ Checkout-local defaults shared across skills are documented in [Compound Enginee
 
 | Skill | Description（说明） |
 |-------|-------------|
-| [`/lfg`](./lfg.md) | Run the full hands-off engineering pipeline through a green PR, then conditionally recommend an opt-in fresh-session handoff for the next separately planned area |
+| [`/lfg`](./lfg.md) | 运行完整 hands-off engineering pipeline 直至得到 green PR；条件满足时推荐一个 opt-in fresh-session handoff，用于下一个单独规划的 area |
 
 ---
 

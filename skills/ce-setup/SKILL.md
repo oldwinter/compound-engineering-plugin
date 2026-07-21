@@ -54,7 +54,7 @@ Proceed to Phase 2 only if one or more repo-local project issues exist:
 - obsolete `compound-engineering.local.md`
 - `.compound-engineering/config.local.yaml` exists but is not safely gitignored
 - `.compound-engineering/config.local.example.yaml` is missing or outdated
-- the health report marks the `ce-work` skill implementation engine unavailable or invalid, detects retired scalar routing keys, or reports malformed dormant `work_engine_preferences`
+- health report 把 `ce-work` skill implementation engine 标为 unavailable/invalid、检测到已弃用的 scalar routing keys（retired scalar routing keys），或报告 malformed dormant `work_engine_preferences`
 
 If no project issues exist, report:
 
@@ -100,9 +100,9 @@ Everything starts commented out -- you only enable what you need.
 
 If the user approves, copy `references/config-template.yaml` to `<repo-root>/.compound-engineering/config.local.yaml`.
 
-### Step 6a: Repair Invalid CE Work Preferences
+### Step 6a: 修复无效的 CE Work Preferences
 
-When the health report marks the CE Work implementation engine unavailable or invalid, detects retired scalar routing keys, or reports malformed dormant `work_engine_preferences`, do not guess the intended recipients. Explain the exact reported problem, derive a valid ordered `work_engine_preferences` block from the user's stated harness/model order (or remove malformed dormant preferences and use `work_engine_mode: off` when they want native-by-default), remove any retired scalar routing keys, and show the complete replacement block. Edit only those CE Work keys after the user approves the preview; preserve every unrelated local setting. Re-run the health check and require it to report either native or the intended normalized ordered list before setup is complete.
+当 health report 把 CE Work implementation engine 标为 unavailable/invalid、检测到已弃用的 scalar routing keys（retired scalar routing keys），或报告 malformed dormant `work_engine_preferences` 时，不要猜测预期 recipients。说明报告的具体问题，根据用户给出的 harness/model 顺序生成有效且有序的 `work_engine_preferences` block；如果用户希望 native-by-default，则删除格式错误的 dormant preferences（remove malformed dormant preferences），并使用 `work_engine_mode: off`。删除所有已弃用的 scalar routing keys（remove any retired scalar routing keys），并展示完整 replacement block。只有用户批准 preview 后，才能编辑这些 CE Work keys；保留所有无关 local settings。重新运行 health check，并要求它在 setup 完成前报告 native 或预期的 normalized ordered list。
 
 ### Step 7: Ensure Local Config Is Gitignored
 

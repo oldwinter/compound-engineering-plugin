@@ -28,16 +28,16 @@ GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/get-pr-comments" PR_NUMBER OWNER
 
 **Pass the base `OWNER/REPO`** (parsed from the PR URL, when one was given) as the second arg. `get-pr-comments` otherwise falls back to `gh repo view` in the *current checkout* — so for a fork→upstream PR handed in as a URL, omitting it would fetch review feedback from the fork (or fail) instead of the upstream base repo. Every `get-pr-comments` call below (fetch and verify) takes the same `OWNER/REPO`.
 
-Returns a JSON object with four keys:
+返回一个包含四个 keys 的 JSON object：
 
-| Key | Contents | Has file/line? | Resolvable? |
+| Key | 内容 | 是否有 file/line？ | 是否可 resolve？ |
 |-----|----------|---------------|-------------|
-| `pending_review` | Node ID of your own unsubmitted (PENDING) review on this PR, or `null` | n/a | n/a |
-| `review_threads` | Unresolved inline code review threads (includes outdated; each carries its `isOutdated` flag so line drift can be accounted for) | Yes | Yes (GraphQL) |
-| `pr_comments` | Top-level PR conversation comments (excludes PR author) | No | No |
-| `review_bodies` | Review submission bodies with non-empty text (excludes PR author) | No | No |
+| `pending_review` | 你自己在此 PR 上尚未提交的（PENDING）review 的 Node ID，或 `null` | n/a | n/a |
+| `review_threads` | 未解决的 inline code review threads（包括 outdated；每项都带有 `isOutdated` flag，以便处理行漂移） | 是 | 是（GraphQL） |
+| `pr_comments` | 顶层 PR conversation comments（排除 PR author） | 否 | 否 |
+| `review_bodies` | 文本非空的 review submission bodies（排除 PR author） | 否 | 否 |
 
-**Stop here if `pending_review` is non-null.** Thread replies posted while you hold an unsubmitted review are absorbed into that draft: the reply call returns a comment ID and URL as if it succeeded, but nothing is visible to the reviewer until the draft is submitted. Do not proceed into steps 2-8 — the fixes would land while every reply silently disappeared. Tell the user they have an unsubmitted review on the PR, that it must be submitted or discarded before this skill can reply, and stop. Do not submit or discard it yourself; a draft review is unsent human writing.
+**如果 `pending_review` 非 null，在这里停止。** 当你持有尚未提交的 review 时，发布的 thread replies 会被吸收到该 draft：reply 调用会像成功一样返回 comment ID 和 URL，但 draft 提交前 reviewer 看不到任何内容。不要进入 steps 2-8；否则 fixes 会落地，而所有 replies 都会静默消失。告诉用户该 PR 上有一个尚未提交的 review，必须先提交或丢弃，skill 才能回复，然后停止。不要自行提交或丢弃；draft review 是尚未发送的人工内容。
 
 If the script fails, fall back to:
 ```bash
@@ -172,8 +172,8 @@ GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/get-thread-for-comment" PR_NUMBE
 ```
 The returned `id` is the authoritative thread ID to use for reply and resolve. If it differs from what `get-pr-comments` returned, use the one from this script.
 
-1. **Reply** using [scripts/reply-to-pr-thread](../scripts/reply-to-pr-thread). If the bundled script is missing, reply with `gh api --method POST repos/{owner}/{repo}/pulls/PR_NUMBER/comments/COMMENT_ID/replies -f body=...` against the thread's first comment — never `gh pr review` or a `/reviews` POST, which open an unsubmitted draft review that swallows this reply and every one after it:
-Feed the body through a quoted heredoc, never `echo "..."` or `printf`. A reply is multi-line Markdown (a quote line, a blank line, then the response), and `echo` neither interprets `\n` nor survives a body composed with escape sequences — the reviewer then sees a single run-on line containing literal `\n` characters. The quoted delimiter (`<<'EOF'`) also stops the shell from expanding backticks, `$`, and `!` inside quoted code:
+1. 使用 [scripts/reply-to-pr-thread](../scripts/reply-to-pr-thread) **回复**。如果 bundled script 缺失，针对 thread 的第一条 comment 调用 `gh api --method POST repos/{owner}/{repo}/pulls/PR_NUMBER/comments/COMMENT_ID/replies -f body=...`；绝不要使用 `gh pr review` 或向 `/reviews` POST，否则会打开一个未提交的 draft review，吞掉当前及之后所有回复：
+通过带引号的 heredoc 传入 body，绝不要使用 `echo "..."` 或 `printf`。Reply 是多行 Markdown（quote line、blank line、response）；`echo` 既不会解释 `\n`，也无法可靠处理带 escape sequences 的 body，reviewer 最终会看到一整行包含字面 `\n` 的文本。带引号的 delimiter（`<<'EOF'`）还会阻止 shell 展开引用代码中的 backticks、`$` 和 `!`：
 ```bash
 SKILL_DIR="<absolute path of the directory containing the ce-resolve-pr-feedback SKILL.md>";
 GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/reply-to-pr-thread" THREAD_ID <<'EOF'
@@ -182,13 +182,13 @@ GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/reply-to-pr-thread" THREAD_ID <<
 Fixed in abc1234 — the lookup now null-checks before dereferencing.
 EOF
 ```
-Check that the returned comment URL contains the correct `OWNER/REPO` and PR number before proceeding.
+继续前，检查返回的 comment URL 是否包含正确的 `OWNER/REPO` 和 PR number。
 
-2. **Verify the posted body renders as Markdown** before resolving. Take the numeric ID from the returned URL fragment (`#discussion_r2589700` → `2589700`) and read back what GitHub actually stored:
+2. Resolve 前，**验证已发布的 body 能渲染为 Markdown**。从返回的 URL fragment 中取得 numeric ID（`#discussion_r2589700` → `2589700`），并读回 GitHub 实际存储的内容：
 ```bash
 GH_HOST=<derived-host> GH_REPO=OWNER/REPO gh api repos/{owner}/{repo}/pulls/comments/COMMENT_ID --jq .body
 ```
-The output must show real line breaks. If instead it shows `\n` (or `\n\n`) as literal backslash-n characters inside one line, the body was posted escaped: **do not resolve the thread**. Fix it first by rewriting the body through a heredoc, then re-verify:
+输出必须包含真正的换行。如果它反而在单行内显示字面 backslash-n 字符 `\n`（或 `\n\n`），说明 body 以 escaped 形式发布：**不要 resolve thread（do not resolve）**。先通过 heredoc 重写 body，再重新验证：
 ```bash
 GH_HOST=<derived-host> GH_REPO=OWNER/REPO gh api --method PATCH repos/{owner}/{repo}/pulls/comments/COMMENT_ID -f body="$(cat <<'EOF'
 > the specific sentence being addressed from the reviewer's comment
@@ -198,7 +198,7 @@ EOF
 )"
 ```
 
-3. **Resolve** using [scripts/resolve-pr-thread](../scripts/resolve-pr-thread) (if the bundled script is missing, resolve the thread with `gh api` if supported):
+3. 使用 [scripts/resolve-pr-thread](../scripts/resolve-pr-thread) **Resolve**（如果 bundled script 缺失，在支持时使用 `gh api` resolve thread）：
 ```bash
 SKILL_DIR="<absolute path of the directory containing the ce-resolve-pr-feedback SKILL.md>";
 GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/resolve-pr-thread" THREAD_ID
@@ -217,7 +217,7 @@ EOF
 )"
 ```
 
-The same escaping rule applies here: compose the body in a quoted heredoc so paragraph breaks are real newlines, and confirm the posted comment renders as Markdown rather than one line containing literal `\n`.
+这里适用同样的 escaping rule：使用带引号的 heredoc 组成 body，使段落分隔成为真正换行，并确认发布后的 comment 渲染为 Markdown，而不是包含字面 `\n` 的单行文本。
 
 Include enough quoted context in the reply so the reader can follow which comment is being addressed without scrolling.
 

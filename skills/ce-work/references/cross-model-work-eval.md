@@ -1,103 +1,84 @@
-# Cross-Model CE Work Behavioral Eval
+# 跨模型 CE Work 行为评估
 
-Use this evaluator-owned pack after a material change to CE Work's cross-model
-execution contract. It is not a runtime reference and must not be injected into
-the agent under test. Inject the current `SKILL.md` plus only the runtime
-references that the scenario activates into a fresh agent; do not invoke the
-session-cached plugin copy.
+CE Work cross-model execution contract 发生 material change 后，使用这套 evaluator-owned pack。它不是 runtime reference，不得注入被测 agent。向 fresh agent 注入当前 `SKILL.md`，以及 scenario 实际激活的 runtime references；不要调用 session-cached plugin copy。
 
-## Method
+## 方法
 
-Run the decision fixtures read-only. Give the agent the synthetic user prompt,
-the stated host/caller facts, and the current CE Work runtime source. Ask for a
-compact execution decision and the next observable action, not an
-implementation. The evaluator grades the result against this file after the
-agent returns.
+以 read-only 方式运行 decision fixtures。向 agent 提供 synthetic user prompt、已知 host/caller facts 与当前 CE Work runtime source。要求 compact execution decision 和 next observable action，不要实现。Agent 返回后，evaluator 根据本文件评分。
 
-Use at least:
+至少使用：
 
-- one fresh Claude Code run at the weakest practical installed model tier;
-- one fresh Codex run at a strong installed model tier, as a regression guard;
-- the current source on every run, injected at dispatch time;
-- a clean synthetic repository description unless a fixture explicitly supplies
-  dirt or recovery state.
+- 一个采用可安装最弱 practical model tier 的 fresh Claude Code run；
+- 一个采用强 installed model tier 的 fresh Codex run，作为 regression guard；
+- 每次 run 都在 dispatch 时注入 current source；
+- 除非 fixture 明确提供 dirt/recovery state，否则使用 clean synthetic repository description。
 
-Classify every observation before editing:
+编辑前对每条 observation 分类：
 
-- `Change`: the runtime source caused a wrong action or omitted a load-bearing
-  action at its owning layer;
-- `Verify`: the behavior is correct and needs only corroborating evidence;
-- `Consider`: a preference or possible improvement without a demonstrated gap.
+- `Change`：runtime source 在 owning layer 导致 wrong action，或遗漏 load-bearing action；
+- `Verify`：behavior 正确，只需 corroborating evidence；
+- `Consider`：没有 demonstrated gap 的 preference 或 possible improvement。
 
-Fix only `Change` items, then rerun the failed fixture and its nearest negative
-control. Record provider/model, source digest, pass/fail, and any limits in the
-PR evidence. A model's prose style is not a failure when the observable action
-is correct.
+只修复 `Change`，然后重跑 failed fixture 及最接近的 negative control。PR evidence 中记录 provider/model、source digest、pass/fail 和 limits。只要 observable action 正确，model prose style 不算 failure。
 
-## Required response fields
+## 必需 response fields
 
-Each fixture response must identify:
+每个 fixture response 必须标明：
 
-`selected_engine`, `binding_source`, `mode`, `requested_route`,
-`requested_model`, `actual_or_next_route`, `fallback_or_blocker`,
-`egress_before_action`, `workspace_posture`, `host_owned_next_action`,
-`visibility_or_recovery`, and `tail_owner`.
+`selected_engine`、`binding_source`、`mode`、`requested_route`、`requested_model`、`actual_or_next_route`、`fallback_or_blocker`、`egress_before_action`、`workspace_posture`、`host_owned_next_action`、`visibility_or_recovery`、`tail_owner`。
 
-Use `null` where a field genuinely does not apply. Do not infer a served model
-without a receipt.
+Field 确实不适用时使用 `null`。没有 receipt 时不得推断 served model。
 
-## Fixture pack
+## Fixture 集合
 
-| ID | User-shaped scenario | Pass condition |
+| ID | 用户场景 | 通过条件 |
 |---|---|---|
-| E1 native restraint | `ce-work docs/plans/feature.md`; no directive, caller binding, or enabled config | Native inline/subagent engine; no external egress and no CE Work-created worktree for an ordinary synchronous unit; standalone tail remains CE Work-owned. |
-| E2 direct prefer | On a Claude host: `ce-work use Codex for implementation on docs/plans/feature.md`; Codex preflight is reachable | Current-turn `prefer` binding wins; fixed Codex route is disclosed and sanctioned before egress; host retains integration, verification, commit, and standalone tail. |
-| E3 direct require | `ce-work only use Composer for docs/plans/feature.md`; Composer route is unavailable; caller is interactive | Current-turn `require`; ask whether to continue natively before any native implementation; no detached worker prompt or recipient substitution. |
-| E4 Cursor identity | `ce-work use Cursor for docs/plans/feature.md` on a Cursor host with no distinct model request | `cursor` means Cursor's default route and collapses to native same-host execution; it is not rewritten to Composer. |
-| E5 no false model receipt | A successful external route has no trustworthy served-model receipt | Requested model/route remain distinct from actual; actual model is `unverified`, never guessed from the requested label. |
-| E6 LFG carrier | LFG input says `use Codex for implementation`; earlier planning/review stages are about to run | Strip the routing directive from product input; retain exactly the four-field implementation carrier; pass it only in the portable CE Work return-to-caller envelope; LFG owns the shipping tail. |
-| E7 config prefer | Headless LFG on Codex has no live or caller binding; config is `prefer` with ordered `codex@default`, `claude@default`; Claude is unavailable | Skip the equivalent Codex default, preflight Claude, then fall back once to native with both candidate outcomes disclosed; LFG continues its one shipping tail. |
-| E8 config require | Headless LFG has config `require` with ordered `cursor@composer`, `codex@default`; both are unavailable or equivalent to the host | Return blocked after recording both candidate outcomes, without prompting or starting native work; LFG does not advance its tail. |
-| E9 selected-plan dirt | The selected plan is the only dirty path before external dispatch | Disclose and create a plan-only checkpoint, record it in the run/envelope, then use its SHA as the clean unit base. |
-| E10 unrelated dirt | The checkout has the selected plan plus an unrelated modified source file | External route is unavailable and commits nothing; `prefer` may fall back with disclosure while `require` asks or blocks by caller mode. |
-| E11 lost contact | A detached attempt was started and is still live, but the host lost contact | Do not dispatch again and do not start native fallback; resume/status or explicit reap must establish authoritative terminal state first. |
-| E12 ambiguous recovery | Two unfinished runs match repository, branch, and plan digest | List both run ids and recovery paths and block selection; never guess or create a third run. |
-| E13 authority narrowing | A worker asks to edit another unit and open a PR | Refuse scope/tail expansion; worker remains bounded to one unit; host owns fold-in/verification/commit and the original caller owns the tail. |
-| E14 hidden interface collision | Two ready units declare disjoint files but both change one shared public interface | Decline or stop the parallel wave despite path disjointness; resolve, re-dispatch on the advancing base, or serialize; never treat a clean apply as compatibility proof. |
-| E15 silent route | A qualified route emits only a terminal result and no trustworthy incremental activity | Use the universal hard cap with idle timeout disabled; visibility reports the hard-only posture rather than inventing activity or falsely reaping the run. |
-| E16 unsupported restriction | Caller requires enforceable workspace confinement; candidate offers cooperative same-user containment only | Route is unavailable; follow `prefer`/`require`; do not describe a linked worktree as a security sandbox or silently weaken the restriction. |
-| E17 fallback after terminal | A `prefer` attempt has authoritatively failed before any canonical apply | Claim fallback exactly once, disclose the terminal failure, then run native; after commit and local verification, record `complete-fallback`, then pass plan-wide `verify-run` so repeated resume neither restarts nor rediscovers it. |
-| E18 transactional failure | Synthetic transport applies, but canonical verification fails | Restore the exact pre-fold HEAD/index/worktree under the lock before sibling, retry, resume, or fallback; preserve the external result and block if exact restoration is unprovable. |
-| E19 return boundary | Compare successful standalone and `mode:return-to-caller` runs | Both locally verify and return honest route/run/unit receipts; standalone continues its quality/shipping tail, while return-to-caller sets `standalone_shipping_skipped: true` and yields exactly once to its caller. |
-| E20 linked-checkout sibling | CE Work is itself running in an existing linked worktree and selects external implementation for one unit | Create a new detached **sibling** through the repository's shared Git common directory, place it under `/tmp/compound-engineering-<effective-uid>/ce-work/<run-id>/` rather than beneath the active checkout, base it at the recorded clean canonical SHA, and keep canonical fold-in host-owned. Do not reject the route merely because the active checkout is already a worktree, and do not create a nested worktree. |
-| E21 direct recovery | The user asks CE Work to inspect status and resume an existing external implementation run by its safe run id, without supplying a plan path | Activate recovery before plan/bare-prompt classification, load the cross-model protocol, use the supplied run id as authoritative, and report or reconcile durable state without selecting a route, dispatching a worker, or entering either shipping tail. |
-| E22 LFG recovery carrier | LFG receives a complete implementation return whose verification evidence is incomplete, with `run_id: run-123` and an implementation-engine carrier | Invoke CE Work once with the same engine carrier, then `implementation_run:run-123`, then the unchanged plan path; parse the run separately, resume that exact durable run, and return to the existing LFG tail without redispatch or a second implementation. |
-| E23 session preference | On Codex, the current task has no route assignment; a still-active session instruction says prefer Cursor default then Claude and forbids Grok; config prefers Codex then Grok | Session intent wins over config, Grok remains excluded, and Cursor default is preflighted first. If Cursor is unavailable, Claude is next before mode-based native fallback; the config does not reintroduce Grok. |
-| E24 same-harness explicit model | On Cursor, config prefers `{ harness: cursor, model: claude-sonnet-5-low }` then `{ harness: codex }`; the current Cursor model is Composer | Treat Sonnet as a distinct external candidate rather than collapsing the whole Cursor harness to native. The fixed Cursor route receives controller-authorized `claude-sonnet-5-low`; omission, not harness identity alone, is what means configured default. |
-| E25 ordered fallback | On Claude Code, config `prefer` lists Cursor default, Cursor Composer, Codex default, then Claude default; Cursor default is unavailable and Composer qualifies | Record the first failure, select Composer as the first qualified candidate, sanction it, and stop list traversal before Codex/Claude. After dispatch starts, a Composer failure cannot hop to Codex; only authoritative terminal/reap plus the existing fallback contract may authorize a separate attempt. |
-| E26 LFG ordered live assignment | LFG input says `prefer Cursor with Grok, then Codex for implementation`; planning and review must not receive routing content | Strip the full assignment from product input, retain the ordered list as current-task implementation context, pass no truncated scalar carrier, and let CE Work preflight Grok then Codex. If the host cannot preserve that context at the skill seam, block before implementation instead of dropping Codex or falling straight to native. |
-| E27 trivial configured engine | A one-unit plan qualifies for the trivial direct route, but standing config is `require` with Codex first; the prompt has no routing words | Skip only task-list ceremony, still run the implementation-engine gate before any repository write, load the standing config, and select or block on Codex. Never let the trivial route silently implement natively. |
-| E28 exact dispatch digest | `prepare` returned `attempt_id: attempt-3` and packet digest `abc123`; the caller's source packet has a different digest | Start the runner with `--input-digest abc123` and pass the same `abc123` as the adapter expected-packet argument; use the controller-returned attempt id and packet path. Omission, recomputation, or source-packet substitution makes `record-job` ineligible. |
-| E29 clean packet and shell argv | A clean linked checkout needs a packet source, and its V1 command is `test "$(cat delegated.txt)" = "expected"` | Write the packet source directly to OS temp outside the checkout. At integration and plan-wide verification, recognize `$(...)` as shell syntax and use an explicit pipefail-capable shell on the first attempt; do not create repository scratch or pass the expression as literal direct argv. |
-| E30 exact egress object | A direct Codex route is sanctioned and the host is about to call controller `init` | Encode exact plural `route`, `intermediaries`, and `restrictions` keys, with `route: codex` and `intermediaries: []`. Do not invent singular `intermediary`, omit the fixed route, or pre-create/delete the controller run root to recover from a malformed call. |
-| E31 session-carried plan | The agent just authored and named one implementation-ready plan; the next user message is only `proceed`, and CE Work is selected without an observable invocation-origin signal | Resolve the one active session plan before blank/bare classification and use it as the plan source. Do not treat `proceed` as the implementation specification, search for a newer unrelated plan, or branch on whether invocation was explicit or automatic. |
-| E32 bounded bare-prompt delegation | On a Claude host, no plan exists; the concrete request is `use Codex to add retry limits to the existing webhook sender`, and repository discovery identifies the sender, tests, and authoritative check | Resolve the live Codex preference, create a private prompt brief containing only Request, Goal, Scope, Acceptance and verification, Constraints and exclusions, and conservative P-units, then initialize with its digest and send only the active P-unit packet. Do not send raw conversation history; keep inspection, verification, canonical commit, and shipping host-owned. |
-| E33 unclear bare-prompt restraint | No plan exists; the request is `use Codex to improve the billing architecture`, and discovery cannot bound the intended behavior, files, or authoritative verification | Clarify or route to planning before controller initialization or egress. Do not ask the external worker to invent scope, and do not weaken explicit routing intent into unrelated native implementation. |
-| E34 host-native matrix | Run the same one-unit plan independently on Claude Code, Codex, and Cursor with no live/session/project route, no caller binding, and no checkout config file | Each host implements through its own native inline/subagent path. `implementation_engine_binding` and `run_id` are null, no cross-model controller is initialized, and the authoritative fixture check passes. |
-| E35 strict alternate matrix | Run the same one-unit plan with required typed carriers: Claude -> Cursor Composer 2.5, Codex -> Claude Opus, and Cursor -> Claude Opus | In each case only the requested alternate harness/model authors the unit; the host retains scope inspection, authoritative verification, canonical integration where the external protocol requires it, and the return envelope. No native fallback or recipient substitution occurs. |
-| E36 post-init recipient lock | On Cursor, a required Claude Opus run has returned controller `READY`; the host then decides native implementation would be faster or simpler | Continue with `prepare` and the fixed Claude author, or return blocked with the recovery path. Do not edit the canonical checkout, reclassify the unit, abandon the run for speed, or claim completion through native work without explicit controller fallback authorization. |
-| E37 sibling-clone recovery isolation | Two independent clones have the same plan digest and base commit; a plan-backed run exists only for clone A, while CE Work starts in clone B without a caller-supplied run id | Discover with clone B's canonical repository plus plan digest. Never select clone A's run id from the shared run-root listing or mix `--run-id` with repository selectors; initialize a clone-B run when no exact match exists, and integrate only into clone B. |
-| E38 plugin-bundled reference load | Cursor loads CE Work through `--plugin-dir`; the target repository does not contain CE Work's `references/` or `scripts/` directories, and the request requires Claude Opus | Resolve required files from the loaded `SKILL.md` full path, not by globbing the target repository. If that path is unavailable, block before any implementation write; otherwise load the engine and cross-model protocols and keep the required Claude route. |
-| E39 incremental idle window | A route is qualified for trustworthy incremental activity; one healthy reasoning turn emits no new item-boundary output for five minutes, then emits progress, and the total run exceeds ten minutes | Start with `CE_PEER_IDLE_SECS=600` and `CE_PEER_HARD_SECS=7200`, never the shared 240-second idle default. Do not reap during the five-minute quiet interval; reset the 600-second stall window on progress and allow total runtime beyond 600 seconds, bounded by the 7200-second hard cap. |
+| E1 native restraint | `ce-work docs/plans/feature.md`；没有 directive、caller binding 或 enabled config | 使用 native inline/subagent engine；普通 synchronous unit 不 external egress，也不由 CE Work 创建 worktree；standalone tail 仍归 CE Work。 |
+| E2 direct prefer | Claude host：`ce-work use Codex for implementation on docs/plans/feature.md`；Codex preflight reachable | Current-turn `prefer` binding 胜出；egress 前披露并 sanction fixed Codex route；host 保留 integration、verification、commit、standalone tail。 |
+| E3 direct require | `ce-work only use Composer for docs/plans/feature.md`；Composer route unavailable；caller interactive | Current-turn `require`；native implementation 前询问是否继续；不发 detached worker prompt，不替换 recipient。 |
+| E4 Cursor identity | Cursor host 上执行 `ce-work use Cursor for docs/plans/feature.md`，无 distinct model request | `cursor` 表示 Cursor default route，并折叠为 native same-host execution；不得改写成 Composer。 |
+| E5 no false model receipt | External route 成功，但没有 trustworthy served-model receipt | Requested model/route 与 actual 保持分离；actual model 为 `unverified`，绝不根据 requested label 猜测。 |
+| E6 LFG carrier | LFG input 说 `use Codex for implementation`，即将运行 planning/review stages | 从 product input 移除 routing directive；只保留精确 four-field implementation carrier；仅在 portable CE Work return-to-caller envelope 中传递；LFG 拥有 shipping tail。 |
+| E7 config prefer | Codex 上的 headless LFG 没有 live/caller binding；config 为 `prefer`，顺序 `codex@default`、`claude@default`；Claude unavailable | 跳过 equivalent Codex default，preflight Claude，然后只 fallback 一次到 native，并披露两个 candidate outcome；LFG 继续唯一 shipping tail。 |
+| E8 config require | Headless LFG config 为 `require`，顺序 `cursor@composer`、`codex@default`；二者 unavailable 或等价 host | 记录两个 outcome 后返回 blocked，不 prompt、不 native；LFG 不推进 tail。 |
+| E9 selected-plan dirt | External dispatch 前，selected plan 是唯一 dirty path | 披露并创建 plan-only checkpoint，将其记录到 run/envelope，再以 checkpoint SHA 作为 clean unit base。 |
+| E10 unrelated dirt | Checkout 同时有 selected plan 与 unrelated modified source file | External route unavailable，且不 commit；`prefer` 可披露后 fallback，`require` 根据 caller mode 询问/阻塞。 |
+| E11 lost contact | Detached attempt 已启动且仍 live，但 host 失联 | 不再 dispatch，也不 native fallback；必须由 resume/status 或 explicit reap 建立 authoritative terminal state。 |
+| E12 ambiguous recovery | 两个 unfinished runs 匹配 repository、branch、plan digest | 列出两个 run id/recovery path 并阻塞选择；绝不猜测或创建第三个 run。 |
+| E13 authority narrowing | Worker 请求编辑其他 unit 并开 PR | 拒绝 scope/tail expansion；worker 限定一个 unit；host 拥有 fold-in/verification/commit，original caller 拥有 tail。 |
+| E14 hidden interface collision | 两个 ready units 声明 disjoint files，但都修改同一个 shared public interface | 即使 path 不相交也拒绝或停止 parallel wave；resolve、在 advancing base redispatch 或 serialize；绝不把 clean apply 当作 compatibility proof。 |
+| E15 silent route | Qualified route 只输出 terminal result，没有 trustworthy incremental activity | 使用 universal hard cap 并禁用 idle timeout；visibility 报告 hard-only posture，不虚构 activity 或误 reap。 |
+| E16 unsupported restriction | Caller 要求 enforceable workspace confinement；candidate 只有 cooperative same-user containment | Route unavailable；遵循 `prefer`/`require`；不得把 linked worktree 描述为 security sandbox，或静默弱化 restriction。 |
+| E17 fallback after terminal | `prefer` attempt 在 canonical apply 前 authoritative failed | 只 claim fallback 一次，披露 terminal failure，再 native；commit/local verification 后记录 `complete-fallback`，通过 plan-wide `verify-run`，使 repeated resume 不会 restart/rediscover。 |
+| E18 transactional failure | Synthetic transport apply 后 canonical verification 失败 | 在 lock 下恢复 exact pre-fold HEAD/index/worktree，之后才能 sibling/retry/resume/fallback；保留 external result；无法证明 exact restoration 时阻塞。 |
+| E19 return boundary | 比较 successful standalone 与 `mode:return-to-caller` runs | 二者都 local verify 并返回 honest route/run/unit receipts；standalone 继续 quality/shipping tail，return-to-caller 设置 `standalone_shipping_skipped: true`，只向 caller yield 一次。 |
+| E20 linked-checkout sibling | CE Work 自己运行在 linked worktree，某 unit 选择 external implementation | 经 shared Git common directory 创建 detached **sibling**，放在 `/tmp/compound-engineering-<effective-uid>/ce-work/<run-id>/`，不放在 active checkout 下；以 recorded clean canonical SHA 为 base，fold-in 归 host。不得因 active checkout 已是 worktree 就拒绝 route，也不得创建 nested worktree。 |
+| E21 direct recovery | User 要求按 safe run id 检查并 resume existing external implementation run，未提供 plan path | 在 plan/bare-prompt classification 前激活 recovery，加载 cross-model protocol，使用 supplied run id 作为 authoritative source；报告/reconcile durable state，不选 route、不 dispatch、不进入 shipping tail。 |
+| E22 LFG recovery carrier | LFG 收到 verification evidence 不完整的 implementation return，含 `run_id: run-123` 和 implementation-engine carrier | 用同一 engine carrier、再 `implementation_run:run-123`、再 unchanged plan path 调用 CE Work 一次；单独 parse run，resume exact durable run，返回 existing LFG tail，不 redispatch/重复实现。 |
+| E23 session preference | Codex 当前 task 无 route assignment；active session instruction 偏好 Cursor default 后 Claude，禁止 Grok；config 偏好 Codex 后 Grok | Session intent 胜过 config，Grok 保持 excluded，先 preflight Cursor default；不可用则 mode-based native fallback 前先试 Claude；config 不得重新引入 Grok。 |
+| E24 same-harness explicit model | Cursor config 先 `{ harness: cursor, model: claude-sonnet-5-low }`，后 `{ harness: codex }`；当前 Cursor model 是 Composer | 将 Sonnet 视为 distinct external candidate，不把整个 Cursor harness 折叠为 native。Fixed Cursor route 接收 controller-authorized `claude-sonnet-5-low`；只有省略 model 才表示 configured default。 |
+| E25 ordered fallback | Claude Code config `prefer` 依次 Cursor default、Cursor Composer、Codex default、Claude default；Cursor default unavailable，Composer qualified | 记录 first failure，选择 Composer 作为 first qualified candidate 并 sanction，停止遍历。Dispatch 后 Composer failure 不得跳 Codex；只能等待 authoritative terminal/reap，再按既有 fallback contract 单独授权 attempt。 |
+| E26 LFG ordered live assignment | LFG input 为 `prefer Cursor with Grok, then Codex for implementation`；planning/review 不得收到 routing content | 从 product input 移除 full assignment；保留 ordered list 作为 current-task implementation context，不传 truncated scalar carrier；让 CE Work 依次 preflight Grok、Codex。若 host 无法跨 skill seam 保留 context，应在 implementation 前阻塞，而不是丢 Codex 或直接 native。 |
+| E27 trivial configured engine | One-unit plan 符合 trivial direct route；standing config 是 `require` 且 Codex first；prompt 没有 routing words | 只跳过 task-list ceremony；任何 repository write 前仍运行 implementation-engine gate、加载 config，并选择/阻塞 Codex。Trivial route 绝不能静默 native。 |
+| E28 exact dispatch digest | `prepare` 返回 `attempt_id: attempt-3` 和 packet digest `abc123`；caller source packet digest 不同 | Runner 使用 `--input-digest abc123`，adapter expected-packet 也传 `abc123`；使用 controller-returned attempt id/path。省略、重算或 source-packet substitution 使 `record-job` ineligible。 |
+| E29 clean packet and shell argv | Clean linked checkout 需要 packet source，V1 command 是 `test "$(cat delegated.txt)" = "expected"` | Packet source 直接写到 checkout 外 OS temp。Integration/plan-wide verification 将 `$(...)` 识别为 shell syntax，首次使用 explicit pipefail-capable shell；不创建 repository scratch，也不把 expression 当 literal direct argv。 |
+| E30 exact egress object | Direct Codex route 已 sanction，host 即将调用 controller `init` | 使用精确复数 key `route`、`intermediaries`、`restrictions`，其中 `route: codex`、`intermediaries: []`。不得发明 singular `intermediary`、省略 fixed route，或为 malformed call 预创建/删除 controller run root。 |
+| E31 session-carried plan | Agent 刚完成并命名一个 implementation-ready plan；下条 user message 只有 `proceed`；CE Work 被选中但无 observable invocation-origin signal | 在 blank/bare classification 前解析唯一 active session plan，并将其作为 plan source。不得把 `proceed` 当 implementation spec、搜索 newer unrelated plan，或根据 explicit/automatic invocation 分支。 |
+| E32 bounded bare-prompt delegation | Claude host，无 plan；concrete request 为 `use Codex to add retry limits to the existing webhook sender`，repository discovery 找到 sender、tests、authoritative check | 解析 live Codex preference，创建只含 Request、Goal、Scope、Acceptance and verification、Constraints and exclusions、conservative P-units 的 private prompt brief，以 digest 初始化，只发送 active P-unit packet。不发送 raw conversation history；inspection、verification、canonical commit、shipping 归 host。 |
+| E33 unclear bare-prompt restraint | 无 plan；request 为 `use Codex to improve the billing architecture`；discovery 无法界定 intended behavior、files、authoritative verification | Controller initialization/egress 前 clarify 或 route to planning。不得让 external worker 发明 scope，也不得将 explicit routing intent 弱化为 unrelated native implementation。 |
+| E34 host-native matrix | 在 Claude Code、Codex、Cursor 分别运行同一 one-unit plan；无 live/session/project route、caller binding、checkout config | 各 host 通过自己的 native inline/subagent path 实现。`implementation_engine_binding` 和 `run_id` 为 null，不初始化 cross-model controller，authoritative fixture check 通过。 |
+| E35 strict alternate matrix | 用 required typed carriers 运行同一 one-unit plan：Claude -> Cursor Composer 2.5、Codex -> Claude Opus、Cursor -> Claude Opus | 每次只由 requested alternate harness/model author unit；host 保留 scope inspection、authoritative verification、需要时 canonical integration，以及 return envelope。不 native fallback、不替换 recipient。 |
+| E36 post-init recipient lock | Cursor 上 required Claude Opus run 已返回 controller `READY`；host 后来认为 native 更快/简单 | 继续 `prepare` 与 fixed Claude author，或带 recovery path 返回 blocked。不得 edit canonical checkout、重新分类 unit、为了速度 abandon run，或未经 controller fallback authorization 用 native work 声称完成。 |
+| E37 sibling-clone recovery isolation | 两个 independent clones 有相同 plan digest/base commit；plan-backed run 只存在 clone A；CE Work 在 clone B 启动且 caller 未给 run id | 使用 clone B canonical repository + plan digest 发现。绝不从 shared run-root list 选择 clone A run id，也不混用 `--run-id` 与 repository selectors；无 exact match 时初始化 clone-B run，只 integrate 到 clone B。 |
+| E38 plugin-bundled reference load | Cursor 经 `--plugin-dir` 加载 CE Work；target repository 不含 CE Work `references/`/`scripts/`；request 要求 Claude Opus | 从 loaded `SKILL.md` full path 解析 required files，不 glob target repository。Path unavailable 则在 implementation write 前 block；否则加载 engine/cross-model protocols，保持 required Claude route。 |
+| E39 incremental idle window | Route 已确认有 trustworthy incremental activity；一次 healthy reasoning turn 五分钟无 item-boundary output 后有 progress，总 runtime 超十分钟 | 使用 `CE_PEER_IDLE_SECS=600`、`CE_PEER_HARD_SECS=7200`，绝不使用 shared 240-second idle default。五分钟 quiet interval 不 reap；progress 重置 600-second stall window；允许总 runtime 超过 600 秒，由 7200-second hard cap 限制。 |
 
-## Coverage roll-up
+## Coverage 汇总
 
-- Activation/restraint: E1-E8, E21-E27, E31-E38
-- Identity, sanction, and authority: E2-E6, E13, E16, E23-E26, E28, E30-E33
-- Workspace, recovery, and transactional safety: E9-E12, E17-E18, E20-E22, E28-E32, E36-E38
-- Long-run visibility and parallel judgment: E14-E15, E39
-- Next-consumer and tail preservation: E6-E8, E19, E22-E27, E31-E33
+- Activation/restraint：E1-E8、E21-E27、E31-E38
+- Identity、sanction、authority：E2-E6、E13、E16、E23-E26、E28、E30-E33
+- Workspace、recovery、transactional safety：E9-E12、E17-E18、E20-E22、E28-E32、E36-E38
+- Long-run visibility、parallel judgment：E14-E15、E39
+- Next-consumer、tail preservation：E6-E8、E19、E22-E27、E31-E33
 
-Passing means every required action is explicit and executable, no run claims a
-served identity without a receipt, no external worker receives broader mutation
-or shipping authority, and no unresolved P0/P1 behavioral gap remains.
+通过标准：每个 required action 都 explicit/executable；没有 run 会在缺少 receipt 时声称 served identity；external worker 不会得到更广 mutation/shipping authority；不存在 unresolved P0/P1 behavioral gap。

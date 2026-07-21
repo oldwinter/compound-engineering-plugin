@@ -82,15 +82,15 @@ Persona selection 是 agent judgment，不是 keyword matching。Production-file
 
 选中 adversarial 且 working tree 就是被 review 的 head（`local-aligned` / standalone）时，同一份 adversarial brief 还会在独立的 read-only process 中交给 **一个不同于 host 的 model provider**。In-process `adversarial` persona 与 peer（`adversarial-<provider>`）达成一致，是 synthesis 中最强的 promotion signal。
 
-**Which target runs the peer** is auto-chosen and overridable — the same independence system as `ce-doc-review`, scoped to the adversarial lens only. Host harness and serving family are tracked separately. Preference order is conversation → `cross_model_peer:` → active project instructions → `codex → claude → grok → composer`; explicit `Cursor` means `cursor-agent` using its configured default/Auto model, while `Composer` means a Composer model through Cursor. Grok prefers its native CLI and may use a sanctioned Grok-via-Cursor route. Cursor Auto does not count as independent agreement unless its serving family is verified different from the host. See the [configuration reference](./configuration.md) for the shared local-config contract.
+**由哪个 target 运行 peer** 会自动选择，也允许 override；它与 `ce-doc-review` 使用同一 independence system，但只覆盖 adversarial lens。Host harness 与 serving family 分开跟踪。优先级是 conversation -> `cross_model_peer:` -> active project instructions -> `codex -> claude -> grok -> composer`。显式 `Cursor` 表示由 `cursor-agent` 使用 configured default/Auto model；`Composer` 表示经 Cursor 使用 Composer model。Grok 优先使用 native CLI，也可以走 sanctioned Grok-via-Cursor route。除非 receipt 验证 Cursor Auto serving family 与 host 不同，否则不算 independent agreement。共享 local-config contract 参见[配置参考](./configuration.md)。
 
 Skill 会先尝试声明的 mappings。如果 CLI 拒绝 obsolete 或 incompatible adapter default，skill 可以在同一 target/family 以及 hard read-only、host-exclusion、authority、egress boundaries 内发现最接近的 compatible equivalent。Substitution 和 actual route 必须披露；显式指定的 user model 或新增接收内容的 intermediary 绝不能静默变化，任何会改变 recipient 的 retry 都要返回 host 获得 sanction。该 pass 保持 detached、non-blocking，第二个 target 仍只在显式设置 `CROSS_MODEL_MAX_PEERS=2` 时启用。
 
 它与 `ce-doc-review` 共享 provider/route kernel（CI 有 parity test），但保留 code review 的 product scope：只跑 adversarial、使用 diff/work-tree delivery，而不是 doc review 的 judgment trio 或 whole-doc sweep。
 
-Large diffs stay on the same single-peer route without being serialized into one enormous prompt. The orchestrator sends a compact semantic review map — intent, material risk divisions, generated-tree treatment, and cross-division interactions — while the worker keeps the exact diff outside the prompt as a private, selectively readable artifact. Deterministic code never invents risk groups or cuts semantic shards; the adversarial agent works within the orchestrator's divisions and narrows its reads again when needed.
+Large diff 仍使用同一 single-peer route，不会序列化成一个巨型 prompt。Orchestrator 发送 compact semantic review map，包括 intent、material risk divisions、generated-tree treatment 和 cross-division interactions；worker 将 exact diff 作为 private、selectively readable artifact 保留在 prompt 外。Deterministic code 不发明 risk groups，也不切割 semantic shards；adversarial agent 在 orchestrator divisions 内工作，必要时再次收窄 reads。
 
-### 2. Severity (P0-P3) and autofix class are orthogonal
+### 2. Severity（P0-P3）和 autofix class 是 orthogonal
 
 Severity 回答 **urgency**（P0=critical breakage，P3=user discretion）。Autofix class 是关于 follow-up shape 的 **signal**（不是 apply permission）：
 

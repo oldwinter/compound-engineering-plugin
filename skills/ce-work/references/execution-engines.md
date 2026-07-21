@@ -1,52 +1,52 @@
-# Execution Engines
+# Execution Engines（执行引擎）
 
-`ce-work` has four implementation engines: inline/subagent, goal-mode, dynamic-workflow, and cross-model execution. The engine decides *how* implementation runs; it never changes *who* owns the shipping tail (see "Tail ownership" below). Native inline/subagent execution is dormant-by-default compatibility: it remains selected unless applicable live intent, a caller binding, or an enabled standing preference selects the fourth engine.
+`ce-work` 有四种 implementation engine：inline/subagent、goal-mode、dynamic-workflow、cross-model execution。Engine 决定 implementation *如何*运行；绝不改变 shipping tail *归谁*（见下方 Tail ownership）。Native inline/subagent execution 是 dormant-by-default compatibility：除非 applicable live intent、caller binding 或 enabled standing preference 选择第四种 engine，否则保持选中。
 
-Engine selection applies only to code execution. Knowledge-work keeps its carve-out. Legacy plans and bare code prompts may select cross-model execution, but otherwise retain the inline/subagent flow in `SKILL.md`; goal-mode and dynamic-workflow selection remains specific to implementation-ready unified plans.
+Engine selection 只适用于 code execution。Knowledge-work 保持 carve-out。Legacy plans/bare code prompts 可以选择 cross-model execution；否则保留 `SKILL.md` 中 inline/subagent flow。Goal-mode/dynamic-workflow selection 仍只适用于 implementation-ready unified plans。
 
-Invocation origin supplies no routing authority and may not be detectable. Resolve the same inputs whether `ce-work` was explicitly invoked or selected by the host: current-task intent, still-active session intent, typed caller binding, active project instructions, enabled checkout configuration, then native execution.
+Invocation origin 不提供 routing authority，也可能无法检测。无论 `ce-work` 是显式调用还是 host 自行选择，都解析相同 inputs：current-task intent、still-active session intent、typed caller binding、active project instructions、enabled checkout config，最后 native execution。
 
-## Resolve cross-model routing before the capability probe
+## Capability probe 前解析 cross-model routing
 
-Resolve one implementation binding from applicable authority and scope; do not reduce routing to keyword matching or a closed state machine. Obey the host's instruction hierarchy first. Within the same authority, prefer narrower and more current intent, using these sources:
+根据 applicable authority/scope 解析一个 implementation binding；不要把 routing 简化为 keyword matching 或 closed state machine。先遵守 host instruction hierarchy。同一 authority 内，优先 narrower、more current intent，source 顺序为：
 
-1. an explicit assignment or constraint in the current task;
-2. a still-active session preference or constraint;
-3. a typed caller binding at its recorded provenance (for example, an LFG current-task assignment retains current-task authority at the `ce-work` seam);
-4. the project's active instructions and conventions already in context;
-5. enabled per-checkout configuration; then
-6. native execution.
+1. Current task 中 explicit assignment/constraint；
+2. still-active session preference/constraint；
+3. 带 recorded provenance 的 typed caller binding（例如 LFG current-task assignment 在 `ce-work` seam 保留 current-task authority）；
+4. context 中 project active instructions/conventions；
+5. enabled per-checkout config；
+6. native execution。
 
-Lower sources may fill an unspecified detail but cannot contradict or broaden a higher source. Incidental mentions in feature prose, quoted material, examples, comparisons, filenames, or discussion do not activate routing. If two applicable instructions of equal authority genuinely conflict on recipient or egress, surface the conflict instead of guessing.
+Lower source 可以补 unspecified detail，但不能 contradict/broaden higher source。Feature prose、quoted material、example、comparison、filename 或 discussion 中 incidental mention 不激活 routing。同等 authority 的 applicable instructions 在 recipient/egress 上真实冲突时，应展示 conflict，不要猜测。
 
-A live request such as "use Codex" is preference-strength by default. Interpret unambiguous strict intent such as "must use Codex" or "only use Codex" as requirement-strength; intent is the contract, not any single keyword. The resolved mode is `prefer` or `require`.
+“use Codex”这类 live request 默认是 preference-strength；“must use Codex”“only use Codex”这类 unambiguous strict intent 是 requirement-strength。Intent 才是 contract，不取决于单一 keyword。Resolved mode 为 `prefer` 或 `require`。
 
-Live or contextual intent may name one route or an ordered fallback list (for example, "prefer Cursor with Grok, then Codex"). Preserve that order and normalize each harness/model candidate with the same rules as standing configuration. A typed caller binding remains a single already-selected candidate; do not widen its exact four-field grammar into a list.
+Live/contextual intent 可以命名一个 route 或 ordered fallback list（如“prefer Cursor with Grok, then Codex”）。保留顺序，并按 standing config 相同规则 normalize 每个 harness/model candidate。Typed caller binding 仍是已选择的单一 candidate；不要把 exact four-field grammar 扩成 list。
 
-For example, current-task strict Composer resolves to Composer with `require` even when a caller Codex binding and config Cursor preference are both present. Without that task instruction, a caller Codex binding sourced from the current LFG task keeps that provenance. Without applicable live or caller intent, the ordered config candidates apply only when standing mode is enabled.
+例如，current-task strict Composer 会以 `require` 解析到 Composer，即使 caller Codex binding 和 config Cursor preference 同时存在。没有该 task instruction 时，来自当前 LFG task 的 caller Codex binding 保留 provenance。没有 applicable live/caller intent 时，只有 standing mode enabled 才应用 ordered config candidates。
 
-### Typed caller binding
+### Typed caller binding（类型化调用方绑定）
 
-An automatic caller may pass an `implementation_engine` object with exactly these four fields:
+Automatic caller 可以传恰好包含四个 field 的 `implementation_engine` object：
 
-- `mode`: `prefer` or `require`
-- `target`: `codex`, `claude`, `grok`, `cursor`, or `composer`
-- `model`: an optional model pin, otherwise `null`
-- `source`: the binding's caller-visible provenance
+- `mode`：`prefer` 或 `require`
+- `target`：`codex`、`claude`、`grok`、`cursor` 或 `composer`
+- `model`：可选 model pin，否则 `null`
+- `source`：binding 的 caller-visible provenance
 
-Accept this carrier only at the `ce-work` seam, beside `mode:return-to-caller`; its fields never enter planning or review input. On string-only skill hosts the initial envelope is `mode:return-to-caller implementation_engine:<compact-json> <plan-path>`, where `<compact-json>` is that exact four-field object with no formatting whitespace (for example `implementation_engine:{"mode":"prefer","target":"codex","model":null,"source":"lfg-current-turn"}`). The original no-carrier form stays `mode:return-to-caller <plan-path>`. Once resolved, preserve the binding and source in the durable run receipt. Downstream consumers and workers may narrow its authority or restrictions but never broaden them.
+只在 `ce-work` seam、`mode:return-to-caller` 旁接受该 carrier；fields 绝不进入 planning/review input。String-only skill host 的 initial envelope 是 `mode:return-to-caller implementation_engine:<compact-json> <plan-path>`，其中 `<compact-json>` 是无 formatting whitespace 的 exact four-field object（如 `implementation_engine:{"mode":"prefer","target":"codex","model":null,"source":"lfg-current-turn"}`）。原 no-carrier form 仍为 `mode:return-to-caller <plan-path>`。解析后，将 binding/source 保存在 durable run receipt。Downstream consumer/worker 可以收窄 authority/restrictions，绝不能扩大。
 
-Return-to-caller recovery may add a separate `implementation_run:<safe-id>` carrier after the optional engine carrier and before the unchanged plan path. It is not an `implementation_engine` field and is accepted only for recovery. A safe id matches `^[A-Za-z0-9._-]{1,128}$` and contains at least one non-period character. Carrierless recovery is `mode:return-to-caller implementation_run:run-123 <plan-path>`; engine-bound recovery is `mode:return-to-caller implementation_engine:<compact-json> implementation_run:run-123 <plan-path>`. Reject malformed or duplicate carriers instead of treating them as plan text. The run id selects durable state; it never authorizes a fresh dispatch or a different route.
+Return-to-caller recovery 可在 optional engine carrier 之后、unchanged plan path 之前增加独立 `implementation_run:<safe-id>` carrier。它不是 `implementation_engine` field，只用于 recovery。Safe id 匹配 `^[A-Za-z0-9._-]{1,128}$`，且至少包含一个非句点字符。Carrierless recovery：`mode:return-to-caller implementation_run:run-123 <plan-path>`；engine-bound recovery：`mode:return-to-caller implementation_engine:<compact-json> implementation_run:run-123 <plan-path>`。Malformed/duplicate carrier 应拒绝，不能当作 plan text。Run id 选择 durable state，从不授权 fresh dispatch 或 different route。
 
-### Target and identity vocabulary
+### Target 与 identity vocabulary
 
-Keep `target`, harness/intermediary route, requested model, served model, and receipt status separate. Target `cursor` means the Cursor harness with its configured default model. Target `composer` is shorthand for a Composer-family model requested through Cursor. The host must attempt the documented adapter recipe first. If the installed harness differs, it may inspect local CLI help or version information and adapt only within the same sanctioned harness/model family and only when the fixed adapter can still enforce the route and restrictions. Otherwise that candidate is unavailable. Disclose any compatible model alias or substitution and never relabel an unverified served model.
+将 `target`、harness/intermediary route、requested model、served model、receipt status 分开。Target `cursor` 表示使用 configured default model 的 Cursor harness；`composer` 是经 Cursor 请求 Composer-family model 的 shorthand。Host 必须先尝试 documented adapter recipe。Installed harness 不同时，只能在同一 sanctioned harness/model family 内检查 local CLI help/version 并适配，且 fixed adapter 仍须执行 route/restrictions；否则 candidate unavailable。披露 compatible model alias/substitution，绝不重标 unverified served model。
 
-When the target resolves to the current host's default execution route and no distinct model or serving route was requested, collapse the request to native execution and record requested-versus-actual identity rather than shelling out to the same host.
+Target 解析为当前 host default execution route，且未请求 distinct model/serving route 时，折叠到 native execution，记录 requested/actual identity，不要 shell out 到同一 host。
 
-### Per-checkout configuration
+### 每个 checkout 的配置
 
-Standing configuration uses one mode plus an ordered route list:
+Standing config 使用一个 mode 加 ordered route list：
 
 ```yaml
 work_engine_mode: prefer
@@ -58,71 +58,71 @@ work_engine_preferences:
   - harness: claude
 ```
 
-- `work_engine_mode`: `off | prefer | require`
-- `work_engine_preferences`: one or more ordered candidate objects
-- `harness`: `codex | claude | grok | cursor`
-- optional `model`: a model id or family understood by that harness; omission means its configured default
+- `work_engine_mode`：`off | prefer | require`
+- `work_engine_preferences`：一个或多个 ordered candidate objects
+- `harness`：`codex | claude | grok | cursor`
+- 可选 `model`：该 harness 理解的 model id/family；省略表示 configured default
 
-Do not put CLI commands or flags in configuration. The list expresses implementation intent; the skill's adapter recipes and local inspection determine how to invoke it. Composer is therefore `{ harness: cursor, model: composer }`, while `{ harness: cursor }` means Cursor's configured default.
+Config 中不要放 CLI commands/flags。List 表达 implementation intent；skill adapter recipes/local inspection 决定如何调用。因此 Composer 是 `{ harness: cursor, model: composer }`，而 `{ harness: cursor }` 表示 Cursor configured default。
 
-Normalize a qualified candidate to the controller's fixed route: Codex -> `codex`, Claude -> `claude`, native Grok -> `grok-cli`, Cursor with no model -> `cursor`, a Composer-family Cursor model -> `composer`, a Grok-family Cursor model -> `grok-cursor`, and another explicit Cursor model -> `cursor` with that controller-authorized model selector. A model selector is data, never shell syntax; if it cannot be represented by the fixed adapter's safe model token, the candidate is unavailable.
+将 qualified candidate normalize 为 controller fixed route：Codex -> `codex`、Claude -> `claude`、native Grok -> `grok-cli`、Cursor 无 model -> `cursor`、Composer-family Cursor model -> `composer`、Grok-family Cursor model -> `grok-cursor`，其他 explicit Cursor model -> `cursor` + controller-authorized model selector。Model selector 是 data，绝不是 shell syntax；无法用 fixed adapter safe model token 表示时，candidate unavailable。
 
-Traverse each ordered candidate during preflight. If a candidate is equivalent to the current host and its current/default model, continue to the next candidate rather than shelling out to self; an explicit different model in the same harness is still a distinct candidate. If a candidate is unavailable before egress, record why and continue to the next candidate. The first qualified candidate becomes the fixed recipient. After dispatch begins, the recipient is locked by the cross-model contract and list traversal stops.
+Preflight 时遍历 ordered candidates。Candidate 等于 current host 及 current/default model 时继续下一项，不 shell out 到自己；同一 harness 的 explicit different model 仍是 distinct candidate。Candidate 在 egress 前 unavailable 时，记录原因并继续。First qualified candidate 成为 fixed recipient。Dispatch 开始后 cross-model contract 锁定 recipient，停止 list traversal。
 
-`off` disables only the standing preference. It does not cancel applicable live intent or a typed caller binding. An enabled mode without a valid candidate list is unavailable rather than guessed. When the list is exhausted, `prefer` falls back natively with every attempted route and reason disclosed; `require` follows the interactive/headless blocker rule. Standing configuration supplies defaults, not permission to change recipient or broaden authority.
+`off` 只禁用 standing preference，不取消 applicable live intent/typed caller binding。Enabled mode 没有 valid candidate list 时是 unavailable，不猜测。List 用尽后，`prefer` 披露全部 attempted routes/reasons 并 native fallback；`require` 遵循 interactive/headless blocker rule。Standing config 提供 defaults，不授权更换 recipient 或扩大 authority。
 
-## Step 1: Probe host capability
+## Step 1：探测 host capability
 
-An engine is usable only when the host exposes a callable primitive for it. Do not assume one exists from its name.
+只有 host 暴露 callable primitive 时 engine 才可用，不要从名称推断。
 
-| Engine | Usable when | Claude Code reality |
+| Engine | 可用条件 | Claude Code 现状 |
 |---|---|---|
-| **Inline / subagent** | Always. The orchestrator runs units inline or dispatches subagents via the platform's subagent primitive (`Agent`/`Task` in Claude Code, `spawn_agent` in Codex, `subagent` in Pi). | Always callable in-session. This is the default. |
-| **Goal-mode** | The host exposes a callable goal *tool* a skill can invoke — e.g. Codex `create_goal` (sets **and activates** a persistent objective for the current session) plus `update_goal(complete\|blocked)` for terminal status. | **No goal tools exposed.** `/goal` is a top-level user command only; a skill cannot invoke it or any goal tool. Emit a copyable `/goal` prompt for the user to paste, or run inline/subagents. **Codex differs — it does expose `create_goal` (see below).** |
-| **Dynamic-workflow** | The host exposes a callable dynamic-workflow / ultracode-style orchestration primitive that returns structured results and blockers without mid-run user decisions. | **Not callable from inside a skill.** Dynamic workflows start from a user prompt (`ultracode:` or `/effort ultracode`). `ce-work` can only emit a copyable prompt block. |
-| **Cross-model execution** | A resolved fixed route has a qualified, write-capable adapter and satisfies every caller restriction. Load `cross-model-execution.md` only after this engine is selected. | Availability depends on the installed target CLI and its qualified adapter, not on the host's native subagent tools. A same-host default request collapses to native execution. |
+| **Inline / subagent** | 始终可用。Orchestrator inline 运行 units，或经 platform subagent primitive dispatch（Claude Code `Agent`/`Task`、Codex `spawn_agent`、Pi `subagent`）。 | Session 内始终 callable，是 default。 |
+| **Goal-mode** | Host 暴露 skill 可调用的 goal *tool*，如 Codex `create_goal`（设置并激活 persistent objective）及 terminal `update_goal(complete|blocked)`。 | **无 goal tools。** `/goal` 只是 top-level user command，skill 无法调用。输出可复制 `/goal` prompt，或 inline/subagents。**Codex 不同，会暴露 `create_goal`。** |
+| **Dynamic-workflow** | Host 暴露 callable dynamic-workflow / ultracode-style primitive，可在无 mid-run user decisions 时返回 structured results/blockers。 | **Skill 内不可调用。** Dynamic workflow 从 user prompt（`ultracode:` 或 `/effort ultracode`）启动；`ce-work` 只能输出 copyable prompt block。 |
+| **Cross-model execution** | Resolved fixed route 有 qualified write-capable adapter，并满足全部 caller restrictions。只在选中 engine 后加载 `cross-model-execution.md`。 | Availability 取决于 installed target CLI/qualified adapter，不取决于 host native subagent tools。Same-host default request 折叠为 native execution。 |
 
-Rule of thumb: **probe for the callable tool, don't infer from the command's existence.** If the host exposes a callable goal tool (Codex `create_goal`), goal-mode is a real callable engine — use it. If it exposes only a user-typed `/goal` (Claude Code), goal-mode is prompt-emission only — emit a copyable prompt. The literal `/goal` slash command is not skill-invocable on any host; the *tool* path is what makes Codex callable.
+经验法则：**probe callable tool，不根据 command 存在推断。** Host 有 callable goal tool（Codex `create_goal`）时，goal-mode 是真实 callable engine；只有 user-typed `/goal`（Claude Code）时，只能 prompt-emission。任何 host 上 literal `/goal` slash command 都不能由 skill 调用；Codex 可调用的是 *tool* path。
 
-**Codex specifically.** Codex exposes goal **tools** to skills (gated by `features.goals`, so probe for their presence): `create_goal(objective)` sets **and activates** a persistent objective — the **current session** then works toward it automatically (it steers this agent; it is not a background worker and returns no awaitable envelope) — and `update_goal(status: complete|blocked)` reports terminal status when the objective is genuinely met (or repeatedly blocked). So a Codex skill can **start goal-mode directly, with no copy-paste**: call `create_goal` with the objective (same content as the copyable prompt below). That is the skill's whole job — `create_goal` activates the objective and the **current session works toward it automatically**, and the goal lifecycle marks it `complete` (via `update_goal`) when the Definition of Done is met. **The skill does NOT call `update_goal`** — the working session handles that on its own (it is terminal-status only, not a mid-stream edit). The literal `/goal` slash command remains user-typed-only; the tool path is the callable one. (Claude Code exposes no goal tools at all, so it stays copy-paste-only.)
+**Codex 特别说明。** Codex 在 `features.goals` 开启时向 skill 暴露 goal **tools**，因此要 probe：`create_goal(objective)` 设置并激活 persistent objective，**当前 session** 会自动朝它工作（它 steer 当前 agent，不是 background worker，也不返回 awaitable envelope）；`update_goal(status: complete|blocked)` 只用于 objective 真正完成/反复阻塞后的 terminal status。因此 Codex skill 可以**直接启动 goal-mode，无需 copy-paste**：用下方 copyable prompt 相同内容调用 `create_goal`。这就是 skill 的全部工作；current session 自动追求 objective，goal lifecycle 在 DoD 满足时由 working session 调用 `update_goal` 标记 complete。**Skill 自己不调用 `update_goal`。** Literal `/goal` 仍只能 user type；Claude Code 没有 goal tools，只能 copy-paste。
 
-## Step 2: Pick the engine by plan shape
+## Step 2：按 plan shape 选择 engine
 
-When more than one engine is callable, choose by the plan's decomposition shape:
+多个 engine callable 时，根据 plan decomposition shape 选择：
 
-| Plan shape | Engine | Why |
+| Plan shape | Engine | 原因 |
 |---|---|---|
-| Sequential or modest U-ID decomposition; units share files or depend on each other | **Inline / subagent** (default), or a **goal-mode** prompt for sustained focus when callable | The DoD already defines the end condition; ordinary persistence finishes it. |
-| Many independent U-IDs with disjoint file ownership; codebase-wide sweep; large migration; adversarial cross-checking | **Dynamic-workflow** when callable; otherwise parallel subagents | Workflow scripts hold branching, loops, and intermediate worker state outside the main context and coordinate many agents. Prefer this over goal-mode for large fan-out. |
-| Host exposes no callable goal/workflow primitive (e.g. Claude Code in-session) | **Inline / subagent** | Preserve the same heading-scan / DoD / U-ID discipline without relying on unavailable host features. |
-| Applicable live intent, a caller binding, or enabled config resolves a qualified fixed external route | **Cross-model execution** | Another harness/model authors bounded units while the host retains canonical integration, verification, commits, and tail ownership. |
+| Sequential/modest U-ID decomposition；units 共享 files 或相互依赖 | **Inline / subagent**（default），或 callable 时用 **goal-mode** prompt 保持 focus | DoD 已定义 end condition；ordinary persistence 可完成。 |
+| 大量 independent U-IDs 且 file ownership disjoint；codebase-wide sweep；large migration；adversarial cross-checking | Callable 时 **Dynamic-workflow**，否则 parallel subagents | Workflow scripts 将 branching/loops/intermediate worker state 放在 main context 外并协调多 agents。Large fan-out 优先于 goal-mode。 |
+| Host 无 callable goal/workflow primitive（如 Claude Code in-session） | **Inline / subagent** | 不依赖 unavailable features，保留 heading-scan/DoD/U-ID discipline。 |
+| Applicable live intent、caller binding 或 enabled config 解析出 qualified fixed external route | **Cross-model execution** | 其他 harness/model author bounded units，host 保留 canonical integration、verification、commits、tail ownership。 |
 
-For a bare prompt, cross-model execution is eligible only after Phase 0 has established a concrete goal, bounded scope, and authoritative verification. The cross-model reference turns that discovery into a private prompt brief and conservative P-unit packet. An unclear bare prompt returns to clarification/planning before egress; it does not fall through to a smarter external worker and ask that worker to invent the scope.
+Bare prompt 只有在 Phase 0 建立 concrete goal、bounded scope、authoritative verification 后才可 cross-model execution。Cross-model reference 将 discovery 转为 private prompt brief/conservative P-unit packet。Unclear bare prompt 在 egress 前返回 clarification/planning；不得把 scope 发给“更聪明”的 external worker 发明。
 
-Recommend exactly one path. Present a non-default engine as an "advanced / large-scale option" only when the plan shape plausibly warrants it — never as an equal coin-flip.
+只推荐一个 path。Non-default engine 只有在 plan shape 确实适合时才作为“advanced / large-scale option”，绝不当作 equal coin-flip。
 
-## Step 3: Run the chosen engine
+## Step 3：运行选定 engine
 
-### Inline / subagent (default)
+### Inline / subagent（default）
 
-Follow the dispatch strategy in `SKILL.md` Phase 1 Step 4 (inline, serial subagents, or parallel subagents) and the Phase 2 execution loop. `ce-work` owns task creation, unit sequencing, dispatch, verification, and commits.
+遵循 `SKILL.md` Phase 1 Step 4 dispatch strategy（inline、serial subagents、parallel subagents）及 Phase 2 execution loop。`ce-work` 负责 task creation、unit sequencing、dispatch、verification、commits。
 
-### Cross-model execution
+### Cross-model execution（跨模型执行）
 
-Read `cross-model-execution.md` only after routing selects this engine. Resolve and disclose its fixed recipient and restrictions before egress, then follow its serial external-unit transaction through the bundled controller, detached runner, and fixed adapter. If the route is unavailable at preflight, apply the preference/requirement behavior defined there; never let the detached worker select a fallback recipient.
+Routing 选中该 engine 后才读 `cross-model-execution.md`。Egress 前解析/披露 fixed recipient/restrictions，再通过 bundled controller、detached runner、fixed adapter 执行 serial external-unit transaction。Preflight route unavailable 时，按文档 `prefer`/`require` behavior 处理；绝不让 detached worker 选择 fallback recipient。
 
-### Goal-mode and dynamic-workflow
+### Goal-mode 与 dynamic-workflow
 
-**With a callable goal tool (Codex `create_goal`):** call `create_goal` with the objective — the content of the copyable prompt below, minus the leading `/goal`. This activates the objective and the **current session** works toward it; there is no separate worker and no envelope to await, so the session continues to its tail (Step 4) and the goal lifecycle marks completion. **The skill does not call `update_goal`** — the working session does that itself. **Use `create_goal` only in standalone use, never in return-to-caller mode** — return-to-caller requires `ce-work` to return control to the caller, but `create_goal` would keep the session pursuing the objective instead of returning; run inline/subagents there.
+**有 callable goal tool（Codex `create_goal`）：** 以 copyable prompt 内容（去掉 leading `/goal`）调用 `create_goal`。这会激活 objective，**当前 session** 继续工作；没有 separate worker/envelope 可等待，因此 session 继续到 Step 4 tail，由 goal lifecycle 标记 completion。**Skill 不调用 `update_goal`**，由 working session 处理。**仅 standalone 使用 `create_goal`，return-to-caller mode 绝不使用**；后者需要 `ce-work` 返回 caller，而 `create_goal` 会让 session 继续追求 objective，应改用 inline/subagents。
 
-**No callable goal tool, or dynamic-workflow (Claude Code today):** do **not** attempt to invoke them. Instead:
+**无 callable goal tool，或 dynamic-workflow（当前 Claude Code）：** 不要尝试调用，而应：
 
-- **Standalone interactive use:** print a copyable prompt block for the user to paste, then continue inline/subagents if the user does not paste it. Do not stall waiting for a paste.
-- **Return-to-caller use (e.g. under `lfg`):** do **not** emit a copyable prompt — a manual paste step strands the caller. Run inline/subagents instead, or return a blocker if the plan genuinely requires an unavailable engine.
+- **Standalone interactive use：** 输出 copyable prompt block；用户没有 paste 时继续 inline/subagents，不要停住等待。
+- **Return-to-caller（如 `lfg`）：** 不输出 copyable prompt，manual paste 会卡住 caller。改用 inline/subagents；若 plan 确实依赖 unavailable engine，则返回 blocker。
 
-Whichever path, the goal/workflow must not open a PR, finalize the session, or bypass the owning workflow's gates.
+无论何种 path，goal/workflow 都不得 open PR、finalize session 或绕过 owning workflow gates。
 
-Copyable goal-mode prompt (standalone — emit verbatim, substituting only the literal plan path). **It must be plan-agnostic: it should read identically for any plan except the substituted path.** Deletion test before emitting — if your draft names a specific command, file path, U-ID dependency relationship, stop condition, or Definition-of-Done item, it copied from the plan; cut it (the goal reads those from the plan). For PR/shipping, don't hardcode an open-a-PR or do-not-open-a-PR directive; instead carry the precedence line below — the goal follows the plan's PR/landing strategy if it has one, with the repo's conventions and the user's preferences overriding it (both of which the executing agent already has).
+Copyable goal-mode prompt（standalone，除 literal plan path 外原样输出）。**必须 plan-agnostic：任何 plan 除 substituted path 外都应完全相同。** 输出前做 deletion test：draft 若命名 specific command、file path、U-ID dependency、stop condition 或 DoD item，说明从 plan 复制了内容，应删除（goal 自行读 plan）。PR/shipping 不 hardcode open/do-not-open PR directive，而携带下方 precedence line：plan 有 PR/landing strategy 时遵循；repo conventions/user preferences 可以覆盖。
 
 ```text
 /goal Implement <plan-path> to its Definition of Done.
@@ -134,7 +134,7 @@ This top-level goal owns the implementation tail: run simplification and code re
 Done when the transcript shows: every non-deferrable Per-Unit DoD row has an observed verification result; the Verification Contract's required checks passed or are documented as not applicable; applicable simplification/review gates ran or were explicitly skipped with reason; dead-end or experimental code from approaches that did not pan out has been removed from the diff; and no progress/status was written into the plan file. Before declaring done, re-open the plan and re-check the active units, Verification Contract, and Definition of Done against the diff — context may have been compacted to a summary that dropped detail.
 ```
 
-Copyable dynamic-workflow prompt (large fan-out — emit verbatim):
+Copyable dynamic-workflow prompt（large fan-out，原样输出）：
 
 ```text
 ultracode: Execute <plan-path> as an end-to-end dynamic workflow.
@@ -142,19 +142,19 @@ ultracode: Execute <plan-path> as an end-to-end dynamic workflow.
 Use the plan as authority. Build the workflow around the Implementation Units and Definition of Done. Parallelize only independent U-IDs with disjoint file ownership, keep intermediate agent results inside the workflow, run simplification/review/verification gates inside the workflow tail, and return a final summary with changed files, U-IDs completed, verification results, residual findings, and blockers.
 ```
 
-Keep emitted prompts under 4,000 characters and always substitute the literal plan path.
+Emitted prompt 限制在 4,000 characters 内，始终替换 literal plan path。
 
-## Step 4: Resume the correct tail
+## Step 4：恢复正确 tail
 
-After any engine finishes implementation, inspect the diff and continue at the tail that matches the caller. The engine never owns more than implementation + local verification on its own.
+任何 engine 完成 implementation 后，检查 diff，并按 caller 匹配的 tail 继续。Engine 自身永远只拥有 implementation + local verification。
 
-| Mode | After implementation, `ce-work` ... |
+| Mode | Implementation 后 `ce-work` ... |
 |---|---|
-| **Standalone** (user invoked `ce-work` directly, or `ce-plan` handed off interactively) | Resumes its normal post-implementation tail — Phase 3-4 quality gates, simplification, review, commit, and handoff in `references/shipping-workflow.md`. A goal-mode run does not skip these; verify they ran or were explicitly skipped with reason. |
-| **Return-to-caller** (`mode:return-to-caller`, e.g. under `lfg`) | Performs implementation and local verification only, then returns the structured summary in `SKILL.md` § Return-to-Caller Mode (`standalone_shipping_skipped: true`). Does not run simplify/review/PR/CI — the caller owns those. |
+| **Standalone**（用户直接调用 `ce-work`，或 `ce-plan` interactive handoff） | 恢复正常 post-implementation tail：Phase 3-4 quality gates、simplification、review、commit，以及 `references/shipping-workflow.md` handoff。Goal-mode 不跳过；确认已运行或明确说明跳过原因。 |
+| **Return-to-caller**（`mode:return-to-caller`，如 `lfg` 下） | 只做 implementation/local verification，然后返回 `SKILL.md` Return-to-Caller Mode 的 structured summary（`standalone_shipping_skipped: true`）。不运行 simplify/review/PR/CI，由 caller 负责。 |
 
-Using goal-mode or a dynamic workflow is a way to get better sustained implementation focus, not a way to skip the owning workflow's finish discipline.
+Goal-mode/dynamic workflow 用于得到更持续的 implementation focus，不是跳过 owning workflow finish discipline 的方法。
 
-## Progress visibility (independent of tail ownership)
+## Progress visibility（独立于 tail ownership）
 
-Tail ownership decides who opens the **final** PR; it does not forbid progress signals during a long run. For multi-hour goals, meaningful commits as units complete and an optional scratch progress artifact (outside the plan body) are encouraged so a long trajectory stays observable. Only final PR creation is gated: a standalone top-level goal may open a **draft** PR only when it explicitly owns that channel; in return-to-caller mode `ce-work` must not open any PR, but may commit and return a progress report in its structured envelope. Never write progress or status into the plan body — git, commits, and the envelope carry it.
+Tail ownership 决定谁开**最终** PR，不禁止 long run 中的 progress signals。Multi-hour goal 应在 unit 完成时创建 meaningful commits，也可使用 plan body 外 optional scratch progress artifact，使 trajectory observable。只 gate final PR creation：standalone top-level goal 只有明确拥有该 channel 时才可 open **draft** PR；return-to-caller mode 下 `ce-work` 不得 open PR，但可以 commit，并在 structured envelope 返回 progress report。绝不要将 progress/status 写入 plan body；由 git、commits、envelope 承载。

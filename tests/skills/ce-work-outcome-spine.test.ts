@@ -25,12 +25,12 @@ describe("ce-work native characterization", () => {
     const skill = await readRepoFile("skills/ce-work/SKILL.md")
     const outcome = sliceSection(skill, "## Outcome", "## Input Document")
 
-    expect(outcome).toContain("**Result:**")
-    expect(outcome).toContain("**Next consumer:**")
-    expect(outcome).toContain("**Done:**")
-    expect(outcome).toContain("**Intent:**")
+    expect(outcome).toContain("**Result：**")
+    expect(outcome).toContain("**Next consumer：**")
+    expect(outcome).toContain("**Done：**")
+    expect(outcome).toContain("**Intent：**")
     expect(outcome).toContain("host orchestrator")
-    expect(outcome).toContain("authoritative verification and canonical commits")
+    expect(outcome).toContain("authoritative verification/canonical commits")
     expect(skill.indexOf("## Outcome")).toBeLessThan(skill.indexOf("## Execution Workflow"))
   })
 
@@ -38,16 +38,16 @@ describe("ce-work native characterization", () => {
     const skill = await readRepoFile("skills/ce-work/SKILL.md")
     const triage = sliceSection(skill, "### Phase 0: Input Triage", "### Phase 1: Quick Start")
 
-    expect(triage).toContain("**Otherwise, parse a leading mode token.**")
+    expect(triage).toContain("**否则解析 leading mode token。**")
     expect(triage).toContain("mode:return-to-caller")
     expect(triage).toContain("mode:caller-owned-tail")
     expect(triage).toContain("caller:lfg")
     expect(triage).toContain("**Plan document**")
-    expect(triage).toContain("**Resolve a session-carried plan before blank or bare-prompt classification.**")
-    expect(skill).toContain("Invocation origin is not observable or relevant")
+    expect(triage).toContain("**Blank/bare-prompt classification 前解析 session-carried plan。**")
+    expect(skill).toContain("Invocation origin 不可观察也不相关")
     expect(triage).toContain("**Blank invocation latest-plan discovery:**")
     expect(triage).toContain("**Bare prompt**")
-    expect(triage).toContain("skip only the task list")
+    expect(triage).toContain("只跳过 task list")
     expect(triage).toContain("mandatory engine-resolution gate")
   })
 
@@ -55,15 +55,15 @@ describe("ce-work native characterization", () => {
     const skill = await readRepoFile("skills/ce-work/SKILL.md")
     const triage = sliceSection(skill, "### Phase 0: Input Triage", "### Phase 1: Quick Start")
 
-    expect(triage).toContain("**Recovery activation comes first.**")
-    expect(triage).toContain("resume, inspect status, reap, or clean up")
+    expect(triage).toContain("**Recovery activation 最先。**")
+    expect(triage).toContain("resume、inspect status、reap 或 cleanup")
     expect(triage).toContain("implementation_run:<safe-id>")
-    expect(triage).toContain("read `references/cross-model-execution.md`")
-    expect(triage).toContain("must not dispatch a new worker")
-    expect(triage).toContain("completed recovery is read-only reconciliation")
-    expect(triage).toContain("Do not rerun test, build, format, install, generation, or `verify-run`")
-    expect(triage).toContain("report the stored unit and plan-wide verification receipts")
-    expect(triage.indexOf("**Recovery activation comes first.**")).toBeLessThan(triage.indexOf("**Otherwise, parse a leading mode token.**"))
+    expect(triage).toContain("读取 `references/cross-model-execution.md`")
+    expect(triage).toContain("不得 dispatch new worker")
+    expect(triage).toContain("completed recovery 是 read-only reconciliation")
+    expect(triage).toContain("不重跑 test、build、format、install、generation 或 `verify-run`")
+    expect(triage).toContain("报告 stored unit 与 plan-wide verification receipts")
+    expect(triage.indexOf("**Recovery activation 最先。**")).toBeLessThan(triage.indexOf("**否则解析 leading mode token。**"))
   })
 
   test("keeps the existing native engines and synchronous inline path", async () => {
@@ -74,33 +74,33 @@ describe("ce-work native characterization", () => {
     expect(engineGate).toContain("goal-mode")
     expect(engineGate).toContain("dynamic-workflow")
     expect(engineGate).toMatch(/\*\*Inline\*\* \| Trivial work/)
-    expect(engineGate).toContain("ordinary native workers")
-    expect(engineGate).toContain("never run `git worktree add` yourself")
+    expect(engineGate).toContain("普通 native workers")
+    expect(engineGate).toContain("不要自行运行 `git worktree add`")
     expect(engineGate).toContain("external cross-model controller")
   })
 
   test("bounds worker scope while leaving canonical verification and commits with the orchestrator", async () => {
     const skill = await readRepoFile("skills/ce-work/SKILL.md")
-    const dispatch = sliceSection(skill, "**Native dispatch (inline/subagent engines only)**", "### Phase 2: Execute")
+    const dispatch = sliceSection(skill, "**Native dispatch（仅 inline/subagent engines）**", "### Phase 2: Execute")
 
-    expect(dispatch).toContain("**bounded unit packet**")
-    expect(dispatch).toContain("A downstream worker may narrow that unit and authority, never broaden either")
-    expect(dispatch).toContain("Do not send \"read the whole plan\"")
-    expect(dispatch).toContain("**Do not commit.**")
-    expect(dispatch).toContain("**orchestrator owns staging, committing, and the authoritative test runs**")
-    expect(dispatch).toContain("Review, test, and commit each unit in dependency order — the orchestrator owns commits")
+    expect(dispatch).toContain("**有边界的 unit packet**")
+    expect(dispatch).toContain("Downstream worker 可以收窄 unit 和 authority，绝不能扩大")
+    expect(dispatch).toContain("不要把“读取整个 plan”作为 worker prompt")
+    expect(dispatch).toContain("**不要 commit。**")
+    expect(dispatch).toContain("**orchestrator 拥有 staging、committing、authoritative test runs**")
+    expect(dispatch).toContain("**按 dependency order review、test、commit 每个 unit；orchestrator 拥有 commits。**")
   })
 
   test("does not re-enter native dispatch after selecting cross-model execution", async () => {
     const skill = await readRepoFile("skills/ce-work/SKILL.md")
     const engineGate = sliceSection(skill, "4. **Choose Execution Engine, then Strategy**", "### Phase 2: Execute")
 
-    expect(engineGate).toContain("**Native dispatch (inline/subagent engines only)**")
-    expect(engineGate).toContain("must not re-enter this ordinary subagent dispatch")
-    expect(engineGate).toContain("**A successful controller `init` locks that unit to the selected cross-model engine.**")
-    expect(engineGate).toContain("Never reclassify it as trivial, abandon it for speed, or implement it natively")
-    expect(engineGate).toContain("**After each serial inline/subagent unit:**")
-    expect(engineGate).toContain("**After a parallel inline/subagent batch")
+    expect(engineGate).toContain("**Native dispatch（仅 inline/subagent engines）**")
+    expect(engineGate).toContain("不能重新进入 ordinary subagent dispatch")
+    expect(engineGate).toContain("**Controller `init` 成功后，该 unit 锁定到 selected cross-model engine。**")
+    expect(engineGate).toContain("不要将其重新分类为 trivial、为速度 abandon，或 native implement")
+    expect(engineGate).toContain("**每个 serial inline/subagent unit 后：**")
+    expect(engineGate).toContain("**Parallel inline/subagent batch 后")
   })
 
   test("preserves standalone shipping and return-to-caller tail ownership", async () => {
@@ -123,24 +123,24 @@ describe("ce-work cross-model engine contract", () => {
     const engineGate = sliceSection(skill, "4. **Choose Execution Engine, then Strategy**", "### Phase 2: Execute")
 
     expect(engineGate).toContain("cross-model execution")
-    expect(engineGate).toContain("native execution remains the default")
-    expect(engineGate).toContain("Route resolution is a mandatory pre-write gate")
+    expect(engineGate).toContain("native execution 仍默认")
+    expect(engineGate).toContain("Route resolution 是 mandatory pre-write gate")
     expect(engineGate).toContain(".compound-engineering/config.local.yaml")
-    expect(engineGate).toContain("Do not infer native execution merely because no typed carrier was supplied")
+    expect(engineGate).toContain("不要仅因没有 typed carrier 就推断 native execution")
     expect(engines).toContain("still-active session")
-    expect(engines).toContain("active instructions and conventions already in context")
+    expect(engines).toContain("project active instructions/conventions")
     expect(engines).toContain("recorded provenance")
-    expect(engines).toMatch(/incidental mentions/i)
+    expect(engines).toContain("incidental mention")
     expect(engines).toContain("work_engine_mode")
     expect(engines).toContain("`off | prefer | require`")
     expect(engines).toContain("work_engine_preferences")
     expect(engines).toContain("`harness`")
-    expect(engines).toContain("optional `model`")
+    expect(engines).toContain("可选 `model`")
     expect(engines).toContain("configured default")
     expect(engines).toContain("ordered candidate")
-    expect(engines).toContain("continue to the next candidate")
-    expect(engines).toContain("equivalent to the current host")
-    expect(engines).toContain("`off` disables only the standing preference")
+    expect(engines).toContain("继续下一项")
+    expect(engines).toContain("Candidate 等于 current host")
+    expect(engines).toContain("`off` 只禁用 standing preference")
     expect(engines).toContain("strict Composer")
     expect(engines).toContain("caller Codex")
     expect(engines).toContain("config Cursor")
@@ -152,57 +152,57 @@ describe("ce-work cross-model engine contract", () => {
     const external = await readRepoFile("skills/ce-work/references/cross-model-execution.md")
 
     expect(skill).toContain("private **bounded implementation brief**")
-    expect(skill).toContain("Do not send raw conversation history")
-    expect(skill).toContain("clarify or route to `ce-plan` before any cross-model egress")
-    expect(engines).toContain("Invocation origin supplies no routing authority")
-    expect(engines).toContain("concrete goal, bounded scope, and authoritative verification")
-    expect(external).toContain("## Build a source for bare-prompt work")
+    expect(skill).toContain("不发送 raw conversation history")
+    expect(skill).toContain("在任何 cross-model egress 前 clarify 或 route 到 `ce-plan`")
+    expect(engines).toContain("Invocation origin 不提供 routing authority")
+    expect(engines).toContain("concrete goal、bounded scope、authoritative verification")
+    expect(external).toContain("## 为 bare-prompt work 构建 source")
     for (const heading of ["Request", "Goal", "Scope", "Acceptance and verification", "Constraints and exclusions", "Units"]) {
       expect(external).toContain(`\`${heading}\``)
     }
-    expect(external).toContain("one conservative `P1` unit by default")
+    expect(external).toContain("默认一个 conservative `P1` unit")
     expect(external).toContain("--prompt-brief <temp-path> --prompt-digest <sha256>")
-    expect(external).toContain("Prompt-backed runs require their disclosed run id")
+    expect(external).toContain("Prompt-backed run 必须使用 disclosed run id")
   })
 
   test("uses agent judgment above fixed safety boundaries when local harness CLIs drift", async () => {
     const engines = await readRepoFile("skills/ce-work/references/execution-engines.md")
     const protocol = await readRepoFile("skills/ce-work/references/cross-model-execution.md")
 
-    expect(engines).toContain("attempt the documented adapter recipe first")
-    expect(engines).toContain("local CLI help or version")
-    expect(engines).toContain("same sanctioned harness/model family")
-    expect(protocol).toContain("first qualified candidate")
-    expect(protocol).toContain("Before egress")
-    expect(protocol).toContain("After dispatch starts")
-    expect(protocol).toContain("never switch recipients")
+    expect(engines).toContain("先尝试 documented adapter recipe")
+    expect(engines).toContain("local CLI help/version")
+    expect(engines).toContain("同一 sanctioned harness/model family")
+    expect(protocol).toContain("第一个 qualified candidate")
+    expect(protocol).toContain("Egress 前")
+    expect(protocol).toContain("Dispatch 开始后")
+    expect(protocol).toContain("不得切换 recipient")
   })
 
   test("keeps explicit cross-model activation read-only until the controller owns the workspace", async () => {
     const skill = await readRepoFile("skills/ce-work/SKILL.md")
     const triage = sliceSection(skill, "### Phase 0: Input Triage", "### Phase 1: Quick Start")
 
-    expect(triage).toContain("Every non-recovery code path must resolve its implementation engine before execution")
+    expect(triage).toContain("每个 non-recovery code path 都必须在 execution 前解析 implementation engine")
     expect(triage).toContain("carrierless Return-to-Caller Mode")
     expect(triage).toContain(".compound-engineering/config.local.yaml")
-    expect(triage).toContain("pre-controller discovery is read-only")
-    expect(triage).toContain("Do not run baseline, test, build, format, install, or generation commands")
-    expect(triage).toContain("prove the canonical Git snapshot is byte-for-byte unchanged")
+    expect(triage).toContain("pre-controller discovery 只读")
+    expect(triage).toContain("不在 canonical checkout 运行 baseline/test/build/format/install/generation commands")
+    expect(triage).toContain("证明 canonical Git snapshot byte-for-byte unchanged")
   })
 
   test("keeps the caller carrier implementation-only and exactly four fields", async () => {
     const engines = await readRepoFile("skills/ce-work/references/execution-engines.md")
-    const carrier = sliceSection(engines, "### Typed caller binding", "### Target and identity vocabulary")
+    const carrier = sliceSection(engines, "### Typed caller binding", "### Target 与 identity vocabulary")
 
     expect(carrier).toContain("implementation_engine")
     for (const field of ["mode", "target", "model", "source"]) {
       expect(carrier).toContain(`\`${field}\``)
     }
-    expect(carrier).toContain("exactly these four fields")
+    expect(carrier).toContain("恰好包含四个 field")
     expect(carrier).toContain("mode:return-to-caller implementation_engine:<compact-json> <plan-path>")
     expect(carrier).toContain('implementation_engine:{"mode":"prefer","target":"codex","model":null,"source":"lfg-current-turn"}')
-    expect(carrier).toContain("only at the `ce-work` seam")
-    expect(carrier).toContain("never enter planning or review input")
+    expect(carrier).toContain("只在 `ce-work` seam")
+    expect(carrier).toContain("fields 绝不进入 planning/review input")
     expect(engines).not.toContain("work_delegate_")
   })
 
@@ -210,10 +210,10 @@ describe("ce-work cross-model engine contract", () => {
     const lfg = await readRepoFile("skills/lfg/SKILL.md")
 
     expect(lfg).toContain("ordered fallback list")
-    expect(lfg).toContain("do not truncate it to the scalar carrier")
-    expect(lfg).toContain("retain the whole ordered assignment as current-task implementation intent")
-    expect(lfg).toContain("pass no `implementation_engine:` object")
-    expect(lfg).toContain("host cannot preserve that context")
+    expect(lfg).toContain("不要 truncate 为 scalar carrier")
+    expect(lfg).toContain("将完整 ordered assignment 保留为 current-task implementation intent")
+    expect(lfg).toContain("不传 `implementation_engine:` object")
+    expect(lfg).toContain("host 无法跨 skill invocation 保留")
     expect(lfg).toContain("routing-carrier blocker")
   })
 
@@ -222,24 +222,24 @@ describe("ce-work cross-model engine contract", () => {
     const phase0 = sliceSection(skill, "### Phase 0: Input Triage", "**Plan document**")
 
     expect(phase0).toContain("implementation_engine:")
-    expect(phase0).toContain("one compact JSON object")
-    expect(phase0).toContain("exactly `mode`, `target`, `model`, and `source`")
+    expect(phase0).toContain("compact JSON object")
+    expect(phase0).toContain("`mode`、`target`、`model`、`source`")
     expect(phase0).toContain("implementation_run:<safe-id>")
     expect(phase0).toContain("`^[A-Za-z0-9._-]{1,128}$`")
-    expect(phase0).toContain("Reject malformed JSON, missing/extra fields, an unsafe run id, or a duplicate carrier")
-    expect(phase0).toContain("entire remaining string is the plan path")
-    expect(phase0).toContain("original `mode:return-to-caller <plan-path>` form is unchanged")
+    expect(phase0).toContain("拒绝 malformed JSON、missing/extra fields、unsafe run id 或 duplicate carrier")
+    expect(phase0).toContain("余下整个 string 是 plan path")
+    expect(phase0).toContain("原 `mode:return-to-caller <plan-path>` form 不变")
   })
 
   test("keeps external dispatch policy out of the implementation-worker persona", async () => {
     const worker = await readRepoFile("skills/ce-work/references/agents/implementation-worker.md")
 
-    expect(worker).toContain("caller, unit packet, and controller own dispatch")
-    expect(worker).toContain("Implement exactly the supplied implementation unit")
-    expect(worker).toContain("Before returning `completed`")
-    expect(worker).toContain("complete Git delta")
-    expect(worker).toContain("disposable artifacts created by your own checks")
-    expect(worker).toContain("every remaining changed path")
+    expect(worker).toContain("Caller、unit packet 与 controller 负责 dispatch")
+    expect(worker).toContain("只在提供的 workspace 中实现指定的 implementation unit")
+    expect(worker).toContain("返回 `completed` 前")
+    expect(worker).toContain("完整 Git delta")
+    expect(worker).toContain("你自己的检查产生的 disposable artifacts")
+    expect(worker).toContain("全部剩余 changed paths")
     for (const dispatchPolicy of ["recipient", "model", "harness", "intermediary", "retry", "route", "additional workers"]) {
       expect(worker.toLowerCase()).not.toContain(dispatchPolicy)
     }
@@ -248,15 +248,15 @@ describe("ce-work cross-model engine contract", () => {
   test("distinguishes Cursor from Composer and collapses same-host default execution", async () => {
     const protocol = await readRepoFile("skills/ce-work/references/cross-model-execution.md")
 
-    expect(protocol).toContain("`cursor` means the Cursor harness with its configured default model")
-    expect(protocol).toContain("`composer` means a Composer-family model through Cursor")
+    expect(protocol).toContain("`cursor` 表示使用 configured default model 的 Cursor harness")
+    expect(protocol).toContain("`composer` 表示经 Cursor 使用 Composer-family model")
     expect(protocol).toContain("same-host default")
-    expect(protocol).toContain("collapse to native execution")
+    expect(protocol).toContain("折叠为 native execution")
     expect(protocol).toContain("codex")
     expect(protocol).toContain("claude")
     expect(protocol).toContain("grok")
     expect(protocol).toContain("Fixed controller route tokens")
-    expect(protocol).toContain("`codex`, `claude`, `grok-cli`, `cursor`, `composer`, or `grok-cursor`")
+    expect(protocol).toContain("`codex`、`claude`、`grok-cli`、`cursor`、`composer` 或 `grok-cursor`")
   })
 
   test("defines prefer, require, fixed-recipient sanction, and restriction failure", async () => {
@@ -264,15 +264,15 @@ describe("ce-work cross-model engine contract", () => {
 
     expect(protocol).toContain("Preference-strength")
     expect(protocol).toContain("Requirement-strength")
-    expect(protocol).toContain("automatic or headless")
-    expect(protocol).toContain("must not prompt")
+    expect(protocol).toContain("Automatic/headless")
+    expect(protocol).toContain("不得 prompt")
     expect(protocol).toContain("fixed recipient")
-    expect(protocol).toContain("every intermediary")
-    expect(protocol).toContain("material exposed")
+    expect(protocol).toContain("全部 intermediary")
+    expect(protocol).toContain("暴露的 repository/unit material")
     expect(protocol).toContain("caller restrictions")
     expect(protocol).toContain("required restriction")
-    expect(protocol).toContain("route unavailable")
-    expect(protocol).toContain("never switch recipients")
+    expect(protocol).toContain("route 视为 unavailable")
+    expect(protocol).toContain("不得切换 recipient")
   })
 
   test("preserves host-only canonical authority and narrows the worktree exception", async () => {
@@ -280,15 +280,15 @@ describe("ce-work cross-model engine contract", () => {
     const protocol = await readRepoFile("skills/ce-work/references/cross-model-execution.md")
     const engineGate = sliceSection(skill, "4. **Choose Execution Engine, then Strategy**", "### Phase 2: Execute")
 
-    expect(engineGate).toContain("ordinary native workers")
+    expect(engineGate).toContain("普通 native workers")
     expect(engineGate).toContain("external cross-model controller")
-    expect(protocol).toContain("isolated transport commit")
+    expect(protocol).toContain("隔离的 transport commit")
     expect(protocol).toContain("host-only canonical")
     for (const forbiddenAuthority of ["canonical commit", "push", "PR", "shipping", "recipient-switch"]) {
       expect(protocol).toContain(forbiddenAuthority)
     }
-    expect(protocol).toContain("may narrow")
-    expect(protocol).toContain("never broaden")
+    expect(protocol).toContain("可以收窄")
+    expect(protocol).toContain("绝不能扩大")
   })
 
   test("loads the cross-model protocol only for selected execution or recovery", async () => {
@@ -296,8 +296,8 @@ describe("ce-work cross-model engine contract", () => {
     const engineGate = sliceSection(skill, "4. **Choose Execution Engine, then Strategy**", "### Phase 2: Execute")
     const triage = sliceSection(skill, "### Phase 0: Input Triage", "**Plan document**")
 
-    expect(engineGate).toContain("If and only if cross-model execution is selected")
-    expect(engineGate).toContain("read `references/cross-model-execution.md`")
+    expect(engineGate).toContain("当且仅当选中 cross-model execution")
+    expect(engineGate).toContain("读取 `references/cross-model-execution.md`")
     expect(triage.match(/references\/cross-model-execution\.md/g)?.length).toBe(2)
     expect(skill.match(/references\/cross-model-execution\.md/g)?.length).toBe(3)
   })
@@ -329,88 +329,88 @@ describe("ce-work cross-model engine contract", () => {
   test("defines an executable serial external-unit transaction before any parallel protocol", async () => {
     const protocol = await readRepoFile("skills/ce-work/references/cross-model-execution.md")
     const runner = await readRepoFile("skills/ce-work/scripts/peer-job-runner.py")
-    const serial = sliceSection(protocol, "## Serial external-unit protocol", "## Preserve tail ownership")
+    const serial = sliceSection(protocol, "## 串行 external-unit protocol", "## 保留 tail ownership")
 
     for (const command of [
       "unit-workspace.py` `init",
-      "unit-workspace.py` `checkpoint-plan",
-      "unit-workspace.py` `prepare",
-      "unit-workspace.py` `authorize-dispatch",
-      "peer-job-runner.py` `start --no-sweep --input-digest <controller-packet-digest>",
+      "`checkpoint-plan`",
+      "`prepare`",
+      "`authorize-dispatch`",
+      "peer-job-runner.py start --no-sweep --input-digest <controller-packet-digest>",
       "cross-model-work.sh",
-      "unit-workspace.py` `record-job",
-      "unit-workspace.py` `terminalize",
+      "`record-job`",
+      "`terminalize`",
       "unit-workspace.py integrate",
-      "unit-workspace.py verify-run",
-      "unit-workspace.py` `integration-acquire",
-      "unit-workspace.py` `preflight",
+      "`verify-run`",
+      "`integration-acquire`",
+      "`preflight`",
       "git cherry-pick --no-commit",
-      "unit-workspace.py` `mark-applied",
-      "unit-workspace.py` `mark-verified",
-      "unit-workspace.py` `mark-committed",
-      "unit-workspace.py` `cleanup",
-      "unit-workspace.py` `integration-release",
+      "`mark-applied`",
+      "`mark-verified`",
+      "`mark-committed`",
+      "`cleanup`",
+      "`integration-release`",
     ]) {
       expect(serial).toContain(command)
     }
     expect(serial).toContain("cross-model-work.sh <authorization_path> <workspace> <unit-packet> <expected-packet-sha256> <result-dir>")
     expect(serial).toContain("controller-returned `authorization_path`")
     expect(serial).toContain("controller-returned `attempt_id`")
-    expect(serial).toContain("invoke the returned adapter path directly")
-    expect(serial).toContain("without a `bash`, `sh`, or `env` prefix")
-    expect(serial).toContain("runner label must equal the unit id exactly")
+    expect(serial).toContain("returned adapter path 必须直接作为第一个 worker argv")
+    expect(serial).toContain("不加 `bash`、`sh`、`env` prefix")
+    expect(serial).toContain("runner label 必须精确等于 unit id")
     expect(serial).toContain("<controller-result-dir>/implementation-result.json")
-    expect(serial).toContain("Do not pre-create the run directory")
+    expect(serial).toContain("不要预创建")
     expect(serial).toContain("`git -C <canonical-checkout>`")
     expect(serial).toContain("new verification artifacts")
-    expect(serial).toContain("authoritative command's exit status")
-    expect(serial).toContain("never infer a pass from stdout")
-    expect(serial).toContain("`run_id`, `unit_id`, and `attempt_id`")
+    expect(serial).toContain("authoritative command exit status")
+    expect(serial).toContain("绝不从 stdout 推断 pass")
+    expect(serial).toContain("`run_id`、`unit_id`、`attempt_id`")
     expect(serial).toContain("`CE_PEER_HARD_SECS=7200`")
-    expect(serial).toContain("`CE_PEER_IDLE_SECS=600` for route-qualified `incremental` activity")
-    expect(serial).toContain("`CE_PEER_IDLE_SECS=0` for `hard-only` or otherwise untrustworthy activity")
-    expect(serial).toContain("resets on progress and detects a stall; it is not a wall-clock maximum")
+    expect(serial).toContain("route-qualified `incremental` activity 设置 `CE_PEER_IDLE_SECS=600`")
+    expect(serial).toContain("`hard-only`/不可信 activity 设置 `CE_PEER_IDLE_SECS=0`")
+    expect(serial).toContain("600 秒 window 随 progress 重置，用来检测 stall，不是 wall-clock maximum")
     expect(serial).toContain(
-      "parent CE Work directory containing all `<run-id>/` directories, not an individual run directory",
+      "包含全部 `<run-id>/` 的父 CE Work directory，不是某个 run directory",
     )
     expect(runner).toContain("CE_WORK_RUNS_ROOT         parent CE Work dir containing all <run-id>/ dirs")
-    expect(serial).toContain("Both `--input-digest` and the adapter's expected-packet argument")
-    expect(serial).toContain("controller `authorize-dispatch` success")
-    expect(serial).toContain("runner-exported job id")
-    expect(serial).toContain("atomically binds that job id to the exact attempt before egress")
-    expect(serial).toContain("A second job for the attempt is refused")
-    expect(serial).toContain("actual runner metadata and exact worker argv")
-    expect(serial).toContain("authorization digest, workspace, packet path and digest, and result directory")
-    expect(serial).toContain("hand-authored or cross-attempt authorization")
-    expect(serial).toContain("exact route, model, and intermediary contract")
-    expect(serial).toMatch(/before prompt construction or external CLI start/i)
-    expect(serial).toContain("`--emit-adapter` mode remains introspection only")
+    expect(serial).toContain("`--input-digest` 与 adapter expected-packet argument 都必须")
+    expect(serial).toContain("调用 `authorize-dispatch` 获得成功")
+    expect(serial).toContain("Runner 向 worker export controller-visible job id")
+    expect(serial).toContain("atomic 地将 job id 绑定 exact attempt")
+    expect(serial).toContain("同 attempt 的第二个 job 会被拒绝")
+    expect(serial).toContain("actual runner metadata 与 exact worker argv")
+    expect(serial).toContain("authorization digest、workspace、packet path/digest、result directory")
+    expect(serial).toContain("hand-authored/cross-attempt authorization")
+    expect(serial).toContain("controller-owned exact route/model/intermediary contract")
+    expect(serial).toContain("构建 prompt 或启动 external CLI 前")
+    expect(serial).toContain("`--emit-adapter` 只用于 introspection")
     expect(serial).not.toContain("CE_WORK_MODEL_OVERRIDE")
     expect(serial).not.toContain("CE_WORK_MODEL_OVERRIDE_TARGET")
-    expect(serial).toContain("one bounded unit packet")
-    expect(serial).toContain("exact plural keys `route`, `intermediaries`, and `restrictions`")
-    expect(serial).toContain("direct `codex`, `claude`, `grok-cli`, and `cursor` routes use `intermediaries: []`")
-    expect(serial).toContain("Write the packet source directly to OS temp outside the canonical checkout")
-    expect(serial).toContain("never draft it inside the repository and move or copy it later")
-    expect(serial).toContain("quoting `$(...)` as a direct argument does not expand it")
+    expect(serial).toContain("准备 bounded unit packet")
+    expect(serial).toContain("精确复数 key `route`、`intermediaries`、`restrictions`")
+    expect(serial).toContain("direct `codex`、`claude`、`grok-cli`、`cursor` 使用 `intermediaries: []`")
+    expect(serial).toContain("Packet source 直接写到 canonical checkout 外的 OS temp")
+    expect(serial).toContain("绝不能先在 repository 起草再移动")
+    expect(serial).toContain("把 `$(...)` 作为 direct arg 引用不会展开")
     expect(serial).toContain("-- bash -o pipefail -c")
-    expect(serial).toContain("separate host tool calls")
-    expect(serial).toContain("Never generate or run a shell script")
-    expect(serial).toContain("`start` must return")
-    expect(serial).toContain("one state-changing controller transition")
-    expect(serial).toContain("single fail-stop `integrate` transaction")
-    expect(serial).toContain("Do not manually chain")
-    expect(serial).toContain("60 seconds")
-    expect(serial).toContain("A nonzero controller, runner, verification, or Git exit ends that host tool call")
-    expect(serial).toContain("every bare-job-id runner `status`, `wait`, `result`, or `reap` call must carry `--skill ce-work`")
-    expect(serial).toContain("inspect the actual transport diff")
-    expect(serial).toContain("generated byproduct")
-    expect(serial).toContain("before `mark-verified`")
-    expect(serial).toContain("authoritative canonical verification")
+    expect(serial).toContain("后续 host tool calls")
+    expect(serial).toContain("绝不生成或运行")
+    expect(serial).toContain("`start` 必须在 supervision 前返回")
+    expect(serial).toContain("只执行一个 state-changing controller transition")
+    expect(serial).toContain("controller 单一 fail-stop `integrate` transaction")
+    expect(serial).toContain("不要手工串联")
+    expect(serial).toContain("60 秒")
+    expect(serial).toContain("Controller、runner、verification 或 Git 非零退出会结束当前 host tool call")
+    expect(serial).toContain("所有 bare-job-id `status`、`wait`、`result`、`reap` 都要带 `--skill ce-work`")
+    expect(serial).toContain("检查 actual transport diff")
+    expect(serial).toContain("Generated byproduct")
+    expect(serial).toContain("在 `mark-verified` 前发生")
+    expect(serial).toContain("authoritative verification")
     expect(serial).toContain("restore")
-    expect(serial).toContain("before fallback, retry, or another unit")
+    expect(serial).toContain("在 fallback/retry/next unit 前")
     expect(serial).toContain("plan-wide Verification Contract gates")
-    expect(serial).toContain("restores verification-created canonical artifacts")
+    expect(serial).toContain("恢复 verification-created artifacts")
     expect(serial.indexOf("integration-acquire")).toBeLessThan(serial.indexOf("git cherry-pick --no-commit"))
     expect(serial.indexOf("mark-verified")).toBeLessThan(serial.indexOf("mark-committed"))
   })
@@ -418,36 +418,36 @@ describe("ce-work cross-model engine contract", () => {
   test("defines exactly-once resume, recovery discovery, and post-start fallback gates", async () => {
     const protocol = await readRepoFile("skills/ce-work/references/cross-model-execution.md")
 
-    expect(protocol).toContain("unit-workspace.py` `resume --run-id")
-    expect(protocol).toContain("list the matching run ids")
-    expect(protocol).toContain("completed run is observation-only")
-    expect(protocol).toContain("must not rerun a Verification Contract gate")
-    expect(protocol).toContain("must not redispatch, reapply, recommit, or run either owning tail")
-    expect(protocol).toContain("unit-workspace.py` `claim-fallback")
-    expect(protocol).toContain("unit-workspace.py` `complete-fallback")
-    expect(protocol).toContain("exactly one native fallback")
+    expect(protocol).toContain("使用 `resume --run-id <id>`")
+    expect(protocol).toContain("列出 run ids/recovery paths")
+    expect(protocol).toContain("completed run 只允许 observation")
+    expect(protocol).toContain("不得仅为重确认 evidence 而重跑 Verification Contract gate")
+    expect(protocol).toContain("不得 redispatch、reapply、recommit 或运行任一 owning tail")
+    expect(protocol).toContain("调用 `claim-fallback`")
+    expect(protocol).toContain("调用 `complete-fallback`")
+    expect(protocol).toContain("只授权一次 native fallback")
     expect(protocol).toContain("FALLBACK_ALREADY_AUTHORIZED")
     expect(protocol).toContain("FALLBACK_COMPLETED")
     expect(protocol).toContain("`RUN_VERIFIED`")
     expect(protocol).toContain("CHOICE_REQUIRED")
-    expect(protocol).toContain("headless `require` remains blocked")
-    expect(protocol).toContain("exact restoration")
-    expect(protocol).toContain("expected post-apply tree and changed-path set")
-    expect(protocol).toContain("unknown dirt blocks without destructive restoration")
-    expect(protocol).toContain("status`, `reap`, and `cleanup")
-    expect(protocol).toContain("same scalar `run_id`")
-    expect(protocol).toContain("a fresh `attempt_id`")
-    expect(protocol).toContain("block selection")
-    expect(protocol).toContain("Do not dispatch a new third run")
+    expect(protocol).toContain("headless `require` 保持 blocked")
+    expect(protocol).toContain("Exact restoration")
+    expect(protocol).toContain("expected post-apply tree/changed-path set")
+    expect(protocol).toContain("unknown dirt 则阻塞且不 destructive restore")
+    expect(protocol).toContain("`status`、`reap`、`cleanup`")
+    expect(protocol).toContain("同一 scalar `run_id`")
+    expect(protocol).toContain("fresh `attempt_id`")
+    expect(protocol).toContain("并阻塞，不自行选择")
+    expect(protocol).toContain("不得创建第三个 run")
   })
 
   test("separates scheduling from engine/workspace selection and declines unsafe waves", async () => {
     const skill = await readRepoFile("skills/ce-work/SKILL.md")
     const loop = await readRepoFile("skills/ce-work/references/implementation-loop.md")
-    const gate = sliceSection(skill, "**Parallel Safety Check**", "**Native dispatch (inline/subagent engines only)**")
+    const gate = sliceSection(skill, "**Parallel Safety Check**", "**Native dispatch（仅 inline/subagent engines）**")
 
-    expect(gate).toContain("separate from engine and workspace selection")
-    expect(gate).toContain("decline parallelism")
+    expect(gate).toContain("scheduling 与 engine/workspace selection 分离")
+    expect(gate).toContain("拒绝 parallelism")
     expect(gate).toContain("dependencies")
     expect(gate).toContain("declared files")
     expect(gate).toContain("shared types/APIs/interfaces")
@@ -459,54 +459,54 @@ describe("ce-work cross-model engine contract", () => {
     expect(gate).toContain("environment singleton")
     expect(gate).toContain("expected merge")
     expect(gate).toContain("3-5")
-    expect(gate).toContain("every concurrent worker")
+    expect(gate).toContain("每个 concurrent worker")
     expect(gate).toContain("isolated workspace")
-    expect(gate).toContain("synchronous native")
+    expect(gate).toContain("Synchronous native")
     expect(gate).toContain("active checkout")
-    expect(loop).toContain("Repeated collision")
-    expect(loop).toContain("disable further parallel waves")
+    expect(loop).toContain("反复 collision")
+    expect(loop).toContain("禁用本次 run 的后续 parallel waves")
   })
 
   test("makes linked-checkout siblings and silent-route supervision explicit", async () => {
     const protocol = await readRepoFile("skills/ce-work/references/cross-model-execution.md")
 
-    expect(protocol).toContain("already a linked worktree does not disable this route")
+    expect(protocol).toContain("Active checkout 本身是 linked worktree 也不禁用该 route")
     expect(protocol).toContain("detached **sibling**")
     expect(protocol).toContain("/tmp/compound-engineering-<effective-uid>/ce-work/<run-id>/")
-    expect(protocol).toContain("never a nested worktree")
-    expect(protocol).toContain("plan-only state is checkpointable, not a route blocker")
-    expect(protocol).toContain("`hard-only` is the normal posture")
-    expect(protocol).toContain("disable idle timeout")
-    expect(protocol).toContain("never infer failure or fallback merely from absent incremental activity")
+    expect(protocol).toContain("绝不在 active checkout 下创建 nested worktree")
+    expect(protocol).toContain("此状态可 checkpoint，不是 route blocker")
+    expect(protocol).toContain("`hard-only`")
+    expect(protocol).toContain("禁用 idle timeout")
+    expect(protocol).toContain("绝不因缺少 incremental activity 推断 failure/fallback")
   })
 
   test("defines same-base parallel authoring with serial semantic fold-in", async () => {
     const protocol = await readRepoFile("skills/ce-work/references/cross-model-execution.md")
-    const wave = sliceSection(protocol, "## Parallel external-wave protocol", "## Resume and fallback exactly once")
+    const wave = sliceSection(protocol, "## 并行 external-wave protocol", "## 精确 resume 与只 fallback 一次")
 
-    expect(wave).toContain("one recorded wave base")
-    expect(wave).toContain("terminalize every worker")
-    expect(wave).toContain("before the first fold-in")
-    expect(wave).toContain("sequentially")
+    expect(wave).toContain("一个 recorded wave base")
+    expect(wave).toContain("将每个 worker terminalize")
+    expect(wave).toContain("之前")
+    expect(wave).toContain("serial integrate")
     expect(wave).toContain("wave-advance")
     expect(wave).toContain("exact earlier host-owned canonical commits")
     expect(wave).toContain("semantic")
-    expect(wave).toContain("clean textual apply")
+    expect(wave).toContain("Clean textual apply")
     expect(wave).toContain("restoration")
-    expect(wave).toContain("dependents remain queued")
+    expect(wave).toContain("affected dependents 保持 queued")
     expect(wave).toContain("unaffected siblings")
-    expect(wave).toContain("re-dispatch")
+    expect(wave).toContain("redispatch")
     expect(wave).toContain("serial fallback")
-    expect(wave).toContain("never blind-merge")
+    expect(wave).toContain("绝不 blind-merge")
   })
 
   test("ships an evaluator-owned fresh-context fixture pack for the weakest seams", async () => {
     const skill = await readRepoFile("skills/ce-work/SKILL.md")
     const evalPack = await readRepoFile("skills/ce-work/references/cross-model-work-eval.md")
 
-    expect(evalPack).toMatch(/must not be injected into\s+the agent under test/)
-    expect(evalPack).toContain("weakest practical installed model tier")
-    expect(evalPack).toContain("strong installed model tier")
+    expect(evalPack).toContain("不得注入被测 agent")
+    expect(evalPack).toContain("可安装最弱 practical model tier")
+    expect(evalPack).toContain("强 installed model tier")
     expect(evalPack).toContain("Change")
     expect(evalPack).toContain("Verify")
     expect(evalPack).toContain("Consider")
@@ -548,10 +548,10 @@ describe("ce-work cross-model engine contract", () => {
     ]) {
       expect(evalPack).toContain(seam)
     }
-    expect(evalPack).toContain("| E20 linked-checkout sibling | CE Work is itself running in an existing linked worktree and selects external implementation for one unit | Create a new detached **sibling** through the repository's shared Git common directory, place it under `/tmp/compound-engineering-<effective-uid>/ce-work/<run-id>/` rather than beneath the active checkout, base it at the recorded clean canonical SHA, and keep canonical fold-in host-owned. Do not reject the route merely because the active checkout is already a worktree, and do not create a nested worktree. |")
-    expect(skill).toContain("from this skill's loaded `SKILL.md` directory")
-    expect(skill).toContain("never glob the target repository")
-    expect(skill).toContain("continuing natively")
+    expect(evalPack).toContain("| E20 linked-checkout sibling | CE Work 自己运行在 linked worktree，某 unit 选择 external implementation | 经 shared Git common directory 创建 detached **sibling**，放在 `/tmp/compound-engineering-<effective-uid>/ce-work/<run-id>/`，不放在 active checkout 下；以 recorded clean canonical SHA 为 base，fold-in 归 host。不得因 active checkout 已是 worktree 就拒绝 route，也不得创建 nested worktree。 |")
+    expect(skill).toContain("从 loaded `SKILL.md` directory")
+    expect(skill).toContain("绝不 glob target repository")
+    expect(skill).toContain("native 继续")
   })
 })
 
@@ -561,27 +561,27 @@ describe("ce-work implementation evidence characterization", () => {
     const implementationLoop = await readRepoFile("skills/ce-work/references/implementation-loop.md")
     const phase2 = sliceSection(skill, "### Phase 2: Execute", "### Phase 3-4: Quality Check and Finishing Work")
 
-    expect(phase2).toContain("you must read `references/implementation-loop.md`")
+    expect(phase2).toContain("必须读取 `references/implementation-loop.md`")
     expect(phase2.indexOf("references/implementation-loop.md")).toBeLessThan(phase2.indexOf("2. **Incremental Commits**"))
-    expect(skill).not.toContain("1. **Task Execution Loop**")
-    expect(skill).not.toContain("**Evidence Strategy** — Test discovery decides where proof belongs")
-    expect(implementationLoop).toContain("1. **Task Execution Loop**")
-    expect(implementationLoop).toContain("**Evidence Strategy** — Test discovery decides where proof belongs")
+    expect(skill).not.toContain("1. **任务执行循环**")
+    expect(skill).not.toContain("**Evidence Strategy**：Test discovery 决定 proof 应放在哪里")
+    expect(implementationLoop).toContain("1. **任务执行循环**")
+    expect(implementationLoop).toContain("**Evidence Strategy**：Test discovery 决定 proof 应放在哪里")
   })
 
   test("retains every task evidence and verification stop across relocation", async () => {
     const contract = await readImplementationContract()
     const orderedStops = [
-      "Mark task as in-progress",
-      "Choose the evidence strategy for this task before changing behavior",
-      "verify the expected failure or baseline capture before changing production code",
-      "Implement following existing conventions",
-      "Run System-Wide Test Check",
-      "Run tests after changes",
-      "Assess testing coverage",
-      "Record verification evidence for the task",
-      "Mark task as completed",
-      "Evaluate for incremental commit",
+      "将 task 标为 in-progress",
+      "在改变 behavior 前为 task 选择 evidence strategy",
+      "在修改 production code 前确认 expected failure 或 baseline capture",
+      "按 existing conventions 实现",
+      "运行 System-Wide Test Check",
+      "修改后运行 tests",
+      "评估 testing coverage",
+      "记录 task verification evidence",
+      "将 task 标为 completed",
+      "评估 incremental commit",
     ]
 
     let previous = -1
@@ -591,7 +591,7 @@ describe("ce-work implementation evidence characterization", () => {
       previous = current
     }
 
-    expect(contract).toContain("Guardrails for execution evidence:")
+    expect(contract).toContain("Execution evidence guardrails：")
     expect(contract).toContain("**Test Discovery**")
     expect(contract).toContain("**Evidence Strategy**")
     expect(contract).toContain("**Test Scenario Completeness**")

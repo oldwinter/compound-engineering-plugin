@@ -118,7 +118,7 @@ Critique 分两层运行。**fresh-context verifier**（一个从未看过 gener
 
 ### 8. Issue-tracker intent（issue tracker 意图）
 
-Phrases like "what users are reporting" or "biggest issue patterns" trigger an issue-intelligence agent that pulls real issues from your tracker — GitHub, Linear, or Jira, whichever is reachable — and feeds leverage-ranked clustered themes into the ideation frames. It scopes large trackers by the tracker's own structure and asks at most one question, only when the tracker is genuinely split; it discloses what it did and didn't analyze rather than implying it read everything.
+“what users are reporting”或“biggest issue patterns”这类 phrase 会触发 issue-intelligence agent，从可访问的 tracker（GitHub、Linear 或 Jira）拉取真实 issues，并把按 leverage 排序的 clustered themes 输入 ideation frames。对于 large tracker，它会根据 tracker 自身结构限定 scope；只有 tracker 真正分裂时才最多询问一个问题。它会披露分析过和未分析的内容，不会暗示自己读完了一切。
 
 ---
 
@@ -207,9 +207,9 @@ Deliverable 会自动写入，不需要额外请求。如果某次 run 纯属探
 | `<path>` | 聚焦某个 directory 或 file |
 | `<constraint>` | 例如 `low-complexity quick wins`、`polish-only` |
 | `surprise me` | Surprise-me mode |
-| `go deep` | Maximum depth: every ideation agent runs on the top-tier model, verification budgets double, and a second critic joins the filtering pass |
-| `top issue themes in <area>` | Triggers issue-tracker intent |
-| `output:md` | Write the artifact as markdown instead of the default self-contained HTML (`output:html` forces HTML explicitly). Also settable per-project via `ideate_output` in `.compound-engineering/config.local.yaml`; see the [configuration reference](./configuration.md) |
+| `go deep` | Maximum depth：每个 ideation agent 都运行在 top-tier model 上，verification budgets 翻倍，并在 filtering pass 中加入第二个 critic |
+| `top issue themes in <area>` | 触发 issue-tracker intent |
+| `output:md` | 将 artifact 写成 markdown，而不是默认 self-contained HTML（`output:html` 会显式强制 HTML）。也可通过 `.compound-engineering/config.local.yaml` 中的 `ideate_output` 做 per-project 设置；参见[配置参考](./configuration.md) |
 
 Prompt 任意位置支持 skip phrases：`no external research`、`no slack`。
 
