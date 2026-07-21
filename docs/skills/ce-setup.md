@@ -4,7 +4,9 @@
 
 `ce-setup` 是 **onboarding** skill。它诊断已安装内容、缺失内容、plugin version、repo-local config 状态，并为缺失部分提供 guided installation。首次安装、升级 plugin 后、排查为什么某个 skill 说 tool 不可用，或把新 repo onboarding 到 compound-engineering 前，都可以运行它。
 
-Beta-style explicit-invocation only（`disable-model-invocation: true`）：不会 auto-fire。
+See [Compound Engineering configuration](./configuration.md) for the complete option reference and how local defaults interact with session and project instructions.
+
+It is explicit-invocation only (`disable-model-invocation: true`) so it never runs as a side effect of ordinary setup discussion.
 
 ---
 
@@ -200,6 +202,7 @@ Skill 会展示 project URL 作为 fallback，并继续下一个 dependency。Ve
 
 ## 另见（See Also）
 
-- [`/ce-test-browser`](./ce-test-browser.md) - 没有 capable host-native browser 时使用 `agent-browser`
-- [`/ce-dogfood`](./ce-dogfood.md) - 使用 `agent-browser` 做 diff-scoped QA
-- [`/ce-product-pulse`](./ce-product-pulse.md) - 使用 `.compound-engineering/config.local.yaml` 中的 pulse settings
+- [`/ce-test-browser`](./ce-test-browser.md) — uses `agent-browser` when no capable host-native browser is available
+- [`/ce-dogfood`](./ce-dogfood.md) — uses `agent-browser` for diff-scoped QA
+- [`/ce-product-pulse`](./ce-product-pulse.md) — uses `.compound-engineering/config.local.yaml` for pulse settings
+- [Compound Engineering configuration](./configuration.md) — every supported local option, its consumer, and precedence guidance

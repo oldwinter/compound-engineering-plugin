@@ -4,6 +4,8 @@
 
 Runtime behavior 和 contributor reference 以每个 skill source folder（`skills/`）下的 `SKILL.md` 为准。
 
+Checkout-local defaults shared across skills are documented in [Compound Engineering configuration](./configuration.md).
+
 ---
 
 ## compound-engineering core loop（核心循环）
@@ -96,7 +98,7 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`skil
 
 | Skill | Description（说明） |
 |-------|-------------|
-| [`/lfg`](./lfg.md) | 运行从 planning 到 green PR 的完整 hands-off engineering pipeline：plan、work、simplify、review、fix、browser-test、ship、watch CI |
+| [`/lfg`](./lfg.md) | Run the full hands-off engineering pipeline through a green PR, then conditionally recommend an opt-in fresh-session handoff for the next separately planned area |
 
 ---
 

@@ -2,7 +2,7 @@
 
 > 按 plan 的 guardrails 执行，在代码面前判断 HOW，交付完整 feature，并 hand off 到干净的 PR。
 
-`ce-work` 是 **execution** skill。它接收一个 plan（或在较小范围内接收 bare prompt），按 plan 的 guardrails 执行实现，持续运行 tests，在 scope 需要时把 subagents 分派到隔离 worktrees 中，运行 quality gates，并 hand off 到 commit + PR flow。它把 plan 视为 **decision artifact**：scope、decisions、units 和 tests 的权威来源；实际实现方式由它自己判断。**它就是 `ce-plan` 刻意不预写的 HOW phase。**
+`ce-work` is the **execution** skill. It takes a plan (or, for smaller scope, a bare prompt), executes the implementation against the plan's guardrails, runs tests continuously, selects an implementation engine and safe scheduling strategy, runs quality gates, and hands off to a commit + PR flow. It can keep implementation on the current host or route bounded units to another qualified model/harness while the host retains verification, canonical commits, and shipping. It treats the plan as a **decision artifact** — authoritative for scope, decisions, units, and tests — and figures out the actual implementation itself. **It is the HOW phase that `ce-plan` deliberately does not pre-write.**
 
 这是 compound-engineering ideation chain 的第四步，也是最后一步：
 
@@ -21,12 +21,12 @@
 
 | Question（问题） | Answer（答案） |
 |----------|--------|
-| 它做什么？ | 读取 implementation-ready plan（或 scope 一个 bare prompt），按 guardrails 执行，持续运行 tests，交付 reviewed PR |
-| 何时使用 | 实现带 `artifact_readiness: implementation-ready` 的 `ce-plan` plan；小/中型 bare-prompt work；恢复 partly-shipped work |
-| 产出什么 | Commits + PR（或 no-PR path 中只产生 commits） |
-| Caller-owned mode | 供 `lfg` 等 outer orchestrator 使用：`mode:return-to-caller <plan path>` 完成实现与本地验证，随后返回 structured envelope，并跳过 standalone shipping tail（final simplify、review、PR、CI）；implementation 中途的 Simplify as You Go 仍会运行 |
-| 下一步 | Review PR；运行 `/ce-compound` 捕获 learnings |
-| Distinguishing | Plan-aware idempotency、带 worktree isolation 的 subagent dispatch、带 residual gate 的 tiered review、PR 中的 operational validation |
+| What does it do? | Reads an implementation-ready plan (or scopes a bare prompt), executes against the guardrails, runs tests continuously, ships a reviewed PR |
+| When to use it | Implementing a `ce-plan` plan with `artifact_readiness: implementation-ready`; small/medium bare-prompt work; resuming partly-shipped work |
+| What it produces | Commits + a PR (or just commits, no-PR path) |
+| Caller-owned mode | For outer orchestrators (e.g. `lfg`): `mode:return-to-caller <plan path>` implements and locally verifies, then returns a structured envelope and skips the standalone shipping tail (final simplify, review, PR, CI). Mid-implementation Simplify as You Go still runs. |
+| What's next | Review the PR; run `/ce-compound` to capture learnings |
+| Distinguishing | Plan-aware idempotency, native or cross-model implementation engines, conservative parallel waves, host-owned verification/commits, operational validation in PR |
 
 ---
 
@@ -60,12 +60,12 @@
 
 `ce-work` 把 execution 作为带 explicit gates 的 structured process：
 
-- Plan 对 **WHAT** 权威；agent 面对代码判断 **HOW**
-- 每个 task 前做 idempotency check；如果 verification 已满足，就 skip
-- 按 scope 选择 dispatch（inline / serial subagents / isolated worktrees 中的 parallel subagents）
-- 在任何 task 标记 done 前，进行 test discovery、integration coverage 和 system-wide test check
-- 带 residual-work gate 的 tiered code review：accept、file、fix 或 stop，但绝不 silently ship
-- 每个 PR 都带 operational validation plan：监控什么、什么触发 rollback
+- The plan is authoritative for **WHAT**; the agent figures out **HOW** with code in front of it
+- An idempotency check before each task — if verification is already satisfied, skip it
+- Scope-appropriate implementation (native inline/subagents by default, or a sanctioned cross-model route) and scheduling (serial or bounded independent waves)
+- Test discovery + evidence selection before behavior changes, plus integration coverage and a system-wide test check before any task is marked done
+- Portable self-sizing code review with a residual-work gate — accept, file, fix, or stop, but never silently ship
+- Every PR carries an operational validation plan — what to monitor, what triggers rollback
 
 ---
 
@@ -79,9 +79,9 @@
 
 每个 task 前，`ce-work` 检查该 unit 的 work 是否已经存在且符合 plan intent。如果 verification 已满足，就把 task 标为 complete 并继续。**不会 silent reimplementation。** 这在 context compaction 后恢复、接手他人 branch，或几周后回到 partly-shipped plan 时最重要。
 
-### 3. Worktree-isolated parallelism：explicit conflicts，而不是 silent data loss
+### 3. Engine, workspace, and scheduling are separate decisions
 
-对于可并行的 independent units，当 harness 支持时，`ce-work` 默认使用 per-subagent worktree isolation：每个 subagent 在自己的 directory 中、自己的 branch 上工作。预测到的 overlap 会作为 merge conflicts 暴露，由 orchestrator 显式处理。隔离不可用时，subagents 禁止 staging 或 committing，由 orchestrator 串行 merge batch。无论哪种方式，**都不会 silent overwrites。**
+Ordinary synchronous native work stays in the active checkout. Native subagents use whatever isolation the current harness provides. A detached external worker always gets a private linked worktree, while the host alone applies, verifies, and commits its result in the canonical checkout. The scheduler may author a bounded wave concurrently only after checking dependencies, actual and expected paths, shared interfaces, generated/config surfaces, migrations, and shared runtime resources. Results then fold in one at a time against the advancing canonical tree. A clean patch is not proof of semantic compatibility; overlap or uncertainty returns the affected work to host resolution, re-dispatch, or serial execution.
 
 ### 4. 执行全程保持 U-ID anchoring
 
@@ -91,9 +91,9 @@
 
 Task 不是 code compiles 就算 done。任何 feature-bearing task 标记 complete 前，`ce-work` 会发现正在修改内容对应的 existing test files，检查 test scenarios 是否覆盖适用类别（happy path、edges、error paths、integration），并向外追踪两层 callbacks、middleware 和 observers，确认 change 可能影响的东西。Mocking everything 只能证明孤立 logic；integration coverage 才能证明 layers 真正协同。
 
-### 6. 带 explicit residual handling 的 tiered code review
+### 6. Portable code review with explicit residual handling
 
-每个 change 都会被 review。默认使用 harness-native review（例如 Claude Code 中的 `/review`）：快，且对大多数 diffs 足够。只有出现真实 signal 才升级到 `ce-code-review`：sensitive surface、大且 diffuse 的 change，或明确请求。当 deeper review 暴露 autofix 未解决的 residuals 时，`ce-work` 不会 silent ship，而是给出四选一 gate（apply / file tickets / accept with durable sink / stop）。"Accept" 需要真实 durable record；findings 不能只存在 transient session 中。
+Every non-mechanical change runs through `ce-code-review`, which selects its own lite or full roster from the diff. Review is read-only; `ce-work` applies eligible fixes afterward, then sends any actionable remainder through a four-option residual gate (apply / file tickets / accept with durable sink / stop). "Accept" requires a real durable record; findings can't live only in the transient session. Harness-native review is only a fallback when the portable reviewer cannot run.
 
 ### 7. 默认包含 operational validation
 
@@ -102,6 +102,10 @@ Task 不是 code compiles 就算 done。任何 feature-bearing task 标记 compl
 ### 8. 对 bare prompts 做 smart triage
 
 不是每次 invocation 都有 plan。`ce-work` 接收 bare prompt，并按 complexity triage：trivial work（少量文件、无 behavior change）直接实现；small/medium work 构建 task list；large 或 sensitive work 建议先用 `/ce-brainstorm` 或 `/ce-plan`。这个 triage 让 `ce-work` 可以合理处理小工作，而不强制所有事情都走完整 chain。
+
+Invocation origin does not change this behavior: agent harnesses do not reliably tell the skill whether the user named it or the model selected it. If the conversation carries one unambiguous active plan (for example, the agent just authored it and the user says "proceed"), that plan is used before bare-prompt triage. Otherwise a concrete implementation request is the bare prompt.
+
+When a qualified external implementation route is selected for clear bare-prompt work, `ce-work` does not send the conversation to the worker. It distills the request and repository discovery into a private bounded implementation brief: goal, scope, discovered files/tests, acceptance and verification, constraints/exclusions, and conservative units. The controller records its digest and private copy for deterministic recovery. If `ce-work` cannot fill in the goal, bounded scope, and authoritative verification without guessing, it clarifies or routes to `ce-plan` before any external egress.
 
 ### 9. Session-settled decisions are not-yours-to-improve
 
@@ -113,9 +117,9 @@ A KTD carrying a `session-settled:` label records a decision the user examined a
 
 一个包含四个 implementation units 的 plan 到来。`ce-work` 读取它，识别某个 unit 上的 `Execution note: test-first`，并记录一个 deferred-implementation question。它用 U-ID prefixes 构建 task list，并确认当前 branch name 有意义。
 
-Parallel Safety Check 发现四个 units 之间没有 file overlap，且 worktree isolation 可用，于是四个 subagents 并行分派，各自使用自己的 branch。它们完成后，orchestrator 按 dependency order merge；每次 merge 后 tests 都通过。Idempotency check 捕获到其中一个 unit 的 verification 已被先前 session 满足，于是直接标为 complete，不重新实现。
+Two units share a contract, so they run serially. The other two are independent and can author concurrently. With native execution, they use the host's available worker isolation; with a selected external route, each gets a detached sibling worktree beneath the private run directory. The host inspects every actual change set, folds results into the active checkout one at a time, verifies, and creates separate canonical commits. The idempotency check catches that one unit's verification was already satisfied by a prior session and marks it complete without reimplementation.
 
-Diff 不在 sensitive surface 上，也不大且 diffuse，所以 harness-native review 处理它；两个 suggested findings 被 inline 修掉。Final validation 通过；operational validation plan 起草完成；`ce-work` 使用 `branding:on` 调用 `ce-commit-push-pr`，因此 PR 包含 summary、testing notes、operational section 和 generic Compound Engineering branding。Plan 本身保持 untouched：它是 decision artifact，是否已经 shipped 由 git 派生，不记录在 doc 中。
+`ce-code-review` self-selects a lite roster for the small, low-risk diff; the two suggested findings are addressed afterward. Final validation passes; the operational validation plan is drafted; and `ce-work` invokes `ce-commit-push-pr` with `branding:on`, so the PR includes summary, testing notes, the operational section, and generic Compound Engineering branding. The plan itself is left untouched — it's a decision artifact, and whether it shipped is derived from git, not recorded in the doc.
 
 ---
 
@@ -123,11 +127,11 @@ Diff 不在 sensitive surface 上，也不大且 diffuse，所以 harness-native
 
 在以下情况使用 `ce-work`：
 
-- `ce-plan` plan 已 ready，准备 ship
-- 有 small 或 medium work 但没有 plan；bare-prompt mode 会处理
-- 正在恢复 partly-shipped work
-- 想要带 safe isolation 的 parallel execution
-- 想要完整 shipping flow：tests、simplify、review、residuals、operational validation、PR
+- A `ce-plan` plan is ready and you're ready to ship
+- You have small or medium work without a plan — bare-prompt mode handles it
+- You're resuming partly-shipped work
+- You want conservative parallel execution with isolated concurrent workers
+- You want a complete shipping flow — tests, simplify, review, residuals, operational validation, PR
 
 以下情况跳过 `ce-work`：
 
@@ -155,7 +159,7 @@ Diff 不在 sensitive surface 上，也不大且 diffuse，所以 harness-native
    |  从 git 推导 progress，而不是从 plan body 推导
    |  通过 quality gates ship 到 PR
    v
-/ce-code-review     （可选 escalation；Tier 2 时自动调用）
+/ce-code-review     (self-sizing review for non-mechanical changes)
    |
    v
 /ce-compound        — 捕获 learning
@@ -169,11 +173,11 @@ Shipping 之后，`/ce-compound` 会把任何 reusable learning（遇到的 bugs
 
 很多人会直接用 bare prompt 调用 `ce-work`：当 scope 很小、agent 能自己 scope 时，`ce-plan` 会过于 heavy。
 
-- **Root cause 清晰的 bug fixes**：trivial 则直接实现；small/medium 则列 task list
-- **Small refactors**：抽 helper、重命名 concept、合并重复
-- **恢复 partly-shipped plan**：idempotency 防止 reimplementation
-- **把你已经在脑中设计好的 feature 接上线**：formal planning 会显得 ceremonial
-- **Multi-feature parallel work**：worktree isolation 让多个 independent features 同时推进，避免 git contention
+- **Bug fixes with a clear root cause** — direct implementation if trivial; task list if small/medium
+- **Small refactors** — extract a helper, rename a concept, consolidate duplication
+- **Resuming a partly-shipped plan** — idempotency prevents reimplementation
+- **Wiring a feature you've already designed** in your head, where formal planning would be ceremony
+- **Multi-feature parallel work** — the scheduler can author truly independent units concurrently, then integrate and verify them sequentially
 
 对于 large bare-prompt scope（cross-cutting、sensitive surfaces、many files），`ce-work` 会建议先用 `/ce-brainstorm` 或 `/ce-plan`，但会按你的选择继续。
 
@@ -187,6 +191,60 @@ Shipping 之后，`/ce-compound` 会把任何 reusable learning（遇到的 bugs
 
 此模式让 `ce-work` 专注于实现与本地验证。实现中段的 "Simplify as You Go" 仍会在 Phase 2 运行（Mid-implementation "Simplify as You Go" still runs）。之后，`ce-work` 会返回一个 structured envelope，其中包含 changed files、completed units、verification evidence 和 blockers，并设置 `standalone_shipping_skipped: true`；它 does not run the standalone shipping tail，也就是 skips the standalone shipping tail (final simplify, review, PR, CI)。每一个实现后关卡仍由 caller 负责。
 
+## Choose the Implementation Author
+
+Native execution is the default. You can assign implementation to a target in the current prompt without changing who owns verification, commits, or the shipping tail:
+
+```text
+/ce-work use Codex for implementation on docs/plans/2026-07-15-example.md
+/ce-work implement docs/plans/2026-07-15-example.md with Cursor
+/ce-work use Cursor with Grok for implementation on docs/plans/2026-07-15-example.md
+/ce-work only use Composer for implementation on docs/plans/2026-07-15-example.md
+/ce-work use Codex to add retry limits to the existing webhook sender
+```
+
+The first three are preferences: `ce-work` attempts the route and continues natively with prominent requested-versus-actual disclosure if it is unavailable. The fourth is a requirement: an interactive standalone run asks before weakening it, while a headless or automatic caller returns a blocker without prompting. Intent matters, not a particular keyword.
+
+Routing uses normal instruction authority plus scope, not keyword matching. An explicit current task wins; a still-active session preference remains applicable; an implementation-only caller binding keeps its recorded provenance; active project/user instructions already in context can supply a default; and per-checkout config is the final preference before native execution. More specific live intent may replace or narrow config, while an incidental model mention in feature prose, quoted text, examples, or filenames does nothing.
+
+The last example is deliberately planless. `ce-work` first scopes the request against the repository and tests, then gives Codex only the bounded private brief/unit packet. The host remains responsible for inspecting the actual change, authoritative verification, canonical commits, and the shipping tail.
+
+Put an ordered, host-relative preference list in the gitignored `.compound-engineering/config.local.yaml`:
+
+```yaml
+work_engine_mode: prefer       # off | prefer | require
+work_engine_preferences:
+  - harness: cursor
+    model: composer
+  - harness: codex
+    model: "gpt-5.6"
+  - harness: claude
+```
+
+The [central configuration reference](./configuration.md#implementation-routing) explains how this checkout-local default interacts with current-task, session, and project instructions.
+
+Each candidate has a `harness` (`codex`, `claude`, `grok`, or `cursor`) and an optional `model`. Omitting `model` means that harness's configured default. Composer is a model family reached through Cursor, so it is written as `harness: cursor` plus `model: composer`. Keep CLI flags and commands out of config; the list describes the desired author, while `ce-work` starts from its qualified adapter recipe and can inspect the installed CLI's help/version when a compatible invocation has drifted.
+
+The list is intentionally host-relative. In Codex, the example skips an equivalent Codex route only if its requested model is also the current/default model; otherwise that explicit model is a distinct candidate. In Claude Code it can try Cursor first, then Codex, and skip the final Claude default. `ce-work` walks the list only during preflight, records why a candidate is skipped or unavailable, and locks the first qualified recipient before egress. It never hops to another list entry after dispatch starts.
+
+`off`, a commented or missing mode, and an invalid mode preserve the native default. `off` affects only standing config; it does not cancel applicable live intent or a caller binding. `prefer` tries ordered candidates in direct and `lfg` runs, then falls back natively with disclosure when the list is exhausted. `require` asks only in an interactive standalone run; under `lfg` or another headless caller it blocks. An enabled mode without a valid candidate list is unavailable rather than guessed.
+
+Harness, requested model, executable route, and served model remain separate facts. Direct prompts and LFG's transient carrier may still use `cursor` for Cursor's configured default or `composer` as shorthand for a Composer-family model through Cursor. A Grok model reached through Cursor is a separately disclosed intermediary. A candidate is usable only after its unattended fixed-recipient, write-capable isolated-workspace route has qualified and the necessary CLI/authentication is available. `ce-work` tries the documented mapping first, may adapt only within the requested harness/model family while preserving deterministic restrictions, and never claims a served model without a trustworthy receipt.
+
+### What an External Run Does
+
+Before any repository material leaves the host, `ce-work` discloses and records the instruction/config source, fixed recipient and intermediaries, bounded unit material exposed, and which restrictions are adapter-enforced versus cooperative. The detached runner gives the adapter its job identity; the controller validates the actual runner metadata and exact adapter argv before the external CLI starts, so a shell prefix or substituted worker cannot egress under a valid unit authorization. The adapter uses the CLI's existing authentication, receives a minimized environment, and cannot switch recipients, widen scope, push, open a PR, or choose fallback. If a required restriction cannot be enforced, the route is unavailable.
+
+Each external unit starts from a clean recorded SHA in a detached linked worktree under `/tmp/compound-engineering/ce-work/<run-id>/`. This is same-user concurrency and accidental-mutation containment, **not a security sandbox**. Synchronous native units still use the active checkout; `ce-work` does not create a temporary worktree for every unit. If the selected plan is the only dirty path, `ce-work` discloses and creates a plan-only checkpoint commit first. Any unrelated dirt makes the external route unavailable.
+
+Every CE Work runner start pins `CE_PEER_HARD_SECS=7200`, giving the detached job a two-hour hard cap independently of the shared runner's shorter default. Route-qualified incremental activity uses `CE_PEER_IDLE_SECS=600`; that progress-reset window detects a stall and is not a wall-clock maximum. Silent terminal-only or otherwise untrustworthy activity uses `CE_PEER_IDLE_SECS=0` and relies on the hard cap. Progress reports the run id, active unit/route, elapsed time, latest meaningful activity, activity posture, worker terminal state, integration, verification, commit, cleanup, blockers, and recovery path rather than streaming the full transcript.
+
+Worker output becomes one complete synthetic transport commit, including committed and residual edits, untracked/binary files, deletes, renames, and mode changes. After the host inspects its actual scope, one fail-stop controller transaction acquires the integration lock, revalidates the canonical checkout, applies without committing, runs authoritative tests, reconciles test side effects, creates one host-owned canonical commit, and records cleanup. A failed pre-commit step cannot fall through into a later commit; it restores the exact pre-fold checkout before another unit or fallback may start. Unknown canonical movement blocks integration.
+
+After all delegated units land, plan-wide verification also runs through the controller rather than as a loose shell tail. The controller begins from a clean canonical snapshot, captures the real exit status, suppresses Python bytecode, removes artifacts created by the gate, proves the starting snapshot again, and records a resumable receipt. A failing gate keeps its private log and blocks completion.
+
+Successful worktrees are cleaned only after canonical verification and commit. Failed, timed-out, divergent, or unintegrated runs remain in the private `0700` run directory with `0600` state for inspection. Reinvoke with the reported run id to resume exactly once; a live or temporarily unreachable attempt cannot race a native fallback. Explicit reap and ownership-checked cleanup are available for preserved attempts. Parallel external units share one wave base, must all terminalize before fold-in, and integrate sequentially; unexpected textual or semantic overlap stops the affected wave.
+
 ---
 
 ## 参考
@@ -195,8 +253,9 @@ Shipping 之后，`/ce-compound` 会把任何 reusable learning（遇到的 bugs
 |----------|--------|
 | _(empty)_ | 自动使用 `docs/plans/` 中最新的 plan |
 | `<plan path>` | Origin-sourced execution |
-| `<bare prompt>` | 按 complexity triage（Trivial / Small-Medium / Large） |
-| `mode:return-to-caller <plan path>` | 供 outer orchestrator 使用：完成实现与本地验证，然后返回 structured evidence，不运行 standalone shipping tail（final simplify、review、PR、CI） |
+| `<bare prompt>` | Triage by complexity (Trivial / Small-Medium / Large) |
+| `mode:return-to-caller <plan path>` | Outer-orchestrator use: implement and locally verify, then return structured evidence without the standalone shipping tail (final simplify, review, PR, CI) |
+| `mode:return-to-caller implementation_engine:<compact-json> <plan path>` | Automatic-caller form carrying one implementation-only `mode`, `target`, `model`, and `source` binding |
 
 Output：通过 `ce-commit-push-pr` 产生 commits 和（通常）PR。整个过程中 plan 都是 read-only；`ce-work` 永远不 mutate plan。是否已经 shipped 由 git 派生，不记录在 doc 中。
 
@@ -210,14 +269,17 @@ Output：通过 `ce-commit-push-pr` 产生 commits 和（通常）PR。整个过
 **如果我没有 plan 怎么办？**
 Bare-prompt mode 会按 complexity triage。Trivial 直接实现；small/medium 构建 task list；large 会建议先 plan。
 
-**Worktree-isolated 和 shared-directory parallel mode 有什么区别？**
-Worktree isolation 给每个 subagent 自己的 branch 和 directory；overlapping writes 会作为 merge conflicts 暴露，由 orchestrator 显式处理。Shared-directory mode 禁止 subagents staging、committing 或运行 test suite（这些由 orchestrator 在 batch 后完成）。两者都安全；worktree isolation 体验更干净。
+**Does `ce-work` create a detached worktree for every unit?**
+No. Synchronous native implementation stays in the active checkout, and native subagents use the host harness's workspace behavior. Only independently running external units use the controller-owned detached worktrees described above.
+
+**Are those external worktrees a security sandbox?**
+No. They isolate concurrent Git state and contain accidental mutation, but the external CLI runs as the same OS user. `ce-work` limits the packet and authority, minimizes environment exposure, and detects canonical-checkout movement; stronger OS isolation is outside this feature.
 
 **为什么每个 task 前要检查 work 是否已经完成？**
 Context compaction 后恢复、接手他人 branch、或回到 partly-shipped plan 都很常见。Idempotency 确保 `ce-work` 不会 silent reimplement 已经存在的 work。
 
-**什么是 Residual Work Gate？**
-当更深层 code review tier 发现 autofix 没解决的问题时，`ce-work` 不会 silent ship。它会询问：apply now / file tickets / accept（with durable sink）/ stop。"Accept" 需要真实 durable record；findings 不能只存在 session 中。
+**What's the Residual Work Gate?**
+When `ce-code-review` surfaces actionable findings the follow-up pass didn't resolve, `ce-work` won't silently ship them. It asks: apply now / file tickets / accept (with durable sink) / stop. "Accept" requires a real durable record — findings can't live only in the session.
 
 **`ce-work` 支持非软件 plans 吗？**
 对于标记为 `execution: knowledge-work` 的 plan（由 `ce-plan` 的 approach-altitude flow 产出），支持：lightweight carve-out 会读取 sources、synthesize 并产出 deliverable，跳过 commit/test/PR lifecycle。其他没有该 marker 的 non-software work 仍然在 `ce-plan` 结束，由人类执行。
@@ -226,9 +288,9 @@ Context compaction 后恢复、接手他人 branch、或回到 partly-shipped pl
 
 ## 另见
 
-- [`ce-plan`](./ce-plan.md) - 产出 `ce-work` 执行时遵守的 guardrails
-- [`ce-brainstorm`](./ce-brainstorm.md) - 定义 plan 应完成什么
-- [`ce-ideate`](./ce-ideate.md) - 上游 "what's worth exploring" discovery
-- [`ce-code-review`](./ce-code-review.md) - Tier 2 escalation target（Tier 2 升级目标）
-- [`ce-commit-push-pr`](./ce-commit-push-pr.md) - 处理最终 commit + PR flow
-- [`ce-compound`](./ce-compound.md) - shipping 后捕获 reusable learning
+- [`ce-plan`](./ce-plan.md) — produces the guardrails `ce-work` executes against
+- [`ce-brainstorm`](./ce-brainstorm.md) — defines what the plan should accomplish
+- [`ce-ideate`](./ce-ideate.md) — upstream "what's worth exploring" discovery
+- [`ce-code-review`](./ce-code-review.md) — portable self-sizing review path
+- [`ce-commit-push-pr`](./ce-commit-push-pr.md) — handles the final commit + PR flow
+- [`ce-compound`](./ce-compound.md) — capture reusable learning after shipping

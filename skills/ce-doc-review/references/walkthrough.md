@@ -88,29 +88,32 @@ Section: {section}
 
 {suggested_fix — rendered per the substitution rules below: prose-first, intent-language}
 
-**Why it works**
+**If this is left as-is**
 
-{short reasoning, grounded in a pattern cited in the document or codebase when available}
+{one sentence naming the concrete downstream cost}
 
 {Conflict-context line, when applicable — see below}
 ```
 
 Substitutions（替换规则）：
 
-- **`{plain-English title}`** — 适合作为 heading 的 3-8 个词摘要。它从 merged finding 的 `title` 字段派生，但要重述为可观察后果（例如 “Implementers will pick different tiers”，而不是 “Section X-Y lists four tiers”）。对 document-review findings 来说，可观察后果是对 *reader、implementer 或 downstream decision* 的影响，而不是 runtime behavior。
-- **`{section}`** — 来自 finding 的 `section` 字段。
-- **Document-defined identifiers** — 此 rendered block 中任何 requirement/unit ID（`R6`、`U3`）首次出现时，都必须带上从 document 提取的简短 plain-language handle（例如 `R6 (suppress peer panels on low-stakes calls)`），绝不能只显示 bare ID；遵循 `references/synthesis-and-presentation.md` 中 self-contained-rendered-lines rule，并遵守下方 code-span budget。
-- **`why_it_matters`** — 来自 merged finding 的 `why_it_matters` 字段。按原样渲染；subagent template 的 framing guidance 已确保它以 observable-consequence-first 表述。
-- **`suggested_fix`** — 来自 merged finding 的 `suggested_fix` 字段。渲染为描述意图的 prose，不要渲染为 raw markup。用户的任务是信任或拒绝该 action，不需要审查 exact text。规则：
-  - **Default（默认）— 用一句话描述效果。** fix 达成什么，位于哪里？优先用 intent language，而不是 quoted text。
-    - Good: `从 enum 中删除 Advisory tier；advisory-style findings 在 presentation layer 的 FYI subsection 中 surface。`
-    - Good: `添加 deployment-ordering constraint，要求 Units 3 和 4 位于单个 commit。`
-    - Bad: `Change "autofix_class: [auto, gated_auto, advisory, present]" to "autofix_class: [safe_auto, gated_auto, manual]" in findings-schema.json on line 48.` — 对 decision loop 来说过于 syntax-focused
-  - **Code-span budget** — 每句最多 2 个 inline backtick spans，每个 span 只能是单个 identifier、flag 或短语（例如 `` `safe_auto` ``、`` `<work-context>` ``）。每个 backtick span 前后始终保留空格。
-  - **Raw code blocks** — 仅用于短小（≤5 行）、真正 additive 且没有 before-state 的内容。超过 5 行时改用 summary。
-  - **No diff blocks.** Document mutations 渲染为 prose。
-- **`Why it works`** — grounded reasoning；在可能时引用文档或 codebase 中已有的相似 pattern。一到三句话。
-- **Conflict-context line（如适用）** — 当 contributing personas 对此 finding 暗示不同 actions，且 synthesis step 3.6 已打破平局时，简要展示。例如：`Coherence recommends Apply; scope-guardian recommends Skip. Agent's recommendation: Skip.` orchestrator 的 recommendation，也就是 post-tie-break value，才是菜单中标记为 “recommended” 的内容。
+- **`{plain-English title}`** — a 3–8 word summary suitable as a heading. Derived from the merged finding's `title` field but rephrased so it reads as observable consequence (e.g., "Implementers will pick different tiers" rather than "Section X-Y lists four tiers"). For document-review findings, observable consequence is the *effect on a reader, implementer, or downstream decision*, not runtime behavior.
+- **`{section}`** — from the finding's `section` field.
+- **Opaque identifiers** — any token the user would have to open the document or the code to understand carries a short plain-language handle on its first mention. This covers both document-defined IDs (`R6`, `U3`, `KTD2`) and implementation identifiers the document happens to name — functions, files, variables, and line references such as `run_codex_cmd`, `$PEERLOG`, or `peer-job-runner.py`. Gloss each on first mention (e.g., `R6 (suppress peer panels on low-stakes calls)`); never leave a bare identifier as the block's only description of what it names. Keep the ID itself: it anchors the finding for anyone editing the document, and later mentions within the same block stay bare so the block scans. Look the handle up in the document already in context; the finding's fields carry the bare ID and do not supply it. This applies to `{section}` and to the body fields below — it is the one exception to rendering those fields as-is, and it is narrow: gloss the identifier at first mention and leave the surrounding prose untouched. Per the self-contained-rendered-lines rule in `references/synthesis-and-presentation.md`. Respect the code-span budget below.
+- **`why_it_matters`** — from the merged finding's `why_it_matters` field, held to the same altitude cap as `suggested_fix` below. Rules:
+  - **First sentence states the consequence, and contains no identifier at all.** What goes wrong, for whom. A reader who skimmed the document once must be able to judge it without looking anything up.
+  - **At most two further sentences of mechanism**, glossed per the identifier rule above. Mechanism explains *how* the problem arises; it is supporting detail, not the finding.
+  - **Everything past that is detail the user can ask for.** When the merged field carries more — file-level tracing, multi-hop interactions, competing call paths — compress it out and add one closing line offering it (e.g. `Ask for the trace if you want the call-path detail.`). Do not print it by default. A block that traces internals across several paragraphs is not more rigorous; it moves the reading cost onto a user who has less document context than the review does, which is the condition this walk-through exists to serve.
+- **`suggested_fix`** — from the merged finding's `suggested_fix` field. Render as prose describing intent, not as raw markup. The user's job is to trust or reject the action — they don't need to review exact text. Rules:
+  - **Default — one sentence describing the effect.** What does the fix achieve, and where does it live? Prefer intent language over quoted text.
+    - Good: `Drop the Advisory tier from the enum; advisory-style findings surface in an FYI subsection at the presentation layer.`
+    - Good: `Add a deployment-ordering constraint requiring Units 3 and 4 in a single commit.`
+    - Bad: `Change "autofix_class: [auto, gated_auto, advisory, present]" to "autofix_class: [safe_auto, gated_auto, manual]" in findings-schema.json on line 48.` — too syntax-focused for a decision loop
+  - **Code-span budget** — at most 2 inline backtick spans per sentence, each a single identifier, flag, or short phrase (e.g., `` `safe_auto` ``, `` `<work-context>` ``). Always leave a space before and after each backtick span.
+  - **Raw code blocks** — only for short (≤5-line) genuinely additive content where no before-state exists. Above 5 lines, switch to a summary.
+  - **No diff blocks.** Document mutations render as prose.
+- **`If this is left as-is`** — one sentence naming the concrete downstream cost of not acting: what breaks, for whom, at what point. This is the line the user's decision turns on when they have not read the document as closely as the review did, so it must be evaluable on its own — no identifier the user would have to look up, no appeal to a claim only the reviewer can verify. When the honest answer is that the cost is small or speculative, say so plainly rather than inflating it.
+- **Conflict-context line (when applicable)** — when contributing personas implied different actions for this finding and synthesis step 3.6 broke the tie, surface that briefly. Example: `Coherence recommends Apply; scope-guardian recommends Skip. Agent's recommendation: Skip.` The orchestrator's recommendation — the post-tie-break value — is what the menu labels "recommended."
 
 ### Question Stem（简短、聚焦决策）
 
@@ -205,7 +208,25 @@ C. Acknowledge without applying — record the decision, no document edit
 
 ---
 
-## Override Rule（覆盖规则）
+## Withdrawing findings the user's earlier answers resolved
+
+Earlier decisions carry information forward. Apply stages a fix that does not execute until end-of-walk-through, so later findings are still being presented against the pre-edit document. Skip and Defer settle a premise. Freeform text, an `Other` answer, or per-option notes may assert a fact the document does not state — the no-freeform-authoring rule below forbids the user hand-writing a *fix*, not supplying information.
+
+Synthesis's premise chains (step 3.5c) do not cover this: they are built on the rejection test, which is why Apply does not cascade under "Cascading root decisions" above.
+
+**When a finding's turn arrives, judge it against everything the user has said so far.** If earlier answers already resolve or contradict it, do not render its terminal block or fire its question. Say succinctly, in plain user-facing language, what the finding was and which earlier answer settled it — enough that the user can tell it was handled rather than lost, and can object if the agent read them wrong. Follow the one-line shape of "Confirmation between findings" above. Then advance to the next finding, or to the completion report if none remain.
+
+Evaluate lazily, at the point the finding would have been presented — do not scan ahead after every answer.
+
+**The cascade opt-out wins.** When the user answered a root's cascade prompt (see "Cascading root decisions" above) with `Decide each dependent individually`, do not auto-withdraw that root's dependents on the strength of the root decision — they explicitly asked to see each one, and a dependent's premise dissolving under the root's rejection is exactly the cascade the opt-out declined. Give those dependents their own walk-through entries. A *different* earlier answer may still withdraw one of them; only the root whose cascade they opted out of is excluded as a trigger.
+
+Record each as `withdrawn` in the decision list, noting which decision retired it. Withdrawn is its own completion-report bucket. It carries forward in the decision primer as a rejected-class decision — alongside Skip, Defer, and Acknowledge — **only when a user decision durably settled it**: a settled premise (Skip/Defer) or a user-asserted fact. Those are user judgments that the finding needn't be actioned, so R29 should suppress a round N+1 re-raise since the document itself never changed.
+
+**An Apply-triggered withdrawal never carries forward as rejected-class.** It is a *prediction* that a staged fix will resolve the finding, not a user judgment that it needn't be. The Apply runs only at end-of-walk-through, and its landing is neither certain nor proof of semantic resolution — it can fail outright, or land in the wrong place and leave the withdrawn finding's evidence untouched (R30 verifies the applied fix's own fingerprint, not the withdrawn finding's). So round N+1 re-synthesis, not R29, is the check: if the fix genuinely resolved the finding, fresh personas won't regenerate it against the edited document; if it didn't — whether the Apply failed or landed ineffectively — the finding resurfaces for the user instead of being silently suppressed. When such an Apply fails outright during execution (write error, or the defensive no-fix fallback), also list its reverted withdrawals in the completion report's failure section as returned to scope, so the user sees them in-run rather than only next round.
+
+---
+
+## Override rule
 
 “Override” 指用户选择了不同的 preset action（用 Defer 或 Skip 替代 Apply，或用 Apply 替代 agent 的 recommendation）。没有 inline freeform custom-fix authoring：walk-through 是 decision loop，不是 pair-editing surface。想要 proposed fix 变体的用户应选择 Skip，并在 flow 外手动编辑；如果他们还想跟踪该 finding，可以先 Defer，再编辑。
 
@@ -249,14 +270,14 @@ Interactive mode 的每条 terminal path 都输出相同的 completion report �
 
 ### Minimum required fields（最低必需字段）
 
-- **Per-finding entries:** flow 触达的每个 finding 都至少要有一行，包含 title、severity、采取的 action（Applied / Deferred / Skipped / Acknowledged）、Deferred entries 的 append location、Skipped entries 的一行 reason（基于 finding 的 confidence anchor 或一行 `why_it_matters` snippet），以及 Acknowledged entries 的 acknowledgement reason（例如 `Apply picked but no suggested_fix available`）。
-- **Summary counts by action:** 每个 bucket 的总数（例如 `4 applied, 2 deferred, 2 skipped`）。当有 entries 落入 `acknowledged` bucket 时包含 acknowledged count；为零时省略该 label。
-- **Failures called out explicitly:** 任何 Apply 失败（例如 document write error，或 defensive no-fix fallback 跳过 Apply-set entry）、任何 Open-Questions append 失败。Failures 展示在 per-finding list 之前，避免被漏看。
-- **End-of-review verdict:** 沿用 Phase 4 Coverage section 的 verdict。
+- **Per-finding entries:** for every finding the flow touched, a line with — at minimum — title, severity, the action taken (Applied / Deferred / Skipped / Acknowledged / Withdrawn), the append location for Deferred entries, a one-line reason for Skipped entries (grounded in the finding's confidence anchor or the one-line `why_it_matters` snippet), the acknowledgement reason for Acknowledged entries (e.g., `Apply picked but no suggested_fix available`), and for Withdrawn entries the decision that retired them (e.g., `Resolved by the applied fix on "Scope Boundaries"`).
+- **Summary counts by action:** totals per bucket (e.g., `4 applied, 2 deferred, 2 skipped`). Include an `acknowledged` count when any entries land in that bucket; omit the label when the count is zero.
+- **Failures called out explicitly:** any Apply that failed (e.g., document write error, or the defensive no-fix fallback skipping an Apply-set entry), any Open-Questions append that failed. Failures surface above the per-finding list so they are not missed.
+- **End-of-review verdict:** carried over from Phase 4's Coverage section.
 
 ### Report ordering（报告排序）
 
-Failures 首先展示（在 per-finding list 之上），随后 per-finding entries 按 action bucket 分组，顺序为 `Applied / Deferred / Skipped / Acknowledged`，然后是 summary counts、Coverage（FYI observations、residual concerns）、verdict。省略 count 为零的 bucket。
+Failures first (above the per-finding list), then per-finding entries grouped by action bucket in the order `Applied / Deferred / Skipped / Acknowledged / Withdrawn`, then summary counts, then Coverage (FYI observations, residual concerns), then the verdict. Omit any bucket whose count is zero.
 
 ### Zero-findings degenerate case（零 finding 退化情况）
 

@@ -6,7 +6,9 @@
 
 Review 前，估算收到的 diff 的 size 和 risk。
 
-**Size estimate：** 统计 diff hunks 中 changed lines（additions + deletions，排除 test files、generated files 和 lockfiles）。
+**Large-diff recovery:** If the diff is too large to consume safely or arrives as a selectively readable artifact, do not reconstruct or load it wholesale. Follow the orchestrator's material risk divisions and summarize as you go. Collapse explicit generated repetition by reviewing generator inputs, manifests, tests, and representative outputs rather than every copy. If any selected range is still too large, narrow it again. Finish only after covering each material division, and return schema-shaped findings (including an empty findings array when appropriate), never a progress note in place of review output.
+
+**Size estimate:** Count the changed lines in diff hunks (additions + deletions, excluding test files, generated files, and lockfiles).
 
 **Risk signals：** 扫描 intent summary 和 diff content 中的 domain keywords：authentication、authorization、payment、billing、data migration、backfill、external API、webhook、cryptography、session management、personally identifiable information、compliance。
 

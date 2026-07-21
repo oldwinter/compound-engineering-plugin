@@ -679,7 +679,7 @@ Fires **whenever Phase 0.2 resolved an upstream Product Contract source** — a 
 
 #### 5.2 Write Plan File
 
-**Reasoning elevation（仅 Claude Code）。** 在编写 plan 前，如果已机械确认当前是 Claude Code（`CLAUDECODE=1`，且不是 Cursor/Codex），加载并遵循 `references/reasoning-elevation.md`。当用户 opt in 时，它可能把 interpret-findings-then-author step 分派给更强的 reasoning model，并负责 completion-time discoverability tip。在任何非 Claude host 上完全跳过：直接使用 session model，不要提及。如果 prompt 指定了当前 harness 上该 skill 不识别的 model，不作说明，直接使用 session model。
+**Model elevation.** Before authoring the plan, load `references/reasoning-elevation.md` and follow it. It resolves whether the user chose a model for the interpret-findings-then-author step — from this run's prompt or the `plan_model` config key — and if so dispatches that one step to the chosen model on any harness, with a read-only verifying handoff and transparent fallback to your session model. When no model is chosen it is a no-op; proceed normally. It runs the same on every harness — do not gate it on the host.
 
 **REQUIRED: Write the plan file to disk before presenting any options.**
 
