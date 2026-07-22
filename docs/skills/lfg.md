@@ -27,6 +27,10 @@
 /ce-brainstorm design account-level notification controls for enterprise teams
 /lfg
 
+# 同一 handoff，但用指定 model author plan（implementation 仍保持 native）
+/ce-brainstorm design account-level notification controls for enterprise teams
+/lfg plan with fable
+
 # 直接交付边界已经很清晰的软件任务
 /lfg add a CSV export button to the account reports page
 
@@ -102,16 +106,29 @@ Skip `lfg` when:
 
 Direct invocation 适合清晰 software tasks，但给 planner 的 product context 更少。
 
-## 只路由 Implementation Stage
+## 路由 Planning 与 Implementation Stage
 
-你可以让 `lfg` 使用另一个 model/harness author implementation，同时 `lfg` 保留 planning、review、PR creation 和 CI ownership：
+你可以让 `lfg` 使用特定 model 或 harness author 某个 pipeline stage，同时 `lfg` 保留 run 其余部分的 ownership。两个 stage 可独立路由：
 
 ```text
-/lfg 使用 Codex 实施；添加 account-level notification mute settings
-/lfg 实施已确定的 plan，但只使用 Composer
+# implementation only
+/lfg add account-level notification mute settings, use Codex for implementation
+/lfg implement the settled plan, but only use Composer for implementation
+
+# planning only
+/lfg plan with fable add account-level notification mute settings
+
+# both at once
+/lfg plan with fable, codex for implementation; add account-level notification mute settings
 ```
 
-`lfg` 从整条 instruction 识别 intent，而不是匹配单一 keyword。Planning 前从 product request 移除 routing direction；只在调用 `ce-work` 时，在 `mode:return-to-caller` 旁携带恰好包含 `mode`、`target`、`model`、`source` 的 transient object。String-only host 上，该 seam 为 `mode:return-to-caller implementation_engine:<compact-json> <plan-path>`；例如 `implementation_engine:{"mode":"prefer","target":"codex","model":null,"source":"lfg-current-turn"}`。Object 绝不会成为 plan content、settled product decision 或 review input（The object never becomes plan content）。Feature text、quoted material、comparison 或 filename 中普通 model mention 不激活 routing。
+`lfg` 从整条 instruction 识别 intent，而不是匹配单一 keyword，并按 **scope** 解析每条 directive：
+
+- **Scoped** — instruction 点名 stage（"plan with fable"、"codex for implementation"）。路由到该 stage：向 `ce-plan` 传 `plan_model:<alias>` carrier（model elevation），向 `ce-work` 传 `implementation_engine` object。两者可同时解析。
+- **Unscoped** — 未点名 stage 的 bare assignment（"use fable"、"with codex"）。只绑定到 **implementation**，并在 `lfg` 的 opening line 中披露；绝不会静默扩散到 planning 或每个 stage。
+- **Unscoped 但确实 ambiguous，且你在场** — `lfg` 在 pipeline 开始前只问一个 upfront question，然后 hands-off 运行。Headless run（scheduler、loop、nested orchestrator）从不提问——应用 implementation default 并披露，因为无人可答。
+
+Implementation carrier 是 transient object，恰好包含 `mode`、`target`、`model` 与 `source`，只在 `lfg` 调用 `ce-work` 时与 `mode:return-to-caller` 一并传递。在 string-only host 上，该 seam 为 `mode:return-to-caller implementation_engine:<compact-json> <plan-path>`；例如 `implementation_engine:{"mode":"prefer","target":"codex","model":null,"source":"lfg-current-turn"}`。`plan_model:<alias>` carrier 与 `ce-plan` 的 request 并排传递——从不放进 request 内。两种 carrier 都不会成为 plan content、settled product decision 或 review input。Feature text、quoted material、comparison 或 filename 中普通 model mention 不激活 routing。
 
 Four-field carrier 刻意保持 scalar。若当前 LFG instruction 指定 ordered fallback list，LFG 将完整 list 保留为 stage-scoped current-task context，不传 truncated carrier；CE Work 按顺序解析并 preflight retained list。Host 无法跨 skill invocation 保留 current-task context 时，LFG 会 block，而不是静默丢失 later candidates。Standing ordered config 不需要 carrier，仍是建立 reusable matrix 最 portable 的方式。
 
@@ -119,7 +136,7 @@ Four-field carrier 刻意保持 scalar。若当前 LFG instruction 指定 ordere
 
 Target `cursor` 表示使用 configured default model 的 Cursor harness。Target `composer` 表示经 Cursor 请求 Composer-family model。Model pin 可选。Route substitution 保持在 requested target/model family 内并披露；fixed-recipient、unattended write adapter qualified 且 locally available 前不使用 route。Cross-model engine 的 launch floor 是至少一个真实 non-native route 通过 qualification matrix；failing candidates 保持 unavailable，不会变成 guessed production commands。
 
-Prompt 没有 implementation instruction 时，`lfg` 不传 empty binding。`ce-work` 先考虑 context 中 applicable session/project instructions，再考虑 gitignored per-checkout `work_engine_mode` 与 ordered `work_engine_preferences` list。每个 config candidate 指定 `harness` 与可选 `model`；省略则使用 harness configured default。Config `prefer` 在 automatic flow 中生效，只在 ordered candidates 用尽后 native fallback；config `require` 在没有 qualified candidate 时 block。Current-task implementation instruction 优先于这些 defaults。
+Prompt 没有 stage instruction 时，`lfg` 不为该 stage 传 empty binding。Planning 方面，`ce-plan` 随后从其 `plan_model` config key 解析 elevation（或无 elevation）。Implementation 方面，`ce-work` 先考虑 context 中 applicable session/project instructions，再考虑 gitignored per-checkout `work_engine_mode` 与 ordered `work_engine_preferences` list。每个 config candidate 指定 `harness` 与可选 `model`；省略则使用 harness configured default。Config `prefer` 在 automatic flow 中生效，只在 ordered candidates 用尽后 native fallback；config `require` 在没有 qualified candidate 时 block。Current-task implementation instruction 优先于这些 defaults。
 
 共享 config shape 及其与 harness-loaded instructions 的关系，参见 [Compound Engineering 配置](./configuration.md#implementation-routing)。
 
@@ -133,7 +150,7 @@ Long external run 通过 `ce-work` return contract 保持 observable：run id、
 |----------|--------|
 | _(empty)_ | 从当前 context plan，然后在 plan eligible 时运行 pipeline |
 | `<feature description>` | 将 description 传给 `/ce-plan`，然后运行 pipeline |
-| `<feature description + implementation assignment>` | 从 planning 移除 assignment，只将其作为 `prefer` 带给 `ce-work`；除非 instruction 明确要求该 target |
+| `<feature description + stage assignment>` | 从 product request 移除 routing directives；将 scoped planning directive 路由到 `ce-plan`（`plan_model`），和/或将 scoped implementation directive 路由到 `ce-work`（`implementation_engine`）；unscoped assignment 只绑定到 implementation |
 
 Output：code changes、commits，通常还有 PR。没有 configured git remote 时，output 只有 local commits。如果 CI 在 bounded repair loop 后仍 red，unresolved failures 会在 run 结束前持久化记录。
 

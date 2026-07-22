@@ -267,7 +267,7 @@ Units reorder、split 或 delete 时，普通 numbering 会断；issue、PR 和 
 
 ## Model elevation（模型提升）
 
-需要为 heavy reasoning step 指定 model 时，`ce-plan` 可以用你选择的 model 而非 session model 编写 plan。它只把 interpret-findings-then-author step dispatch 给该 model，并提供 read access 以验证 brief；skill 其余部分（dialogue、research）留在 session model。可以在 prompt 中为单次 run 指定 model（“use fable”“have opus plan this”），或在 `.compound-engineering/config.local.yaml` 中用 `plan_model: <model>` 设置 default。Prompt request 会覆盖 config key。
+需要为 heavy reasoning step 指定 model 时，`ce-plan` 可以用你选择的 model 而非 session model 编写 plan。它只把 interpret-findings-then-author step dispatch 给该 model，并提供 read access 以验证 brief；skill 其余部分（dialogue、research）留在 session model。可以在 prompt 中为单次 run 指定 model（“use fable”“have opus plan this”），由 orchestrator（例如 `lfg`）传入 `plan_model:<alias>` carrier（pipeline mode 也生效），或在 `.compound-engineering/config.local.yaml` 中用 `plan_model: <model>` 设置 default。Precedence：caller carrier 高于 prompt request，prompt request 高于 config key。
 
 这适用于任何 harness：host 能原生提供 chosen model 时走原生，否则调用已安装并认证的 Claude CLI，再否则在 session model 上运行该 step，并说明未满足的 precondition。**因此，设置 `plan_model` 会在每个运行 `ce-plan` 的 harness 中生效**，不只 Claude Code。详见 `references/reasoning-elevation.md`。
 

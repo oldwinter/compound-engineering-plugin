@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `d1bff966`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `5c7cb347`。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -22,6 +22,8 @@
 ## Philosophy（理念）
 
 **每一个工程工作单元都应该让后续工作更容易，而不是更困难。**
+
+调用语法：本 README uses `/skill-name` examples for slash-skill hosts。在 Codex 中，invoke installed skills with `$skill-name`（for example, `$ce-plan` and `$lfg`）；`/goal` remains a Codex built-in command。
 
 传统开发会积累技术债。每个 feature 都增加 complexity。每个 bug fix 都留下一点 local knowledge，后来的人还得重新发现。Codebase 越来越大，context 越来越难 hold，下一次 change 也越来越慢。
 
@@ -77,7 +79,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 ```text
 /ce-ideate new drawing tools
 /ce-ideate surprise me
-/ce-ideate github issues   # ground ideas in your open issues instead of a prompt
+/ce-ideate open issues     # ground ideas in your tracker's open issues (GitHub, Linear, Jira)
 ```
 
 `/ce-ideate` 会先做 homework（codebase、past learnings、web 上的 prior art，以及可选的 issue tracker），然后给出一组 ranked grounded candidates，供你带入 `/ce-brainstorm`。
@@ -117,7 +119,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 /lfg
 ```
 
-`/lfg` 会 hands-off 跑完整 loop：plan，按 plan work，simplify，运行 code review 并应用 fixes，运行 browser tests，commit，push，open PR，然后 watch CI 并修复 failures 直到 green。建议在 `/ce-brainstorm` 之后启动，让它基于真实 requirements plan，而不是基于一行 prompt。它是 standard loop 的 autopilot 版本，适合你想离开一会儿、回来看到一个打开且 green 的 PR。
+`/lfg` 会 hands-off 跑完整 loop：plan，按 plan work，simplify，运行 code review 并应用 fixes，运行 browser tests，commit，push，open PR，然后 watch CI 并修复 failures 直到 green。建议在 `/ce-brainstorm` 之后启动，让它基于真实 requirements plan，而不是基于一行 prompt。它是 standard loop 的 autopilot 版本，适合你想离开一会儿、回来看到一个打开且 green 的 PR。当 eligible multi-area plan 仍有 unplanned work 时，`lfg` 还会推荐并说明 next separately planned area；只有你接受后，才会为 fresh session 和 separate plan 创建 `/ce-handoff`。
 
 ## Getting Started（开始使用）
 
@@ -135,7 +137,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-explain`](docs/skills/ce-explain.md) | 将 concept、diff、idea 或你自己的一段 work 解释成个人学习 artifact |
 | [`/ce-brainstorm`](docs/skills/ce-brainstorm.md) | 探索 requirements 并写出尺寸合适的 requirements doc |
 | [`/ce-plan`](docs/skills/ce-plan.md) | 创建 structured implementation plans |
-| [`/ce-work`](docs/skills/ce-work.md) | 系统性执行 implementation plans |
+| [`/ce-work`](docs/skills/ce-work.md) | 以 native 或 cross-model implementation 执行 plans，并保持 durable progress 与 transactional host-owned integration |
 | [`/ce-code-review`](docs/skills/ce-code-review.md) | 使用 skill-local reviewer personas review code |
 | [`/ce-doc-review`](docs/skills/ce-doc-review.md) | Review requirements 和 plan documents |
 | [`/ce-debug`](docs/skills/ce-debug.md) | Reproduce failures，trace root cause，fix bugs，并为 non-trivial fixes 准备 PR |
@@ -262,7 +264,7 @@ The marketplace step only makes the plugin available; the plugin install is what
 
 ### 其他 editor 和 CLI
 
-[Claude Code、Cursor 和 Codex](#install) 的说明在上方；这里列出的平台同样受到支持。
+[Claude Code、Cursor 和 Codex](#claude-code) 的说明在上方；这里列出的平台同样受到支持。
 
 ### Kimi Code CLI
 

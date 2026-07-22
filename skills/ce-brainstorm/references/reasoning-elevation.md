@@ -8,13 +8,13 @@ Elevated steps：**ce-plan** 将 interpret research findings 与 author plan 合
 
 ## Activation resolution（所有 harness 都运行）
 
-按 precedence 为每个 skill 解析 **model choice**。值是 model alias（如 `fable`、`opus`），不是 boolean。
+按 precedence 为每个 skill 解析 **model choice**。值是 model alias（如 `fable`、`opus`），不是 boolean。Structured caller carrier 是最高权威来源，会**最先**评估，因此对 prompt 的解读永远不能覆盖它。
 
-1. **In-prompt intent**：对本次 run prompt 做 reasoning，判断是否要求用 named model 执行该 step（“use fable”“have opus author this”“get fable to plan it”）。Affirmative -> elevate；negative（“don't use fable”“no elevation”）-> 不 elevate。Intent 依靠 reasoning，不做 keyword matching；将 model 作为 subject 顺带提及（如“design a fable-generator feature”）不激活。
-2. **Config**：否则读取 per-skill key：ce-plan 用 `plan_model`，ce-brainstorm 用 `brainstorm_model`。读取方式与该 skill Phase 0.0 解析 `plan_output` / `brainstorm_output` 相同：复用已解析 repo root，否则运行 `git rev-parse --show-toplevel`；用 native file-read tool 读取 `<repo-root>/.compound-engineering/config.local.yaml`，若 Phase 0.0 read 仍在手中则复用。忽略以 `#` 开头的 commented lines。Model alias -> elevate；missing/commented/invalid/no file -> off。
-3. **Pipeline runs**：pipeline / `disable-model-invocation` runs 没有 prompt，因此只根据 config 解析。
+1. **Caller carrier**：automatic orchestrator 可在 invocation 旁传入显式 structured carrier `<per-skill-key>:<model-alias>`（LFG 传给 ce-plan 的是 `plan_model:<alias>`；传给 ce-brainstorm 的对应 carrier 是 `brainstorm_model:<alias>`）。这是 structured caller data，不是 product prose：从 request text 中 strip 掉，绝不要通过对 feature request 做 reasoning 来重建它。**当 carrier 存在时它直接胜出——不要再对 prompt 做 model intent reasoning（跳过 step 2）。** 每次 run 都生效，**包括 pipeline / `disable-model-invocation`**。Alias 必须匹配 `^[A-Za-z0-9._-]{1,64}$`；malformed carrier 视为 absent 并忽略，不做猜测。
+2. **In-prompt intent**：**仅当没有 caller carrier 时**，对本次 run 的 prompt 做 reasoning，判断是否要求用 named model 执行该 step（“use fable”“have opus author this”“get fable to plan it”）。Affirmative -> elevate 到该 model；negative（“don't use fable”“no elevation”）-> 不 elevate。Intent 依靠 reasoning，不做 keyword matching；将 model 作为 subject 顺带提及（如“design a fable-generator feature”）不激活。在 pipeline / `disable-model-invocation` runs 中没有可 reason 的 user prompt——sanitized feature request 是 product content，绝不是 elevation intent 的来源——因此**完全跳过本 step**，解析落到 config。
+3. **Config**：否则读取 per-skill key：ce-plan 用 `plan_model`，ce-brainstorm 用 `brainstorm_model`。读取方式与该 skill Phase 0.0 解析 `plan_output` / `brainstorm_output` 相同：复用已解析 repo root，否则运行 `git rev-parse --show-toplevel`；用 native file-read tool 读取 `<repo-root>/.compound-engineering/config.local.yaml`，若 Phase 0.0 read 仍在手中则复用。忽略以 `#` 开头的 commented lines。Model alias -> elevate；missing/commented/invalid/no file -> off。
 
-**Prompt 会覆盖 config，也包括换成另一个 model**：prompt 指定 Opus 时胜过 `plan_model: fable`。没有 explicit prompt request/config key 就不 elevation。
+**Precedence：caller carrier 高于 in-prompt intent，后者高于 config。** Explicit request——orchestrated runs 的 caller carrier，或 interactive runs 的 in-prompt intent——会覆盖 config，也包括换成另一个 model（prompt 或 carrier 指定 Opus 时胜过 `plan_model: fable`）。在 pipeline / `disable-model-invocation` runs 中，解析只走 caller-carrier-then-config。没有 caller carrier、explicit in-prompt request 或 explicit config key 时，不会 elevation。
 
 若 session model 已经是 resolved model，elevation 没有意义：跳过 dispatch（是否仍显示一行，参见 Transparency）。
 
@@ -84,6 +84,6 @@ Recovery **绝不替换成其他 model**。用户认为来自 chosen model 的 p
 
 ## Transparency（透明性）
 
-- **Elevation fired**：显示一行，说明 **model**、**route**、触发原因（config key 或 explicit request）。Receipt 确认时称为 **served** model；否则称为 **requested** 并显式标记 *unverified*。所有 route 都如此，包括 native。
+- **Elevation fired**：显示一行，说明 **model**、**route**、触发原因（config key、explicit in-prompt request，或 caller carrier）。Receipt 确认时称为 **served** model；否则称为 **requested** 并显式标记 *unverified*。所有 route 都如此，包括 native。
 - 未触发 elevation，或 session model 已是 **config key** requested model 时，**抑制该行**。**Explicit in-prompt request** 始终显示，包括 session model 已匹配时，避免 recognized request 与 unparsed request 无法区分。
 - **Requested but unavailable**（无 native support、`claude` 不存在或未认证）：在 session model inline 运行，说明**哪个 precondition 未满足**，以及如何让 requested model reachable（例如安装并认证 Claude CLI）。
