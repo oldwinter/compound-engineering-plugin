@@ -71,11 +71,12 @@ describe("ce-work review contract", () => {
     const content = await readCeWorkImplementationContract()
 
     // Testing deliberation exists in the execution loop
-    expect(content).toContain("评估 testing coverage")
+    expect(content).toContain("Assess testing coverage")
 
-    const runTestsIdx = content.indexOf("修改后运行 tests")
-    const assessIdx = content.indexOf("评估 testing coverage")
-    const markDoneIdx = content.indexOf("将 task 标为 completed")
+    // Deliberation is between "Run tests after changes" and "Mark task as completed"
+    const runTestsIdx = content.indexOf("Run tests after changes")
+    const assessIdx = content.indexOf("Assess testing coverage")
+    const markDoneIdx = content.indexOf("Mark task as completed")
     expect(runTestsIdx).toBeLessThan(assessIdx)
     expect(assessIdx).toBeLessThan(markDoneIdx)
   })
@@ -179,9 +180,9 @@ describe("ce-work testing evidence contract", () => {
   test("requires evidence strategy before behavior changes and evidence in return-to-caller", async () => {
     const content = await readCeWorkImplementationContract()
 
-    expect(content).toContain("在改变 behavior 前为 task 选择 evidence strategy")
-    expect(content).toContain("默认 test-first 或 characterization-first")
-    expect(content).toContain("不要新增重复 regression test")
+    expect(content).toContain("Choose the evidence strategy for this task before changing behavior")
+    expect(content).toContain("default to test-first or characterization-first")
+    expect(content).toContain("Do not add a duplicate regression test")
     expect(content).toContain("verification_evidence")
     expect(content).toContain("existing_tests_inspected")
     expect(content).toContain("Return `status: complete` only when behavior-bearing work has verification evidence")
@@ -720,10 +721,10 @@ describe("ce-compound frontmatter schema expansion contract", () => {
       "skills/ce-compound/references/yaml-schema.md"
     )
 
-    expect(mapping).toContain("architecture_pattern` -> `docs/solutions/architecture-patterns/")
-    expect(mapping).toContain("design_pattern` -> `docs/solutions/design-patterns/")
-    expect(mapping).toContain("tooling_decision` -> `docs/solutions/tooling-decisions/")
-    expect(mapping).toContain("convention` -> `docs/solutions/conventions/")
+    expect(mapping).toContain("architecture_pattern` -> `<root>/solutions/architecture-patterns/")
+    expect(mapping).toContain("design_pattern` -> `<root>/solutions/design-patterns/")
+    expect(mapping).toContain("tooling_decision` -> `<root>/solutions/tooling-decisions/")
+    expect(mapping).toContain("convention` -> `<root>/solutions/conventions/")
   })
 })
 

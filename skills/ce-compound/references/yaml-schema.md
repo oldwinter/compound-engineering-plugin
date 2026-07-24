@@ -1,6 +1,6 @@
 # YAML Frontmatter Schema（YAML Frontmatter schema，YAML 前置元数据 schema）
 
-本目录中的 `schema.yaml` 是 `ce-compound` 写入的 `docs/solutions/` frontmatter 的 canonical contract。
+本目录中的 `schema.yaml` 是 `ce-compound` 写入的 `<root>/solutions/` frontmatter 的 canonical contract。
 
 将本文件作为以下内容的 quick reference：
 - required fields（必填字段）
@@ -60,23 +60,23 @@ Track system 之前创建的 docs 可能在 knowledge-type problem_types 上带�
 
 ## Category Mapping（类别映射）
 
-- `build_error` -> `docs/solutions/build-errors/`
-- `test_failure` -> `docs/solutions/test-failures/`
-- `runtime_error` -> `docs/solutions/runtime-errors/`
-- `performance_issue` -> `docs/solutions/performance-issues/`
-- `database_issue` -> `docs/solutions/database-issues/`
-- `security_issue` -> `docs/solutions/security-issues/`
-- `ui_bug` -> `docs/solutions/ui-bugs/`
-- `integration_issue` -> `docs/solutions/integration-issues/`
-- `logic_error` -> `docs/solutions/logic-errors/`
-- `developer_experience` -> `docs/solutions/developer-experience/`
-- `workflow_issue` -> `docs/solutions/workflow-issues/`
-- `best_practice` -> `docs/solutions/best-practices/`
-- `documentation_gap` -> `docs/solutions/documentation-gaps/`
-- `architecture_pattern` -> `docs/solutions/architecture-patterns/`
-- `design_pattern` -> `docs/solutions/design-patterns/`
-- `tooling_decision` -> `docs/solutions/tooling-decisions/`
-- `convention` -> `docs/solutions/conventions/`
+- `build_error` -> `<root>/solutions/build-errors/`
+- `test_failure` -> `<root>/solutions/test-failures/`
+- `runtime_error` -> `<root>/solutions/runtime-errors/`
+- `performance_issue` -> `<root>/solutions/performance-issues/`
+- `database_issue` -> `<root>/solutions/database-issues/`
+- `security_issue` -> `<root>/solutions/security-issues/`
+- `ui_bug` -> `<root>/solutions/ui-bugs/`
+- `integration_issue` -> `<root>/solutions/integration-issues/`
+- `logic_error` -> `<root>/solutions/logic-errors/`
+- `developer_experience` -> `<root>/solutions/developer-experience/`
+- `workflow_issue` -> `<root>/solutions/workflow-issues/`
+- `best_practice` -> `<root>/solutions/best-practices/`
+- `documentation_gap` -> `<root>/solutions/documentation-gaps/`
+- `architecture_pattern` -> `<root>/solutions/architecture-patterns/`
+- `design_pattern` -> `<root>/solutions/design-patterns/`
+- `tooling_decision` -> `<root>/solutions/tooling-decisions/`
+- `convention` -> `<root>/solutions/conventions/`
 
 ## Validation Rules（验证规则）
 

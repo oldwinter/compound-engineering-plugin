@@ -5,19 +5,19 @@ argument-hint: "[feature, focus area, or constraint] [output:md]"
 
 ---
 
-# Generate Improvement Ideas
+> **中文导读（下方英文为 canonical contract）：** Ideation artifact 通过统一 `<root>` 规则写入配置的 CE artifact root；输出不再在不同 layer 重复同一 normative rule。任何依赖 `<root>/solutions/`、`<root>/ideation/` 或其它 CE path 的步骤，都要先完成 fail-closed root resolution。
 
-**中文导读：** 在尚未确定要 build 什么时，先基于 repository、past learnings、external prior art 和可选 tracker evidence 做 grounding，再把 topic 拆成 orthogonal axes，从多种 conceptual frames 生成、反驳并排序 candidates。输出的是 qualified idea set，而不是 implementation plan；选定 survivor 后交给 `ce-brainstorm`。下方英文内容是 canonical executable contract，必须按原文执行。
+# Generate Improvement Ideas
 
 **Note: The current year is 2026.** Use this when dating ideation documents and checking recent ideation artifacts.
 
 `ce-ideate` precedes `ce-brainstorm`.
 
 - `ce-ideate` answers: "What are the strongest ideas worth exploring?"
-- `ce-brainstorm` answers: "What exactly should one chosen idea mean?" and writes a requirements-only unified plan under `docs/plans/`.
+- `ce-brainstorm` answers: "What exactly should one chosen idea mean?" and writes a requirements-only unified plan under `<root>/plans/`.
 - `ce-plan` answers: "How should it be built?"
 
-This workflow produces a ranked ideation artifact — written to `docs/ideation/` when present, else a CE temp path (see Phase 4). It does **not** produce requirements, plans, or code.
+This workflow produces a ranked ideation artifact — written to `<root>/ideation/` when present, else a CE temp path (see Phase 4). It does **not** produce requirements, plans, or code.
 
 ## Interaction Method
 
@@ -38,6 +38,18 @@ Interpret any provided argument as optional context. It may be:
 - a volume hint such as `top 3`, `100 ideas`, or `raise the bar`
 
 If no argument is provided, proceed with open-ended ideation.
+
+## Artifact Root
+
+This skill writes ideation artifacts under `<root>/ideation/` in repo mode and reads learnings under `<root>/solutions/`. Resolve `<root>` (per the block below) only when you compose such a path — the no-repo / elsewhere flow writes to a temp directory and never needs it, so do not resolve or create a root before mode classification. Pass the resolved path to any subagent when you do resolve it, not the config.
+
+<!-- ce-docs-root:start -->
+**Resolve the CE artifact root `<root>` before composing any artifact path.**
+
+- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml`; first non-empty value wins (`<repo-root>` = `git rev-parse --show-toplevel`). Unset -> `<root>` is `docs`, exactly as before.
+- **Validate** a set value: a repo-relative directory whose real, symlink-resolved path stays inside the repo and is neither the repo root nor under `.git/`. Otherwise stop with an error naming `docs_root` and the value -- never fall back to `docs`.
+- **Use** `<root>` as the sole artifact location: create it if absent, compose each path as `<root>/<subdir>` with this skill's own subdirectory, and never also read `docs`.
+<!-- ce-docs-root:end -->
 
 ## Core Principles
 
@@ -89,7 +101,7 @@ The `output:` preference does NOT auto-propagate to `ce-brainstorm` on handoff (
 
 #### 0.1 Check for Recent Ideation Work
 
-Look in `docs/ideation/` for ideation documents (`*.md` or `*.html`) created within the last 30 days.
+Look in `<root>/ideation/` for ideation documents (`*.md` or `*.html`) created within the last 30 days. This is a repo-mode convenience: if there is no git repository, or resolving `<root>` fails (a bad `docs_root`), skip this scan and continue — do not fail the run before Phase 0.3 classifies repo vs elsewhere/no-repo mode, since an elsewhere or non-software ideation run writes to a temp area and never touches `<root>/ideation/`.
 
 Treat a prior ideation doc as relevant when:
 
@@ -120,11 +132,11 @@ Before classifying mode or dispatching any grounding, check whether the subject 
 - Questions exist only to supply what sub-agents need to operate: an identifiable subject (this phase) and enough context for the agent to say something specific about it (0.4, elsewhere modes only). Nothing else.
 - Never ask about solution direction, constraints, audience, tone, success criteria, or anything that characterizes the subject — those belong to `ce-brainstorm`.
 - Always keep "Surprise me" (letting the agent decide the focus) as a real option, not a fallback for when the user can't name a subject. Ideation is allowed to be greenfield by design.
-- 一旦 subject 可识别，或用户已委托给 "Surprise me"，就停止提问。0.2、0.3（mode confirmation）、0.4 和 Phase 1 issue-scoping gate 合计超过 3 个问题，说明 ideation 可能不是合适的 workflow；考虑建议使用 `ce-brainstorm`。
+- Stop as soon as the subject is identifiable or the user has delegated to "Surprise me." More than 3 total questions across 0.2, 0.3 (mode confirmation), 0.4, and the Phase 1 issue-scoping gate is a smell that ideation is not the right workflow — consider suggesting `ce-brainstorm`.
 
 **Detection — issue-tracker intent (repo mode only; subject-identifying).**
 
-Issue-tracker intent 要求明确提到 tracker 或其中提交的 reports。仅当 prompt 使用 `open issues`、`issue patterns`、`issue themes`、`what users are reporting`、`bug reports`，或点名 tracker（`github issues`、`linear issues`、`jira tickets`）时触发；此时 subject 是 "issues in the tracker"。该 lens 使用任何可访问的 tracker（GitHub、Linear、Jira），不得强制要求 GitHub。标记 issue-tracker intent 后进入 0.3。
+Issue-tracker intent requires an explicit reference to the tracker or to reports filed in it. Trigger only when the prompt uses phrases like `open issues`, `issue patterns`, `issue themes`, `what users are reporting`, `bug reports`, or a named tracker (`github issues`, `linear issues`, `jira tickets`) — the subject is "issues in the tracker." The lens works against whichever tracker is reachable (GitHub, Linear, Jira); do not require GitHub. Proceed to 0.3 with issue-tracker intent flagged.
 
 Do NOT trigger on arguments that merely mention bugs as a focus: `bug in auth`, `fix the login issue`, `the signup bug`, `top 3 bugs in authentication` — these are focus hints on regular ideation, not requests to analyze the issue tracker. A bare `bugs` with no tracker phrasing is handled by the vagueness check below, not here.
 
@@ -181,7 +193,7 @@ Do not prescribe correction phrases ("say X to switch"). State the inferred mode
 
 **Active confirmation on mode ambiguity.** Only fire when mode classification is genuinely ambiguous *after* 0.2 settled the subject — e.g., "our docs" could mean repo docs (repo-grounded) or public marketing docs (elsewhere-software). Most subjects settled in 0.2 classify cleanly here. When ambiguous, ask one confirmation question via the blocking tool with two self-contained labels naming the two candidate interpretations in plain language (e.g., "Treat as repo docs in this codebase" vs "Treat as public marketing docs") — never leak internal mode names. Otherwise the one-sentence inferred-mode statement is sufficient; do not ask.
 
-**Routing rule (non-software mode).** When Decision 2 = non-software, still run Phase 1 Elsewhere-mode grounding (user-context synthesis + web-research by default; skip phrases honored). Learnings-researcher is skipped by default in this mode — the CWD's `docs/solutions/` rarely transfers to naming, narrative, personal, or non-digital business topics; see Phase 1 for the full rationale. Then load `references/universal-ideation.md` and follow it in place of Phase 2's software frame dispatch and the Phase 5 menu narrative. This load is non-optional — the file contains the domain-agnostic generation frames, critique rubric, and wrap-up menu that replace Phase 2 and the post-ideation menu for this mode, and none of those details live in this main body. Improvising from memory produces the wrong facilitation for non-software topics. Do not run the repo-specific codebase scan at any point. The deliverable is auto-written here too (per `references/post-ideation-workflow.md` Phase 4); if the user publishes a markdown deliverable to Proof and it fails, the §5.1 Proof handling applies and the auto-written local file remains the intact record.
+**Routing rule (non-software mode).** When Decision 2 = non-software, still run Phase 1 Elsewhere-mode grounding (user-context synthesis + web-research by default; skip phrases honored). Learnings-researcher is skipped by default in this mode — the CWD's `<root>/solutions/` rarely transfers to naming, narrative, personal, or non-digital business topics; see Phase 1 for the full rationale. Then load `references/universal-ideation.md` and follow it in place of Phase 2's software frame dispatch and the Phase 5 menu narrative. This load is non-optional — the file contains the domain-agnostic generation frames, critique rubric, and wrap-up menu that replace Phase 2 and the post-ideation menu for this mode, and none of those details live in this main body. Improvising from memory produces the wrong facilitation for non-software topics. Do not run the repo-specific codebase scan at any point. The deliverable is auto-written here too (per `references/post-ideation-workflow.md` Phase 4); if the user publishes a markdown deliverable to Proof and it fails, the §5.1 Proof handling applies and the auto-written local file remains the intact record.
 
 #### 0.4 Context-Substance Gate (Elsewhere Modes Only)
 
@@ -227,13 +239,13 @@ Use reasonable interpretation rather than formal parsing.
 
 #### 0.6 Cost Transparency Notice
 
-分派 Phase 1 前，用一行简短文字显示推断 mode 的 agent 数量和成本构成，避免隐藏 multi-agent 成本。按实际分派决策计算：1 个 grounding-context agent（repo mode 扫描 codebase；elsewhere 合成 user context）+ 1 个 learnings（elsewhere-non-software 跳过）+ 1 个 web researcher + evidence scouts（仅 repo mode，Phase 1.5 每个 axis 一个，最多 5 个，extraction tier）+ user-research distillers（每份需要提炼的用户 research artifact 一个，所有 mode，extraction tier）+ ideation fleet（默认 5 个：3 个 generation-tier + 2 个 ceiling-tier；surprise-me 或 `go deep` 时 6 个且全部为 ceiling；issue-tracker mode 时 4 个）+ 1 个 basis verifier（generation tier）。当 issue-tracker intent 触发时（仅 repo mode），为 issue-intelligence 的 scan 和 cluster 两次调用加 2（scan 在 ideation fleet 前运行；cluster 可能增加一个 scoping question）。如果用户选择 Slack research，加 1；如果用户给出跳过 web research 的短语或将触发 V15 reuse，减 1。在 **surprise-me mode** 中注明 "(surprise-me mode: deeper exploration per agent)"。如果 generation 后任何 topic axis 为空，Phase 2 的 axis-coverage 检查最多可再分派 2 个 recovery sub-agents（surprise-me mode 跳过）；非 surprise-me 时，在数量行追加 "(+up to 2 if axis-coverage requires recovery)"。
+Before dispatching Phase 1, surface the agent count and cost shape for the inferred mode in one short line so multi-agent cost is not invisible. Compute the count from the actual dispatch decision: 1 grounding-context agent (codebase scan in repo mode; user-context synthesis in elsewhere) + 1 learnings (skip in elsewhere-non-software) + 1 web researcher + evidence scouts (repo mode only, one per Phase 1.5 axis, max 5, extraction tier) + user-research distillers (one per user-supplied research artifact needing distillation, extraction tier, all modes) + the ideation fleet (5 agents default: 3 generation-tier + 2 ceiling-tier; 6 all-ceiling in surprise-me or `go deep`; 4 in issue-tracker mode) + 1 basis verifier (generation tier). When issue-tracker intent triggers (repo mode only): add 2 for the issue-intelligence scan and cluster calls (the scan runs before the ideation fleet; the cluster call may add one scoping question). Add 1 if the user opted into Slack research. Subtract 1 if the user issued a web-research skip phrase or V15 reuse will fire. In **surprise-me mode**, note "(surprise-me mode: deeper exploration per agent)". Phase 2's axis-coverage check may dispatch up to 2 additional recovery sub-agents when generation leaves any topic axis empty (skipped in surprise-me mode); when not in surprise-me, append "(+up to 2 if axis-coverage requires recovery)" to the count line.
 
 Examples (defaults, no skips, no opt-ins):
 
 - **Repo mode, specified subject:** "Will dispatch ~13 agents, most on cheap tiers: codebase scan + learnings + web research + up to 5 evidence scouts (cheap) + 5 ideation (3 mid-tier, 2 top-tier) + 1 basis verifier (mid-tier). Skip phrases: 'no external research', 'no slack'."
 - **Repo mode, surprise-me:** "Will dispatch ~10 agents (surprise-me mode: deeper exploration per agent): codebase scan + learnings + web research + 6 ideation (top-tier) + 1 basis verifier. Skip phrases: 'no external research', 'no slack'."
-- **Repo mode, issue-tracker intent：** "将分派约 14 个 agents：codebase scan + learnings + web research + issue intelligence（scan + cluster）+ 最多 5 个 evidence scouts + 4 个 ideation + 1 个 basis verifier。跳过短语：'no external research'、'no slack'。" 这表示 theme 成功生成的路径；如果 issue scan 返回的 signal 不足（见 Phase 1），则跳过 cluster 调用，ideation 回退到默认的 5-agent fleet。
+- **Repo mode, issue-tracker intent:** "Will dispatch ~14 agents: codebase scan + learnings + web research + issue intelligence (scan + cluster) + up to 5 evidence scouts + 4 ideation + 1 basis verifier. Skip phrases: 'no external research', 'no slack'." Reflects the successful-theme path; if the issue scan returns insufficient signal (see Phase 1), the cluster call is skipped and ideation falls back to the default 5-agent fleet.
 - **Elsewhere-software:** "Will dispatch ~9 agents: context synthesis + learnings + web research + 5 ideation + 1 basis verifier. Skip phrases: 'no external research'."
 - **Elsewhere-non-software:** "Will dispatch ~8 agents: context synthesis + web research + 5 ideation + 1 basis verifier. Skip phrases: 'no external research'."
 
@@ -241,7 +253,7 @@ The line is informational; users do not need to acknowledge it.
 
 ### Phase 1: Mode-Aware Grounding
 
-Before generating ideas, gather grounding. The dispatch set depends on the mode chosen in Phase 0.3. Web research runs in all modes (skip phrases honored). When the user supplied a research artifact, the user-supplied research handling below also runs in all modes. Learnings runs in repo mode and elsewhere-software, and is **skipped by default in elsewhere-non-software** — the CWD repo's `docs/solutions/` almost always contains engineering patterns that do not transfer to naming, narrative, personal, or non-digital business topics.
+Before generating ideas, gather grounding. The dispatch set depends on the mode chosen in Phase 0.3. Web research runs in all modes (skip phrases honored). When the user supplied a research artifact, the user-supplied research handling below also runs in all modes. Learnings runs in repo mode and elsewhere-software, and is **skipped by default in elsewhere-non-software** — the CWD repo's `<root>/solutions/` almost always contains engineering patterns that do not transfer to naming, narrative, personal, or non-digital business topics.
 
 **Surprise-me grounding depth.** When Phase 0.2 routed to surprise-me mode, Phase 1 must produce richer material than specified mode — Phase 2 sub-agents will discover their own subjects from what Phase 1 returns, so texture matters:
 
@@ -298,22 +310,22 @@ Use the project's active instructions already in context. Send the codebase scan
 
 3. **Web research** (always-on; see "Web research" subsection below for skip-phrase and V15 cache handling).
 
-4. **Issue intelligence**（条件触发、由 orchestrator 把关的两次调用 protocol）— 如果 Phase 0.3 检测到 issue-tracker intent，按下述方式运行 issue lens。与其他 grounding agents 不同，它**不能**作为 fire-and-forget parallel：它可能需要一个 scoping question，而 subagent 无法阻塞等待用户输入，因此两次 analyst 调用之间的问题由你（orchestrator）负责。
+4. **Issue intelligence** (conditional, orchestrator-gated two-call protocol) — if issue-tracker intent was detected in Phase 0.3, run the issue lens as below. Unlike the other grounding agents this one is **not** fire-and-forget parallel: it may need a scoping question, and a subagent cannot block for user input, so you (the orchestrator) own the question between the analyst's two calls.
 
-   **a. Scan 调用。** 读取 `references/agents/issue-intelligence-analyst.md`，分派一个 generic subagent，并传入该 prompt、focus hint、Phase 1 前面创建的 `<scratch-dir>`，以及它处于 **SCAN mode** 的指令。它按 capability 探测 tracker 访问能力（GitHub / Linear / Jira，而不是假设某个 binary 存在），执行一次有边界的 fetch，把结果集持久化到 `<scratch-dir>/issue-scan.json`，并返回 distribution、signal 数量和 ambiguity assessment；它**不**执行 cluster。
+   **a. Scan call.** Read `references/agents/issue-intelligence-analyst.md` and dispatch a generic subagent seeded with that prompt, the focus hint, the `<scratch-dir>` from earlier in Phase 1, and the instruction that it is in **SCAN mode**. It probes tracker access (GitHub / Linear / Jira by capability, not by assuming a binary), does one bounded fetch, persists that fetched set to `<scratch-dir>/issue-scan.json`, and returns the distribution, a signal count, and an ambiguity assessment — it does **not** cluster.
 
-   - 如果**第一行是 `Issue analysis unavailable:` marker**（没有可访问的 tracker），记录警告（"{该消息}。继续执行 standard ideation。"），然后继续其余 grounding；不调用 cluster。
-   - 如果报告的 eligible issues 少于 5 个，注明 "Insufficient issue signal for theme analysis"，并在 Phase 2 使用默认 ideation frames；不提出 scoping question，也不调用 cluster。
+   - If its **first line is the `Issue analysis unavailable:` marker** (no reachable tracker), log a warning ("{that message}. Proceeding with standard ideation.") and continue with the remaining grounding — no cluster call.
+   - If it reports fewer than 5 eligible issues, note "Insufficient issue signal for theme analysis" and proceed with default ideation frames in Phase 2 — no scoping question, no cluster call.
 
-   **b. Scoping gate（由你决定，最多问一个问题）。** 阅读 scan 的 ambiguity assessment。默认**静默**执行 auto-scope，按 focus hint → priority（如有）→ workflow-state → recency 组成 scope。**仅当** scan 报告不可消解的 ambiguity 时，才按 Interaction Method 提出**一个** blocking scoping question：存在两个或更多连贯、实质不同的 scopes，且单个刻意多样化的 sample 无法公平代表它们。选项由 scan distribution 派生的 slices 加一个始终存在的 "analyze a representative sample of everything" 组成，让用户可以拒绝收窄。如果 slices 加 representative-sample 选项超过平台 blocking tool 的选项上限（例如 Codex `request_user_input` 明确选项为 2-3 个，而 `AskUserQuestion` 为 4 个），展示容得下的最高 mass slices，并把其余内容并入 representative-sample 选项；或按 Interaction Method 回退到编号 chat list。绝不能删除 representative-sample 选项。这是一个 **grounding / subject-scoping** 问题，与 Phase 0.2 subject gate（"agent 应处理什么"）同类，**不是** Phase 0.4 solution-constraint 问题；它计入 ≤3 个问题的粒度，且 "Surprise me" 仍需保留。scan 无歧义时完全跳过。
+   **b. Scoping gate (you decide; ask at most one question).** Read the scan's ambiguity assessment. Auto-scope **silently** by default — compose the scope from focus hint → priority (when populated) → workflow-state → recency. Fire **one** blocking scoping question (per Interaction Method) **only** when the scan reports irreducible ambiguity: two or more coherent, materially-different scopes that no single deliberately-varied sample could fairly represent. Its options are the scan's distribution-derived slices plus an always-present "analyze a representative sample of everything," so the user can decline to narrow. When the slices plus that representative-sample option would exceed the platform's blocking-tool option cap (e.g., Codex `request_user_input`'s 2-3 explicit options, vs `AskUserQuestion`'s 4), show the highest-mass slices that fit and fold the rest into the representative-sample option, or fall back to a numbered chat list per Interaction Method — never drop the representative-sample option. This is a **grounding / subject-scoping** question — the same kind as the Phase 0.2 subject gate ("what should the agent work on") — **not** a Phase 0.4 solution-constraint question; it counts toward the ≤3-question grain, and "Surprise me" stays available. Skip it entirely when the scan is unambiguous.
 
-   **c. Cluster 调用。** 以 **CLUSTER mode** 再次分派 analyst，传入已确定的 scope **以及同一个 `<scratch-dir>`**，使其复用 scan 持久化的 `issue-scan.json`，而不是重新 fetch。它返回按 leverage 排序的 themes 和 coverage accounting。scan 调用可以与其他 grounding agents 同时运行，但必须 **await** cluster 调用以及依赖其 themes 的 consolidation 和 Phase 1.5：不要把 issue lens 当成 fire-and-forget，也不要在 cluster 结果返回前结束 consolidation。
+   **c. Cluster call.** Dispatch the analyst again in **CLUSTER mode**, passing the resolved scope **and the same `<scratch-dir>`** so it reuses the scan's persisted `issue-scan.json` rather than re-fetching. It returns the leverage-ranked themes plus coverage accounting. The scan call can run alongside the other grounding agents, but this cluster call — and the consolidation and Phase 1.5 that depend on its themes — must **await** it: do not treat the issue lens as fire-and-forget, and do not close consolidation before the cluster result lands.
 
 **Elsewhere mode dispatch (skip the codebase scan; user-supplied context is the primary grounding):**
 
 1. **User-context synthesis** — dispatch a general-purpose sub-agent (cheapest capable model) to read the user-supplied context from Phase 0.4 intake plus any rich-prompt material, and return a structured grounding summary that mirrors the codebase-context shape (project shape → topic shape; notable patterns → stated constraints; pain points → user-named pain points; leverage points → opportunity hooks the context implies). This keeps Phase 2 sub-agents agnostic to grounding source.
 
-2. **Learnings search** *(elsewhere-software only; skipped by default in elsewhere-non-software)* — read `references/agents/learnings-researcher.md` and dispatch a generic subagent seeded with that local prompt plus the topic summary in case relevant institutional knowledge exists (skill-design patterns, prior solutions in similar shape). Skip for elsewhere-non-software: the CWD's `docs/solutions/` is unlikely to be topically relevant for non-digital topics, and running it risks polluting generation with unrelated engineering patterns.
+2. **Learnings search** *(elsewhere-software only; skipped by default in elsewhere-non-software)* — read `references/agents/learnings-researcher.md` and dispatch a generic subagent seeded with that local prompt plus the topic summary in case relevant institutional knowledge exists (skill-design patterns, prior solutions in similar shape). Skip for elsewhere-non-software: the CWD's `<root>/solutions/` is unlikely to be topically relevant for non-digital topics, and running it risks polluting generation with unrelated engineering patterns.
 
 3. **Web research** — same as repo mode (see subsection below).
 
@@ -355,8 +367,8 @@ Consolidate all dispatched results into a short grounding summary using these se
 - **Codebase context** *(repo mode)* — project shape, notable patterns, pain points, leverage points (project-defining files: AGENTS.md/CLAUDE.md/README.md/STRATEGY.md) OR **Topic context** *(elsewhere mode)* — topic shape, stated constraints, user-named pain points, opportunity hooks
 - **User-named references** *(repo mode, when the focus hint named root-level `*.md` files)* — full content from directive files the user explicitly named in their prompt or focus (research artifacts route through `User-supplied research` instead). Phase 2 treats these as constraint
 - **Additional context** *(repo mode, when other root-level markdown was discovered but not named)* — one-line gists per file. Phase 2 treats these as background, not direction
-- **Past learnings** — relevant institutional knowledge from `docs/solutions/`
-- **Issue intelligence** *（存在时，仅 repo mode）* — theme summaries，包含 titles、descriptions、issue counts、leverage 和 trend directions，**再加上 cluster 调用的 coverage accounting**（fetched / eligible / analyzed / excluded / unknown-remainder，以及任何 `>N` 下界），使非穷尽 coverage disclosure 能进入 Phase 2 ideation 和 Phase 4 artifact，而不是在这里丢失
+- **Past learnings** — relevant institutional knowledge from `<root>/solutions/`
+- **Issue intelligence** *(when present, repo mode only)* — theme summaries with titles, descriptions, issue counts, leverage, and trend directions, **plus the cluster call's coverage accounting** (fetched / eligible / analyzed / excluded / unknown-remainder, with any `>N` lower bound) so the non-exhaustive-coverage disclosure reaches Phase 2 ideation and the Phase 4 artifact rather than being dropped here
 - **External context** *(when web research ran)* — prior art, adjacent solutions, market signals, cross-domain analogies. Note "(reused from earlier dispatch)" when V15 reuse fired
 - **User-supplied research** *(when the user provided research artifacts)* — dossier gists with paths, or inline content for small artifacts; kept distinct from External context so source provenance stays visible
 - **Slack context** *(when present)* — organizational context

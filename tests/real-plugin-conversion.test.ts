@@ -47,6 +47,7 @@ type SourceInventory = {
   commands: string[]
   skills: { name: string; cePlatforms?: string[]; userInvocable?: boolean }[]
 }
+
 function listFileBasenames(dir: string, extension: string): string[] {
   try {
     return readdirSync(dir, { withFileTypes: true })

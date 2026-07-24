@@ -12,7 +12,7 @@ It also contains:
 
 ```bash
 bun install
-bun test                  # full test suite (also runs in CI)
+bun run test              # full test suite (also runs in CI; `--parallel` across worker processes)
 bun run release:validate  # plugin/marketplace consistency (also runs in CI)
 bun run plugin:validate   # Claude marketplace + plugin schema (also runs in CI; needs `claude` on PATH)
 ```
@@ -24,18 +24,20 @@ When testing current skill files in Codex, run the repository workflow from the 
 ```bash
 bun run codex:dev -- local    # link this worktree's skills and remove CE plugin installs
 bun run codex:dev -- status   # show local/remote state and checkout provenance
-bun run codex:dev -- remote   # restore the official Git-backed plugin
+bun run codex:dev -- remote   # restore the official marketplace-backed plugin
 bun run codex:dev -- remove   # remove both supported CE installation surfaces
 ```
 
-`refresh` is an idempotent alias for `local`. Local mode manages only the exact `$CODEX_HOME/skills/compound-engineering-local` symlink and Compound Engineering plugin IDs; it must not alter unrelated user skills. The symlink includes modified and untracked files from the selected worktree. Start a new Codex session after switching installation modes. Current Codex versions detect direct skill edits automatically; restart only if an edit does not appear. Do not use this repository itself as a Codex marketplace for local testing: its committed marketplace source points to the public Git repository.
+`refresh` is an idempotent alias for `local`. Local mode manages only the exact `$CODEX_HOME/skills/compound-engineering-local` symlink and Compound Engineering plugin IDs; it must not alter unrelated user skills. The symlink includes modified and untracked files from the selected worktree. Start a new Codex session after switching installation modes. Current Codex versions detect direct skill edits automatically; restart only if an edit does not appear. For live local testing, use this workflow instead of adding the repository as a marketplace: a marketplace install caches a snapshot, while local mode links the current skill files.
 
 ## Working Agreement
 
 - **Branching:** Create a feature branch for any non-trivial change. If already on the correct branch for the task, keep using it; do not create additional branches or worktrees unless explicitly requested.
 - **Merge policy:** All changes to `main` go through pull requests. Direct pushes and direct merges are not allowed; branch protection on `main` enforces this by requiring the `test` status check to pass. The direct path bypasses `release:validate`, the test suite, and PR title validation — past direct merges have caused version drift requiring multi-PR recovery (see `docs/solutions/workflow/release-please-version-drift-recovery.md`).
+- **Contribution gate (non-maintainers):** If you are not a repository maintainer or admin, do not open a PR without a linked issue — file the issue first and reference it from the PR. Adding a **new skill** has a stricter gate: non-maintainers and non-admins must raise a discussion in an issue and get explicit maintainer approval **before** starting the work; do not open a new-skill PR that has not been approved this way. Maintainers and admins are exempt from both gates but still follow the merge policy above.
+- **PR disclosure:** `.github/pull_request_template.md` ends with `## Security Disclosure` and `## Agent Disclosure` sections. Fill both when opening a PR — including PRs authored via `gh pr create --body`/`--body-file`, which bypass the template so nothing pre-fills them. State any security-relevant changes (or "No security-relevant changes"), and the model plus reasoning level that did the bulk of the work; write "unknown" for the level if you cannot determine it, never guess. The body above those sections stays freeform — add whatever sections best explain the change.
 - **Safety:** Do not delete or overwrite user data. Avoid destructive commands.
-- **Testing:** Run `bun test` after changes that affect parsing, conversion, output, skill conventions, or other mechanical guards. Local `bun test` is the same suite CI runs — there is no separate local-only unit-test lane.
+- **Testing:** Run `bun run test` after changes that affect parsing, conversion, output, skill conventions, or other mechanical guards. Local `bun run test` is the same suite CI runs — there is no separate local-only unit-test lane. Prefer it over bare `bun test`: the package script carries `--parallel`, which is where the suite's speed comes from. Bare `bun test <file>` is still the right tool for iterating on one file.
 - **Release versioning:** Releases are prepared by release automation, not normal feature PRs. The repo has one root plugin/package release component (`compound-engineering`) plus marketplace components (`marketplace`, `cursor-marketplace`). GitHub release PRs and GitHub Releases are the canonical release-notes surface for new releases; root `CHANGELOG.md` is only a pointer to that history. Use conventional titles such as `feat:` and `fix:` so release automation can classify change intent, but do not hand-bump release-owned versions or hand-author release notes in routine PRs.
 - **Output Paths:** Keep OpenCode output at `opencode.json` and `.opencode/{agents,skills,plugins}`. For OpenCode, commands go to `~/.config/opencode/commands/<name>.md`; `opencode.json` is deep-merged (never overwritten wholesale).
 - **Scratch Space:** Default to OS temp. Use `.context/` only when explicitly justified by the rules below.
@@ -179,7 +181,15 @@ Behavioral changes to a plugin skill or skill-local persona (anything under `ski
 
 ## CI and Quality Gates
 
-PR CI (`.github/workflows/ci.yml`) is the merge gate. It runs, in order: PR-title lint (PRs only), `bun run release:validate`, `bun run plugin:validate`, and `bun test`. Do not invent a parallel local-only mechanical suite — if a check is deterministic and should block merges, put it in one of those steps (usually `bun test`).
+PR CI (`.github/workflows/ci.yml`) is the merge gate. It runs, in order: PR-title lint (PRs only), `bun run release:validate`, `bun run plugin:validate`, and `bun run test`. Do not invent a parallel local-only mechanical suite — if a check is deterministic and should block merges, put it in one of those steps (usually `bun run test`).
+
+The `test` script runs `bun test --parallel`, which distributes test *files* across worker processes (one file still runs its own tests serially, and `--parallel` implies `--isolate`). This is the single biggest lever on CI wall time, because most of the suite is spent blocked on subprocesses — `python3`, `bash`, `git`, and `bun run src/index.ts` — not on CPU. Keeping it in the package script rather than the workflow means CI and a contributor's local run cannot drift apart.
+
+That makes cross-file isolation load-bearing rather than incidental: a test file may not depend on another file's leftovers, and any test that writes outside its own `mktemp` directory is a latent flake. `tests/skills/ce-code-review-cross-model-routes.test.ts` is the one deliberate exception — it stages a marker file in the repo root to exercise dirty-tree handling, and cleans it up in `afterAll`.
+
+**Do not pin a worker count.** `--parallel` with no value tracks the runner's core count, which is what you want. Raising it looks free — the suite is idle-bound, so more workers should pack better — but it was measured on CI and it is not: at `--parallel=8` on a 4-core runner, wall time improved ~9% (102s -> 93s) while total test-CPU inflated from 223s to 343s, and five tests crossed the 5000ms default per-test timeout. That converts runner busyness into red builds. A file that legitimately runs for seconds should call `setDefaultTimeout` instead, as the subprocess-heavy suites do.
+
+Wall time is now bounded by the **slowest single file**, since a file never splits across workers. As measured: `tests/skills/ce-work-unit-workspace.test.ts` is 61s of a ~100s run and `tests/ce-babysit-pr-snapshot.test.ts` is 40s. The next real speedup is splitting those two, not more workers.
 
 ### What belongs where
 

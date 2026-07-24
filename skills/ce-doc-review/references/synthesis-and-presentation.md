@@ -1,5 +1,7 @@
 # Phases 3-5: Synthesis, Presentation, and Next Action
 
+> **中文导读：** Findings 依次经过 confidence gate、dedupe、classification 和 autofix state machine。所有输出 surface 共用 decision-first rendering floor；recommendation 与 consequence 最先出现，opaque tokens 必须被解释或移出 decision block。Headless envelope、interactive routing 和 completion report 都不能各自发明一套字段顺序。
+
 ## Phase 3: Synthesize Findings
 
 Process findings from all agents through this pipeline. Order matters — each step depends on the previous. The pipeline implements the finding-lifecycle state machine: **Raised → (Confidence Gate | FYI-eligible | Dropped) → Deduplicated → Classified → SafeAuto | GatedAuto | Manual | FYI**. Re-evaluate state at each step boundary; do not carry forward assumptions from earlier steps as prose-level shortcuts.
@@ -250,6 +252,14 @@ Run this pass on the merged set across all personas. Record the count dropped as
 
 ## Phase 4: Apply and Present
 
+**Rendering floor (applies to every finding, every mode — read before rendering anything).** Read
+`references/rendering-floor.md` now. It is the single source of truth for the decision-first field
+order (Recommendation → Consequence-if-unchanged → Change → Basis → Trace-on-request), the
+domain-agnostic opaque-token policy (navigation anchors, provenance anchors, mechanism symbols; at
+most two anchors per block), and the code-span budget. Every surface below — the headless envelope,
+the interactive template, and the bulk preview — maps its own layout onto that floor. Do not restate
+a weaker per-surface rule; the floor is authoritative.
+
 **User-facing vocabulary rule (applies to ALL user-visible output in Phase 4, not just the rendered template).** Internal enum values — `safe_auto`, `gated_auto`, `manual`, `FYI` — stay inside the schema and synthesis prose. Every word the user sees in Phase 4 output, including free-text narration between sections, transition preambles, status lines, and confirmation messages, MUST use user-facing vocabulary: "fixes" (for `safe_auto`), "proposed fixes" (for `gated_auto`), "decisions" (for `manual` findings at anchor `75` or `100`), "FYI observations" (for any finding at anchor `50`). The only exception is the `Tier` column in rendered tables, which is explicitly documented as surfacing the internal enum for transparency. Do NOT emit narration like "safe_auto fixes applied" or "N safe_auto findings" — write "fixes applied" or "N fixes" instead.
 
 ### Apply safe_auto fixes
@@ -272,7 +282,22 @@ After safe_auto fixes apply, remaining findings split into buckets:
 - FYI-subsection findings → surface in the presentation only, no routing
 - Zero actionable findings remaining → skip the routing question; flow directly to Phase 5 terminal question
 
-**自包含 rendered lines（两种 modes，包括 Applied-fixes list）。** Rendered output 面向没有打开文档、也未掌握其内部 ID scheme 的读者。当 rendered line（applied fix、proposed fix、decision、FYI observation、residual concern 或 deferred question）引用文档自身定义的 identifier（requirement ID、unit ID，或 `R6`、`U3`、`KTD2` 等 shorthand）时，在该 finding rendered block 内首次出现时，为 identifier 配上从文档提取的简短 plain-language handle（例如 `R6 (suppress peer panels on low-stakes calls)`，不能只写 bare `R6`）。在 render 时依据 Phase 1 已在 context 中的文档解析 handle；findings 只携带 bare identifier，因此 handle 在这里查找，而不是由提出 finding 的 persona 传递。Render-time lookup 还能确保 Apply 编辑或重新编号所指项后 handle 仍准确。如果文档已不在 context，render 前重新读取引用 section，不要输出 bare identifier。保留 identifier，使编辑文档的人能定位 finding；handle 只需几个词，不要 inline 完整 requirement 或 unit 文本。只用 bare identifier 描述引用项的 line 不是可接受的 rendered output。通用 section names（`Requirements`、`Open Questions`）无需 handle。
+**Self-contained rendered lines (both modes, including the Applied-fixes list).** Every rendered line —
+an applied fix, proposed fix, decision, FYI observation, residual concern, or deferred question —
+obeys the shared rendering floor's (`references/rendering-floor.md`) opaque-token policy across **all
+three** token classes, not document IDs alone. A requirement or unit ID (`R6`, `U3`) is a navigation
+anchor (keep the ID, gloss at first mention); a ticket or PR number (`ESP-3373`, `PR #1776`) is a
+provenance anchor (gloss only when the event changes the decision, else move to trace); a function,
+file, variable, or line reference the document names (`clearMuxStatus`, `codebookTranscriptMode.ts:46`)
+is a mechanism symbol (translate to its role; keep the exact symbol only when precise scope drives the
+decision). At most two anchors per finding — counted across all its rendered lines, matching the floor's
+per-block budget — each resolved at render time against the document in context so it stays accurate
+after an Apply renumbers the item. The floor's full decision-first field order
+(Recommendation → Consequence → Change → Basis) applies to **actionable findings** — proposed fixes and
+decisions. FYI observations, residual concerns, and deferred questions carry no recommendation or fix,
+so they render as a single consequence / concern / question line under the token policy, not the full
+field order. A line whose only description of a referenced item is a bare identifier — of any class — is
+not acceptable rendered output.
 
 **Headless mode:** Do not use interactive question tools. Output all findings as a structured text envelope the caller can parse. Internal enum values (`safe_auto`, `gated_auto`, `manual`, `FYI`) stay in the schema and synthesis prose; the envelope below uses user-facing vocabulary — "fixes", "Proposed fixes", "Decisions", "FYI observations" — so headless output reads the same way interactive output does.
 
@@ -285,26 +310,30 @@ Applied N fixes:
 
 Proposed fixes (concrete fix, requires user confirmation):
 
-[P0] Section: <section> — <title> (<reviewer>, confidence <anchor>)
-  Why: <why_it_matters>
-  Suggested fix: <suggested_fix>
+[P0] Section: <section> — <consequence-first title> (<reviewer>, confidence <anchor>)
+  Recommendation: <Apply | Defer | Skip>
+  Consequence if unchanged: <one sentence, no opaque identifier>
+  Change: <suggested_fix as intent language>
+  Basis: <at most two sentences of mechanism, opaque tokens glossed, at most two anchors>
 
 Decisions (requires user judgment):
 
-[P1] Section: <section> — <title> (<reviewer>, confidence <anchor>)
-  Why: <why_it_matters>
-  Suggested fix: <suggested_fix or "none">
+[P1] Section: <section> — <consequence-first title> (<reviewer>, confidence <anchor>)
+  Recommendation: <Apply | Defer | Skip>
+  Consequence if unchanged: <one sentence, no opaque identifier>
+  Change: <suggested_fix as intent language, or "none">
+  Basis: <at most two sentences of mechanism, opaque tokens glossed, at most two anchors>
 
   Dependents (would resolve if this root is rejected):
-    [P2] Section: <section> — <title> (<reviewer>, confidence <anchor>)
-      Why: <why_it_matters>
-    [P2] Section: <section> — <title> (<reviewer>, confidence <anchor>)
-      Why: <why_it_matters>
+    [P2] Section: <section> — <consequence-first title> (<reviewer>, confidence <anchor>)
+      Consequence if unchanged: <one sentence, no opaque identifier>
+    [P2] Section: <section> — <consequence-first title> (<reviewer>, confidence <anchor>)
+      Consequence if unchanged: <one sentence, no opaque identifier>
 
 FYI observations (anchor 50, no decision required):
 
-[P3] Section: <section> — <title> (<reviewer>, confidence <anchor>)
-  Why: <why_it_matters>
+[P3] Section: <section> — <consequence-first title> (<reviewer>, confidence <anchor>)
+  Consequence if unchanged: <one sentence, no opaque identifier>
 
 Residual concerns:
 - <concern> (<source>)
@@ -321,7 +350,7 @@ Review complete
 
 Omit any section with zero items. The section headers reflect user-facing vocabulary: the "Proposed fixes" bucket carries `gated_auto` findings at anchor `75` or `100` (the persona has a concrete fix; the user confirms), "Decisions" carries `manual` findings at anchor `75` or `100` (judgment calls), and "FYI observations" carries any finding at anchor `50` regardless of `autofix_class`. When a root has dependents, render the root at its normal position in the severity-sorted list and nest its dependents as an indented `Dependents (...)` sub-block immediately below. Do not re-list dependents at their own severity position — they appear only under their root. End with "Review complete" as the terminal signal so callers can detect completion.
 
-**Compact rendering for FYI observations, residual concerns, and deferred questions (high-count mode).** When the combined count of these three buckets is 5 or more, collapse each to a one-line count followed by a tight bullet list without per-item `Why` expansion. Actionable buckets (Proposed fixes / Decisions) remain fully rendered regardless. This mirrors the interactive-mode rule in `references/review-output-template.md` so both modes produce the same shape.
+**Compact rendering for FYI observations, residual concerns, and deferred questions (high-count mode).** When the combined count of these three buckets is 5 or more, collapse each to a one-line count followed by a tight bullet list — FYI observations use their consequence line, residual concerns and deferred questions their concern or question text — with no per-item elaboration. Actionable buckets (Proposed fixes / Decisions) remain fully rendered regardless. This mirrors the interactive-mode rule in `references/review-output-template.md` so both modes produce the same shape.
 
 **Interactive mode:**
 
@@ -338,7 +367,7 @@ Include the Coverage table, applied fixes, FYI observations (as a distinct subse
 
 ### R29 Rejected-Finding Suppression (Round 2+)
 
-当 orchestrator 在同一 session 对同一文档运行 round 2+ 时，decision primer（见 `SKILL.md` 的 Decision primer）会带入所有 prior-round Skipped、Deferred、Acknowledged，以及由用户确定的 Withdrawn findings。Synthesis 会抑制重新提出的 rejected findings，而不是再次展示给用户。Acknowledged 在这里作为 rejected-class decision：用户已经看到 finding，选择不处理（不 Apply，也不 Defer append），并希望留有记录；为 suppression 目的，这等同于 Skip。只有 user-settled withdrawals（因 Skip/Defer premise 或用户陈述的事实而退出）进入该 primer；Apply 触发的 withdrawal 是 provisional，绝不带入这里，因此失败或落地无效的 staged fix 会由 fresh synthesis 重新检查，而不是被 R29 抑制。
+When the orchestrator is running round 2+ on the same document in the same session, the decision primer (see `SKILL.md` — Decision primer) carries forward every prior-round Skipped, Deferred, Acknowledged, and user-settled Withdrawn finding. Synthesis suppresses re-raised rejected findings rather than re-surfacing them to the user. Acknowledged is treated as a rejected-class decision here: the user saw the finding, chose not to act on it (no Apply, no Defer append), and wants it on record — equivalent to Skip for suppression purposes. Only user-settled withdrawals (retired by a Skip/Defer premise or a user-asserted fact) reach this primer; an Apply-triggered withdrawal is provisional and never carried here, so a staged fix that failed or landed ineffectively is re-checked by fresh synthesis rather than suppressed by R29.
 
 For each current-round finding, compare against the primer's rejected list:
 
@@ -366,13 +395,7 @@ This rule prevents two failure modes: (1) regressions where a fix didn't actuall
 
 ### Protected Artifacts
 
-During synthesis, discard any finding that recommends deleting or removing files in:
-
-- `docs/brainstorms/`
-- `docs/plans/`
-- `docs/solutions/`
-
-These are pipeline artifacts and must not be flagged for removal.
+During synthesis, discard any finding that recommends deleting or removing a CE pipeline artifact: any file **under** a `plans/`, `solutions/`, `ideation/`, `explainers/`, `residual-review-findings/`, `pulse-reports/`, `dogfood-reports/`, `feedback-sweep/`, or `personas/` directory (or the legacy `brainstorms/` one) **whose immediate parent is the artifact root**. The artifact root is a directory named `docs` — the default, and where unmigrated legacy artifacts stay even after a project sets `docs_root` — or the configured `docs_root` when this run resolved it. Matching by that parent covers nested category files (`solutions/<category>/foo.md`) while leaving a same-named directory elsewhere — a skill's own `references/personas/` prompt assets, whose parent is `references` — as ordinary code whose deletion finding stands. A review that never resolved a configured root still protects the `docs`-parented tree (default and legacy); a configured-root artifact seen by such a run is the one honest gap.
 
 ## Phase 5: Next Action — Terminal Question
 

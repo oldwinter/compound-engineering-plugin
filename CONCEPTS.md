@@ -85,7 +85,7 @@ The inline remnant left in a Skill when load-bearing content moves to a referenc
 ### Detached job（脱离式任务）
 Delegated worker process 会在自己的 session 中启动，因此能活过发起它的 shell tool call。它的状态（status word、log、identity 和 result）保存在 durable job directory 中；orchestrator 在 turns 之间轮询该目录，而不是原地等待。
 
-Job 一经创建，launching call 就立即返回。Supervision（idle/hard limits、process-tree reaping）在 detached worker 内运行；caller 维护自己的 aggregate deadline，超时后会在没有该 job 的情况下继续。每个 job 只会 atomic 地发布一条 terminal record，detached path 中的任何环节都不得请求用户输入。
+Job 一经创建，launching call 就立即返回。Supervision（idle/hard limits、process-tree reaping）在 detached worker 内运行；caller 维护自己的 aggregate deadline，超时后会在没有该 job 的情况下继续。每个 job 只会 atomic 地发布一条 terminal record，detached path 中的任何环节都不得请求用户输入。Process-tree reaping 必须由 host OS 的 process-grouping primitive 保证，不能由 job contract 想当然地假设；如果某种 grouping 不会活过其 leader process，就必须换用真正持久的 primitive 重新建立 reaping，否则 descendants 会在 terminal record 发布后继续存活。
 
 Liveness 与 progress 是不同信号，idle window 只能检测 watched stream 实际携带的那一种。Worker 发出的 heartbeat 只证明 supervising process 仍 alive，并不说明 delegate 是否有产出；相反，将 output 缓冲到 completion 才输出的 delegate，看起来与 wedged delegate 完全相同。某个 delegate 能提供哪种 signal，是应先测量而非假设的自身属性；完成测量前，不能信任 idle window 区分 working run 与 stalled run。
 
@@ -105,6 +105,9 @@ A discrete, self-scored confidence value on a fixed small scale, each level tied
 
 ### Autofix class
 The classification of a review finding by how safely its proposed fix can be applied: applied silently, applied only after user confirmation, left for a human to resolve, or recorded as advisory with no action.
+
+### Rendering floor（渲染底线）
+跨 skill 所有输出 surface（interactive walkthrough、batch report、unattended envelope、one-line preview）向人类呈现 review finding 时，共享的一份 surface-agnostic contract。它固定 decision-first 字段顺序：先给 recommendation 和 plain-language consequence，最后才给有长度上限的 mechanism；对于不打开被 review 文档或代码就无法理解的 opaque tokens，则按 navigation、provenance 或 mechanism 功能加以解释，或移出 decision block。每个 surface 只把自己的 layout 映射到这份 floor，避免某一 surface 加强后，其余 surface 悄然落后。
 
 ### Headless mode（无交互模式）
 一种 explicit opt-in mode：Skill 无人值守运行，不向用户提问，以 written report 作为 deliverable；真正 ambiguous 的 decisions 会 conservatively defer，而不是猜测。当 automation 需要显式 coverage tradeoff 时，Skill 可以在 headless mode 内额外提供独立的 depth selector；non-interactive contract 与 work depth 始终是两个不同 decisions。

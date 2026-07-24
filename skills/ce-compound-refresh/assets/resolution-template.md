@@ -14,7 +14,7 @@
 ---
 title: [Clear problem title]
 date: [YYYY-MM-DD]
-category: [docs/solutions subdirectory]
+category: [solutions subdirectory]
 module: [Module or area]
 problem_type: [schema enum]
 component: [schema enum]
@@ -62,7 +62,7 @@ tags: [keyword-one, keyword-two]
 ---
 title: [Clear, descriptive title]
 date: [YYYY-MM-DD]
-category: [docs/solutions subdirectory]
+category: [solutions subdirectory]
 module: [Module or area]
 problem_type: [schema enum]
 component: [schema enum]

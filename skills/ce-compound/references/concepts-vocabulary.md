@@ -1,6 +1,6 @@
 # CONCEPTS.md vocabulary rules（词汇规则）
 
-`CONCEPTS.md` 定义在此 codebase 中具有特定含义的词汇，是 `docs/solutions/` 和 AGENTS.md 无需重新定义即可引用的 substrate。文件位于 repo root。Terms 通过两种方式进入：accretion 和 seeding（见下文）；任一路径首次产生 qualifying entry 时创建该文件。
+`CONCEPTS.md` 定义在此 codebase 中具有特定含义的词汇，是 `<root>/solutions/` 和 AGENTS.md 无需重新定义即可引用的 substrate。文件位于 repo root。Terms 通过两种方式进入：accretion 和 seeding（见下文）；任一路径首次产生 qualifying entry 时创建该文件。
 
 ## Terms 如何进入：accretion 和 seeding
 

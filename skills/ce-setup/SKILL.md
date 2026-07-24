@@ -4,13 +4,27 @@ description: "Check Compound Engineering health and repo-local config."
 disable-model-invocation: true
 ---
 
+> **中文导读（下方英文是 canonical executable contract）：** `ce-setup` 会解析并报告 CE artifact root。`docs_root` 先读 checkout-local config，再读 tracked config；必须是留在 repo 内的 relative directory，不能指向 repo root 或 `.git/`。无效值会 fail closed，必须由用户确认修复或删除，不能静默回退到 `docs`。
+
 # Compound Engineering Setup
 
 ## Interaction Method
 
-Ask each question below using the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_question` in Pi (requires the `pi-ask-user` extension). Fall back to a numbered list in chat only when no blocking tool exists in the harness or the call errors. Never silently skip or auto-configure.
+Ask each question below using the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to a numbered list in chat only when no blocking tool exists in the harness or the call errors. Never silently skip or auto-configure.
 
 `ce-setup` is a lightweight health check and repo-local config helper. It does **not** bulk-install every optional dependency. Missing tools are reported as optional capabilities so the user can install only the workflows they use.
+
+## Artifact Root Resolution
+
+Every Compound Engineering skill that writes or reads an artifact directory (`solutions`, `plans`, `ideation`, and the other CE-owned trees) resolves its root through the rule below. `ce-setup` carries the canonical statement and reports the resolved root so an operator can confirm where artifacts land before running other skills.
+
+<!-- ce-docs-root:start -->
+**Resolve the CE artifact root `<root>` before composing any artifact path.**
+
+- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml`; first non-empty value wins (`<repo-root>` = `git rev-parse --show-toplevel`). Unset -> `<root>` is `docs`, exactly as before.
+- **Validate** a set value: a repo-relative directory whose real, symlink-resolved path stays inside the repo and is neither the repo root nor under `.git/`. Otherwise stop with an error naming `docs_root` and the value -- never fall back to `docs`.
+- **Use** `<root>` as the sole artifact location: create it if absent, compose each path as `<root>/<subdir>` with this skill's own subdirectory, and never also read `docs`.
+<!-- ce-docs-root:end -->
 
 ## Phase 1: Diagnose
 
@@ -45,7 +59,7 @@ If the script is unavailable, perform the inline equivalent:
 4. Check whether `.compound-engineering/config.local.yaml` exists and, if it does, whether `git check-ignore -q .compound-engineering/config.local.yaml` succeeds.
 5. Compare `.compound-engineering/config.local.example.yaml` with `references/config-template.yaml` when the template is readable; otherwise report that the example refresh must be done manually.
 
-Display the diagnostic output to the user. Missing optional tools are not setup failures.
+Display the diagnostic output to the user. Missing optional tools are not setup failures. The health report includes the resolved artifact root and which config layer supplied it (per Artifact Root Resolution above); surface that line so the operator can confirm where CE artifacts will be written.
 
 ### Step 3: Decide Whether Fixes Are Needed
 
@@ -56,7 +70,8 @@ Proceed to Phase 2 only if one or more repo-local project issues exist:
 - obsolete `compound-engineering.local.md`
 - `.compound-engineering/config.local.yaml` exists but is not safely gitignored
 - `.compound-engineering/config.local.example.yaml` is missing or outdated
-- health report 把 `ce-work` skill implementation engine 标为 unavailable/invalid、检测到已弃用的 scalar routing keys（retired scalar routing keys），或报告 malformed dormant `work_engine_preferences`
+- the health report marks the `ce-work` skill implementation engine unavailable or invalid, detects retired scalar routing keys, or reports malformed dormant `work_engine_preferences`
+- the health report marks `docs_root` invalid (`Invalid docs_root ...`) — CE artifacts will not be written until it is fixed
 
 If no project issues exist, report:
 
@@ -102,9 +117,13 @@ Everything starts commented out -- you only enable what you need.
 
 If the user approves, copy `references/config-template.yaml` to `<repo-root>/.compound-engineering/config.local.yaml`.
 
-### Step 6a: 修复无效的 CE Work Preferences
+### Step 6a: Repair Invalid CE Work Preferences
 
-当 health report 把 CE Work implementation engine 标为 unavailable/invalid、检测到已弃用的 scalar routing keys（retired scalar routing keys），或报告 malformed dormant `work_engine_preferences` 时，不要猜测预期 recipients。说明报告的具体问题，根据用户给出的 harness/model 顺序生成有效且有序的 `work_engine_preferences` block；如果用户希望 native-by-default，则删除格式错误的 dormant preferences（remove malformed dormant preferences），并使用 `work_engine_mode: off`。删除所有已弃用的 scalar routing keys（remove any retired scalar routing keys），并展示完整 replacement block。只有用户批准 preview 后，才能编辑这些 CE Work keys；保留所有无关 local settings。重新运行 health check，并要求它在 setup 完成前报告 native 或预期的 normalized ordered list。
+When the health report marks the CE Work implementation engine unavailable or invalid, detects retired scalar routing keys, or reports malformed dormant `work_engine_preferences`, do not guess the intended recipients. Explain the exact reported problem, derive a valid ordered `work_engine_preferences` block from the user's stated harness/model order (or remove malformed dormant preferences and use `work_engine_mode: off` when they want native-by-default), remove any retired scalar routing keys, and show the complete replacement block. Edit only those CE Work keys after the user approves the preview; preserve every unrelated local setting. Re-run the health check and require it to report either native or the intended normalized ordered list before setup is complete.
+
+### Step 6b: Repair Invalid `docs_root`
+
+When the health report marks `docs_root` invalid, explain the exact reason it gave (absolute, escapes the repo, `..` traversal, repo root, `.git/`, or a non-directory component) and the consequence: CE artifacts will not be written until it is fixed, because `docs_root` fails closed rather than silently falling back to `docs`. `docs_root` may live in the tracked `.compound-engineering/config.yaml` or the local `config.local.yaml`, resolved local-first. Offer to either correct the value to a valid repo-relative directory the user names, or remove the bad `docs_root` key. Note the fallback precisely: removing it falls back to the **next layer** that sets `docs_root` (deleting a bad value in `config.local.yaml` yields to a `docs_root` still set in the tracked `config.yaml`), reaching the default `docs` only when no layer sets it — so when both layers carry a value, fix or remove it in each layer that contributes a bad one. Edit only those keys after the user approves; preserve every unrelated setting. Re-run the health check and require it to report a resolved artifact root before setup is complete.
 
 ### Step 7: Ensure Local Config Is Gitignored
 

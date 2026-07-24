@@ -1,5 +1,7 @@
 # HTML Rendering
 
+> **中文导读：** 本文件是跨 skill 共享且逐字节一致的 HTML rendering contract。下方英文规则为 canonical contract，必须保持可访问结构、稳定 semantic markers 与明确的输出安全边界。
+
 This is a format-rendering reference — it describes how to render any
 artifact in HTML, independent of which skill is producing it.
 
@@ -236,7 +238,7 @@ git remote get-url origin
 Apply linking to three reference shapes:
 
 - **Repo-relative code/doc paths** (`services/foo.ts`,
-  `docs/solutions/bar.md`) → `<repo-url>/blob/main/<path>`.
+  `<root>/solutions/bar.md`) → `<repo-url>/blob/main/<path>`.
 - **Named GitHub PRs/issues** (`PR #636`, `issue #1048`) →
   `<repo-url>/pull/636` or `<repo-url>/issues/1048`.
 - **Named external trackers** (Linear `ESP-1705`, Jira `PROJ-123`) →
@@ -275,10 +277,11 @@ Long HTML plans are agent-consumed as source text as often as they are read in
 a browser. Keep the heading text visible and adjacent to the `id`; do not rely
 on a nav link alone to carry the section name.
 
-拥有 contract-defined semantic role 的 optional sections，要用 `data-ce-section`
-把该 role 放在外层 `<section>` 上。例如 broader-work relationship section 使用
-`data-ce-section="work-relationships"`。即使 visible heading 改变，该 role 也保持
-稳定；它用于补充而不是取代可读的 heading text 和任何有用的 anchor。
+Optional sections with a contract-defined semantic role put that role on their
+wrapping `<section>` with `data-ce-section`. For example, the broader-work
+relationship section uses `data-ce-section="work-relationships"`. The role is
+stable even when the visible heading changes; it supplements, rather than
+replaces, readable heading text and any useful anchor.
 
 ### Text contrast is local
 
@@ -481,7 +484,7 @@ with a UI/layout shape can carry a wireframe, whether or not the brainstorm
 as a whole is "a visual product" — a backend-heavy brainstorm with one
 screen change still earns a wireframe for that requirement. It still applies
 to brainstorm **requirements** output — the requirements-only unified plan
-`ce-brainstorm` writes (now under `docs/plans/`), not an implementation-ready
+`ce-brainstorm` writes (now under `<root>/plans/`), not an implementation-ready
 plan (`ce-plan`'s enriched output) — and only to UI-shaped requirements — a
 non-visual requirement (API design, data model, agent workflow,
 infrastructure) takes a conceptual diagram instead, not a

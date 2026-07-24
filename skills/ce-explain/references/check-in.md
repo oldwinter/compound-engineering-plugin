@@ -6,11 +6,13 @@ The check-in is the active-recall step that makes the explainer stick: the user 
 
 Offer a check-in when retention is the point: a hard or unfamiliar concept, a gnarly or consequential diff, a dense recap window with decisions worth recalling later. Skip it (produce the explainer and move on) when comprehension is the point and retention is incidental: a routine recap before a meeting, a small mechanical diff, a topic the user signals they only need to skim. When skipping, do not announce a justification — just proceed.
 
+**When the material and the request disagree, the request wins.** A dense window asked for explicitly as meeting prep is a skip, not an offer — density is your judgment, the stated purpose is the user's. And when the explainer is rendered for another reader, skip the offer: the check-in exercises the user, so quizzing them on a document written for someone else is beside the point. Offer it there only if they ask.
+
 The user can always decline the offer, and a decline is final for the run — do not re-offer.
 
 严格按以下顺序提供两个 choices：
 
-1. **Just the explainer (Recommended)** — 构建 report，跳过 prediction 和 exercises。
+1. **Just the explainer (Recommended)** — skip prediction and exercises；构建 report。
 2. **Quiz me** — 运行适用的 prediction 或 exercise loop。
 
 不要把 quiz 标为 recommended。多数 run 需要的是 explainer；active recall 应由用户主动 opt in。
@@ -19,7 +21,7 @@ In diff mode, word the offer without describing the change's content or purpose 
 
 ## Predict-then-reveal (diff mode)
 
-仅当用户的确切选择为 **Quiz me** 时运行此 section。**Just the explainer** 会跳过 prediction，直接进入 composition。
+Run this section only when the user's exact choice was **Quiz me**. **Just the explainer** 会跳过 prediction，直接进入 composition。
 
 The prediction must come before any interpretation reaches the user, or the mechanic is dead on arrival.
 
@@ -30,7 +32,7 @@ The prediction must come before any interpretation reaches the user, or the mech
 
 ## Exercises (concepts, ideas, dense recaps)
 
-仅当用户的确切选择为 **Quiz me** 时运行此 section。
+Run this section only when the user's exact choice was **Quiz me**.
 
 Two to four exercises, posed in chat one at a time after the artifact is presented. Design them to expose understanding, not recall of the artifact's phrasing:
 

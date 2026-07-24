@@ -60,6 +60,7 @@ Skill 运行 **一个** check script，覆盖所有 CLI tools、agent skills、r
 - 始终从 template 刷新 `.compound-engineering/config.local.example.yaml`（committed；给 teammates 参考可用 settings）
 - 缺失时创建一次 `.compound-engineering/config.local.yaml`（gitignored；实际 local settings，全部注释掉，只 opt in 需要项）
 - 如果 `.compound-engineering/*.local.yaml` 尚未被覆盖，询问是否加入 `.gitignore`
+- 报告 resolved artifact root 及其来源 config layer，并标记不可用的 `docs_root`；详见 [Artifact root](./configuration.md#artifact-root)
 
 Example（committed）与 local（gitignored）的 split 是 repo 中 machine-local config 的 canonical pattern。Bootstrap 后，未来 skills 就不用重复处理。
 

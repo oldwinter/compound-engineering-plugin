@@ -660,6 +660,7 @@ describe("skill self-containment (AGENTS.md 'File References in Skills')", () =>
     })
   }
 })
+
 describe("skill reference integrity (AGENTS.md 'File References in Skills')", () => {
   for (const skill of skillDirs) {
     test(`${skill.relPath} only mentions skill-local paths that exist on disk`, () => {

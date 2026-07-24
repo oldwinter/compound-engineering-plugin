@@ -1,5 +1,7 @@
 # Markdown Rendering
 
+> **中文导读：** 本文件是跨 skill 共享且逐字节一致的 Markdown rendering contract。下方英文规则为 canonical contract，必须保持纯 Markdown、可移植路径和稳定 semantic markers。
+
 This is a format-rendering reference — it describes how to render any
 artifact in markdown, independent of which skill is producing it.
 
@@ -21,10 +23,11 @@ These hold regardless of which skill produced the artifact.
 - **Repo-relative paths for file references.** Always. Never absolute paths
   — they break portability across machines, worktrees, teammates.
 - **No HTML mixed in.** Keep the markdown pure. No `<div>`, no `<details>`,
-  不使用 inline `<style>`。唯一例外是 contract-defined invisible semantic marker，
-  例如 `<!-- ce-section: work-relationships -->`；它向 downstream agents 传递
-  section 语义，不创建 layout。只能用 HTML 实现的 layout idea，应留给 HTML
-  rendering。Markdown 仍保持纯 Markdown。
+  no inline `<style>`. The only exception is a contract-defined invisible
+  semantic marker such as `<!-- ce-section: work-relationships -->`; it carries
+  section meaning for downstream agents and does not create layout. If a layout
+  idea only works as HTML, defer it to the HTML rendering. Markdown stays
+  markdown.
 - **No fixed-width line wrapping.** Do not hard-wrap prose to a column (e.g.
   80 chars). Write one sentence per line, or let each paragraph flow as a
   single line. The artifact is read rendered and shared, where fixed wraps add
@@ -137,10 +140,11 @@ contracts — the agent picks the shape that fits the content.
   applicability, unit IDs, and done signals share a uniform shape. Name
   concrete repo commands such as `bun test` rather than generic "run tests"
   when the repo has known commands.
-- **Key Technical Decisions** — bullets with bold decision name + prose
-  rationale, or numbered KTD-N pattern when traceability matters. A
-  `session-settled:` annotation renders as part of the KTD bullet's
-  visible text, stem preserved verbatim.
+- **Key Technical Decisions** — bullets with `KTD<N>.` plain prefix (same
+  format as `R1.`/`U1.`) + bold decision name + prose rationale. Legacy
+  plans with unnumbered KTDs stay readable by label; do not renumber
+  existing numbered ones. A `session-settled:` annotation renders as part
+  of the KTD bullet's visible text, stem preserved verbatim.
 - **Key Flows / Acceptance Examples** — bullets with bold leader labels
   (Trigger / Actors / Steps / Outcome / Covers / Given-When-Then).
 - **Scope Boundaries** — bullets, optionally split into "Deferred for

@@ -4,6 +4,8 @@ description: Commit, push, and open a PR. Use when asked to ship/open a PR, or f
 argument-hint: "[PR ref] [mode:pipeline] [archive:on|off] [branding:on|off] [babysit:off|continuous|checkpoint]"
 ---
 
+> **中文导读（下方英文是 canonical executable contract）：** 当 PR concept-teaching archive 开启时，本 skill 会先按统一 `docs_root` 规则解析 `<root>`，再把 explainer 写到 `<root>/explainers/`。路径必须通过 ignore、安全边界和 apply-intent 检查；写入、commit 或 push 失败时只告警并继续 PR 流程，不能把工作卡在 commit 与 PR 之间。
+
 # Git Commit, Push, and PR
 
 **Asking the user:** When this skill says "ask the user", use the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Fall back to presenting the question in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
@@ -15,8 +17,6 @@ argument-hint: "[PR ref] [mode:pipeline] [archive:on|off] [branding:on|off] [bab
 - **Full workflow** — otherwise. Run Steps 1-5 in order.
 
 **`mode:pipeline` modifier** — set by orchestrated callers (e.g., `lfg`). Run the resolved mode non-interactively: suppress every blocking ask. Step 5's existing-PR rewrite question defaults to **not rewriting**; in description-update mode the preview ask is skipped and the rewrite applies directly (the update invocation itself is the apply intent); any other suppressed ask takes its conservative documented default (keep the current branch; if Pre-A cannot resolve a base, stop and report rather than guess).
-
-**中文说明：** `mode:pipeline` 由 `lfg` 等 orchestrated caller 传入，要求整个已选 mode 以 non-interactive 方式运行。所有 blocking ask 都使用文档中的保守 default；existing-PR rewrite 默认不重写，无法 resolve base 时停止并报告，绝不猜测。
 
 ## Context
 
@@ -42,6 +42,18 @@ Substitute `<branch>` with the current branch from `git branch --show-current`, 
 Everything gathered here is a snapshot taken before any action — treat it as a hint, not ground truth. Re-verify the branch, remote, and existing-PR state immediately before each consequential step (push in Step 3, `gh pr create` in Step 5), since they can change between gathering and acting.
 
 ---
+
+## Artifact Root
+
+When PR concept-teaching archival is on, this skill writes an explainer under `<root>/explainers/`. Resolve `<root>` once before that write and use it everywhere a `<root>/` path appears below.
+
+<!-- ce-docs-root:start -->
+**Resolve the CE artifact root `<root>` before composing any artifact path.**
+
+- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml`; first non-empty value wins (`<repo-root>` = `git rev-parse --show-toplevel`). Unset -> `<root>` is `docs`, exactly as before.
+- **Validate** a set value: a repo-relative directory whose real, symlink-resolved path stays inside the repo and is neither the repo root nor under `.git/`. Otherwise stop with an error naming `docs_root` and the value -- never fall back to `docs`.
+- **Use** `<root>` as the sole artifact location: create it if absent, compose each path as `<root>/<subdir>` with this skill's own subdirectory, and never also read `docs`.
+<!-- ce-docs-root:end -->
 
 ## Step 1: Resolve branch and PR state
 
@@ -99,8 +111,6 @@ Do not block PR creation solely because no visual artifact exists. Test output a
 
 **Concept teaching gate** before composition. Use the repo root gathered in Context (resolving it with `git rev-parse --show-toplevel` if you don't already have it) and read `<repo-root>/.compound-engineering/config.local.yaml` with the native file-read tool. Only an **active (non-commented)** `pr_teaching_section:` key counts — lines starting with `#` are YAML comments, and the shipped template documents keys as commented examples; matching those would silently flip the gate. The gate is off only when the active value is exactly `false`; a missing file, missing key, or any other value means the default: **on**. The same read resolves `pr_teaching_archive:` — on only when the active value is exactly `true`, otherwise **off** — and a per-run `archive:on|off` token overrides the archive key for this invocation.
 
-**中文说明：** Composition 前需要 resolve concept-teaching gate。只认可 active（非 comment）的 `pr_teaching_section:`；精确为 `false` 时才关闭，其余情况默认开启。`pr_teaching_archive:` 只在精确为 `true` 时开启，且单次 `archive:on|off` 可覆盖 config。Gate 关闭时，同时跳过 novelty judgment、section、trailer、offer 和 archival。
-
 - Gate **on** — judge concept novelty and compose the section per **Step B2** of the reference. The gate is single: when it is off, skip judgment, the section, the Step 5 trailer and offer, and archival entirely.
 - Gate **off** — compose the description without any concept handling.
 
@@ -123,9 +133,7 @@ Then continue with the rest of the reference (Steps A through E, including the S
 
 **Explainer archival** — runs only in full workflow, with `pr_teaching_archive` on, a composed `## New concepts` section, and the apply confirmed (new-PR create, or existing-PR rewrite accepted); a declined rewrite skips archival entirely so no unlinked doc commit is left behind. All paths resolve from the repo root gathered in Context, never the CWD. With two taught concepts, write one file per concept and stage both in the single commit. Execute as explicit transitions immediately before the `gh` call:
 
-**中文说明：** Explainer archival 只在 full workflow、archive 开启、已生成 `## New concepts`，且 apply 已确认时运行。Declined rewrite skips archival，避免留下未链接的 doc commit。所有 path 都从 pre-resolved repo root resolve，每个 concept 一个 file，只 stage 这些 files，绝不强制添加 ignored path。
-
-1. `git check-ignore -q docs/explainers/YYYY-MM-DD-<concept-slug>.md` (from the repo root) — the check works on not-yet-created paths. If the path is ignored, print a one-line warning and skip archival entirely, writing nothing (never `git add -f`).
+1. `git check-ignore -q <root>/explainers/YYYY-MM-DD-<concept-slug>.md` (from the repo root) — the check works on not-yet-created paths. If the path is ignored, print a one-line warning and skip archival entirely, writing nothing (never `git add -f`).
 2. Write the file (create the directory if needed) with YAML frontmatter `title`, `date`, `input_shape: concept`, `subject`, and the teaching content. If the file already exists from a prior run, overwrite it.
 3. `git add` those file(s) only (never `-A`), commit with `docs(explainer): teach <concept>[, <concept>]`, and push. If the commit reports nothing to commit, the doc is already committed from a prior run — keep the link and continue.
 4. Splice a head-branch blob URL per doc into the `## New concepts` section before applying. Build the URL for the repo's actual host — e.g. `gh browse -n -b <head-branch> -- <path>` (prints the link on whatever host `gh` targets, GitHub Enterprise included) — do not hardcode `github.com`, or the link 404s on GHE.
@@ -136,13 +144,9 @@ If the doc write, commit, or push fails, warn and continue to PR creation withou
 
 **Concept trailer** — when a body applied by this run contains a `## New concepts` section, print one line after the PR URL in every mode: `New concepts: <name>[, <name>]`. In interactive full-workflow runs follow it with one line per taught concept telling the user to invoke `ce-explain <name>` using the rendering rule above. No trailer when this run applied no body — including a rewrite that was declined or pipeline-defaulted to no — or no PR exists.
 
-**中文说明：** `New concepts:` 和 `Run /ce-explain` 是下游 workflow 会读取的精确 output contract，保持原样输出。
-
 **Babysit handoff — default on.** In interactive full workflow, after reporting a newly-created PR URL (or after new commits land on an existing open PR), **auto-invoke `ce-babysit-pr` on that PR by default**: announce it in one non-blocking line (e.g. "Babysitting toward merge-ready — watching CI + incoming review; pass `babysit:off` to skip"), then invoke — never block on a yes/no. *Off is the explicit choice:* **`babysit:off`** skips it this run (**`babysit:continuous`** / **`babysit:checkpoint`** forces that watch mode); **`auto_babysit: false`** in `<repo-root>/.compound-engineering/config.local.yaml` is a standing opt-out, read with the same gate semantics as `pr_teaching_section` (only an active, non-commented value of exactly `false` disables; a missing file/key or any other value means the default **on**; a `babysit:off` token overrides the config for this run).
 
 **Do not fire (auto-detected, no flag needed):** `mode:pipeline` (the orchestrated caller owns follow-on steps), description-only / description-update modes, no PR created or updated this run, non-GitHub (babysit's own guard stops it), or **a head branch you cannot push to**. **Fork PRs are drivable — not a hard-off.** A fork-to-upstream PR (the common open-source case) is babysittable whenever you can push to its head branch, which holds for a PR whose branch this skill just pushed (you own the fork): babysit reads state on the **base** repo (from the PR URL) and pushes fixes to the **head** repo (your fork). Hard-off only when the head is genuinely not pushable (e.g. someone else's PR). **Soft-degrade:** a checkpoint-only harness runs one tick and prints the resume command instead of a live loop.
-
-**中文说明：** Interactive full workflow 默认自动调用 `ce-babysit-pr`，无需 yes/no 确认。`babysit:off` 或 config 中严格等于 `false` 的 `auto_babysit` 可关闭；pipeline、description-only/update、未创建或更新 PR、非 GitHub，以及无法 push head branch 时不触发。Fork PR 只要 head branch 可 push，仍可 babysit。
 
 ---
 

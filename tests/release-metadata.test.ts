@@ -9,8 +9,6 @@ import {
 } from "../src/release/metadata"
 
 const tempRoots: string[] = []
-const COMPOUND_DESCRIPTION =
-  "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具"
 
 afterEach(async () => {
   for (const root of tempRoots.splice(0, tempRoots.length)) {
@@ -204,7 +202,9 @@ describe("release metadata", () => {
   test("builds a stable compound-engineering manifest description", async () => {
     const description = await buildCompoundEngineeringDescription(process.cwd())
 
-    expect(description).toBe(COMPOUND_DESCRIPTION)
+    expect(description).toBe(
+      "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具",
+    )
   })
 
   test("detects cross-surface version drift even without explicit override versions", async () => {
@@ -338,6 +338,60 @@ describe("release metadata", () => {
     ).toBe(true)
   })
 
+  test("reports a materialized (non-local) Codex marketplace source as a structural error", async () => {
+    const root = await makeFixtureRoot()
+    await writeFile(
+      path.join(root, ".agents", "plugins", "marketplace.json"),
+      JSON.stringify(
+        {
+          name: "compound-engineering-plugin",
+          plugins: [
+            {
+              name: "compound-engineering",
+              source: {
+                source: "url",
+                url: "https://github.com/EveryInc/compound-engineering-plugin.git",
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    )
+
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(
+      result.errors.some(
+        (err) => err.includes(".agents/plugins/marketplace.json") && err.includes("#1226"),
+      ),
+    ).toBe(true)
+  })
+
+  test("accepts a co-located local Codex marketplace source", async () => {
+    const root = await makeFixtureRoot()
+    await writeFile(
+      path.join(root, ".agents", "plugins", "marketplace.json"),
+      JSON.stringify(
+        {
+          name: "compound-engineering-plugin",
+          plugins: [
+            { name: "compound-engineering", source: { source: "local", path: "./" } },
+          ],
+        },
+        null,
+        2,
+      ),
+    )
+
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(
+      result.errors.some((err) => err.includes(".agents/plugins/marketplace.json")),
+    ).toBe(false)
+  })
+
   test("reports package.json version drift without auto-correcting", async () => {
     const root = await makeFixtureRoot()
     await writeFile(
@@ -391,7 +445,7 @@ describe("release metadata", () => {
       JSON.stringify(
         {
           version: "2.42.0",
-          description: COMPOUND_DESCRIPTION,
+          description: "Brainstorm, plan, debug, review, and compound learnings with AI agents",
         },
         null,
         2,
@@ -414,7 +468,9 @@ describe("release metadata", () => {
     await syncReleaseMetadata({ root, write: true })
 
     const afterContents = JSON.parse(await Bun.file(codexPath).text())
-    expect(afterContents.description).toBe(COMPOUND_DESCRIPTION)
+    expect(afterContents.description).toBe(
+      "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具",
+    )
   })
 
   test("reports missing Codex manifest as a structural error", async () => {
@@ -497,7 +553,9 @@ describe("release metadata", () => {
     await syncReleaseMetadata({ root, write: true })
 
     const afterContents = JSON.parse(await Bun.file(devinPath).text())
-    expect(afterContents.description).toBe(COMPOUND_DESCRIPTION)
+    expect(afterContents.description).toBe(
+      "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具",
+    )
   })
 
   test("reports Codex plugin.json name mismatch as structural error", async () => {
@@ -614,39 +672,6 @@ describe("release metadata", () => {
     expect(
       result.errors.some(
         (err) => err.includes(".agents/plugins/marketplace.json") && err.includes("does not match"),
-      ),
-    ).toBe(true)
-  })
-
-  test("reports Codex marketplace root-local plugin source as structural error", async () => {
-    const root = await makeFixtureRoot()
-    await writeFile(
-      path.join(root, ".agents", "plugins", "marketplace.json"),
-      JSON.stringify(
-        {
-          name: "compound-engineering-plugin",
-          plugins: [
-            {
-              name: "compound-engineering",
-              source: {
-                source: "local",
-                path: "./",
-              },
-            },
-          ],
-        },
-        null,
-        2,
-      ),
-    )
-    const result = await syncReleaseMetadata({ root, write: false })
-
-    expect(
-      result.errors.some(
-        (err) =>
-          err.includes(".agents/plugins/marketplace.json") &&
-          err.includes("compound-engineering") &&
-          err.includes('source.path "./"'),
       ),
     ).toBe(true)
   })

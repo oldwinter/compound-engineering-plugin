@@ -63,15 +63,27 @@ Each call is a CLI shell-out, not a subagent. Resolve one target and one fixed r
 
 Invoke via the skill-dir anchor — set `SKILL_DIR` to the absolute directory of **this** skill's `SKILL.md` (the Bash tool's CWD is the user's project, not the skill dir, on every host; shell state does not persist between Bash calls, so set it inline in every runner call):
 
+**Interpreter.** The commands below run a bundled Python script. Resolve the
+interpreter in the *same* shell call as the command -- each tool call is a fresh
+shell, so a `$PY` set in an earlier call does not persist. Do not hardcode
+`python3`: on native Windows it resolves to a Microsoft Store stub that exits
+without running Python, and that stub still satisfies `command -v`, so probe
+execution rather than presence.
+
+```bash
+PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1 && { echo "$c"; break; }; done)"; [ -n "$PY" ] || { echo "no working Python 3 interpreter on PATH" >&2; exit 1; };
+```
+
 ```bash
 SKILL_DIR="<absolute path of the directory containing the ce-doc-review SKILL.md you read>";
+PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1 && { echo "$c"; break; }; done)"; [ -n "$PY" ] || { echo "no working Python 3 interpreter on PATH" >&2; exit 1; };
 SCRATCH_ROOT="/tmp/compound-engineering-$(id -u)";
 if [ -L "$SCRATCH_ROOT" ]; then echo "unsafe scratch root symlink: $SCRATCH_ROOT" >&2; exit 1; fi;
 install -d -m 700 "$SCRATCH_ROOT" || exit 1;
 if [ -L "$SCRATCH_ROOT" ] || [ ! -O "$SCRATCH_ROOT" ]; then echo "scratch root is not owned by the current user: $SCRATCH_ROOT" >&2; exit 1; fi;
 chmod 700 "$SCRATCH_ROOT" || exit 1;
 RUN_DIR="$SCRATCH_ROOT/ce-doc-review/<run-id>"; (umask 077; mkdir -p "$RUN_DIR") || exit 1; chmod 700 "$RUN_DIR" || exit 1;
-CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" python3 "$SKILL_DIR/scripts/peer-job-runner.py" start --skill ce-doc-review --run-id "<run-id>" --label "<reviewer-name>" -- env CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" bash "$SKILL_DIR/scripts/cross-model-doc-review.sh" "<host-serving-family>" "<target>" "<reviewer-name>" "<document-path>" "<document-type>" "<origin>" "$RUN_DIR"
+CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" start --skill ce-doc-review --run-id "<run-id>" --label "<reviewer-name>" -- env CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" bash "$SKILL_DIR/scripts/cross-model-doc-review.sh" "<host-serving-family>" "<target>" "<reviewer-name>" "<document-path>" "<document-type>" "<origin>" "$RUN_DIR"
 ```
 
 Omit `--result-path`; `done` means only that the worker exited. The fixed target determines the expected `<reviewer-name>-<target>.json` filename.
@@ -88,7 +100,8 @@ Every runner call is bounded — no tool call ever spans a worker's runtime, on 
 
 ```bash
 SKILL_DIR="<absolute path of the directory containing the ce-doc-review SKILL.md you read>";
-python3 "$SKILL_DIR/scripts/peer-job-runner.py" wait --max-secs 30 --json <job-ids...>
+PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1 && { echo "$c"; break; }; done)"; [ -n "$PY" ] || { echo "no working Python 3 interpreter on PATH" >&2; exit 1; };
+"$PY" "$SKILL_DIR/scripts/peer-job-runner.py" wait --max-secs 30 --json <job-ids...>
 ```
 
 最后一次 `start` 后立即捕获 epoch time（`date +%s`）；其他机制不会跨 tool calls 跟踪 wall clock，因此需要该 anchor 判断 deadline。Synthesis 时，循环执行 bounded `wait` calls，直到所有 jobs 进入 terminal，或从最后一次 `start` 起已过 **610 秒**（每个 slice 前用 `date +%s` 与 anchor 比较；不要启动会超过 deadline 的 `wait` slice，应改为 reap）。达到 deadline 时，对仍 nonterminal 的每个 job 执行 `reap`，再运行最后一次 bounded `wait --max-secs 10` pass（reap 是异步的，terminal record 会在返回后一段 grace period 落地），然后纳入 `<run-dir>` 中存在的所有 `<reviewer-name>-<provider>.json` files。Detached script 仍自带边界（codex idle-timeout 默认 480s，并强制 reasoning 以维持 liveness；hard backstop `CROSS_MODEL_HARD_SECS` 默认 600s）并干净退出；runner supervisor windows 位于这些 caps 之外，作为 backstop。无需向 script 传 prompt 或 schema；它会从 disk 读取 persona brief、`findings-schema.json` 和 document 本身。
@@ -99,7 +112,15 @@ The cross-model pass does **not** receive the accumulated decision primer that i
 
 ## Step 5 — Fold into synthesis
 
-- Read each fold-in artifact through the runner's verified read — `python3 "$SKILL_DIR/scripts/peer-job-runner.py" result --path <run-dir>/<reviewer-name>-<target>.json` (fd-ownership-checked, bounded; exit 4 means unreadable -> treat as no file). If present, treat it as one reviewer return with `reviewer: <reviewer-name>-<target>`. It enters ordinary dedup, but enters cross-model agreement promotion **only when `independence_verified` is `true`**. A false or absent value may contribute findings but never raises an anchor. Peer returns never grant silent-apply authority.
+- Read each fold-in artifact through the runner's verified read (resolve `$PY` in the same tool call — shells do not persist):
+
+  ```bash
+  SKILL_DIR="<absolute path of the directory containing the ce-doc-review SKILL.md you read>";
+  PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1 && { echo "$c"; break; }; done)"; [ -n "$PY" ] || { echo "no working Python 3 interpreter on PATH" >&2; exit 1; };
+  "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" result --path <run-dir>/<reviewer-name>-<target>.json
+  ```
+
+  (fd-ownership-checked, bounded; exit 4 means unreadable -> treat as no file). If present, treat it as one reviewer return with `reviewer: <reviewer-name>-<target>`. It enters ordinary dedup, but enters cross-model agreement promotion **only when `independence_verified` is `true`**. A false or absent value may contribute findings but never raises an anchor. Peer returns never grant silent-apply authority.
 - **No file, clean skip** (script skipped before starting real work: host un-attestable, no different provider reachable, CLI missing/unauthed, unparseable output, or lens not activated) → the pass simply didn't run for that lens. Note "cross-model pass: not run" in Coverage on an interactive host in default mode; stay silent in headless mode. Never fail the review. Ignore any `*.raw.json` leftovers — they are not fold-in artifacts.
 - **Dispatch-infrastructure failure vs. clean skip.** The clean skip above is a script that *chose* not to start real work. A dispatch-infrastructure crash is different — the runner or worker itself failed: a non-zero exit before any job starts, a preflight/detach failure, or an unresolved `$SKILL_DIR`/script path. Because every leg shares one runner, route, and `$SKILL_DIR`, such a crash typically drops the **whole** cross-model pass at once, not one lens. Do not fold it into the silent skip on the first error: re-run the **same resolved route** by hand — re-issuing the affected `start` calls with the target/model, the tool-less empty-scratch isolation posture, and the embedded-document read scope all held fixed — while each failure is a new, plausibly recoverable one and the shared 610s deadline holds (a same-route retry, distinct from the quota rule below, which requires a newly disclosed route). Stop and drop the cross-model pass once a failure repeats or the deadline is spent. Each trio lens is still covered by its in-process twin; what an infra crash silently voids is the **whole-doc broad read** (the sweep leg has no twin) plus cross-model corroboration — name that loss in the Coverage line rather than letting it disappear as "not run." A hand recovery may not substitute a different target or provider, widen the read scope beyond the embedded document, or relax the read-only empty-scratch posture.
 - **Started but not `done`** (the job's final state is `failed` / `timeout` / `died-without-result`) → still non-blocking, but never silent: name the lens and terminal state in Coverage per Step 4's naming rule.

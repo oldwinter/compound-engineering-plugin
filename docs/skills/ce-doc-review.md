@@ -144,6 +144,10 @@ Skill 会先尝试声明的 model/route mappings。当当前 CLI 拒绝 obsolete
 
 用户已审视并确定的 decisions 带有 `session-settled:` annotation，`ce-doc-review` 会把它视为 protected content：safe-auto pass 绝不会移除 annotation；persona 若要挑战 settled decision，必须把问题表述为 infeasibility，而不是 preference。该挑战只会展示给用户作 decision，绝不会自动应用。
 
+### 11. Shared rendering floor — decision-first, domain-agnostic legibility
+
+Because the skill reviews documents for arbitrary products, a finding can name identifiers only its author understands: document IDs (`R6`, `U3`), external refs (tickets, PR numbers), and code symbols the reviewed doc happens to mention (functions, files, line references). A single source — `references/rendering-floor.md` — governs every presentation surface (interactive walkthrough, batch table, headless envelope, bulk preview) so each finding leads with a recommendation and a one-sentence consequence that names no opaque token, caps mechanism at two sentences, and glosses opaque tokens by function: navigation anchors keep their ID and get a handle, provenance anchors appear only when the referenced event drives the decision, and code symbols are translated to the role they play. The user can decide Apply / Defer / Skip without opening the reviewed codebase.
+
 ---
 
 ## 快速示例

@@ -4,15 +4,15 @@ description: 'Explore vague or ambitious ideas into a right-sized requirements-o
 argument-hint: "[feature idea or problem to explore] [output:html]"
 ---
 
-# Brainstorm a Feature or Improvement
+> **中文导读（下方英文为 canonical contract）：** Brainstorm 现在把 requirements-only unified plan 写入 `<root>/plans/`。首次需要读写 CE artifact path 时才解析 `docs_root`；repo-backed resume scan 也只在 root 可安全解析时运行。所有 durable rule 只保留一个 owner，其他 section 用 R-ID 引用，禁止无链接地重复规则。
 
-**中文导读：** 把模糊或 ambitious idea 通过协作式对话收敛成尺寸合适的 requirements-only unified plan。先映射 decision surface，再一次只问一个真正能推进决策的问题；用户行为、scope boundaries 和 success criteria 在这里定，implementation detail 留给 `ce-plan`。该 skill 不写 code，也不替代针对外部技术 adoption 的 decisive `ce-pov`。下方英文内容是 canonical executable contract，必须按原文执行。
+# Brainstorm a Feature or Improvement
 
 **Note: The current year is 2026.** Use this when dating requirements-only unified plans.
 
 Brainstorming helps answer **WHAT** to build through collaborative dialogue. It precedes `ce-plan`, which enriches the same unified plan artifact with **HOW** to build it.
 
-The durable output of this workflow is a **requirements-only unified plan**. In other workflows this might be called a lightweight PRD or feature brief. In compound engineering, keep the workflow name `brainstorm`, but write the first version of the plan artifact under `docs/plans/` with `artifact_readiness: requirements-only` so planning does not need to invent product behavior, scope boundaries, or success criteria.
+The durable output of this workflow is a **requirements-only unified plan**. In other workflows this might be called a lightweight PRD or feature brief. In compound engineering, keep the workflow name `brainstorm`, but write the first version of the plan artifact under `<root>/plans/` with `artifact_readiness: requirements-only` so planning does not need to invent product behavior, scope boundaries, or success criteria.
 
 This skill does not implement code. It explores, clarifies, and documents decisions for later planning or execution.
 
@@ -25,7 +25,7 @@ This skill does not implement code. It explores, clarifies, and documents decisi
 5. **Right-size the artifact** - Simple work gets a compact requirements-only unified plan or brief alignment. Larger work gets a fuller Product Contract. Do not add ceremony that does not help planning.
 6. **Apply YAGNI to carrying cost, not coding effort** - Prefer the simplest approach that delivers meaningful value. Avoid speculative complexity and hypothetical future-proofing, but low-cost polish or delight is worth including when its ongoing cost is small and easy to maintain.
 7. **Do not turn coverage into decomposition** - For software brainstorms, treat named devices, providers, and data sources as coverage requirements, not automatically as separate integration workstreams. Split them only when a shared access path cannot satisfy a named requirement. Leave connector selection to planning unless that choice materially changes product scope or behavior.
-8. **每个 artifact 只保留一个连贯 work unit** - 当请求包含可分别规划和交付、各自具有独立价值的 outcomes 时，在深入探索前选择一个作为当前焦点。保留对周边工作的现有理解，但不要把暂定的未来领域变成本 plan 的 requirements。
+8. **Keep one coherent work unit per artifact** - When a request contains independently valuable outcomes that can be planned and delivered separately, choose one as the current focus before deep exploration. Preserve how the surrounding work is currently understood without turning tentative future areas into requirements for this plan.
 
 ## Interaction Rules
 
@@ -38,9 +38,21 @@ These rules apply to every brainstorm, including the universal (non-software) fl
 5. **Use an open-ended question only when the question is genuinely open** - Drop the blocking tool when the answer is inherently narrative, when presented options would steer a diagnostic or introspective answer, or when you cannot write 3-4 genuinely distinct, plausibly-correct options without padding. The test: if you'd be straining to fill the option slots, the question is open — ask it open-ended. Rule 1 still applies: one question per turn.
 6. **Open-ended questions earn their place only when they're specific enough to elicit a substantive answer** - Apply Rule 5 silently: just ask the question, never narrate the form choice. The question must give the user something concrete to anchor on. Good: *"What's the most concrete thing someone's already done about this — paid for it, built a workaround, quit a tool over it?"* — it names what counts as an answer. Too thin: *"What's your take?"* — nothing to bite into, and framings that imply a short answer ("briefly", yes/no) waste the open question the same way.
 
+## Artifact Root
+
+This skill writes requirements-only plans under `<root>/plans/`. Resolve `<root>` when you first compose a `<root>/` path (per the block below), never before you need it. A write to `<root>/...` and a read of `<root>/solutions/` both count as composing a `<root>/` path, so either one triggers resolution; only a run that touches no `<root>/` path at all -- a scratch-only or no-repo flow -- skips it.
+
+<!-- ce-docs-root:start -->
+**Resolve the CE artifact root `<root>` before composing any artifact path.**
+
+- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml`; first non-empty value wins (`<repo-root>` = `git rev-parse --show-toplevel`). Unset -> `<root>` is `docs`, exactly as before.
+- **Validate** a set value: a repo-relative directory whose real, symlink-resolved path stays inside the repo and is neither the repo root nor under `.git/`. Otherwise stop with an error naming `docs_root` and the value -- never fall back to `docs`.
+- **Use** `<root>` as the sole artifact location: create it if absent, compose each path as `<root>/<subdir>` with this skill's own subdirectory, and never also read `docs`.
+<!-- ce-docs-root:end -->
+
 ## Output Guidance
 
-- **优先保留与决策相关的细节** - 保留下一个决策所需的事实、tradeoffs 和 caveats；优先精简引言、重复内容和可选背景。
+- **Prioritize decision-relevant detail** - Preserve the facts, tradeoffs, and caveats needed for the next decision; trim introductions, repetition, and optional background first.
 
 ## Model Tiers
 
@@ -84,7 +96,9 @@ The `output:` preference does NOT auto-propagate to `ce-plan` on handoff — ce-
 
 #### 0.1 Resume Existing Work When Appropriate
 
-If the user references an existing brainstorm topic or document, or there is an obvious recent matching unified plan in `docs/plans/` with `artifact_contract: ce-unified-plan/v1`, `artifact_readiness: requirements-only`, and `product_contract_source: ce-brainstorm`:
+This resume scan needs `<root>/plans/`, so it applies only to a repo-backed run. If there is no git repository, or resolving `<root>` fails (a bad `docs_root`), skip the scan and continue — do not fail the run here, since Phase 0.1b may route non-software work to `references/universal-brainstorming.md`, whose contract does not write a unified plan under `<root>/plans/`.
+
+Only when that gate passes — a repo-backed run whose `<root>` resolved — evaluate this resume condition; never resolve `<root>` here on a run the gate told you to skip. When it applies, if the user references an existing brainstorm topic or document, or there is an obvious recent matching unified plan in `<root>/plans/` with `artifact_contract: ce-unified-plan/v1`, `artifact_readiness: requirements-only`, and `product_contract_source: ce-brainstorm`:
 - Read the document
 - Confirm with the user before resuming: "Found an existing requirements-only plan for [topic]. Should I continue from this, or start fresh?"
 - If resuming, summarize the current state briefly, continue from its existing decisions and outstanding questions, and update the existing document instead of creating a duplicate
@@ -136,17 +150,17 @@ Use the feature description plus a light repo scan to classify the work:
 
 If the scope is unclear, ask one targeted question to disambiguate and then proceed.
 
-**连贯工作 gate。** 进入 Phase 1 前，检查请求是否包含多个可独立规划的 product outcome：每个 outcome 都有自己的用户价值或验收边界，并且无需完成其他 outcome 即可交付。共享 actors、同一个端到端 outcome，或覆盖多个指定设备/provider，本身都不足以成为拆分理由。
+**Coherent-work gate.** Before entering Phase 1, check whether the request contains more than one independently plannable product outcome: each has its own user value or acceptance boundary and could be delivered without completing the others. Shared actors, one end-to-end outcome, or coverage across named devices/providers do not by themselves justify a split.
 
-当 gate 发现多个连贯领域时：
+When the gate finds multiple coherent areas:
 
-1. 用直白语言提出拆分方式，只陈述当前有依据的关系：哪些领域依赖或支持其他领域、共享 product rule，或可以独立推进。
-2. 询问本次 brainstorm 应负责哪一个领域。如果用户已经选定，就直接沿用，不要重复提问。
-3. 仅把该领域作为 Requirements、Flows、Acceptance Examples 以及后续 Implementation Units 的来源。其他领域只是上下文候选项，不属于 scope。
-4. 为 Phase 3 的 **How This Work Fits Together** section 保留当前的整体理解。把暂定关系标为暂定；后续 brainstorm 可以修改、拆分、合并或放弃它们。
-5. 把这个边界带入 Goal Capsule：在 objective 中点明当前领域，并说明周边领域不属于 active scope。
+1. Propose a plain-language breakdown and state only relationships supported now: which areas depend on or enable others, share a product rule, or can proceed independently.
+2. Ask which one area this brainstorm should own. If the user already chose one, carry it forward instead of asking again.
+3. Treat that area as the sole source of Requirements, Flows, Acceptance Examples, and later Implementation Units. Other areas remain contextual candidates, not scope.
+4. Preserve the current broader understanding for Phase 3's **How This Work Fits Together** section. Mark tentative relationships as tentative; later brainstorms may revise, split, merge, or discard them.
+5. Carry the boundary into the Goal Capsule: name the current area in its objective and state that the surrounding areas are not active scope.
 
-如果 outcomes 无法独立产生价值或接受验证，或者拆分会迫使 Product Contract 臆造缺失的共享行为，就应把工作保留在一起。这个 gate 只收窄 active artifact，不创建 parent plan 或 roadmap。
+Keep the work together when the outcomes cannot be independently useful or validated, or when separating them would force this Product Contract to invent the missing shared behavior. This gate narrows the active artifact; it does not create a parent plan or a roadmap.
 
 **Deep sub-mode: feature vs product.** For Deep scope, also classify whether the brainstorm must establish product shape or inherit it:
 
@@ -157,7 +171,7 @@ Product-tier triggers additional Phase 1.2 questions and additional Product Cont
 
 **Visual probe tripwire.** If the feature is inherently visual or spatial — drawing/canvas tools, annotation behavior, visual editors, UI layout or navigation, interaction states, charts, diagrams, animation, maps, timelines, or spatial flows — read `references/visual-probes.md` now. Strong signals include freehand vs constrained drawing behavior, canvas annotation tools, layout comparisons, and state/flow placement. Loading the reference here is readiness only; it owns when the gate fires (state-based, at the first shape/behavior/state/layout/flow/diagram decision), the text-vs-visual offer, and helper invocation.
 
-**陌生领域 tripwire。** 如果用户表明自己缺少该 domain 或 topic 涉及领域的 working knowledge，例如 "I know nothing about X"、"never touched the auth modules"、"I don't know what's possible / what I should be asking"，立即读取 `references/blindspot-pass.md`。此处加载只是为了 readiness；该 reference 负责决定 offer 何时触发（按 territory 限定，在进入 flagged territory 的第一个 substantive question 之前）、map 的形状，以及 mapped decisions 如何重新进入 dialogue。
+**Unfamiliarity tripwire.** If the user signals they lack working knowledge of the domain or the territory the topic touches — "I know nothing about X", "never touched the auth modules", "I don't know what's possible / what I should be asking" — read `references/blindspot-pass.md` now. Loading here is readiness only; the reference owns when the offer fires (territory-scoped, before the first substantive question into the flagged territory), the map's shape, and how mapped decisions re-enter the dialogue.
 
 #### 0.4 Surface the Workflow Spine
 
@@ -236,7 +250,7 @@ A session-settled decision counts as already-probed — it is not a gap. Spend t
 
 Follow the Interaction Rules above. Use the platform's blocking question tool when available.
 
-**Blindspot gate：在探查 flagged territory 前检查。** 如果 Phase 0.3 的 unfamiliarity tripwire 已触发，在进入 flagged territory 的第一个 substantive question 之前，先触发 `references/blindspot-pass.md` 中的 blindspot offer。关于用户自身 problem、users 和 evidence 的问题正常进行，因为该 gate 按 territory 限定。即使没有 tripwire，gate 也会在 dialogue 中途 arm：当连续两个回答显示用户 *无法评估* 问题实质，而不是只是还没决定时，读取该 reference 并提供 pass。绝不要静默切换为教学；offer 必须是 blocking question。
+**Blindspot gate — check it before probing flagged territory.** If the Phase 0.3 unfamiliarity tripwire fired, fire the blindspot offer from `references/blindspot-pass.md` before the first substantive question into the flagged territory (questions about the user's own problem, users, and evidence proceed normally — the gate is territory-scoped). The gate also arms mid-dialogue without a tripwire: when two consecutive answers show the user *cannot evaluate* the question's substance — not merely hasn't decided — read the reference and offer the pass then. Never silently switch into teaching; the offer is a blocking question.
 
 **Visual-probe gate — precondition, check it before raising the first shape decision.** If the Phase 0.3 tripwire fired, then before raising the first decision about shape, behavior, state, layout, flow, or a diagram — in any form, plain chat or a blocking tool — fire the text-vs-visual offer from `references/visual-probes.md`. The gate is state-based: offer unless this specific decision has already been through it; anchor the check to the decision you are about to raise, not a "pending gate" remembered since Phase 0.3. It **takes precedence over the default blocking-question path** (Interaction Rule 4): do not raise the shape decision as an `AskUserQuestion`/`request_user_input` menu until the user has declined visual. **An ASCII preview or text mockup inside the question's choices does not satisfy the offer** — that is the shortcut this gate exists to stop. Use the platform's blocking question tool for the text-vs-visual offer itself when available; the reference owns the offer wording, the cheapest-probe build, helper invocation, and the display-only feedback contract.
 
@@ -256,7 +270,7 @@ Follow the Interaction Rules above. Use the platform's blocking question tool wh
 
 ### Phase 2: Explore Approaches
 
-**Model elevation。** 生成 approaches 前，加载并遵循 `references/reasoning-elevation.md`。它会从本次 run 的 prompt 或 `brainstorm_model` config key 判断用户是否为 approach generation 选择了 model；如果已选择，就在任何 harness 上把这一步分派给所选 model，并进行 read-only verifying handoff，在失败时透明回退到 session model。未选择 model 时它是 no-op，正常继续。在所有 harness 上行为相同，不要按 host 设置 gate。
+**Model elevation.** Before generating approaches, load `references/reasoning-elevation.md` and follow it. It resolves whether the user chose a model for approach generation — from this run's prompt or the `brainstorm_model` config key — and if so dispatches that one step to the chosen model on any harness, with a read-only verifying handoff and transparent fallback to your session model. When no model is chosen it is a no-op; proceed normally. It runs the same on every harness — do not gate it on the host.
 
 If multiple plausible directions remain, propose **2-3 concrete approaches** based on research and conversation. Otherwise state the recommended direction directly.
 
@@ -310,7 +324,7 @@ Skip when Path A fires, when the doc will make no checkable claims, or on the no
 
 ### Phase 3: Capture the Requirements-Only Unified Plan
 
-Write or update a requirements-only unified plan only when the conversation produced durable decisions worth preserving — see `references/brainstorm-sections.md` "Decide whether a doc is warranted at all" for the criteria and the bug-fix stress test. Skip document creation when the user only needs brief alignment and the decisions can flow downstream (ce-plan, commit message, docs/solutions/) without a brainstorm artifact in the middle.
+Write or update a requirements-only unified plan only when the conversation produced durable decisions worth preserving — see `references/brainstorm-sections.md` "Decide whether a doc is warranted at all" for the criteria and the bug-fix stress test. Skip document creation when the user only needs brief alignment and the decisions can flow downstream (ce-plan, commit message, <root>/solutions/) without a brainstorm artifact in the middle.
 
 When a doc is warranted, compose it using:
 
@@ -319,11 +333,11 @@ When a doc is warranted, compose it using:
 
 Session-settled decisions land in the Product Contract's Key Decisions section carrying their `session-settled:` annotation (shape in `references/settled-decisions.md`), so `ce-plan` enrichment inherits the label into plan KTDs.
 
-**精炼写作。** section 内容重要不等于可以填充篇幅。所有保留的 section 都要遵循 `references/brainstorm-sections.md` 的 prose-economy 纪律：先写 decision 或 outcome；每句只表达一个 idea；一条 requirement 只包含 intent 和至多一个 qualifier；把分叉推迟到 Outstanding Questions，而不是同时规定两条路径；就地替换已失效文本，不要层层堆叠。
+**Write tight.** A section being material is not license to pad it. Hold every kept section to the prose-economy discipline in `references/brainstorm-sections.md`: lead with the decision or outcome, one idea per sentence, a requirement is intent plus at most one qualifier, defer forks to Outstanding Questions rather than specifying both arms, resolve superseded text in place rather than stacking strata.
 
-写入 `docs/plans/YYYY-MM-DD-NNN-<type>-<topic>-plan.<md|html>`，扩展名遵循 `OUTPUT_FORMAT`。包含 `artifact_contract: ce-unified-plan/v1`、`artifact_readiness: requirements-only` 和 `product_contract_source: ce-brainstorm`。标题为 `<Name> - Plan`（与 H1 一致，不加 conventional-commit 前缀）。文档保持轻量且可独立阅读：一个 Goal Capsule（objective、product authority、open blockers）和 Product Contract。**不要**输出 Goal Launch Block 或 Reader Index。参见 `references/brainstorm-sections.md`，artifact 内容规则由它负责，包括文档中的 repo-relative file paths。
+Write to `<root>/plans/YYYY-MM-DD-NNN-<type>-<topic>-plan.<md|html>` — extension follows `OUTPUT_FORMAT`. Include `artifact_contract: ce-unified-plan/v1`, `artifact_readiness: requirements-only`, and `product_contract_source: ce-brainstorm`. Title is `<Name> - Plan` (matching the H1; no conventional-commit prefix). Keep the doc light and standalone-readable: a Goal Capsule (objective, product authority, open blockers) and the Product Contract. Do **not** emit a Goal Launch Block or Reader Index. See `references/brainstorm-sections.md` — which owns the artifact content rules, including repo-relative file paths inside the doc.
 
-**规划就绪检查。** 写入实际文件后，运行 `references/brainstorm-sections.md` 中的四项检查：Complete、Consistent、Focused、Usable by planning。如果修正不会改变已确定的 intent，就地修复失败项并重新检查。如果修正会选择或改变 product behavior 或 scope，提出一个有针对性的问题，得到回答后更新 artifact 并重跑检查。只要还有检查失败，就不得宣布 artifact 已写入或进入 Phase 4。通过后在 chat 中确认时，使用 absolute path 报告 artifact，使引用可点击。
+**Ready for Planning Check.** After writing the actual file, run the four checks in `references/brainstorm-sections.md`: Complete, Consistent, Focused, and Usable by planning. Fix failures in place when the correction preserves settled intent, then rerun the failed checks. If a correction would choose or change product behavior or scope, ask one targeted question, update the artifact after the answer, and rerun the checks. Do not declare the artifact written or enter Phase 4 while any check fails. When confirming in chat after the pass, report the artifact with its absolute path so the reference is clickable.
 
 #### Vocabulary Capture — after the requirements-only unified plan (only if CONCEPTS.md already exists)
 

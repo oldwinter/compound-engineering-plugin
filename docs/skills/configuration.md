@@ -4,6 +4,19 @@ Compound Engineering 将可选的 checkout-local 默认值保存在 `.compound-e
 
 运行 `/ce-setup` 创建或修复该文件及其 `.gitignore` 覆盖。已提交的 `.compound-engineering/config.local.example.yaml` 列出了可用设置；只取消注释你要修改的 key。不要在此文件中放置 credential、CLI command 或 harness flag。
 
+## Artifact root
+
+默认情况下，CE 写入的所有 artifact folders 都位于 `docs/` 下，例如 `docs/plans/` 和 `docs/solutions/`。如果项目已把 `docs/` 用作 Obsidian vault、文档站点等受版本控制内容，可用 `docs_root` 把 CE artifact root 迁移到任意 repo-relative folder；未设置时，行为与现状 byte-identical。
+
+`docs_root` 按 local-first 的两层顺序读取，首个非空值生效：先读上述 checkout-local `config.local.yaml`，再读受版本控制的 `.compound-engineering/config.yaml`。优先使用 tracked file，才能让每个 clone 和 worktree 共享设置；local file 只属于单个 checkout。（Tracked `config.yaml` 是通用 config layer，目前只有 `docs_root` 使用它。）
+
+`docs_root` 与其它设置有两个关键区别：
+
+- **Repo-relative 且必须验证。** 值必须解析到 repository 内的目录，不能是 absolute path，不能通过 `../` 或 symlink 逃出 repo，不能等于 repo root，也不能位于 `.git/` 下。目录不存在时，会在首次写入时创建。
+- **Fail closed。** 其它设置无效时会回退默认值；不可用的 `docs_root` 会让 skill 直接报错停止，因为静默回退到 `docs/` 会把 CE artifacts 写进用户刻意避开的目录。`/ce-setup` 会报告 resolved root 及其来源 layer。
+
+`docs_root` 不会让 artifacts 脱离 ephemeral workspace 持久化，因为 root 仍在 repo 内，会随 checkout 一起存在或消失。跨 worktree 共享 artifacts 属于独立的 repo-external storage 问题。
+
 ## Config 与 instructions 的关系
 
 Config 是 local default，不是另一份 agent-instructions 文件：
@@ -21,6 +34,7 @@ Config 是 local default，不是另一份 agent-instructions 文件：
 
 | Consumer | Options | Purpose 和 values |
 |---|---|---|
+| all artifact-writing skills | `docs_root` | 所有 CE artifact subdirectories 的 repo-relative root。未设置时为 `docs`，且行为与当前一致；设置后是 CE 唯一读写位置。详见 [Artifact root](#artifact-root)。这是唯一 fail closed 而不是回退默认值的 setting。 |
 | [`ce-ideate`](./ce-ideate.md)、[`ce-brainstorm`](./ce-brainstorm.md)、[`ce-plan`](./ce-plan.md) | `ideate_output`、`brainstorm_output`、`plan_output` | Artifact format：`md` 或 `html`。Ideation 默认 HTML，brainstorm/plan 默认 markdown；pipeline context 强制 markdown。 |
 | [`ce-plan`](./ce-plan.md) | `plan_skip_scoping_confirm` | `true` 跳过正常的 pre-plan scope confirmation，默认 `false`；不会抑制真实 blocker 或 post-plan menu。 |
 | [`ce-plan`](./ce-plan.md)、[`ce-brainstorm`](./ce-brainstorm.md) | `plan_model`、`brainstorm_model` | Model elevation：将 reasoning-heavy step 交给命名 model（例如 `fable`、`opus`），而非 session model。值为 model alias；prompt request 或 orchestrator 的 `plan_model:<alias>` carrier（例如来自 `lfg`，pipeline mode 也生效）可覆盖。会在所有 harness 生效：host 原生提供时走原生，否则走 Claude CLI，再否则 inline。无默认值（关闭 elevation）。 |

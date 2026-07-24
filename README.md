@@ -21,6 +21,8 @@
 
 ## Philosophy（理念）
 
+Codex 本地开发模式直接链接当前 checkout；`remote` 模式则恢复为 this checkout 的 cached copy（cached copy of this checkout）。
+
 **每一个工程工作单元都应该让后续工作更容易，而不是更困难。**
 
 调用语法：本 README uses `/skill-name` examples for slash-skill hosts。在 Codex 中，invoke installed skills with `$skill-name`（for example, `$ce-plan` and `$lfg`）；`/goal` remains a Codex built-in command。
@@ -57,6 +59,8 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 每个 cycle 都会 compound：`/ce-compound` 写下 learnings，下一次 `/ce-brainstorm` 和 `/ce-plan` 会读取它们作为 grounding。Brainstorms sharpen plans，plans inform future plans，reviews catch more issues，patterns get documented。这个 return arrow 就是重点。
 
+> `docs/solutions/`、`docs/plans/` 等 artifact folders 只是默认位置。如果项目本身把 `docs/` 用作受版本控制的内容，可通过 `docs_root` 把所有 CE artifact folders 统一迁移到一个 repo-relative root；详见[配置](docs/skills/configuration.md#artifact-root)。
+
 ### Additional skills（额外 skills）
 
 这些 skills 位于 loop 周边，或按需使用；并不是每个 cycle 都需要它们。
@@ -68,7 +72,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-product-pulse`](docs/skills/ce-product-pulse.md) | *Outer loop*：给定时间窗口内用户实际经历了什么（usage、performance、errors）的 report，保存到 `docs/pulse-reports/`；follow-ups 反馈到 ideation 和 brainstorming |
 | [`/ce-debug`](docs/skills/ce-debug.md) | 当输入是 bug 而不是 feature 时，替代 brainstorm -> plan -> work：reproduce，trace root cause，fix，然后在必要时 polish/review 并 handoff 给 PR |
 | [`/ce-pov`](docs/skills/ce-pov.md) | *On demand, before you commit*：给出 decisive、project-grounded adoption verdict、holistic document take 或针对既有 approaches 的立场；可由 named peers 或 `oracle` 通过 blind initial round 和 bounded reconciliation 做 cross-check |
-| [`/ce-explain`](docs/skills/ce-explain.md) | *On demand, to keep learning*：把 concept、diff、idea 或 “what did I do this week?” 变成写给你个人的 dense visual explainer，可选 check-in（diff 的 predict-then-reveal、corrected exercises）让内容留下来 |
+| [`/ce-explain`](docs/skills/ce-explain.md) | *按需记录或理解工作*：把 concept、diff、idea 或 “what did I do this week?” 变成值得长期保留、self-contained 的 visual document；材料值得记住时，可选 check-in（diff 的 predict-then-reveal、corrected exercises） |
 
 完整 catalog 和 skill chaining 见 [docs/skills](docs/skills/README.md)。完整 inventory 见[下方](#full-skill-inventory)。
 
@@ -134,7 +138,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-strategy`](docs/skills/ce-strategy.md) | 创建或维护 `STRATEGY.md` |
 | [`/ce-ideate`](docs/skills/ce-ideate.md) | 生成并严格评估 grounded ideas |
 | [`/ce-pov`](docs/skills/ce-pov.md) | 对 adoption、document 或 approach set 形成 decisive、project-grounded POV |
-| [`/ce-explain`](docs/skills/ce-explain.md) | 将 concept、diff、idea 或你自己的一段 work 解释成个人学习 artifact |
+| [`/ce-explain`](docs/skills/ce-explain.md) | 将 concept、diff、idea 或你自己的一段 work 记录成可长期保留的 visual artifact |
 | [`/ce-brainstorm`](docs/skills/ce-brainstorm.md) | 探索 requirements 并写出尺寸合适的 requirements doc |
 | [`/ce-plan`](docs/skills/ce-plan.md) | 创建 structured implementation plans |
 | [`/ce-work`](docs/skills/ce-work.md) | 以 native 或 cross-model implementation 执行 plans，并保持 durable progress 与 transactional host-owned integration |
@@ -541,7 +545,7 @@ bun run codex:dev -- remove
 
 脚本会自动推导 repository path，因此可用于任意位置的 checkout，包括带空格的路径。它继承当前 `CODEX_HOME`；测试隔离 profile 时，在命令上设置 `CODEX_HOME`。所有模式必须针对启动 Codex 时使用的同一 `CODEX_HOME` 运行。
 
-不要把 `codex plugin marketplace add "$PWD"` 当作本地开发捷径。仓库提交的 `.agents/plugins/marketplace.json` 会刻意把 Compound Engineering 指回公开 Git repository，因此从该 marketplace 安装仍可能缓存远端内容。Manifest version 相同也不能证明 cache 与 worktree 一致。
+不要用 `codex plugin marketplace add "$PWD"` 做 live local development。它会安装当前 checkout 的缓存副本，之后的编辑在重新安装 plugin 前不会生效；manifest version 相同也不能证明 cache 与 worktree 一致。`codex:dev` workflow 会让 Codex 始终链接当前 skill files。
 
 </details>
 

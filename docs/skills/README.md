@@ -6,6 +6,8 @@ Runtime behavior 和 contributor reference 以每个 skill source folder（`skil
 
 Skills 共享的 checkout-local defaults 记录在 [Compound Engineering 配置](./configuration.md)中。
 
+这些页面中的 artifact paths（`docs/plans/`、`docs/solutions/`、`docs/ideation/` 等）都是**默认位置**。项目可用 `docs_root` 把所有 CE artifact folders 迁移到一个 repo-relative root；设置后，请把页面中的路径理解为 `<your-docs_root>/plans/`、`<your-docs_root>/solutions/` 等。详见 [Artifact root](./configuration.md#artifact-root)。
+
 ---
 
 ## compound-engineering core loop（核心循环）
@@ -66,7 +68,7 @@ Skills 共享的 checkout-local defaults 记录在 [Compound Engineering 配置]
 | Skill | Description（说明） |
 |-------|-------------|
 | [`/ce-pov`](./ce-pov.md) | 以 adoption verdict、holistic document take 或既有 approaches 立场的形式形成 decisive、project-grounded POV；支持 blind initial round、bounded evidence-based reconciliation 和 user-extensible checkpoint 的 named/`oracle` panel |
-| [`/ce-explain`](./ce-explain.md) | 把 concept、diff、idea 或你最近一段 work 转成写给你个人的 dense visual explainer；可选 check-in（diff 的 predict-then-reveal、corrected exercises）和 capability-detected destination ask |
+| [`/ce-explain`](./ce-explain.md) | 把 concept、diff、idea 或你最近一段 work 转成值得长期保留、self-contained 的 dense visual document；支持 evidence-grounded recap、capability-detected destination ask 和可选 opt-in check-in（diff 的 predict-then-reveal、corrected exercises） |
 | [`/ce-debug`](./ce-debug.md) | 系统找出 root causes：causal chain gate、predictions、post-fix polish/review、PR handoff |
 | [`/ce-code-review`](./ce-code-review.md) | 使用 skill-local reviewer personas、confidence-gated findings 和四种 modes 的 structured code review |
 | [`/ce-doc-review`](./ce-doc-review.md) | 使用 skill-local reviewer personas review requirements 或 plan documents：coherence、feasibility、product-lens、design-lens、security-lens、scope-guardian、adversarial |
