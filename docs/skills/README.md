@@ -74,6 +74,7 @@ Skills 共享的 checkout-local defaults 记录在 [Compound Engineering 配置]
 | [`/ce-doc-review`](./ce-doc-review.md) | 使用 skill-local reviewer personas review requirements 或 plan documents：coherence、feasibility、product-lens、design-lens、security-lens、scope-guardian、adversarial |
 | [`/ce-simplify-code`](./ce-simplify-code.md) | Refine 最近改动的 code：reuse、quality、efficiency review，并验证 behavior preservation |
 | [`/ce-optimize`](./ce-optimize.md) | Metric-driven iterative optimization loops：three-tier evaluation、parallel experiments、persistence discipline |
+| [`/ce-retune`](./ce-retune.md) | 以 measurement-first 方式为新 model retune skill corpus：归档 baseline、测量 noise floor、执行 adversarial audit 和 measured cut passes |
 
 ---
 

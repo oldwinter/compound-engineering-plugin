@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `5c7cb347`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `a9f6d530`。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -129,7 +129,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 安装后，在任意 project 中运行 `/ce-setup`。它会检查 repo-local config、报告 optional tool capabilities，并帮助把 machine-local CE settings 安全地放进 gitignore。
 
-`compound-engineering` plugin 当前包含 31 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
+`compound-engineering` plugin 当前包含 32 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
 
 ### Full Skill Inventory（完整 Skill 清单）
 
@@ -148,6 +148,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-compound`](docs/skills/ce-compound.md) | 记录已解决问题，compound team knowledge |
 | [`/ce-compound-refresh`](docs/skills/ce-compound-refresh.md) | Refresh stale 或 drifting learnings |
 | [`/ce-optimize`](docs/skills/ce-optimize.md) | 运行 iterative optimization loops |
+| [`/ce-retune`](docs/skills/ce-retune.md) | 以 measurement-first 方式为新 model retune skill corpus |
 | [`/ce-product-pulse`](docs/skills/ce-product-pulse.md) | 生成 time-windowed product pulse reports |
 | [`/ce-riffrec-feedback-analysis`](docs/skills/ce-riffrec-feedback-analysis.md) | 把 Riffrec recordings 或 notes 转成 structured feedback |
 | [`/ce-sweep`](docs/skills/ce-sweep.md) | Sweep feedback sources，track item lifecycles，并产出 `/lfg`-ready plan |

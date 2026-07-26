@@ -64,11 +64,13 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
    - target path 和 category（除非 category 本身变化，否则与 old learning 相同）
    - 上面列出的三个 support files 的 relevant contents
 2. Subagent 以 support files 作为 source of truth 编写 new learning：`references/schema.yaml` 用于 frontmatter fields 和 enum values，`references/yaml-schema.md` 用于 category mapping 和 array items 的 YAML-safety rules，`assets/resolution-template.md` 用于 section order。如果需要传入内容之外的额外 context，应使用 dedicated file search 和 read tools。
-3. **Validate parser-safety of the new learning's frontmatter**，捕获 prose rules 漏掉的 silent-corruption issues：malformed `---` delimiter lines、scalar values 中未 quote 的 ` #`（silent comment truncation），以及 scalar values 中未 quote 的 `: `（silent mapping confusion）。Bundled validator 位于 **skill bundle 内部**；在 Claude Code 中 `${CLAUDE_SKILL_DIR}` resolve 为 skill directory，但 runtime Bash tool 的 CWD 是用户 project，因此不带 `${CLAUDE_SKILL_DIR}` prefix 的 project-relative path 会 miss。通过 existence guard 运行，让无法 locate script 的平台（例如 native Codex/Gemini installs，`${CLAUDE_SKILL_DIR}` unset）fallback 到 manual check，而不是 silent skip protection：
+3. **Validate parser-safety of the new learning's frontmatter**，捕获 prose rules 漏掉的 silent-corruption issues：malformed `---` delimiter lines、scalar values 中未 quote 的 ` #`（silent comment truncation），以及 scalar values 中未 quote 的 `: `（silent mapping confusion）。Bundled validator 位于 **skill bundle 内部**；把 `SKILL_DIR` 设置为包含本 skill `SKILL.md` 的目录绝对路径，并通过 existence guard 运行。无法 locate script 的平台应 fallback 到 manual check，而不是静默跳过 protection：
 
    ```bash
-   if [ -n "${CLAUDE_SKILL_DIR}" ] && [ -f "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" ]; then
-     python3 "${CLAUDE_SKILL_DIR}/scripts/validate-frontmatter.py" <new-learning-path>;
+   SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
+   if [ -f "$SKILL_DIR/scripts/validate-frontmatter.py" ]; then
+     PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1 && { echo "$c"; break; }; done)"; [ -n "$PY" ] || { echo "no working Python 3 interpreter on PATH" >&2; exit 1; };
+     "$PY" "$SKILL_DIR/scripts/validate-frontmatter.py" <new-learning-path>;
    else
      echo "Bundled validate-frontmatter.py not resolvable on this platform; applying the parser-safety checklist manually.";
    fi
@@ -85,7 +87,12 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
 
    ```bash
    SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
-   python3 "$SKILL_DIR/scripts/validate-doc-claims.py" <new-learning-path>
+   if [ -f "$SKILL_DIR/scripts/validate-doc-claims.py" ]; then
+     PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1 && { echo "$c"; break; }; done)"; [ -n "$PY" ] || { echo "no working Python 3 interpreter on PATH" >&2; exit 1; };
+     "$PY" "$SKILL_DIR/scripts/validate-doc-claims.py" <new-learning-path>;
+   else
+     echo "Bundled validate-doc-claims.py not resolvable on this platform; applying the claims checklist manually.";
+   fi
    ```
 
    Exit 1 flags 是 **adjudication input，而不是 failures**。描述 removed code 的 successor doc 可能合理地引用已不存在的 paths。通过修正 citation、将其标注为 historical，或确认其为 intentional 来处理每个 flag；scaffold flags 必须始终修复。如果该 script 在当前平台无法 resolve，手动扫描 body 中的相同 patterns，并在 report 中说明。
