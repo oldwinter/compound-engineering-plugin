@@ -90,9 +90,9 @@ PEER_HARD="${CROSS_MODEL_HARD_SECS:-1200}"; echo "peer-deadline-secs=$(( PEER_HA
 CE_PEER_HARD_SECS="$(( PEER_HARD + 30 ))" CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" start --skill ce-code-review --run-id "<run-id>" --label adversarial -- env CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" bash "$SKILL_DIR/scripts/cross-model-adversarial-review.sh" "<host-serving-family>" "<target>" "<base-ref>" "<run-dir>"
 ```
 
-The nested windows are one budget with one knob, `CROSS_MODEL_HARD_SECS`. Resolve `PEER_HARD` **in the same shell call as `start`** (as above) — a separate call loses it, and the prefixes would then compute `CE_PEER_HARD_SECS` as `30`. The runner supervisor gets `+30s` and the orchestrator's shared deadline `+10s`, both derived there, so raising the knob widens every outer window. Read the printed `peer-deadline-secs=<n>` and use that `<n>` as the shared deadline below; never hardcode any of these, because when they drift the tightest one silently reaps a healthy peer and its full spend is wasted.
+这些嵌套 window 共用一份预算和一个 knob：`CROSS_MODEL_HARD_SECS`。必须像上例一样，在调用 `start` 的同一个 shell call 中解析 `PEER_HARD`；分开调用会丢失该值，并让前缀把 `CE_PEER_HARD_SECS` 计算成 `30`。Runner supervisor 使用由此派生的 `+30s`，orchestrator 的共享 deadline 使用 `+10s`，因此调大 knob 会同步扩大所有外层 window。读取打印出的 `peer-deadline-secs=<n>`，并把该 `<n>` 作为下方共享 deadline；绝不能硬编码，否则这些值一旦漂移，最窄的 window 会静默回收健康 peer，浪费它的全部执行成本。
 
-**Do not forward `CROSS_MODEL_HARD_SECS` to the worker.** The runner already passes the ambient environment through, so a knob the user actually set reaches the worker on its own. Re-exporting the orchestrator's *resolved* value would convert a fallback into an explicit override and destroy the one distinction the worker needs: it applies the raised default only to the idle-guarded codex route and keeps a lower bound on the routes with no output-idle detection (`UNGUARDED_HARD_SECS` in the worker). Forcing one value would silently restore the doubled hang on those routes. `PEER_HARD` exists only to size the two *outer* windows, and since the worker's effective cap is never larger than `PEER_HARD`, the nesting still holds.
+**不要把 `CROSS_MODEL_HARD_SECS` 转发给 worker。** Runner 已经透传 ambient environment，因此用户实际设置的 knob 会自行到达 worker。若重新导出 orchestrator 解析后的值，会把 fallback 变成显式 override，并破坏 worker 必须保留的区别：它只对带 idle guard 的 codex route 使用提高后的默认值，而对没有 output-idle detection 的 route 保留较低上限（worker 中的 `UNGUARDED_HARD_SECS`）。强制统一值会让这些 route 再次出现加倍 hang。`PEER_HARD` 只用于设置两个外层 window；worker 的有效 cap 不会超过 `PEER_HARD`，所以嵌套关系仍然成立。
 
 - `<run-id>` = the Stage 3d run id (the same one that forms `<run-dir>`); job state lives under `<run-dir>/jobs/<job-id>/`.
 - `<host-serving-family>` is `codex`, `claude`, `grok`, `composer`, or `unknown`; `<host-harness>` is `codex`, `claude`, `grok`, `cursor`, or `unknown`.
@@ -101,6 +101,8 @@ The nested windows are one budget with one knob, `CROSS_MODEL_HARD_SECS`. Resolv
 - `<run-dir>` = the absolute Stage 4 run dir. The script writes `adversarial-<provider>.json` there **only after** forcing `reviewer` to `adversarial-<provider>` and downgrading peer `safe_auto` → `gated_auto`.
 
 **单次收尾回收。** Runner 把 worker 分离到独立的受监督 session。`start` 后立即捕获 epoch time（`date +%s`），local reviewers 活跃期间不要轮询。收集完 local returns 后只检查一次 status。若仍在运行，就重复执行 bounded `wait` slice，直到 job 进入 terminal，或从 `start` 起已经耗尽共享 deadline（取自该次 `start` 输出的 `peer-deadline-secs`，默认 1210 秒）；每个 slice 前都要用 `date +%s` 对比 anchor，绝不能启动会越过 deadline 的 slice。每个 slice 最长 480 秒（Luna xhigh run 合理情况下可能耗时约 419 秒，更短的 slice 可能在健康 peer 返回前结束），并允许重复 slice：单个 slice 远短于派生出的 deadline，如果限制总等待时间，反而会因为本次预算扩大的同一个原因提前回收健康 peer。一个 slice 不算一次轮询 turn；slice 之间不要插入 status 读取、shell 空操作或“仍在等待”turn。进入 terminal 后纳入 artifact。达到 deadline 时运行 `reap <job-id>`，并执行最后一次 `wait --max-secs 10`，因为 reap 是异步的。Script 会在该 deadline 内自行限制运行（idle timeout 为 480 秒；hard backstop 为 `CROSS_MODEL_HARD_SECS`，默认 1200 秒），所以 deadline reaping 应属例外。Done detection 仍以文件是否存在为准：worker 只在 normalization 后发布 `<run-dir>/adversarial-<provider>.json`。Script 从 skill dir 读取 persona brief 和 schema，并依据 `<base-ref>` review 当前 work tree。Large-diff preflight 只处理 transport：它在 prompt 外测量并暂存 exact diff；orchestrator 选择 semantic divisions，reviewer 在其中选择 representatives 和 evidence。
+
+默认派生出的共享 deadline 为 1210 秒（1210s by default）。
 
 The `start` command's returned job ID is the successful-start receipt. Do not immediately call `status`, inspect `--help`, or otherwise verify that receipt; persist it and continue to local dispatch. Status collection begins only after the local wave completes.
 
@@ -114,7 +116,7 @@ PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c 
 "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" status "<job-id>" --json
 ```
 
-If it is still running and time remains, each `wait` slice is exactly:
+如果 job 仍在运行且还有时间，每个 `wait` slice 必须严格使用：
 
 ```bash
 SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
@@ -122,7 +124,7 @@ PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c 
 "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" wait --max-secs <remaining-slice-secs> --json "<job-id>"
 ```
 
-Repeat that call until the job is terminal or the derived deadline is spent; do not invent alternate status flags or inspect help.
+重复调用，直到 job 进入 terminal 或派生出的 deadline 用完；不要自创其他 status flag，也不要检查 help。
 
 ## Step 5 — Fold into Stage 5
 

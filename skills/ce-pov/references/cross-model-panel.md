@@ -207,18 +207,17 @@ root, and pre-create the round output directory as private scratch outside the
 repository. For named peers, start one job per exact target; for a selected panel,
 start one job per selected peer. Start all jobs before waiting.
 
-**At the defaults, the peer budget needs nothing from you.** This skill's worker
-self-bounds at 600s and the runner supervisor's own default is 630s, so the
-runner window already sits outside the worker's cap and reaps nothing healthy.
+**使用默认值时，无需额外处理 peer budget。**该 skill 的 worker 会在 600 秒自行停止，
+runner supervisor 的默认值是 630 秒，因此 runner window 已位于 worker cap 之外，不会
+回收健康 worker。
 
-**Raising `CROSS_MODEL_HARD_SECS` above 600 here also requires raising
-`CE_PEER_HARD_SECS` to at least `knob + 30`.** The worker reads the knob from the
-ambient environment, but the runner does not derive its supervisor window from it
-— left alone it stays at 630s and becomes the tightest window, reaping the worker
-the knob was raised for. Both are ordinary environment variables the runner and
-worker inherit, so export them together. Do not re-export a *resolved*
-`CROSS_MODEL_HARD_SECS` onto the worker's command line: that converts a fallback
-into an override and strips the worker of its route-aware default.
+**如果在此把 `CROSS_MODEL_HARD_SECS` 提高到 600 以上，还必须把
+`CE_PEER_HARD_SECS` 提高到至少 `knob + 30`。** Worker 从 ambient environment
+读取 knob，但 runner 不会据此派生 supervisor window；若不调整，runner 会保持 630 秒并
+成为最窄的 window，提前回收本应由新 knob 延长的 worker。二者都是 runner 和 worker 会
+继承的普通 environment variable，因此要一起 export。不要在 worker command line 上重新
+导出已经解析的 `CROSS_MODEL_HARD_SECS`：这会把 fallback 变成 override，并让 worker
+失去 route-aware default。
 
 Each worker writes `<run-dir>/pov-<target>.json`, where `<target>` is the resolved
 route target with `grok-cli`/`grok-cursor` collapsing to `grok`. Pass exactly that
@@ -246,16 +245,19 @@ PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c 
 "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" wait --max-secs 30 --json <job-ids...>
 ```
 
-Job ids or job-directory paths are positional. `--skill`, `--run-id`, and
-`--label` are start-only; never pass them to `wait`. Do not add a separate shell
-sleep: `wait` itself provides the bounded polling delay. Use one aggregate
-deadline of `CROSS_MODEL_HARD_SECS` + 10 seconds (610s by default, since this
-skill's workers self-bound at 600s); never begin a wait that can cross it. Read
-the knob rather than hardcoding the result -- a hardcoded deadline silently reaps
-a healthy peer whenever a user raises the knob, wasting the peer's full spend.
-Repeat the bounded slices above until every job is terminal or that deadline is
-spent; a single slice shorter than the deadline is not a substitute. At the
-deadline, reap each nonterminal job in a short call, then make one final wait:
+Job id 或 job-directory path 是 positional argument。`--skill`、`--run-id` 和
+`--label` 只用于 start，绝不能传给 `wait`。不要另加 shell sleep；`wait` 自身已经
+提供有界 polling delay。使用 `CROSS_MODEL_HARD_SECS` + 10 秒作为统一 aggregate
+deadline（默认为 610 秒，因为该 skill 的 worker 在 600 秒自行停止）；绝不能开始会越过
+deadline 的 wait。读取 knob，不要硬编码结果；用户提高 knob 时，硬编码 deadline 会静默
+回收健康 peer，浪费其全部执行成本。重复上方 bounded slice，直到所有 job 进入 terminal
+或 deadline 用完；一个短于 deadline 的 slice 不能替代完整等待。达到 deadline 时，用
+一次短 call 回收每个 nonterminal job，然后执行最后一次 wait。默认 aggregate deadline 为
+610 秒（610s by default）。
+
+精确执行约束：`--skill`, `--run-id`, and `--label` are start-only. Do not add a separate shell sleep; `wait` itself provides the bounded polling delay.
+
+最后一次 wait：
 
 ```bash
 SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";

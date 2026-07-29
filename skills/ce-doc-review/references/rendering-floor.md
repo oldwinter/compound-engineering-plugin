@@ -18,11 +18,11 @@ or the reviewed product's codebase. The output exists so they can decide **Apply
 without reconstructing the finding from expert narrative. A finding whose only path to a decision is
 "go read the code" has failed this floor regardless of how correct it is.
 
-Write human-facing finding prose in an ASD-STE100 Simplified Technical English (STE)-inspired style.
-Use short, direct sentences. Keep one consequence, recommendation, or supporting idea per sentence,
-and use one consistent term for each concept. Preserve exact document identifiers and domain terms
-when they help the decision. Shorten sentences, not content: preserve coverage, evidence, technical
-depth, and every distinct consequence, qualification, or required action.
+面向人类的 finding prose 应采用受 ASD-STE100 Simplified Technical English（STE）启发的风格。
+句子要短而直接；每句只表达一个 consequence、recommendation 或 supporting idea，并为同一
+concept 始终使用同一 term。能帮助决策时，精确保留 document identifier 和 domain term。
+只缩短句子，不删减内容：coverage、evidence、technical depth，以及每个不同的 consequence、
+qualification 或 required action 都必须保留。
 
 ## Decision-first field order
 
@@ -39,11 +39,10 @@ verbatim.
 
 1. **Recommendation** — the recommended action (`Apply` / `Defer` / `Skip`, from the finding's
    `recommended_action`), stated up front. This is what the user is being asked to accept or reject.
-2. **Consequence if unchanged** — one short sentence per distinct consequence: what goes wrong, for
-   whom, if the finding is not acted on. Use multiple sentences only when required to preserve
-   independent consequences. **Contains no opaque identifier at all** (see the token policy). A reader
-   who skimmed the document once must be able to judge it without looking anything up. This is the
-   load-bearing field.
+2. **Consequence if unchanged** — 每个不同 consequence 使用一个短句：若不处理该 finding，
+   会发生什么问题、影响谁。只有为了保留彼此独立的 consequence 时才使用多个句子。
+   **不得包含任何 opaque identifier**（即 no opaque identifier；见 token policy）。只粗读过一次文档的读者也必须能在
+   不查阅其他内容的情况下作出判断。这是承重字段。
 3. **Change** — one sentence of intent: what the fix achieves and where it lives. Prefer intent
    language over quoted text or raw markup.
 4. **Basis** — at most **two** sentences of mechanism explaining how the problem arises. Every opaque

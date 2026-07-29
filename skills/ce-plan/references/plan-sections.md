@@ -290,14 +290,12 @@ Hold every kept section to these:
   goal beneath its rationale. This does not override section roles — Summary
   stays proposal-only, Problem Frame stays motivation-only and never restates
   the remedy.
-- **Use an ASD-STE100 Simplified Technical English (STE)-inspired style for
-  technical plan content.** Write short, direct sentences. Keep one decision,
-  action, or condition per sentence, and use one consistent term for each
-  concept. Preserve exact identifiers, paths, commands, protocol names, and
-  domain terms. Shorten sentences, not content: preserve every distinct
-  requirement, qualification, and test scenario. A Summary is a handful of
-  sentences, not one sentence with five semicolons and four parentheticals. A
-  KTD's rationale is the load-bearing reason, not every reason.
+- **Technical plan content 使用受 ASD-STE100 Simplified Technical English（STE）
+  启发的风格。**句子要短而直接；每句只表达一个 decision、action 或 condition，并为同一
+  concept 始终使用同一 term。精确保留 identifier、path、command、protocol name 和
+  domain term。只缩短句子，不删减内容：每个不同的 requirement、qualification 和 test
+  scenario 都必须保留。Summary 应由少量句子组成，不能把五个分号和四组括号塞进一个
+  句子。KTD rationale 只保留承重原因，而不是所有可能原因。
 - **A requirement or unit is one sentence of intent plus at most one
   qualifier.** When it would specify two outcomes ("either A or B, the
   implementer decides"), state the intent and send the fork to Open Questions —
