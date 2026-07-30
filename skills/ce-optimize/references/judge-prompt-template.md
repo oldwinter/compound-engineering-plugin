@@ -108,3 +108,4 @@ Rules:
 - Items 上的 `ambiguous` flag 帮助 orchestrator 识别 noisy evaluations，而不强迫给出 bad scores
 - 对 singleton evaluation，orchestrator 提供 cluster summaries（不是 full contents）以保持 judge context lean
 - 每个 sub-agent 独立 evaluate 一个 batch；sub-agents 看不到彼此 results
+- **这种独立性是硬性要求，而非仅仅建议。** 这些分数会决定 accept/revert，因此 judge 必须处于独立于 hypothesis author 和 experiment executor 的 context 中。如果无法 dispatch，则应阻止 judge pass，而不是 inline scoring；orchestrator 给自己的 experiment 打分不构成 measurement。

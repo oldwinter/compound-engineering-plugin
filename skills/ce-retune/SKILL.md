@@ -9,7 +9,7 @@ argument-hint: "[target model or symptom] [path to the corpus, defaults to ./ski
 
 本 skill 用于在模型升级导致 skill 语料库表现退化时，先测量、再裁剪。开始前必须确认三项条件：存在可分析的运行归档或可生成归档的 benchmark harness；harness 能选择不同语料库构建；有一项可重复执行的端到端任务。任一条件缺失时，明确指出缺口并停止，不要把静态审计包装成 retune。
 
-执行顺序不可调换：先从历史归档建立基线，再用同一 commit 的两个副本完成 A/A 测试并预先登记通过门槛；随后按 skill 单元开展带反方辩护的审计，以互不重叠的文件所有权分批裁剪；每一批都重新测量，让失败位置决定下一次修改。流程遵循度与任务完成度必须作为两项独立指标，空 transcript、错误退出和基础设施故障归入 `broken`，不计入成功率分子或分母。
+执行顺序不可调换：先从历史归档建立基线，再用同一 commit 的两个副本完成 A/A 测试并预先登记通过门槛；随后按 skill 单元开展带反方辩护的审计，proposer 与 defender 必须在分别 dispatch 的独立 context 中运行，无法保证独立性时停止审计，不能让同一 context 自问自答；再以互不重叠的文件所有权分批裁剪，每一批都重新测量，让失败位置决定下一次修改。流程遵循度与任务完成度必须作为两项独立指标，空 transcript、错误退出和基础设施故障归入 `broken`，不计入成功率分子或分母。
 
 只有预先登记的门槛通过，或报告明确说明无法支持哪项结论，才算结束。测试通过只能证明没有破坏现有契约，不能证明行为改善。逐批单独提交并保留基线表、noise floor、逐次运行记录及被证伪的假设。下方英文内容是 canonical executable prompt contract；命令、字段、统计公式、停止条件和阶段顺序均须按原文执行。
 
@@ -22,6 +22,20 @@ A corpus that degrades on a new model is a measurement problem before it is a wr
 **Done:** the bar is cleared, or the run reports the specific claim it could not support. A green test suite is not done: it proves nothing broke, not that behavior improved.
 
 **Non-goal:** word reduction. Leanness and performance are separate programs that happen to share a corpus, and only one of them is the result. Report completion, not word count.
+
+## Setup
+
+Run this once at the start of this invocation, before any subagent dispatch, and follow the directives it prints — except where one conflicts with this skill's own rules on asking the user questions, whether those rules are scoped to a non-interactive mode or apply in every mode, in which case this skill's rules win and no blocking question is asked. Do not rerun it within the same invocation; a later invocation of this or any other skill runs its own. If no Node runtime is available the skill proceeds unchanged.
+
+```bash
+SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
+NODE="$(for c in node nodejs; do command -v "$c" >/dev/null 2>&1 && "$c" -e '' >/dev/null 2>&1 && { echo "$c"; break; }; done)";
+if [ -n "$NODE" ]; then
+"$NODE" "$SKILL_DIR/scripts/context.mjs" || echo "context script failed; continue with the skill's normal behavior";
+else
+echo "no Node runtime; continue with the skill's normal behavior";
+fi
+```
 
 ## Phase 0: the measurement gate — check this first
 
@@ -59,6 +73,8 @@ Expect the floor to be wider than intuition suggests. If a corpus produces a lar
 One agent per skill, each reading that skill's full directory, proposing cuts with a target and a reason. Then a second agent per skill whose job is the opposite: **defend the existing prose** using the project's own documented learnings, its tests, and git history.
 
 Read `references/corpus-audit.md` for the dispatch shape, the finding schema, and the classes worth hunting.
+
+**These two passes require independent contexts.** The defense is only worth running when it can genuinely disagree with the proposal, which one context arguing both sides cannot do. If the host exposes no way to run them as separate agents, report that as a blocker and stop the audit — do not run proposal and defense inline and present the result as an audit.
 
 Two rules make the difference between an audit and a demolition:
 

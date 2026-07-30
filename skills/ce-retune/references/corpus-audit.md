@@ -2,7 +2,7 @@
 
 ## 中文导读
 
-本阶段只生成候选 finding，不修改文件，也不把 finding 数量当成改进证据。第一轮按 corpus unit 分派 proposer，要求读取该单元完整目录并严格返回规定 schema；每个单元一有结果就立即进入第二轮 defender，由 defender 结合项目 learnings、测试和 Git 历史逐条寻找保留理由。缺少历史时必须在 `sources_searched` 中声明，不能据此直接裁剪。
+本阶段只生成候选 finding，不修改文件，也不把 finding 数量当成改进证据。第一轮按 corpus unit 分派 proposer，要求读取该单元完整目录并严格返回规定 schema；每个单元一有结果就立即进入第二轮 defender，由 defender 结合项目 learnings、测试和 Git 历史逐条寻找保留理由。两轮必须由分别 dispatch 的独立 agent 执行；Host 无法提供独立 context 时报告 blocker 并停止审计，不能 inline 运行后把结果交给 Phase 4。缺少历史时必须在 `sources_searched` 中声明，不能据此直接裁剪。
 
 每条 finding 都要保留稳定 `id`、精确 `target`、闭集 `class`、原文、替代文本和风险；每个单元还要列出 `must_survive` 与所有潜在 `halt_sites`。有可引用依据的保留项应从裁剪列表移除；没有依据但未达到项目自身变更证据标准的项，只能列为待验证。下方英文是精确审计契约，schema、枚举、证据门槛和安全边界保持不变。
 
@@ -11,6 +11,8 @@ Produces one finding set per corpus unit, each finding carrying a defender rulin
 The audit is not evidence. It ranks candidates; only the harness says whether a cut helped. Do not let a large finding count imply a large effect — a corpus's run-to-run spread on fixed inputs (`references/noise-floor.md`) is the same whether the audit found 6 findings or 600.
 
 ## Dispatch shape
+
+**The two waves must run as separate dispatched agents.** A defender's ruling is only worth recording when it can genuinely disagree with the proposal that reached it, which one context holding both roles cannot do. If the host exposes no way to run them as independent agents, report that as a blocker and stop the audit — do not run the waves inline and hand the result to Phase 4. The same context arguing both sides still emits confident `cut` rulings, and Phase 4 deletes on them: that is the demolition this reference warns about below, arriving through the dispatch layer instead of a weak model tier.
 
 Two waves, one agent per unit each way.
 

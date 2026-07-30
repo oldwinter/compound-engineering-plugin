@@ -100,6 +100,10 @@ Each fixer receives:
 
 For `pr_comment` / `review_body` fix-list items (no file/line), the fixer identifies the relevant files from the comment text and the PR diff.
 
+**没有 subagent capability 时，按顺序自行应用修复。** Harness 无法 dispatch（或 dispatch 失败）时，在当前 context 中逐项处理 fix-list；把 fixer prompt 当作自己的执行指令，并生成相同的逐项结果。这是受支持的路径，不属于需要披露 coverage 损失的降级：legitimacy judgment 已在 step 3 集中完成，fixer 只负责实现已批准的变更，因此 inline 执行损失的只是并行度和 context headroom，不是 correctness。继续遵守 dispatch 路径的纪律：一次只处理一个 item，每次编辑前重新读取文件；实现过程中若发现矛盾，停止并重新评估（`blocked` 处理保持不变）。
+
+因此，本 skill 不依赖 agent-tool authorization 也能完成 review。这是有意设计：它会在 `ce-babysit-pr` 下无人值守运行，权限提示会卡住整个 loop，所以 tool surface 保持收敛，且没有 dispatch 时 fixer 路径仍然可用。
+
 ### Fixer return format
 
 - **verdict**: `fixed`, `fixed-differently`, or `blocked`
