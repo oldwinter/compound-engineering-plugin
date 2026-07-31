@@ -16,6 +16,7 @@
 - 将 `module: AuthToken` 更新为 `module: SessionToken`
 - 修复指向相关 docs 的过期 links
 - 在 directory move 后刷新 implementation notes
+- 在 doc 的 directory 与 frontmatter category 明确不一致时迁移该 doc（见下方 Relocation）
 
 **不应**作为 in-place updates 的示例：
 
@@ -28,6 +29,18 @@
 
 这些情况需要 **Replace**，而不是 Update。
 
+## Relocation Flow（迁移流程，属于 Update）
+
+仅在错位明确时迁移：doc 的 directory 与 frontmatter category 不一致，或内容明确属于另一个**已存在**的 category。两者不一致只能证明存在问题，不能直接证明应改哪一侧；应阅读内容，判断是 directory 错了（迁移），还是 frontmatter 错了（原地修复 frontmatter，这仍是普通 Update，不是移动）。迁移时不得创建新的 category directory，也不得凭主观判断迁移；目录归属没有 ground truth，下一次运行可能反向判断，造成 churn。
+
+在 headless mode 中，只有以下四个条件全部满足时才执行迁移，门槛与 auto-delete 相同：(1) 按 category mapping 判断，frontmatter 与 directory 不一致；(2) 内容证据明确表明是 directory 错位；(3) 目标 category directory 已存在；(4) 所有 inbound citation 都在仓库内且可机械重写。只要一个条件不满足（包括内容合理地同时属于两个 category），就将迁移记录为 recommendation（doc、建议目标、未满足的条件），不要移动。
+
+1. 确认目标 category directory 已存在。
+2. 使用 `git mv` 移动文件，以保留 rename history。
+3. 让 frontmatter category metadata 与新位置一致。
+4. 重写仓库 Markdown 中的 inbound links，包括 README 中的 catalog rows。
+5. 重新检查迁移 doc 的**出站**相对 links：移动改变了相对路径的解析基准，原本可解析的 `../category/doc.md` 可能变成 dangling link。对迁移后的 doc 运行 bundled claims validator（`scripts/validate-doc-claims.py`，调用方式与 Replace flow 相同），或手动检查相对 links，并在完成迁移前改正所有失效链接。
+
 ## Consolidate Flow（合并流程）
 
 Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过，merge 是 focused edit）。按 topic cluster 处理 Consolidate candidates。对 Phase 1.75 中识别出的每个 cluster：
@@ -35,14 +48,27 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
 1. **确认 canonical doc**：cluster 中更广、更 current、更准确的 doc。
 2. **从 subsumed doc(s) 提取 unique content**：canonical doc 尚未覆盖的任何内容。这可能是 specific edge cases、additional prevention rules 或 alternative debugging approaches。
 3. **把 unique content merge 到 canonical doc 的自然位置。** 不要只是 append；要集成到逻辑上所属的位置。如果 unique content 很小（一个 bullet point、一句话），inline 它。如果是 substantial sub-topic，添加为清晰标记的 section。
-4. **更新 cross-references**：如果任何其他 docs 引用了 subsumed doc，将这些 references 更新为指向 canonical doc。
+4. **更新 cross-references**：如果任何其他 docs 引用了 subsumed doc，将这些 references 更新为指向 canonical doc。README 中的 catalog rows 是 inventory，不是 citations：consolidation 后 canonical doc 必须恰好有一行，subsumed doc 不应再有行。如果两篇都有 row，删除 subsumed row，并把其 unique description 合并进 canonical row；如果只有 subsumed doc 有 row，则把该 row 的 path 和 description 改指向 canonical doc，不要删除 surviving content 唯一的 catalog entry。README 不作为 review candidate，但当 action 删除、重命名或移动所列 doc 时，必须机械维护其 rows。
 5. **删除 subsumed doc。** 不要 archive，不要添加 redirect metadata；直接删除文件。Git history 会保留它。
 
 如果一个 doc cluster 有 3+ overlapping docs，pairwise 处理：先 consolidate 重叠最多的两个 docs，然后评估 merged result 是否应与下一个 doc consolidate。
 
 完成 merge 后，对 canonical doc 运行 mechanical claims check（见下方 Replace flow 的 step 4）。Merged content 会连同它的 citations 一起带入，而 consolidation 是 cross-references 最容易失效的地方。
 
-**Merge 以外的 structural edits：** Consolidate 也覆盖反向情况。如果一个 doc 已变得笨重，并覆盖多个适合 separate retrieval 的 distinct problems，可以建议拆分。只有当 sub-topics 真正 independent，且 maintainer 可能只搜索其中一个而不需要另一个时才这样做。
+**Merge 以外的 structural edits：** Consolidate 也覆盖反向情况。如果一个 doc 已变得笨重，并覆盖多个适合 separate retrieval 的 distinct problems，可以建议拆分。只有当 sub-topics 真正 independent，且 maintainer 可能只搜索其中一个而不需要另一个时才这样做；此时使用下方 Split Flow。
+
+## Split Flow（拆分流程）
+
+Split 是 Consolidate 的反向操作：把一篇覆盖多个问题的 doc 拆成 N 个聚焦的 successor。门槛很高，因为拆分会使 drift surface 翻倍，而 consolidation 正是为了消除这种风险。只有当 Retrieval-Value Test 反向成立时才拆分：maintainer 搜索一个子主题时，如果必须穿过其他内容会受到实质妨碍，并且每个片段都有独立 retrieval value。文档长度本身永远不是拆分理由。
+
+在 headless mode 中不要执行拆分；将 recommendation（doc、建议的片段边界、证据）记录到 Recommended。
+
+拆分必须**一次一个、顺序执行**，复用 Replace machinery：
+
+1. 启动一个 subagent 编写 successor docs。传入原 doc 的完整内容、调查中识别出的子主题边界、目标 paths 和 categories，以及 Replace flow 传入的三个 contract files（`references/schema.yaml`、`references/yaml-schema.md`、`assets/resolution-template.md`）。每个片段都需要的 shared context（root cause、environment、background）应复制到各 successor，而不是互相引用；每个片段必须独立成立。
+2. 按 Replace flow 的 steps 3-4 验证每个 successor：先用 `scripts/validate-frontmatter.py` 检查 parser-safe frontmatter，再用 `scripts/validate-doc-claims.py` 做 mechanical claims check；script 无法 resolve 时采用相同的 fallback 行为。
+3. 重写 inbound links，使每个 citation 指向承载相应内容的片段；跨片段 citation 指向最相关的片段。同步更新 README 中的 catalog rows。
+4. orchestrator 删除原 doc。Git history 会保留它。
 
 ## Replace Flow（替换流程）
 
@@ -96,7 +122,7 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
    ```
 
    Exit 1 flags 是 **adjudication input，而不是 failures**。描述 removed code 的 successor doc 可能合理地引用已不存在的 paths。通过修正 citation、将其标注为 historical，或确认其为 intentional 来处理每个 flag；scaffold flags 必须始终修复。如果该 script 在当前平台无法 resolve，手动扫描 body 中的相同 patterns，并在 report 中说明。
-5. Subagent 完成后，orchestrator 删除 old learning file。New learning 的 frontmatter 可选包含 `supersedes: [old learning filename]` 以便 traceability，但这不是必须；git history 和 commit message 提供相同信息。
+5. Subagent 完成后，orchestrator 删除 old learning file，并更新任何列出 old filename 的 catalog README row，使其指向 successor。New learning 的 frontmatter 可选包含 `supersedes: [old learning filename]` 以便 traceability，但这不是必须；git history 和 commit message 提供相同信息。
 
 **当 evidence insufficient 时：**
 
@@ -111,6 +137,6 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
 
 Unlink 文件前，在 repo markdown content 中运行 final inbound-link check，以捕获 Phase 1 investigation 中漏掉的 references。为了效率，优先使用 platform 的 native content-search tool（例如 Claude Code 中的 Grep）；对 matches 周围使用 ranged 或 context-line reads，而不是加载整个文件。
 
-每个 match 都是删除后会 dangling 的 citation。Cleanup 是 mechanical 的；Phase 2 已经分类 citations 并确认 Delete 正确。不要重新争论。
+每个 match 都是删除后会 dangling 的 citation。Cleanup 是 mechanical 的；Phase 2 已经分类 citations 并确认 Delete 正确。不要重新争论。README 中的 catalog rows 也算 citations，删除被删 doc 对应的 row。
 
 如果此处出现 Phase 1 未见过的 citation，且它不是 unambiguously decorative（而是 substantive 或 mixed/unclear），停止并重新分类：autofix mode 做 stale-mark；interactive mode 询问用户 Replace 是否合适。只有当所有 late-discovered citations 都 unambiguously decorative 时，才继续 cleanup。

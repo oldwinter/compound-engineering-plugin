@@ -35,7 +35,17 @@ Resolve the preference in this order:
 3. A preference already in your **project instructions** (the active instructions in your context) — consumed from context, **never** read from a named file.
 4. **Default:** first available attested-different target in `codex → claude → grok → composer`; Cursor-default participates only when explicitly preferred.
 
-Before egress, resolve the target to one concrete installed route, verify every recipient against `CROSS_MODEL_PEERS`, announce it, and pass it as `CROSS_MODEL_FIXED_ROUTE`. A failed route returns no artifact and never changes provider or intermediary internally. A retry is a new disclosed and sanctioned dispatch. For backward compatibility, either `cursor` or `composer` in `CROSS_MODEL_PEERS` sanctions Cursor as an intermediary, but selecting Cursor-default requires target `cursor`; `grok` alone never sanctions Grok-via-Cursor.
+在 egress 之前，将 target 解析为一个具体的已安装 route，依据 `CROSS_MODEL_PEERS` 验证每个 recipient，先公布该 route，再将其作为 `CROSS_MODEL_FIXED_ROUTE` 传入。`CROSS_MODEL_FIXED_ROUTE` accepts exactly these tokens（只接受以下 token）；其他值（包括 `codex-cli` 这类看起来像 route 的猜测）都会让 worker fail-closed：
+
+| 目标 | Route token(s) |
+|--------|----------------|
+| `codex` | `codex` |
+| `claude` | `claude` |
+| `grok` | `grok-cli`（原生 CLI）或 `grok-cursor`（经 Cursor intermediary） |
+| `cursor` | `cursor` |
+| `composer` | `composer` |
+
+失败的 route 不会返回 artifact，也不会在内部改变 provider 或 intermediary。重试属于新的 dispatch，必须重新披露并获得 sanction。为兼容旧配置，`CROSS_MODEL_PEERS` 中的 `cursor` 或 `composer` 任一项都允许 Cursor 作为 intermediary；但选择 Cursor-default 时 target 必须是 `cursor`，仅有 `grok` 永远不会允许 Grok-via-Cursor。
 
 `CROSS_MODEL_PEERS` is an optional restriction: when unset, it leaves the resolved route unfiltered and this skill invocation plus the concrete pre-egress disclosure sanctions that route; when set, the selected target/intermediary must appear. Use this contract directly. Do not inspect the worker source to rediscover its allowlist behavior.
 
@@ -86,17 +96,17 @@ PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c 
 ```bash
 SKILL_DIR="<absolute path of the directory containing the ce-code-review SKILL.md you read>";
 PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1 && { echo "$c"; break; }; done)"; [ -n "$PY" ] || { echo "no working Python 3 interpreter on PATH" >&2; exit 1; };
-PEER_HARD="${CROSS_MODEL_HARD_SECS:-1200}"; echo "peer-deadline-secs=$(( PEER_HARD + 10 ))";
-CE_PEER_HARD_SECS="$(( PEER_HARD + 30 ))" CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" start --skill ce-code-review --run-id "<run-id>" --label adversarial -- env CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" bash "$SKILL_DIR/scripts/cross-model-adversarial-review.sh" "<host-serving-family>" "<target>" "<base-ref>" "<run-dir>"
+echo "peer-deadline-secs=$(( ${CROSS_MODEL_HARD_SECS:-1200} + 10 ))";
+CE_PEER_HARD_SECS= CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" start --skill ce-code-review --run-id "<run-id>" --label adversarial -- env CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" bash "$SKILL_DIR/scripts/cross-model-adversarial-review.sh" "<host-serving-family>" "<target>" "<base-ref>" "<run-dir>"
 ```
 
-这些嵌套 window 共用一份预算和一个 knob：`CROSS_MODEL_HARD_SECS`。必须像上例一样，在调用 `start` 的同一个 shell call 中解析 `PEER_HARD`；分开调用会丢失该值，并让前缀把 `CE_PEER_HARD_SECS` 计算成 `30`。Runner supervisor 使用由此派生的 `+30s`，orchestrator 的共享 deadline 使用 `+10s`，因此调大 knob 会同步扩大所有外层 window。读取打印出的 `peer-deadline-secs=<n>`，并把该 `<n>` 作为下方共享 deadline；绝不能硬编码，否则这些值一旦漂移，最窄的 window 会静默回收健康 peer，浪费它的全部执行成本。
+这些嵌套 window 共用一份预算和一个 knob：`CROSS_MODEL_HARD_SECS`。Runner 会自动根据 ambient knob 派生 supervisor hard window（`max(1230, knob + 30)`）。在 start 前缀中清空 `CE_PEER_HARD_SECS`（`CE_PEER_HARD_SECS=`），避免上一次 session 或 harness 导出的旧值压低该派生值；如果某个 skill 有意设置了显式数值（例如 ce-work / elevation），显式的 `CE_PEER_HARD_SECS` 仍然优先，但本路径不得这样做。必须像上例一样，在调用 `start` 的同一个 shell call 中打印 `knob + 10` 得到 orchestrator deadline，并使用打印出的 `peer-deadline-secs=<n>` 作为下方共享 deadline；绝不能硬编码，否则 knob 改变后旧字面量仍会回收健康 peer，浪费它的全部执行成本。
 
-**不要把 `CROSS_MODEL_HARD_SECS` 转发给 worker。** Runner 已经透传 ambient environment，因此用户实际设置的 knob 会自行到达 worker。若重新导出 orchestrator 解析后的值，会把 fallback 变成显式 override，并破坏 worker 必须保留的区别：它只对带 idle guard 的 codex route 使用提高后的默认值，而对没有 output-idle detection 的 route 保留较低上限（worker 中的 `UNGUARDED_HARD_SECS`）。强制统一值会让这些 route 再次出现加倍 hang。`PEER_HARD` 只用于设置两个外层 window；worker 的有效 cap 不会超过 `PEER_HARD`，所以嵌套关系仍然成立。
+**不要把 `CROSS_MODEL_HARD_SECS` 转发给 worker。** Runner 已经透传 ambient environment，因此用户实际设置的 knob 会自行到达 worker。若重新导出 orchestrator 解析后的值，会把 fallback 变成显式 override，并破坏 worker 必须保留的区别：带 idle guard 的 route（codex 以及 streaming claude/cursor-family）使用提高后的 `HARD_SECS` 默认值，而 `grok-cli` 因为其 `--json-schema` 路径无法 stream，仍保留较低的 `UNGUARDED_HARD_SECS` 上限。强制统一值会让这个仅支持 hard timeout 的 route 再次出现加倍 hang。
 
 - `<run-id>` = the Stage 3d run id (the same one that forms `<run-dir>`); job state lives under `<run-dir>/jobs/<job-id>/`.
 - `<host-serving-family>` is `codex`, `claude`, `grok`, `composer`, or `unknown`; `<host-harness>` is `codex`, `claude`, `grok`, `cursor`, or `unknown`.
-- `<target>` is one of `codex`, `claude`, `grok`, `cursor`, or `composer`; `<fixed-route>` is its already-sanctioned concrete route.
+- `<target>` 是 `codex`、`claude`、`grok`、`cursor` 或 `composer` 之一；`<fixed-route>` 是 Step 1 表中已 sanction 的具体 route token（`codex`、`claude`、`grok-cli`、`grok-cursor`、`cursor` 或 `composer`）。
 - `<base-ref>` = the Stage 1 `BASE` (the diff base the peer reviews via `git diff <base-ref>`).
 - `<run-dir>` = the absolute Stage 4 run dir. The script writes `adversarial-<provider>.json` there **only after** forcing `reviewer` to `adversarial-<provider>` and downgrading peer `safe_auto` → `gated_auto`.
 

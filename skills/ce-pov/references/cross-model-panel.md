@@ -136,6 +136,17 @@ For each peer:
    intermediary. Confirm every actual recipient is in the egress allowlist.
 5. Announce the selected target and route in ordinary language before dispatch.
 
+传给 worker 的 fixed route accepts exactly these tokens（只接受以下 token）；其他值（包括 `codex-cli` 这类看起来像
+route 的猜测）都会让 worker fail-closed：
+
+| 目标 | Route token(s) |
+|--------|----------------|
+| `codex` | `codex` |
+| `claude` | `claude` |
+| `grok` | `grok-cli`（原生 CLI）或 `grok-cursor`（经 Cursor intermediary） |
+| `cursor` | `cursor` |
+| `composer` | `composer` |
+
 Binary presence proves only that a route is a candidate. Use an available
 non-egressing authentication or capability probe when the harness exposes one,
 and do not call a route usable until it returns a valid artifact. Classify a
@@ -208,16 +219,16 @@ repository. For named peers, start one job per exact target; for a selected pane
 start one job per selected peer. Start all jobs before waiting.
 
 **使用默认值时，无需额外处理 peer budget。**该 skill 的 worker 会在 600 秒自行停止，
-runner supervisor 的默认值是 630 秒，因此 runner window 已位于 worker cap 之外，不会
-回收健康 worker。
+runner supervisor 会派生至少 1230 秒的上限，因此 runner window 已位于 worker cap 之外，
+不会回收健康 worker。
 
-**如果在此把 `CROSS_MODEL_HARD_SECS` 提高到 600 以上，还必须把
-`CE_PEER_HARD_SECS` 提高到至少 `knob + 30`。** Worker 从 ambient environment
-读取 knob，但 runner 不会据此派生 supervisor window；若不调整，runner 会保持 630 秒并
-成为最窄的 window，提前回收本应由新 knob 延长的 worker。二者都是 runner 和 worker 会
-继承的普通 environment variable，因此要一起 export。不要在 worker command line 上重新
-导出已经解析的 `CROSS_MODEL_HARD_SECS`：这会把 fallback 变成 override，并让 worker
-失去 route-aware default。
+**提高 `CROSS_MODEL_HARD_SECS` 会自动扩大 runner window。**Runner 会根据 ambient knob
+派生 supervisor hard cap（`max(1230, knob + 30)`）。不要在此设置数值型
+`CE_PEER_HARD_SECS`，并在 start 前缀中清空任何 ambient 值（`CE_PEER_HARD_SECS=`），避免
+旧 export 压低该派生值。不要把已解析的 `CROSS_MODEL_HARD_SECS` 重新导出到 worker 的
+command line：这会把 fallback 变成 override，并让 worker 失去 route-aware default
+（带 idle guard 的 streaming route 共用 `HARD_SECS`；`grok-cli` 因为其 `--json-schema`
+路径无法 stream，单独保留较低的 `UNGUARDED_HARD_SECS` 上限）。
 
 Each worker writes `<run-dir>/pov-<target>.json`, where `<target>` is the resolved
 route target with `grok-cli`/`grok-cursor` collapsing to `grok`. Pass exactly that

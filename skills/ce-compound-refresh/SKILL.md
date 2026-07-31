@@ -36,6 +36,7 @@ Check whether the arguments you were invoked with contain `mode:headless`. If pr
 - **Skip all user questions.** Never pause for input.
 - **Process all docs in scope.** No scope narrowing questions — if no scope hint was provided, process everything.
 - **Attempt all safe actions:** Keep (no-op), Update (fix references), Consolidate (merge and delete subsumed doc), auto-Delete (unambiguous criteria met), Replace (when evidence is sufficient). If a write succeeds, record it as **applied**. If a write fails (e.g., permission denied), record the action as **recommended** in the report and continue — do not stop or ask for permissions.
+- **Relocation 遵循 auto-delete 模式：只有所有条件都满足才执行，否则给出 recommendation。**Headless relocation 只有在以下四个条件全部满足时才自动应用：(1) 按 category mapping 判断，frontmatter 与 directory 不一致；(2) 内容证据明确判断方向是 directory 错了，而不是 frontmatter 错了；(3) 目标 category directory 已存在；(4) 所有 inbound citations 都在仓库内且可机械重写。只要一个条件不满足（包括 doc 内容合理地同时属于两个 category），就把 relocation 记录到 Recommended。Headless mode 中 Split 始终只能给 recommendation：拆分标准属于没有 ground truth 的 retrieval-value 判断，因此把建议的 fragment boundaries 记录到 Recommended。
 - **Mark as stale when uncertain.** If classification is genuinely ambiguous (Update vs Replace vs Consolidate vs Delete) or Replace evidence is insufficient, mark as stale with `status: stale`, `stale_reason`, and `stale_date` in the frontmatter. If even the stale-marking write fails, include it as a recommendation.
 - **Use conservative confidence.** In interactive mode, borderline cases get a user question. In headless mode, borderline cases get marked stale. Err toward stale-marking over incorrect action.
 - **Always generate a report.** The report is the primary deliverable. It has two sections: **Applied** (actions that were successfully written) and **Recommended** (actions that could not be written, with full rationale so a human can apply them or run the skill interactively). The report structure is the same regardless of what permissions were granted — the only difference is which section each action lands in.
@@ -110,13 +111,13 @@ For each candidate artifact, classify it into one of five outcomes:
 3. **Match docs to reality, not the reverse.** When current code differs from a learning, update the learning to reflect the current code. The skill's job is doc accuracy, not code review — do not ask the user whether code changes were "intentional" or "a regression." If the code changed, the doc should match. If the user thinks the code is wrong, that is a separate concern outside this workflow.
 4. **Be decisive, minimize questions.** When evidence is clear (file renamed, class moved, reference broken), apply the update. In interactive mode, only ask the user when the right action is genuinely ambiguous. In headless mode, mark ambiguous cases as stale instead of asking. The goal is automated maintenance with human oversight on judgment calls, not a question for every finding.
 5. **Avoid low-value churn.** Do not edit a doc just to fix a typo, polish wording, or make cosmetic changes that do not materially improve accuracy or usability.
-6. **Use Update only for meaningful, evidence-backed drift.** Paths, module names, related links, category metadata, code snippets, and clearly stale wording are fair game when fixing them materially improves accuracy.
+6. **仅在有意义且有证据支持的 drift 上使用 Update。**Paths、module names、related links、category metadata、code snippets 和明显过时的 wording，只要修复能实质改善 accuracy，就可以更新。错位也属于 drift：当 doc 的 directory 与 frontmatter category 不一致，或内容明确属于另一个已存在的 category 时，按 Update flow 的 relocation steps 迁移文件。frontmatter/directory 不一致只能证明存在问题，不能证明应改哪一侧；移动前必须根据内容证据确定方向，绝不能凭下一次运行可能反驳的主观判断迁移（这会造成 rule-5 churn）。Headless mode 中只有满足 headless rules 的四条件 gate 才执行 relocation，否则给出 recommendation。
 7. **Use Replace only when there is a real replacement.** That means either:
    - the current conversation contains a recently solved, verified replacement fix, or
    - the user has provided enough concrete replacement context to document the successor honestly, or
    - the codebase investigation found the current approach and can document it as the successor, or
    - newer docs, pattern docs, PRs, or issues provide strong successor evidence.
-8. **Delete when the code is gone, and only after checking for inbound links.** If the referenced code, controller, or workflow no longer exists in the codebase and no successor can be found, delete the file — don't default to Keep just because the general advice is still "sound." When in doubt between Keep and Delete, ask the user (in interactive mode) or mark as stale (in headless mode). Inbound links inform classification, not cleanup: cleanup is always mechanical, but **decorative** citations (principle stated inline) allow Delete, while **substantive** citations (citing doc relies on the cited doc) signal Replace. The auto-delete case is missing code, no matching successor, and citations absent or decorative.
+8. **代码消失后才使用 Delete，并且必须先检查 inbound links。**如果被引用的 code、controller 或 workflow 曾经存在于本仓库、后来已被删除，且找不到 successor，就删除该文件；不要仅因为一般建议仍然“sound”就默认 Keep。“Gone”要求它确实曾存在于这里：从未引用仓库内 code 的 learning（developer environment、onboarding、process）不属于该规则，永远不能自动删除，见 Phase 2 中 no-in-repo-implementation 的情况。在 Keep 和 Delete 之间犹豫时，interactive mode 询问用户，headless mode 标记 stale。Inbound links 用于分类，不用于 cleanup：cleanup 始终是机械操作，但**装饰性** citation（原则已在正文中直接说明）允许 Delete，而**实质性** citation（引用方依赖被引用 doc）则指向 Replace。auto-delete 的条件是 code 缺失、没有匹配的 successor，且 citations 不存在或仅为装饰性引用。
 9. **Evaluate document-set design, not just accuracy.** In addition to checking whether each doc is accurate, evaluate whether it is still the right unit of knowledge. If two or more docs overlap heavily, determine whether they should remain separate, be cross-scoped more clearly, or be consolidated into one canonical document. Redundant docs are dangerous because they drift silently — two docs saying the same thing will eventually say different things.
 10. **Delete, don't archive.** There is no `_archived/` directory. When a doc is no longer useful, delete it. Git history preserves every deleted file — that is the archive. A dedicated archive directory creates problems: archived docs accumulate, pollute search results, and nobody reads them. If someone needs a deleted doc, `git log --diff-filter=D -- <root>/solutions/` will find it.
 
@@ -130,6 +131,8 @@ Exclude:
 - `<root>/solutions/_archived/` (legacy — if this directory exists, flag it for cleanup in the report)
 
 Find all `.md` files under `<root>/solutions/`, excluding `README.md` files and anything under `_archived/`. If an `_archived/` directory exists, note it in the report as a legacy artifact that should be cleaned up (files either restored or deleted).
+
+`README.md` 文件不作为 review *candidates*，但不能从 cleanup 中排除：当 action 删除、重命名、移动、consolidate 或 replace 某个 catalog README 列出的 doc 时，必须在该 action 的 cross-reference cleanup 中机械更新 README 的 rows；否则每次 delete 都会留下 dangling catalog row。
 
 If a scope argument was provided, use it to narrow scope before proceeding. Try these matching strategies in order, stopping at the first that produces results:
 
@@ -286,6 +289,10 @@ Separate docs earn their keep only when:
 
 If none of these apply, prefer consolidation. Two docs covering the same ground will eventually drift apart and contradict each other — that is worse than a slightly longer single doc.
 
+### Category-Shape Signal（仅报告）
+
+聚类时记录 category-level shape 问题：一个 directory 下的 docs 覆盖多个不同主题、接近为空的 category，或 doc 被放在与其 frontmatter category 不一致的 directory 中。将这些问题作为 recommendations 报告；永远不要重组 directories、重命名 categories 或创建新的 category。该 skill 唯一执行的 structural action 是 per-doc 类型：明确的错位进入 Update flow 的 relocation steps，难以维护且覆盖多个问题的 doc 进入 Split flow。
+
 ### Cross-Doc Conflict Check
 
 Look for outright contradictions between docs in scope:
@@ -315,7 +322,7 @@ Use subagents for context isolation when investigating multiple artifacts — no
 There are two subagent roles:
 
 1. **Investigation subagents** — read-only. They must not edit files, create successors, or delete anything. Each returns: file path, evidence, recommended action, confidence, and open questions. These can run in parallel when artifacts are independent.
-2. **Replacement subagents** — write a single new learning to replace a stale one. These run **one at a time, sequentially** (each replacement subagent may need to read significant code, and running multiple in parallel risks context exhaustion). The orchestrator handles all deletions and metadata updates after each replacement completes.
+2. **Replacement subagents** — 为一个 candidate doc 编写 successor content：Replace 编写一个新的 learning，已确认的 Split 则编写**全部 successor fragments**（整个 split candidate 仍由一个 subagent 负责，避免 fragment 在 worker 之间丢失）。这些任务必须**一次一个、顺序执行**（每个 replacement subagent 可能需要读取大量 code，并行运行会有 context exhaustion 风险）。每个 replacement 完成后，由 orchestrator 统一处理 deletions 和 metadata updates。
 
 The orchestrator merges investigation results, detects contradictions, coordinates replacement subagents, and performs all deletions/metadata edits centrally. In interactive mode, it asks the user questions on ambiguous cases. In headless mode, it marks ambiguous cases as stale instead. If two artifacts overlap or discuss the same root issue, investigate them together rather than parallelizing.
 
@@ -351,6 +358,8 @@ Choose **Consolidate** when Phase 1.75 identified docs that overlap heavily but 
 
 The Consolidate action is: merge unique content from the subsumed doc into the canonical doc, then delete the subsumed doc. Not archive — delete. Git history preserves it.
 
+**Split（Consolidate 的反向操作）：** Consolidate 也覆盖反向情况：一篇包含多个真正独立问题的 doc 变成多个聚焦的 successor，按 `references/per-action-flows.md` 中的 Split flow 执行。门槛是反向应用 Retrieval-Value Test：只有 maintainer 搜索一个 sub-topic 时会因其他内容而受到实质妨碍，且每个 fragment 都有独立 retrieval value，才允许拆分。文档长度本身永远不是理由；拆分会使 drift surface 翻倍，而 consolidation 正是为了消除这种风险。Headless mode 中 Split 只能给 recommendation。
+
 ### Replace
 
 Choose **Replace** when the learning's core guidance is now misleading — the recommended fix changed materially, the root cause or architecture shifted, or the preferred pattern is different.
@@ -384,6 +393,7 @@ When a learning's referenced files are gone, that is strong evidence — but onl
 
 - A learning about session token storage where `auth_token.rb` is gone — does the application still handle session tokens? If so, the concept persists under a new implementation. That is Replace, not Delete.
 - A learning about a deprecated API endpoint where the entire feature was removed — the problem domain is gone. That is Delete.
+- 从未引用仓库内 implementation 的 learning（developer-environment、onboarding、tooling-on-laptops 或 process learning）永远不能满足“implementation is gone”：仓库从未见证其 domain，因此找不到 supporting files 不能证明问题已经消失。这类 learning 永远不能 auto-delete；如果其时效性存疑，headless mode 标记 stale，interactive mode 询问用户。
 
 Do not search mechanically for keywords from the old learning. Instead, understand what problem the learning addresses, then investigate whether that problem domain still exists in the codebase. The agent understands concepts — use that understanding to look for where the problem lives now, not where the old code used to be.
 
@@ -409,7 +419,7 @@ In headless mode, Delete + decorative cleanup is fine. Any substantive citation,
 
 **Auto-delete only when all three hold:**
 
-- The implementation is gone (or fully superseded by a clearly better successor, or the doc is plainly redundant).
+- Implementation 已消失——它曾存在于本仓库，后来被删除（或已被明确更好的 successor 完全取代，或 doc 明显 redundant）。
 - The problem domain is gone — the app no longer deals with what the learning addresses.
 - Inbound links are absent or unambiguously decorative.
 
@@ -443,6 +453,7 @@ Most Updates and Consolidations should be applied directly without asking. Only 
 - You are about to Delete a document **and** the evidence is not unambiguous (see auto-delete criteria in Phase 2). When auto-delete criteria are met, proceed without asking.
 - You are about to Consolidate and the choice of canonical doc is not clear-cut
 - You are about to create a successor via Replace
+- 即将执行 Split——它会写入 successors 并删除原 doc，因此要像 Replace 一样确认 fragment boundaries；Consolidation 的默认免询问规则只覆盖 merge，永远不覆盖 split
 
 Do **not** ask questions about whether code changes were intentional, whether the user wants to fix bugs in the code, or other concerns outside doc maintenance. Stay in your lane — doc accuracy.
 
@@ -515,8 +526,8 @@ Do not front-load the user with a full maintenance queue.
 For each candidate, execute the flow that matches its classification from Phase 2 (confirmed in Phase 3). Read `references/per-action-flows.md` and follow the matching section:
 
 - **Keep** — no file edit by default; summarize why the learning remains trustworthy.
-- **Update** — in-place edits when the solution is still substantively correct (path renames, link refreshes, module renames).
-- **Consolidate** — merge overlapping docs into a canonical doc, delete subsumed docs, update cross-references. The orchestrator handles consolidation directly.
+- **Update** — solution 仍 substantively correct 时做 in-place edits（path renames、link refreshes、module renames），并处理明确的 misfiled doc relocation（headless：仅在四条件 gate 下执行）。
+- **Consolidate** — 将重叠 docs merge 到 canonical doc，删除 subsumed docs，更新 cross-references。由 orchestrator 直接处理 consolidation。反向情况执行 Split flow：一篇 multi-problem doc 通过 subagent 变成聚焦的 successors（仅 interactive mode）。
 - **Replace** — write a successor learning via subagent (passing the documentation contract files), validate frontmatter and cited claims, then delete the old. When evidence is insufficient, mark stale instead.
 - **Delete** — final inbound-link check, then remove. Reclassify if late-discovered substantive citations surface.
 
@@ -591,11 +602,13 @@ Split actions into two sections:
 - For each **Deleted** file: the file path and why it was removed (problem domain gone, fully redundant, etc.)
 - For each **Marked stale** file: the file path, what evidence was found, and why it was ambiguous
 
-**Recommended** (actions that could not be written — e.g., permission denied):
+**Recommended**（无法写入的 actions，例如 permission denied，以及不会在 unattended 模式运行的 actions）：
 - Same detail as above, but framed as recommendations for a human to apply
 - Include enough context that the user can apply the change manually or re-run the skill interactively
+- 每个未通过四条件 gate 的 relocation（doc、建议的目标 category、未满足的条件）以及每个 split（doc、建议的 fragment boundaries——split 始终只能给 recommendation）
+- Phase 1.75 发现的所有 category-shape 观察
 
-If all writes succeed, the Recommended section is empty. If no writes succeed (e.g., read-only invocation), all actions appear under Recommended — the report becomes a maintenance plan.
+只有当所有 writes 都成功**且**没有 report-only items 时，Recommended section 才为空；即使一次运行中的所有 writes 都成功，recommend-only relocations、splits 和 category-shape observations 仍会出现在 Recommended 下。如果没有任何 write 成功（例如 read-only invocation），所有 actions 都出现在 Recommended 下，report 就是一份 maintenance plan。
 
 **Legacy cleanup** (if `<root>/solutions/_archived/` exists):
 - List archived files found and recommend disposition: restore (if still relevant), delete (if truly obsolete), or consolidate (if overlapping with active docs)

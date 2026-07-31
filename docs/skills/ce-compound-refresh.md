@@ -57,8 +57,8 @@
 `ce-compound-refresh` 作为 structured review 运行，并给出五种 explicit outcomes：
 
 - **Keep**：准确且有用；不编辑
-- **Update**：references drifted，但 solution 仍正确；in-place 修复
-- **Consolidate**：两篇 docs 高度 overlap；把 unique content 合并进 canonical doc，删除被 subsumed 的一篇
+- **Update**：references drifted，但 solution 仍正确；in-place 修复，包括在 directory 与 frontmatter category 明确不一致时迁移文档
+- **Consolidate**：两篇 docs 高度 overlap；把 unique content 合并进 canonical doc，删除被 subsumed 的一篇。其反向操作是 **Split**：当子主题具有独立 retrieval value 时，把一篇覆盖多个问题的文档拆成聚焦的 successor 文档
 - **Replace**：旧 guidance 已误导；写 successor（用 subagent 隔离 context）并删除旧 doc
 - **Delete**：code 已消失，problem domain 已消失，没有 substantive inbound citations；删除文件（git history 就是 archive）
 
@@ -78,7 +78,7 @@ Skill 先调查（Phase 1 用当前 codebase 读取每篇 doc），再执行 doc
 
 ### 3. Document-set analysis：捕获 per-doc review 看不到的问题
 
-Phase 1.75 把 document set 作为整体评估：按五个 dimensions（problem statement、solution shape、referenced files、prevention rules、root cause）做 overlap detection、查找 supersession signals（newer canonical doc 吞并 older narrow precursor）、识别每个 topic cluster 的 canonical doc，并检查 cross-doc conflicts。两篇 docs 覆盖同一主题时，最终会 drift 并互相矛盾；这比一篇稍长的 single doc 更糟。
+Phase 1.75 把 document set 作为整体评估：按五个 dimensions（problem statement、solution shape、referenced files、prevention rules、root cause）做 overlap detection、查找 supersession signals（newer canonical doc 吞并 older narrow precursor）、识别每个 topic cluster 的 canonical doc，并检查 cross-doc conflicts；同时以 report-only 方式记录 category-shape signal（跨多个主题的目录、接近为空的 category、归类错误的 docs）。两篇 docs 覆盖同一主题时，最终会 drift 并互相矛盾；这比一篇稍长的 single doc 更糟。
 
 ### 4. 通过 subagent 执行 Replace：context isolation
 
@@ -213,6 +213,9 @@ Interactive mode 中，delete 前你会看到带 evidence 的 recommendation。�
 
 **为什么 delete，而不是 archive？**
 Archive folders 会积累并污染 search results，没人阅读，还会制造 "we'll come back to this" 的假象却没有实际行动。Git history 保留每个 deleted file。`git log --diff-filter=D -- docs/solutions/` 可以找到需要恢复的任何内容。
+
+**它会重组 solutions 文件夹吗？**
+只处理安全子集，并保持有意的不对称：content drift 可以自动修复；structural drift 只有在和 content drift 一样可证伪时才自动修复。明确的错位文档通过 `git mv` 加 inbound-link rewrite 迁移；headless mode 只有在满足与 auto-delete 对应的四个条件时才执行（frontmatter 与 directory 不一致、内容证据明确表明是目录错位、目标 category 已存在、所有 citations 都在仓库内且可机械重写）。只要有一个条件不满足，就只记录 recommendation 而不执行。覆盖多个问题的 doc 可以拆成聚焦的 successor（门槛很高；headless mode 始终只给 recommendation，因为拆分标准是没有 ground truth 的 retrieval-value 判断）。只要 README catalog 列出了被删除或重命名的 doc，就同步更新对应行。目录级重组（重命名 category、创建新 category、重新分类）永不自动执行；Phase 1.75 只把 category-shape 观察作为 recommendation 报告。
 
 **它会区别处理 pattern docs 吗？**
 会。Pattern docs 是 derived guidance，不是 incident-level learnings。Five outcomes 都适用，但 evidence 不同：Keep 表示 underlying learnings 仍支持规则；Replace 表示 synthesis 已误导，需要基于 refreshed learnings 形成不同 generalization。
