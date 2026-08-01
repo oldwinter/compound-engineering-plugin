@@ -31,7 +31,7 @@ Script 负责报告 flags；你负责决定如何处理每一个。只有三种 
 
 在本 step 或 Step 2 修改 body 后，重新运行 script，直到它报告 clean，或每个剩余 flag 都已确认为 intentional。
 
-## Step 2：Semantic validator subagent（Full 和 headless；lightweight 跳过）
+## Step 2：Semantic validator subagent（Full 和 non-interactive；lightweight 跳过）
 
 Dispatch **一个 generic read-only subagent**，覆盖 written solution doc，以及本次 run 新增或编辑的任何 `CONCEPTS.md` entries。Phase 2.4 entries 同样是 claims；从 session-level summary 写出 glossary entry，正是错误 semantics 进入 vocabulary 的方式。当 platform 提供对应能力时，使用与其他 reviewer subagents 相同的 mid-tier model class。使用下方模板构建 prompt；这是 canonical executable prompt contract，保留英文原文：
 
@@ -81,4 +81,4 @@ Return a structured list, one entry per claim checked:
 
 ## Reporting（报告）
 
-在 run output 中用一行总结该 phase（headless report 的 `Grounding:` 行；interactive success output）：包含已 adjudicate 的 flags（fixed / annotated / confirmed）、已检查的 claims、已软化或修正的 claims，以及适用时的 `degraded — merge-state claims unverified offline`。
+在 run output 中用一行总结该 phase（non-interactive report 的 `Grounding:` 行；interactive success output）：包含已 adjudicate 的 flags（fixed / annotated / confirmed）、已检查的 claims、已软化或修正的 claims，以及适用时的 `degraded — merge-state claims unverified offline`。

@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Purpose** | Sweep configured feedback sources 中的新 items，跟踪每个 item 到 verified resolution，并产出 `/lfg`-ready plan |
-| **Inputs** | `feedback_sources` config（首次运行时 setup）；可选 `setup`/`reconfigure` 和 `mode:headless` tokens |
+| **Inputs** | `feedback_sources` config（首次运行时 setup）；可选 `setup`/`reconfigure` 和 `mode:non-interactive` tokens（deprecated alias `mode:headless`） |
 | **Outputs** | Rolling requirements-only unified plan（`docs/plans/feedback-sweep-plan.md`）、durable state file、source-side acknowledgments、run summary |
-| **Invocation** | 手动（`/ce-sweep`）或定时（`/ce-sweep mode:headless`）；绝不 model-invoked |
+| **Invocation** | 手动（`/ce-sweep`）或定时（`/ce-sweep mode:non-interactive`）；绝不 model-invoked |
 | **Position** | Around the loop，从 customer feedback 供给 `/lfg` 和 `ce-plan` |
 
 ## 调用示例
@@ -18,7 +18,7 @@
 /ce-sweep
 
 # Scheduled 或 unattended run：把 ambiguous decisions 延后到 plan
-/ce-sweep mode:headless
+/ce-sweep mode:non-interactive
 
 # 重新进入 setup，增加或编辑 feedback sources
 /ce-sweep reconfigure
@@ -45,7 +45,7 @@ Feedback triage 往往变成每个 repo 自己的 ritual：扫描上次之后的
 2. **Per-item durability ordering.** Source acknowledge -> 确认可读 -> 写 state -> 最后推进 cursor。任意点崩溃都能恢复，且不会重复 customer-visible actions。
 3. **Fix verification trusts only merge evidence.** Thread claims 永不关闭 item；只有 verified merge 到 default branch 才能关闭，并记录 merge SHA。
 4. **The plan is a view, not a log.** 一个稳定路径上的 rolling plan 每次 run reconcile：新 items append，verified-fixed items drain，human-owned notes region 保持 untouched。如果 `/lfg` 已经就地 enrich plan，sweep 会 archive 它并开始 fresh view，而不是 clobber execution state。
-5. **Headless-safe by contract.** `mode:headless` 永不 prompt：ambiguous product calls deferred 到 plan 的 outstanding questions；当 cursor 看起来错误导致 ack volume 过大时，circuit-breaker 会 defer，而不是 mass-react。
+5. **Non-interactive-safe by contract.** `mode:non-interactive` 永不 prompt：ambiguous product calls deferred 到 plan 的 outstanding questions；当 cursor 看起来错误导致 ack volume 过大时，circuit-breaker 会 defer，而不是 mass-react。
 
 ## 何时使用
 

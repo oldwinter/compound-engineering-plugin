@@ -29,10 +29,10 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 /ce-compound the email digest race condition we fixed
 
 # 由 automation 或 standing instructions 调用时，以无人值守方式捕获
-/ce-compound mode:headless the verified caching fix
+/ce-compound mode:non-interactive the verified caching fix
 ```
 
-只有后续 decision 应由 caller 负责时才使用 headless mode；普通 interactive capture 仍可在修改 project guidance 前提问。
+只有后续 decision 应由 caller 负责时才使用 non-interactive mode；普通 interactive capture 仍可在修改 project guidance 前提问。
 
 ---
 
@@ -53,7 +53,7 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 - 两种 modes：**Full**（parallel subagents 负责 cross-referencing 和 duplicate detection）与 **Lightweight**（single-pass，更快、更省 tokens）
 - Bug track 和 knowledge track 生成匹配 doc 类型的不同 section structures
 - Overlap check 决定更新 existing doc，还是创建 duplicate
-- Discoverability check 确保项目的 `AGENTS.md`/`CLAUDE.md` 暴露 `docs/solutions/`，让未来 agents 找得到（interactive Full 编辑前征求 consent；headless 和 lightweight 只 report 或 tip）
+- Discoverability check 确保项目的 `AGENTS.md`/`CLAUDE.md` 暴露 `docs/solutions/`，让未来 agents 找得到（interactive Full 编辑前征求 consent；non-interactive 和 lightweight 只 report 或 tip）
 - Specialized post-review 可选增强 doc：performance、security、data-integrity 和 read-only simplification checks 会 review drafted learning，但不 mutate product code
 
 ---
@@ -68,7 +68,7 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 
 **Skill 会自行选择 mode，不会提问。** Full 是默认模式，因为与产生这条 learning 的工作相比，它增加的 token 成本很小；只有在 context 确实紧张（session 接近上限），或 fix 非常简单、cross-referencing 没有收益时，才会选择 Lightweight。这些条件 agent 能观察到，用户却看不到，因此提问只会让用户猜测。Skill 会在 output 第一行说明运行了哪个 mode 及原因；如果选择不符合你的偏好，重新运行的成本很低。
 
-Automations 也可以无提示地选择同一 tradeoff：`mode:headless depth:lightweight` 运行 single-pass workflow；`mode:headless depth:full` 运行包含 automatic session-history probe 的完整 workflow。现有 `mode:headless` 调用仍默认使用 Full。Depth 只适用于 headless；没有 headless intent 的 depth flag、unknown value 或 conflicting depth flags 都会显式失败，不会静默猜测。
+Automations 也可以无提示地选择同一 tradeoff：`mode:non-interactive depth:lightweight` 运行 single-pass workflow；`mode:non-interactive depth:full` 运行包含 automatic session-history probe 的完整 workflow。Bare `mode:non-interactive`（以及 deprecated alias `mode:headless`）仍默认使用 Full。Depth 只适用于 non-interactive；没有 non-interactive intent 的 depth flag、unknown value 或 conflicting depth flags 都会显式失败，不会静默猜测。
 
 ### 2. Bug track vs knowledge track：不同形状使用不同结构
 
@@ -89,7 +89,7 @@ Related Docs Finder 会按五个 dimensions 评估与 existing `docs/solutions/`
 
 ### 4. Discoverability check：knowledge 能被找到才会 compound
 
-每次运行都会检查 project instruction file（`AGENTS.md` 或 `CLAUDE.md`）是否会引导未来 agent 发现 `docs/solutions/`。如果不会，interactive Full 会提出暴露 knowledge store 的最小补充，征得 consent 后应用。Headless 只报告 `Instruction-file edit: gap noted, not applied`，绝不编辑；skill-to-skill handoff 不能越过上游 approval gate 修改 repo operating contract。Lightweight 只给 tip。这个检查每次都跑，因为 knowledge store 只有在 findable 时才有 compound value。
+每次运行都会检查 project instruction file（`AGENTS.md` 或 `CLAUDE.md`）是否会引导未来 agent 发现 `docs/solutions/`。如果不会，interactive Full 会提出暴露 knowledge store 的最小补充，征得 consent 后应用。Non-interactive 只报告 `Instruction-file edit: gap noted, not applied`，绝不编辑；skill-to-skill handoff 不能越过上游 approval gate 修改 repo operating contract。Lightweight 只给 tip。这个检查每次都跑，因为 knowledge store 只有在 findable 时才有 compound value。
 
 Proposed addition 会匹配 existing file 的 tone 和 density：能塞进 existing directory listing 时就是单行；只有没有合适位置时才新增小 headed section。
 
@@ -97,7 +97,7 @@ Proposed addition 会匹配 existing file 的 tone 和 density：能塞进 exist
 
 Solution doc 的价值取决于其 claims 是否真实，而基于 conversation evidence 起草容易引入三种失败形态：从 session-level summary 而不是 source 写出 code-behavior claims；宣称 "fixed in X"，但 current checkout 看不到该 merge；以及 drafting scaffold（"Learning 3"）泄漏进最终 doc。
 
-Phase 2.45 用两层机制关闭这些缺口。Deterministic script（`scripts/validate-doc-claims.py`）检查 cited repo paths、commit SHAs（按 HEAD 与 upstream default branch 的 reachability 分类，从而区分 stale checkout 和 fabricated citation）、relative links 以及 dangling scaffold。其 flags 需要 adjudication，不会自动判定失败，因为 doc 可能合理地引用一个恰好被它记录的 fix 删除的 path。然后，read-only validator subagent（Full mode，包括 headless Full）通过引用 defining source line 验证 code-behavior claims，通过 remote truth（`gh` 为 primary，local git 为 fallback）验证 merge-state claims，并检查 countable assertions 的 internal completeness。Lightweight 保留 deterministic check，但跳过 validator subagent。起草阶段同样适用这种 discipline：Solution Extractor 必须先读 defining line 再声明 behavior，并优先引用 PR numbers，而不是对 rebase 敏感的 SHAs。
+Phase 2.45 用两层机制关闭这些缺口。Deterministic script（`scripts/validate-doc-claims.py`）检查 cited repo paths、commit SHAs（按 HEAD 与 upstream default branch 的 reachability 分类，从而区分 stale checkout 和 fabricated citation）、relative links 以及 dangling scaffold。其 flags 需要 adjudication，不会自动判定失败，因为 doc 可能合理地引用一个恰好被它记录的 fix 删除的 path。然后，read-only validator subagent（Full mode，包括 non-interactive Full）通过引用 defining source line 验证 code-behavior claims，通过 remote truth（`gh` 为 primary，local git 为 fallback）验证 merge-state claims，并检查 countable assertions 的 internal completeness。Lightweight 保留 deterministic check，但跳过 validator subagent。起草阶段同样适用这种 discipline：Solution Extractor 必须先读 defining line 再声明 behavior，并优先引用 PR numbers，而不是对 rebase 敏感的 SHAs。
 
 ### 6. 选择性 refresh trigger
 
@@ -109,7 +109,7 @@ Phase 2.45 用两层机制关闭这些缺口。Deterministic script（`scripts/v
 
 ### 8. Session history integration（自动 probe，不向用户提问）
 
-当某个看似无关的 earlier session 实际包含相关问题解决经验时，搜索 prior sessions 才真正有价值；但 agent 和用户都无法事先知道是否存在，因此它不适合做成 yes/no prompt。Full mode 改用低成本的两阶段 probe：始终运行 discovery + metadata pass（与 research subagents 并行，几乎不增加 wall-clock），只有 candidate session 达到 relevance bar 时才升级到成本较高的 extraction + synthesis。通过条件是 current-branch match，或至少命中 2 个 topic keywords。命中后，findings 会折入 bug track 的 "What Didn't Work" 或 knowledge track 的 "Context"；未命中时记录 "no relevant prior sessions" 并继续。这个 gate 让 always-on probe 足够便宜，headless 也会运行它；该 probe 不提问，因此保持 headless 的 non-interactive contract。只有 lightweight mode 完全跳过它。
+当某个看似无关的 earlier session 实际包含相关问题解决经验时，搜索 prior sessions 才真正有价值；但 agent 和用户都无法事先知道是否存在，因此它不适合做成 yes/no prompt。Full mode 改用低成本的两阶段 probe：始终运行 discovery + metadata pass（与 research subagents 并行，几乎不增加 wall-clock），只有 candidate session 达到 relevance bar 时才升级到成本较高的 extraction + synthesis。通过条件是 current-branch match，或至少命中 2 个 topic keywords。命中后，findings 会折入 bug track 的 "What Didn't Work" 或 knowledge track 的 "Context"；未命中时记录 "no relevant prior sessions" 并继续。这个 gate 让 always-on probe 足够便宜，non-interactive 也会运行它；该 probe 不提问，因此保持 non-interactive contract。只有 lightweight mode 完全跳过它。
 
 ### 9. Auto-invoke triggers（自动调用触发条件）
 
@@ -173,8 +173,8 @@ Output 会反馈给 upstream skills：
 - **Just-finished problem**：`/ce-compound`（或从 "that worked" auto-invoked）
 - **With context hint（带 context hint）**：`/ce-compound "the email digest race condition we fixed"`
 - **Long session 中用 Lightweight**：context 紧张时，skill 会自行选择 lightweight mode，并在 output 中说明
-- **低开销 unattended capture**：`/ce-compound mode:headless depth:lightweight "the verified fix"`
-- **完整 unattended capture**：`/ce-compound mode:headless depth:full "the verified fix"`（等同于 plain `mode:headless`）
+- **低开销 unattended capture**：`/ce-compound mode:non-interactive depth:lightweight "the verified fix"`
+- **完整 unattended capture**：`/ce-compound mode:non-interactive depth:full "the verified fix"`（等同于 plain `mode:non-interactive`）
 
 Auto-invoke triggers 会在对话中触发；如果你刚确认某件事 works，不需要记住 slash command。
 
@@ -192,11 +192,11 @@ Auto-invoke trigger phrases（"that worked"、"it's fixed"）只有在你刚好�
 
 **自动运行**：不提问，因为自动化的目的就是不被打断：
 
-> 当一个已经解决并验证的问题产生 non-trivial、reusable learning 时，自动调用 `ce-compound` skill，并传入 `mode:headless` argument。仅在接受把 `docs/solutions/` 作为 tracked knowledge store 的 repository 中执行。
+> 当一个已经解决并验证的问题产生 non-trivial、reusable learning 时，自动调用 `ce-compound` skill，并传入 `mode:non-interactive` argument。仅在接受把 `docs/solutions/` 作为 tracked knowledge store 的 repository 中执行。
 
-如果 standing workflow 明确接受较少 research 和 validation，以换取 single-pass、no-subagent closure，可改用 `mode:headless depth:lightweight`。
+如果 standing workflow 明确接受较少 research 和 validation，以换取 single-pass、no-subagent closure，可改用 `mode:non-interactive depth:lightweight`。
 
-Auto-run 会不经询问写入 `docs/solutions/`（也可能触及 `CONCEPTS.md`），这正是选择自动化的含义，与 branch 上其他会在 commit 前 review 的 edits 没有本质差异。Headless 永不编辑 `AGENTS.md`/`CLAUDE.md`；discoverability 缺失时会报告 `gap noted, not applied`，让后续 interactive run 在获得 consent 后应用。传入 `mode:headless` 是显式且无歧义的形式；skill 也会接受明确的 “run headless / without prompts” 请求，但 token 可以消除疑问。没有 headless signal 时，run 保持 interactive，并可能为一次性 discoverability consent 暂停。
+Auto-run 会不经询问写入 `docs/solutions/`（也可能触及 `CONCEPTS.md`），这正是选择自动化的含义，与 branch 上其他会在 commit 前 review 的 edits 没有本质差异。Non-interactive 永不编辑 `AGENTS.md`/`CLAUDE.md`；discoverability 缺失时会报告 `gap noted, not applied`，让后续 interactive run 在获得 consent 后应用。传入 `mode:non-interactive` 是显式且无歧义的形式；skill 也会接受明确的 “run headless / without prompts” 请求，但 token 可以消除疑问。没有 non-interactive signal 时，run 保持 interactive，并可能为一次性 discoverability consent 暂停。
 
 这些措辞中的其余部分也有明确作用：
 
@@ -217,7 +217,7 @@ Categories 会 auto-detect。Bug-track examples：`build-errors/`、`test-failur
 
 Doc 带 YAML frontmatter（`module`、`tags`、`problem_type` 等）以便 search。Validation 通过 `scripts/validate-frontmatter.py` 运行，用于捕获 silent corruption（malformed `---` delimiters、scalar values 中未 quote 的 `:`）；`scripts/validate-doc-claims.py` 则对照 tree 检查 body 中的 cited paths、SHAs、links 和 drafting scaffold。
 
-在 interactive Full mode 中，如果 discoverability check 发现 knowledge store 未暴露，并且你 consent，skill 也可能对 `AGENTS.md`/`CLAUDE.md` 做小编辑。Headless 和 lightweight 永不应用该编辑。
+在 interactive Full mode 中，如果 discoverability check 发现 knowledge store 未暴露，并且你 consent，skill 也可能对 `AGENTS.md`/`CLAUDE.md` 做小编辑。Non-interactive 和 lightweight 永不应用该编辑。
 
 ---
 
@@ -247,7 +247,7 @@ Bug track 捕获 incident-level fixes："X broke, here's why and how we fixed it
 Knowledge track 可以泛化（conventions、decisions、workflow practices），但 skill 假设存在 code repo、`docs/solutions/` directory 和 YAML-frontmatter conventions。它主要是 software-team tool。
 
 **如果我不想改 AGENTS.md 的 discoverability 怎么办？**
-Interactive Full mode 会在应用编辑前征求 consent。你可以拒绝；doc 仍会写入。Headless 和 lightweight 永不编辑 instruction file，只会 report 或 tip 该 gap。如果 AGENTS.md 已经提到 `docs/solutions/`，这个 prompt 不会触发。
+Interactive Full mode 会在应用编辑前征求 consent。你可以拒绝；doc 仍会写入。Non-interactive 和 lightweight 永不编辑 instruction file，只会 report 或 tip 该 gap。如果 AGENTS.md 已经提到 `docs/solutions/`，这个 prompt 不会触发。
 
 ---
 

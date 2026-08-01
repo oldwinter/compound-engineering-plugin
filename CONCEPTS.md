@@ -95,6 +95,12 @@ Liveness 与 progress 是不同信号，idle window 只能检测 watched stream 
 ### Model identity receipt（模型身份回执）
 Serving backend 对“实际由哪个 model 处理 delegated run”的自有报告。它与 requested model 一同记录，因此两者不一致时会明确显示。只有这种 receipt 才能验证 run 的 model identity；request parameters 或 model 自己生成的文本都不能作为验证依据。没有 receipt 的 output 会标为 requested-but-unverified；为 cross-model agreement 加权的 logic 依据 receipt，而不是 request。
 
+### Handoff seam
+The point in a calling Skill where completed work triggers a follow-on Skill in the same run — distinct from a Session handoff, which carries continuity to a fresh session. A seam that states only intent ("auto-invoke X") invites the caller's agent to reproduce the callee's mechanics from memory; a hardened seam pins the invocation mechanism (the platform's skill-invocation primitive, so the callee's instructions actually load) and, when the callee runs a stateful protocol, explicitly forbids starting that protocol's mechanics directly.
+
+### Context-absent agent
+An agent performing a Skill-shaped action without that Skill's instructions loaded in context — typically reconstructing a half-remembered command, recognizable by parameter values that drift from the Skill's documented defaults. Prose in the unloaded Skill cannot reach it; the only channels that do are the seam it entered through and the output of the tools it runs, which is why fail-closed refusals in bundled CLIs carry their own recovery path.
+
 ## Review and workflow vocabulary
 
 ### Reviewer persona

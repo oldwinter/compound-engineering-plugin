@@ -15,7 +15,7 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 | 它做什么？ | 根据 doc content 选择 reviewer personas，并行分派，应用 `safe_auto` fixes，并把 remaining findings 路由到 structured interaction |
 | 何时使用？ | `ce-brainstorm` 生成 requirements doc 后；`ce-plan` 写出 plan 后；把两者交给 implementation 前 |
 | 产出什么？ | 应用了 `safe_auto` fixes 的 updated doc，外加对 `gated_auto` / `manual` findings 的 structured handling |
-| 模式 | Interactive（direct invocation）、Headless（从 `/ce-plan` chain 调用时默认） |
+| 模式 | Interactive（direct invocation）、Non-interactive（从 `/ce-plan` chain 调用时默认） |
 
 ---
 
@@ -111,14 +111,14 @@ Walk-through 本身支持中途 "auto-resolve the rest" escape；当用户已经
 
 当用户选择 "Auto-resolve with best judgment"、"Append to Open Questions"，或在 walk-through 中途 escape 到 "Auto-resolve the rest" 时，skill 会在 apply 前展示每个 change 的 preview。Preview 包含 section、finding title、action（apply / skip / defer / acknowledge）和 brief rationale。用户 confirm 或 cancel。这是 bulk operations 的 safety valve：用户在内容落地前看到将发生什么。
 
-### 6. Two modes：Interactive 和 Headless
+### 6. Two modes：Interactive 和 Non-interactive
 
 | Mode | When | Behavior |
 |------|------|----------|
 | **Interactive** | Direct user invocation，或 caller post-generation menu 中选择 `Run deeper doc review` | Routing question、per-finding walk-through、bulk-preview confirmations |
-| **Headless** _(chained invocation default)_ | `mode:headless`；`/ce-plan` Phase 5.3.8 默认 | 静默应用 `safe_auto`；其他 findings 作为 structured text 返回；在 caller 下一步 menu 上方展示 one-line summary；无 prompts |
+| **Non-interactive** _(chained invocation default)_ | `mode:non-interactive`；`/ce-plan` Phase 5.3.8 默认 | 静默应用 `safe_auto`；其他 findings 作为 structured text 返回；在 caller 下一步 menu 上方展示 one-line summary；无 prompts。Deprecated alias：`mode:headless`。 |
 
-从 doc-producing skills chain 调用时，Headless 是 default：`/ce-plan` Phase 5.3.8 以 headless 调用它，让 routine plans autofix 并 surface summary line，不阻塞用户。Interactive 用于 direct invocation，或用户从 post-generation menu opt into `Run deeper doc review`。
+从 doc-producing skills chain 调用时，Non-interactive 是 default：`/ce-plan` Phase 5.3.8 以 non-interactive 调用它，让 routine plans autofix 并 surface summary line，不阻塞用户。Interactive 用于 direct invocation，或用户从 post-generation menu opt into `Run deeper doc review`。
 
 ### 7. 带 backpressure 的 bounded parallelism
 
@@ -138,7 +138,7 @@ Output 会说明哪些 personas 运行了、哪些 signals 激活了它们，以
 
 Skill 会先尝试声明的 model/route mappings。当当前 CLI 拒绝 obsolete 或 incompatible adapter default 时，可以在同一 target/family 以及 hard read-only、host-exclusion、authority、egress boundaries 内发现最接近的 compatible equivalent，并记录 substitution 与 actual route。显式指定的 user model 或新增接收内容的 intermediary 绝不能静默变化：route selection 必须返回 host，完成必要 disclosure 并取得 sanction。第二个 target 仍只在显式设置 `CROSS_MODEL_MAX_PEERS=2` 时启用，失败继续保持 non-blocking。
 
-**Trust boundary：**该 pass 会把完整 document content 嵌入 peer prompt，并发送给外部 model provider（取决于最终 peer，可能是 OpenAI、Anthropic、xAI 或 Cursor）；`CROSS_MODEL_PEERS` 限制哪些 providers 可以接收内容（未设置时采用默认顺序，设置后作为 allowlist）。Peer 从没有 project context 的空 scratch dir 启动，并保持严格 read-only；所有 routes 都拒绝 writes、network、MCP 和 subagents。Read 权限分为两级：**truly tool-less** 的 claude（`--safe-mode --tools ""`，禁用所有 built-ins 并抑制 custom behavior）与 grok（拒绝 `Read`/`Edit`/`Write`/`Bash`/`Task`/web/`mcp__*`），完全没有 read tool；以及仍有少量 read 能力的 **read-only residual** routes：codex（`-s read-only`）与 cursor-agent（`--mode ask --sandbox enabled`），它们仍允许 read tool，codex 还允许 read-only shell exec。因此，影响边界是信息披露，而不是 repo mutation；script 会为每次 cross-model send 输出一行 audit log，headless mode 下也可审计 egress。Peer prompt 仅使用 document basename，因为内容已嵌入 prompt；超大 document 会干净地 skip，而不是截断。对于本项目的 own-document threat model，codex/cursor-agent routes 的 read residual 是**可接受的**：被 review 的 doc 属于 maintainer，host agent 本来就以比 peer 更高的权限在 repo 内运行，因此 peer 能读取文件不会增加实质暴露面。
+**Trust boundary：**该 pass 会把完整 document content 嵌入 peer prompt，并发送给外部 model provider（取决于最终 peer，可能是 OpenAI、Anthropic、xAI 或 Cursor）；`CROSS_MODEL_PEERS` 限制哪些 providers 可以接收内容（未设置时采用默认顺序，设置后作为 allowlist）。Peer 从没有 project context 的空 scratch dir 启动，并保持严格 read-only；所有 routes 都拒绝 writes、network、MCP 和 subagents。Read 权限分为两级：**truly tool-less** 的 claude（`--safe-mode --tools ""`，禁用所有 built-ins 并抑制 custom behavior）与 grok（拒绝 `Read`/`Edit`/`Write`/`Bash`/`Task`/web/`mcp__*`），完全没有 read tool；以及仍有少量 read 能力的 **read-only residual** routes：codex（`-s read-only`）与 cursor-agent（`--mode ask --sandbox enabled`），它们仍允许 read tool，codex 还允许 read-only shell exec。因此，影响边界是信息披露，而不是 repo mutation；script 会为每次 cross-model send 输出一行 audit log，non-interactive mode 下也可审计 egress。Peer prompt 仅使用 document basename，因为内容已嵌入 prompt；超大 document 会干净地 skip，而不是截断。对于本项目的 own-document threat model，codex/cursor-agent routes 的 read residual 是**可接受的**：被 review 的 doc 属于 maintainer，host agent 本来就以比 peer 更高的权限在 repo 内运行，因此 peer 能读取文件不会增加实质暴露面。
 
 ### 10. Settled-decision protection（保护已定 decision）
 
@@ -152,13 +152,13 @@ Because the skill reviews documents for arbitrary products, a finding can name i
 
 ## 快速示例
 
-`/ce-plan` 完成了 notification-mute feature 的 Standard plan。Phase 5.3.8 以 `mode:headless` 和 plan path 调用 `/ce-doc-review`。
+`/ce-plan` 完成了 notification-mute feature 的 Standard plan。Phase 5.3.8 以 `mode:non-interactive` 和 plan path 调用 `/ce-doc-review`。
 
 Skill 读取 doc，通过 content-shape signals（U-IDs、plan section structure）将其分类为 `plan`，读取 `Origin:` slot，并分析 content 以选择 conditional personas。Plan 触及 UI surface（mute toggle copy），但没有 high-stakes domains，也没有提出 new abstractions。它激活 `coherence-reviewer`（always-on）、`feasibility-reviewer`（always-on，收窄到 plan-shape techniques）和 `design-lens-reviewer`（UI surface）。Adversarial、scope-guardian、security-lens 和 product-lens skip，因为它们的 triggers 在一个有 origin 的 routine plan 上没有触发。
 
 三个 reviewers 并行分派，返回 9 个 raw findings。Synthesis merge 成 6 个 distinct findings：2 个 `safe_auto`（typo、broken cross-reference），3 个 `gated_auto`（durability tradeoff wording、U2 test scenarios 缺 missing edge case、toggle copy 上的 design-lens flag），1 个 FYI（suggested scope clarification）。
 
-两个 `safe_auto` 直接应用。Headless mode 返回其余 structured text：没有 walkthrough，没有 per-finding routing。Post-generation menu 上方展示单行 summary：`Doc review applied 2 fixes. 3 decisions, 1 FYI remain.` 用户选择 `Start /ce-work` 并继续。如果他们想交互处理 3 个 decisions，会选择 `Run deeper doc review`。
+两个 `safe_auto` 直接应用。Non-interactive mode 返回其余 structured text：没有 walkthrough，没有 per-finding routing。Post-generation menu 上方展示单行 summary：`Doc review applied 2 fixes. 3 decisions, 1 FYI remain.` 用户选择 `Start /ce-work` 并继续。如果他们想交互处理 3 个 decisions，会选择 `Run deeper doc review`。
 
 ---
 
@@ -168,7 +168,7 @@ Skill 读取 doc，通过 content-shape signals（U-IDs、plan section structure
 
 - `/ce-brainstorm` 刚生成 requirements doc，想在 planning 前做 structured review
 - `/ce-plan` 刚生成 plan，想在 execution 前做 deeper review
-- 处于 headless mode，programmatic caller（chain skills）需要 structured output 的 review
+- 处于 non-interactive mode，programmatic caller（chain skills）需要 structured output 的 review
 - 想在 doc 上做 round-to-round refinement；decision primer 防止 loops
 
 以下情况跳过 `ce-doc-review`：
@@ -184,10 +184,10 @@ Skill 读取 doc，通过 content-shape signals（U-IDs、plan section structure
 `ce-doc-review` 被 doc-producing skills 作为 review pass 调用：
 
 - **`/ce-brainstorm` Phase 4**：作为 post-doc options 之一提供（"Agent review of requirements doc"）；以 interactive 运行，完整 scrutiny premise，因为验证 premise 正是 brainstorm 的意义
-- **`/ce-plan` Phase 5.3.8**：confidence check 后默认以 `mode:headless` 运行。`safe_auto` fixes 静默应用；remaining findings 以 one-line summary 出现在 post-generation menu 上方，`Run deeper doc review` 作为 first-class option 提供给想要 interactive walkthrough 的用户
+- **`/ce-plan` Phase 5.3.8**：confidence check 后默认以 `mode:non-interactive` 运行。`safe_auto` fixes 静默应用；remaining findings 以 one-line summary 出现在 post-generation menu 上方，`Run deeper doc review` 作为 first-class option 提供给想要 interactive walkthrough 的用户
 - **`/ce-resolve-pr-feedback`**：当 reviewer feedback 落在 brainstorm 或 plan doc，而不是 code 上时
 
-Headless mode 中，callers 接收 structured findings，并自行 route user-decision options。
+Non-interactive mode 中，callers 接收 structured findings，并自行 route user-decision options。
 
 ---
 
@@ -197,7 +197,7 @@ Skill 可直接作用于任何 requirements 或 plan doc：
 
 - **Specific path（指定路径）**：`/ce-doc-review docs/plans/2026-05-04-001-feat-notification-mute-plan.md`
 - **Ask the user**：无 path 调用 `/ce-doc-review` 会询问 review 哪个 doc（或 auto-find `docs/brainstorms/` 或 `docs/plans/` 中最新的）
-- **Headless**：`/ce-doc-review mode:headless docs/plans/.../plan.md` 返回 structured findings，不交互 prompt
+- **Non-interactive**：`/ce-doc-review mode:non-interactive docs/plans/.../plan.md` 返回 structured findings，不交互 prompt
 
 ---
 
@@ -207,9 +207,9 @@ Skill 可直接作用于任何 requirements 或 plan doc：
 |----------|--------|
 | _(empty, interactive)_ | 询问要 review 哪个 doc，或 auto-find most recent |
 | `<doc path>` | Review 指定 doc |
-| `mode:headless <doc path>` | Headless mode；structured text output，无 prompts |
+| `mode:non-interactive <doc path>` | Non-interactive mode；structured text output，无 prompts。Deprecated alias：`mode:headless`。 |
 
-Headless mode 需要 path；没有 path 时会 error，而不是猜。
+Non-interactive mode 需要 path；没有 path 时会 error，而不是猜。
 
 ---
 

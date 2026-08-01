@@ -148,7 +148,7 @@ Universal planning 还区分两种 **dispositions**。*Plan-seeking* tasks（tri
 
 Plan 写入。Confidence check 随后自动运行：它发现 `Risks & Dependencies` 对 mute-leak risk 描述较薄，且某 unit 的 test scenarios 缺少 permission edge cases，于是分派 data-integrity reviewer 和 correctness reviewer，并把 findings synthesis 回 plan。Plan 加盖 `deepened:` date。
 
-Document review 随后以 headless mode 运行。因为 plan 设置了 origin 且不触及 high-stakes domains，cheap minimum dispatches（coherence + feasibility）；`safe_auto` fixes（typo、broken cross-reference）静默应用。Remaining findings 作为 one-line summary 回到 plan handoff。
+Document review 随后以 non-interactive mode 运行。因为 plan 设置了 origin 且不触及 high-stakes domains，cheap minimum dispatches（coherence + feasibility）；`safe_auto` fixes（typo、broken cross-reference）静默应用。Remaining findings 作为 one-line summary 回到 plan handoff。
 
 ---
 

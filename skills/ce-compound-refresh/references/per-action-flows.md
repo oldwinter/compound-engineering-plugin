@@ -33,7 +33,7 @@
 
 仅在错位明确时迁移：doc 的 directory 与 frontmatter category 不一致，或内容明确属于另一个**已存在**的 category。两者不一致只能证明存在问题，不能直接证明应改哪一侧；应阅读内容，判断是 directory 错了（迁移），还是 frontmatter 错了（原地修复 frontmatter，这仍是普通 Update，不是移动）。迁移时不得创建新的 category directory，也不得凭主观判断迁移；目录归属没有 ground truth，下一次运行可能反向判断，造成 churn。
 
-在 headless mode 中，只有以下四个条件全部满足时才执行迁移，门槛与 auto-delete 相同：(1) 按 category mapping 判断，frontmatter 与 directory 不一致；(2) 内容证据明确表明是 directory 错位；(3) 目标 category directory 已存在；(4) 所有 inbound citation 都在仓库内且可机械重写。只要一个条件不满足（包括内容合理地同时属于两个 category），就将迁移记录为 recommendation（doc、建议目标、未满足的条件），不要移动。
+在 non-interactive mode 中，只有以下四个条件全部满足时才执行迁移，门槛与 auto-delete 相同：(1) 按 category mapping 判断，frontmatter 与 directory 不一致；(2) 内容证据明确表明是 directory 错位；(3) 目标 category directory 已存在；(4) 所有 inbound citation 都在仓库内且可机械重写。只要一个条件不满足（包括内容合理地同时属于两个 category），就将迁移记录为 recommendation（doc、建议目标、未满足的条件），不要移动。
 
 1. 确认目标 category directory 已存在。
 2. 使用 `git mv` 移动文件，以保留 rename history。
@@ -61,7 +61,7 @@ Orchestrator 直接处理 consolidation（不需要 subagent：docs 已经读过
 
 Split 是 Consolidate 的反向操作：把一篇覆盖多个问题的 doc 拆成 N 个聚焦的 successor。门槛很高，因为拆分会使 drift surface 翻倍，而 consolidation 正是为了消除这种风险。只有当 Retrieval-Value Test 反向成立时才拆分：maintainer 搜索一个子主题时，如果必须穿过其他内容会受到实质妨碍，并且每个片段都有独立 retrieval value。文档长度本身永远不是拆分理由。
 
-在 headless mode 中不要执行拆分；将 recommendation（doc、建议的片段边界、证据）记录到 Recommended。
+在 non-interactive mode 中不要执行拆分；将 recommendation（doc、建议的片段边界、证据）记录到 Recommended。
 
 拆分必须**一次一个、顺序执行**，复用 Replace machinery：
 

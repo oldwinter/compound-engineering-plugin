@@ -105,7 +105,7 @@ Synthesis 拥有 final route。Persona 提供的 routing metadata 是 input，�
 | Mode | When | Behavior |
 |------|------|----------|
 | **Default markdown** | Direct user invocation | Report-only markdown，包含 stable findings 和 actionable summary |
-| **`mode:agent`** | `mode:agent`（alias `mode:headless`） | 一个 JSON object；report-only：review 不 mutate，caller（例如 `/ce-work`）应用 findings 并拥有 Residual Work Gate |
+| **`mode:agent`** | `mode:agent`（alias `mode:headless`） | 一个 JSON object；report-only：review 不 mutate，caller（例如 `/ce-work`）应用 findings 并拥有 Residual Work Gate。`mode:non-interactive` **不是**这个 alias，收到它时 fail closed。 |
 | **Explicit local apply** | 添加 `apply:local`，或显式要求 review 应用/修复 findings | 保持 markdown presentation；Stage 5c 可以应用 verified fixes，并在 pre-review tree clean 时 commit。绝不 push |
 
 Skill 永不 switch branches：PR/branch argument 选择 review *scope*（无需 checkout 的 diff），不是 mutation permission。Explicit local apply 只在当前 checkout 原地编辑；要 review current checkout against another ref，请传 `base:<ref>`。
@@ -216,7 +216,7 @@ Concurrent use note：bare 和 `mode:agent` reviews 都是 report-only，可与�
 | `<branch name>` | Review that branch without checking it out（remote/local ref diff） |
 | `base:<sha-or-ref>` | 跳过 scope detection；review current checkout against that ref |
 | `plan:<path>` | 加载 plan 进行 requirements verification |
-| `mode:agent` | JSON machine handoff；report-only（caller applies）。`mode:headless` 是 deprecated alias；`mode:report-only` 被忽略 |
+| `mode:agent` | JSON machine handoff；report-only（caller applies）。`mode:headless` 是 deprecated alias；`mode:non-interactive` **不是**这里的 alias（收到时停止）；`mode:report-only` 被忽略 |
 | `apply:local` | 显式授权 verified local fixes；与 `mode:agent` 冲突 |
 | `grouping:auto` / `grouping:off` / `grouping:always` | Thematic triage grouping of findings（默认 `auto`：当 findings 跨 distinct concerns 时分组）。这只是 presentation，不会改变 reviewer selection、merge logic 或 apply behavior |
 
@@ -233,7 +233,7 @@ Conflicting mode flags（或 conflicting grouping flags）会以 error 停止。
 基于 actual diff 的 agent judgment，不是 keyword matching。Correctness 和 project-standards 在每次 multi-agent review 中运行。Generic、cross-cutting 和 stack-specific personas 只在对应 concern 存在时加入，例如 tests/harnesses 变化或 meaningful runtime behavior 缺少相应 test work 时选择 testing，auth 选择 security，migration artifacts 选择 `data-migration-reviewer`。仅存在 production files 或 non-behavioral edits 不会触发 testing。Silent-pass verification mechanism（CI/CD gate、build/deploy step、coverage/lint gate、test harness/mock）无论 diff 多小，都会获得 adversarial + cross-model pass。
 
 **Default、`mode:agent` 和 `apply:local` 有什么区别？**
-Default 是 human-facing markdown report，并且 report-only。`mode:agent` 使用同一 review pipeline，但序列化为一个 JSON object 交给 caller；它始终 report-only。`apply:local` 是单独的 authority，允许 markdown run 在本地应用 verified findings。`mode:headless` 是 `mode:agent` 的 deprecated alias。
+Default 是 human-facing markdown report，并且 report-only。`mode:agent` 使用同一 review pipeline，但序列化为一个 JSON object 交给 caller；它始终 report-only。`apply:local` 是单独的 authority，允许 markdown run 在本地应用 verified findings。`mode:headless` 是 `mode:agent` 的 deprecated alias。其他 CE skills 中的 `mode:non-interactive` 表示“抑制 prompts”，在这里无效；要获取 JSON 请传 `mode:agent`。
 
 **什么是 Residual Work Gate？**
 Caller-owned step（不是 review skill 的一部分）：在 `mode:agent` 中，caller（通常 `/ce-work`）应用能应用的内容，然后展示未应用 findings 并询问用户：apply now、file tickets、accept with durable sink，或 stop。"Accept" 需要真实 durable record（PR description 中的 Known Residuals，或 `docs/residual-review-findings/<sha>.md`）；findings 不能消失在 chat 里。

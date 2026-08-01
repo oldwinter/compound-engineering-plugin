@@ -2,7 +2,7 @@
 
 > 保留一次 agent session 中真正有用的上下文，让新 agent 无需原始 transcript 也能迅速恢复定位。
 
-`ce-handoff` 是一个双向的 session continuity 工具。Bare invocation 会创建 handoff；resume intent 会读取用户选定的 continuity source，或帮助用户找到一个，然后解释恢复出的状态并给出合理的继续方式，但不会自动执行后续操作。
+`ce-handoff` 是一个双向的 session continuity 工具。Bare invocation 会创建 handoff；resume intent 会读取用户选定的 continuity source，或帮助用户找到一个，然后解释恢复出的状态并推荐如何继续，但不会自动执行后续操作。
 
 该 skill 以文档约定为主，复用当前 agent 已有的 capabilities；不会新增 transport script、mutable index 或 lifecycle database。
 
@@ -17,7 +17,7 @@
 | Bare `/ce-handoff` 做什么？ | 始终创建新的 handoff |
 | 写在哪里？ | 默认情况下，`/tmp/compound-engineering-<effective-uid>/ce-handoff/<repo-namespace>/<topic>.md`；显式用户路径、格式或发布目标会覆盖默认值 |
 | 我要在下一个会话中粘贴什么内容？ | `/ce-handoff resume <path-or-URL>` |
-| Resume 后会发生什么？ | Agent 总结恢复的上下文，建议一个或多个下一步操作，然后等待用户选择 |
+| Resume 后会发生什么？ | Agent 总结恢复的上下文，基于 handoff 的 reason 推荐 continuation；只有存在真正互斥的分支时才编号，然后等待用户选择 |
 
 ---
 
@@ -58,7 +58,7 @@
 - 有意义的进展、决策、约束、阻碍和验证
 - 对 authoritative plans、issues、commits、diffs、docs 和 repository files 的引用
 - 对 machine-local paths 与 fragile worktree state 的清晰标注
-- 供 receiving agent 考虑的合理后续步骤
+- 供 receiving agent 考虑的合理后续步骤（互斥 forks 作为 alternatives；相关的 sequential work 合并成一条 path）
 
 只有 managed-store frontmatter 具有固定 contract，因为 default discovery 依赖它。正文没有封闭的 section schema：agent 可以自行增加 section，或合并、重命名、重排、忽略示例，以便把具体 session 清楚地交给下一个 agent。
 
@@ -105,8 +105,8 @@ Resume intent 会读取 explicit source，或发现可能的 candidates。Select
 1. 检查材料是否包含足够具体的上下文来恢复有意义的目标或当前状态。如果没有，它会指出缺少的内容并等待用户补充或选择其他来源。
 2. 在材料充足的情况下，总结恢复的目标、进度、决策、约束和未完成的工作。
 3. 指出 material drift，例如 worktree 已不存在，或 repository state 不再匹配 handoff。
-4. 建议一项或多项针对具体情况的下一步行动和相关的已安装skill。
-5. 停止并等待用户选择。
+4. 根据 handoff 的实际 continuity reason（不是默认的 implementation-resume menu）推荐 continuation，并命名合适的已安装 skill。只有 mutually exclusive forks 才编号；同一 continuation 的相关 pieces 放在同一条 recommendation 下，不要为了对称而发明 alternatives。
+5. 停止并等待用户确认或改向。
 
 选择仅授权阅读选定的源。它不授权命令、文件更改、远程链接遍历、不相关的本地文件访问或其他工作流程。
 
@@ -154,7 +154,7 @@ Discovery 在读取 body 前停止，orientation 在采取行动前停止。这�
 
 `ce-handoff` 是 utility，而不是固定 pipeline stage。它可以捕获任何有价值的 session：research、brainstorming、planning、implementation、debugging、review，甚至完全没有 repository 的 conversation。
 
-Resume 时，它会根据 selected source 和 current context 建议相关后续步骤，但不会自动调用 `ce-plan`、`ce-work`、`ce-debug` 或任何其他 workflow。
+Resume 时，它会根据 selected source 的 continuity reason 和 current context 推荐 continuation，但不会自动调用 `ce-plan`、`ce-work`、`ce-debug` 或任何其他 workflow。
 
 ---
 

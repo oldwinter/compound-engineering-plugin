@@ -222,7 +222,7 @@ start one job per selected peer. Start all jobs before waiting.
 runner supervisor 会派生至少 1230 秒的上限，因此 runner window 已位于 worker cap 之外，
 不会回收健康 worker。
 
-**提高 `CROSS_MODEL_HARD_SECS` 会自动扩大 runner window。**Runner 会根据 ambient knob
+**提高 `CROSS_MODEL_HARD_SECS` 会自动扩大 runner window（widens the runner window automatically）。**Runner 会根据 ambient knob
 派生 supervisor hard cap（`max(1230, knob + 30)`）。不要在此设置数值型
 `CE_PEER_HARD_SECS`，并在 start 前缀中清空任何 ambient 值（`CE_PEER_HARD_SECS=`），避免
 旧 export 压低该派生值。不要把已解析的 `CROSS_MODEL_HARD_SECS` 重新导出到 worker 的
