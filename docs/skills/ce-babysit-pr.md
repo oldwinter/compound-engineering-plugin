@@ -1,10 +1,12 @@
 # `ce-babysit-pr`
 
-> Watch open PR 并持续推动它走向 merge。Review feedback、CI 和 base-branch movement 到达时分别响应；需要 human decision 的事项会明确上报，而不是强行处理。
+> Watch open PR 并持续推动它走向 merge。Review feedback、CI 和 base-branch movement 到达时分别响应，并在它*看起来* ready 时报告——或在明确 stack posture 下，继续处理已确认的 managed stack（只有你要求 land 时才 land）。
 
 `ce-babysit-pr` 是 **PR 打开后的 watch loop**。`/ce-commit-push-pr` 打开 PR 后，该 skill 会同时 watch 三条独立 attention stream：新到达的 review comments、CI status，以及 PR 相对 base 的 branch currency，直到 PR 看起来 merge-ready、需要 human decision，或进入 terminal state。它是一个轻量 conductor，不自行 resolve feedback 或 fix CI，而是把 review comments 委派给 `/ce-resolve-pr-feedback`，把 CI failures 委派给 `/ce-debug`；自身负责 loop、ordering、跨 tick dedup、settle window、安全 branch maintenance 和 stop decision。
 
-**它无法保证 merge-readiness，也不会假装能保证。** Reviewer 随时可能新增 feedback，required checks 也可能变化。Skill 会推动 PR 前进，并在它*看起来* ready 时告诉你；merge 仍由你决定。“这个 fix 会不会改变我原本想要的 behavior？”这一 safety judgment 属于 `/ce-resolve-pr-feedback`，后者会把此类 fix 升级为 `needs-human`，因此 babysit loop 可以自主运行，而不会静默改变 intended behavior。
+**Posture 限定本次 run 的范围。** 默认是 `target`（仅指定 PR）。在已确认的 managed stack 上，你可以选择 `stack-ready`（settle 后继续 upstack，不 merge）或 `stack-land`（同样的遍历，外加对 bottom-most open settled prefix 的授权 `gh stack merge`）。**Settled ≠ merged**——某个 layer 可能看起来 ready 但仍处于 OPEN 状态；继续 babysit 并不要求先 land。
+
+**它无法保证 merge-readiness，也不会假装能保证。** Reviewer 随时可能新增 feedback，required checks 也可能变化。在 `target` 和 `stack-ready` 下，skill 会推动 PR 走向 ready，merge 仍由你决定。在 `stack-land` 下，选择该 posture *即* 是对 managed prefix 的 land 授权。“这个 fix 会不会改变我原本想要的 behavior？”这一 safety judgment 属于 `/ce-resolve-pr-feedback`，后者会把此类 fix 升级为 `needs-human`，因此 babysit loop 可以自主运行，而不会静默改变 intended behavior。
 
 Compound-engineering 的 shipping chain 是 `/ce-work -> /ce-commit-push-pr -> (reviewers comment) -> /ce-resolve-pr-feedback`。`ce-babysit-pr` 位于最后一步之上，按 schedule 调用它，并穿插处理 CI fixes。
 
@@ -14,11 +16,11 @@ Compound-engineering 的 shipping chain 是 `/ce-work -> /ce-commit-push-pr -> (
 
 | 问题 | 回答 |
 |----------|--------|
-| 它做什么？ | Watch open PR，并在 review comments、CI 和 base-branch movement 到达时响应，持续推动 PR 走向 merge |
-| 何时使用 | PR 已打开，希望 hands-off 推动它走向 merge 时（`/ce-commit-push-pr` 结束时会自动提供 handoff） |
-| 产出什么 | 委派完成的 feedback/CI fixes、需要 human decision 的 escalations，以及 PR 如何走到当前状态的 high-level summary |
-| 如何工作 | Comments 委派给 `/ce-resolve-pr-feedback`，CI 委派给 `/ce-debug`；自身负责 bounded branch-currency maintenance 和 loop |
-| 模式 | Self-sustaining in-session watch（default），或 Checkpoint（harness 不支持 background-and-wake 时执行一个 tick 并给出 resume command） |
+| 它做什么？ | Watch open PR（或 posture 下已确认的 managed stack），持续推动它走向 merge-ready，并在 review comments、CI 和 base-branch movement 到达时响应 |
+| 何时使用 | PR 已打开，希望 hands-off 推动它走向 merge 时（`/ce-commit-push-pr` 结束时会自动提供 handoff）；当你拥有 managed stack 时使用 stack postures |
+| 产出什么 | 委派完成的 feedback/CI fixes、需要 human decision 的 escalations、stack posture 下的 layer transitions，以及 high-level summary |
+| 如何工作 | Comments 委派给 `/ce-resolve-pr-feedback`，CI 委派给 `/ce-debug`；自身负责 bounded branch-currency maintenance、posture 和 loop |
+| 模式 | Self-sustaining in-session watch（default），或 Checkpoint；postures 为 `target` / `stack-ready` / `stack-land` |
 
 ---
 
@@ -34,6 +36,12 @@ Compound-engineering 的 shipping chain 是 `/ce-work -> /ce-commit-push-pr -> (
 
 # 运行一个 checkpoint tick，并返回可复制的 resume command
 /ce-babysit-pr 1234 checkpoint
+
+# 负责一个已确认的 managed stack，直到 merge-ready（不自动 merge）
+/ce-babysit-pr posture:stack-ready
+
+# 负责整个 stack，并在 green 时 land settled prefixes
+/ce-babysit-pr posture:stack-land
 ```
 
 ---
@@ -61,6 +69,7 @@ Compound-engineering 的 shipping chain 是 `/ce-work -> /ce-commit-push-pr -> (
 - **单一 authoritative watcher**：较新的 invocation 会取消仍在 preflight 的旧 invocation，但只有自己的首次 snapshot 成功后才接管 active ownership，并立即停止 prior watcher。Wake 会携带 persisted generation，因此被 supersede process 延迟发出的 notifications 会基于 fresh snapshot 合并，不会重置 session 或 settle clocks。
 - **完整分页的 source of truth**：`pr-snapshot` 会把 review-thread connection 翻到最后一页。`reviewThreads(first:50)` 之类的 one-shot diagnostic query 永远不能覆盖 canonical snapshot。
 - **High-level final summary**：Outcome-first，按组计数，不输出 receipts。
+- **Managed stacks 的 Run posture**：`target` 停在指定 PR（可提供一次 stack-wide offer）；`stack-ready` 在 settle 后继续 upstack 而不 merge；`stack-land` 继续，并通过 `gh stack merge` + sync 合并 bottom-most open settled prefix。
 
 ---
 
@@ -104,6 +113,18 @@ Snapshot 不会因为“观察到 item”就将它标记为 handled。只有 age
 
 关键是它会显示 **judgment calls**：loop 没有照字面 ask 行动的地方、reviewer signal stalled，或 branch movement 无法机械 resolve，都会带一行原因；常规 changes 只计入 aggregate。你看到的是代表你做出的 decisions，不是每次 edit 的 transcript。
 
+### 8. Posture：不 merge 地继续，只在明确要求时 land
+
+在已确认的 managed stack（`manager_status == "confirmed"`）上，posture 是一等 run value，而不是通过关键词猜测：
+
+| Posture | Behavior（行为） |
+|---------|----------|
+| `target` | 只处理 named PR，在 looks-ready 时停止。可以提供一次继续 upstack 的选项；拒绝后仍停在 target-local scope。绝不 merge。 |
+| `stack-ready` | 当前 layer settle 后，继续处理下一个需要工作的 open、non-draft upstack layer。绝不 merge。 |
+| `stack-land` | 遍历方式同 `stack-ready`，并提供 run-level land 授权：settle 后通过 `gh stack merge` 合并 bottom-most open settled PR，再运行 `gh stack sync` 并继续。 |
+
+在 `stack-ready` 下，settled layers 仍保持 OPEN。`stack-land` 下刚 land 的 `MERGED` 是 layer transition，不是整个 run 的 terminal stop。Manual dependency chains 永远不会启用 stack-wide continuation。
+
 ---
 
 ## 何时使用
@@ -113,6 +134,7 @@ Snapshot 不会因为“观察到 item”就将它标记为 handled。只有 age
 - PR 已打开，希望无需逐轮 hand-holding 也能推动它走向 merge
 - 准备 context-switch，但希望 CI failures 和 review comments 到达时得到处理
 - `/ce-commit-push-pr` 刚打开 PR，并提供 babysit handoff
+- 你拥有已确认的 managed stack，希望 sequential babysit（`stack-ready`）或 green 时 land（`stack-land`）
 
 以下情况跳过：
 
@@ -147,6 +169,7 @@ Snapshot 不会因为“观察到 item”就将它标记为 handled。只有 age
 - **Current branch 的 PR**：`/ce-babysit-pr`
 - **指定 PR**：`/ce-babysit-pr 1234` 或 `/ce-babysit-pr <PR-url>`
 - **强制 mode**：`/ce-babysit-pr 1234 checkpoint`（或 `watch`）
+- **Stack postures**：`/ce-babysit-pr posture:stack-ready` 或 `posture:stack-land`
 
 ---
 
@@ -157,6 +180,7 @@ Snapshot 不会因为“观察到 item”就将它标记为 handled。只有 age
 | _(empty)_ | Current branch 的 PR；根据 harness capability 推断 mode |
 | `<PR number or URL>` | 指定 PR |
 | `watch` / `checkpoint` | 强制 execution mode |
+| `posture:target\|stack-ready\|stack-land` | 已确认 managed stacks 的 run scope（未命名 / 无 stack 语言时默认 `target`） |
 
 `scripts/pr-snapshot` 是 deterministic snapshot + state helper：它完整分页 review threads、fetch review、CI 和 branch-currency state，在 lock 下 atomic read/write state，并输出每个 tick 的 actionable set 和 settle window 所需的 `quiet_seconds`。其 `watch` subcommand 是支持 in-session loop 的 token-free change detector。Watch ownership 采用 latest-valid-wins：成功 prefetch 的 replacement 会记录新的 `watch_generation`、终止 predecessor，并成为唯一可 persist polls 或发出 `BABYSIT_WAKE` 的 process。旧 generation 的 queued wakes 只是触发 refresh 的 stale hints，不是独立工作；handoff 会保留原来的 session 和 settle clocks。`references/watch-loop.md` 记录 watch 如何维持自身、state schema、dedup identities、settle window 和 edge cases。
 
@@ -165,7 +189,7 @@ Snapshot 不会因为“观察到 item”就将它标记为 handled。只有 age
 ## 常见问题
 
 **它会替我 merge PR 吗？**
-不会。它会持续推动 PR，并在 GitHub 报告 mergeable 且 PR 在 settle window 内保持 quiet 时告诉你它*看起来* ready；merge 仍由你决定。它无法保证后续不会再有 feedback。
+在 `target` 和 `stack-ready` 下，不会。它会持续推动 PR，并在它*看起来* ready 时告诉你；merge 仍由你决定（对 managed stacks，它会在 ready-as-next 时打印精确的 `gh stack merge` 命令）。在 `stack-land` 下，选择该 posture 即授权通过 `gh stack merge` + sync land bottom-most open settled prefix。它无法保证后续不会再有 feedback。
 
 **为什么不先等 CI，再处理 comments？**
 因为 comment fix 会 push commit，并重新触发 CI。在 CI 运行时处理 comments 可以折叠两条 timeline；等待会把它们串行化，每轮浪费一个完整 CI cycle。

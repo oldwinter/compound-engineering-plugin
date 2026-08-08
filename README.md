@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `bed74b2e`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `0a295785`。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -129,7 +129,7 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 
 安装后，在任意 project 中运行 `/ce-setup`。它会检查 repo-local config、报告 optional tool capabilities，并帮助把 machine-local CE settings 安全地放进 gitignore。
 
-`compound-engineering` plugin 当前包含 32 个 skills 和 0 个 standalone agents。Specialist review、research 和 workflow behavior 位于所属 skill 内，作为 skill-local prompt assets。
+`compound-engineering` plugin 当前包含 32 个 skills。其核心 workflows 会按需为 research、review、planning 和 implementation 启动 specialist subagents；每个 skill 用自己的 prompts 初始化 generic subagents，而不是依赖 standalone plugin agents，从而让 workflows 在不同 harness（它们对 formal agent definitions 的处理方式不同）之间保持可移植。
 
 ### Full Skill Inventory（完整 Skill 清单）
 
@@ -154,8 +154,8 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 | [`/ce-sweep`](docs/skills/ce-sweep.md) | Sweep feedback sources，track item lifecycles，并产出 `/lfg`-ready plan |
 | [`/ce-resolve-pr-feedback`](docs/skills/ce-resolve-pr-feedback.md) | Resolve PR review feedback |
 | [`/ce-commit`](docs/skills/ce-commit.md) | 创建带清晰 message 的 git commit |
-| [`/ce-commit-push-pr`](docs/skills/ce-commit-push-pr.md) | Commit、push 并 open PR，同时讲解本次 change 新引入的任何 concept |
-| [`/ce-babysit-pr`](docs/skills/ce-babysit-pr.md) | 持续 watch open PR，根据新到达的 review comments 和 CI 状态推动它走向 merge-ready |
+| [`/ce-commit-push-pr`](docs/skills/ce-commit-push-pr.md) | Commit、push 并 open PR（或 construct/submit 一个选择加入的 managed stack），同时讲解本次 change 新引入的任何 concept |
+| [`/ce-babysit-pr`](docs/skills/ce-babysit-pr.md) | 持续 watch open PR（或 posture 下已确认的 managed stack），根据新到达的 review comments 和 CI 状态推动它走向 merge-ready |
 | [`/ce-worktree`](docs/skills/ce-worktree.md) | 确保 work 在 isolated git worktree 中进行 |
 | [`/ce-promote`](docs/skills/ce-promote.md) | Draft user-facing announcement copy |
 | [`/ce-test-browser`](docs/skills/ce-test-browser.md) | 对 PR-affected pages 运行 browser tests |
@@ -198,7 +198,7 @@ Or search for "compound engineering" in the plugin marketplace.
 Compound Engineering is not listed in Codex's built-in plugin marketplace yet. Add it as a custom marketplace:
 
 1. In the Codex app, open **Plugins** from the sidebar.
-2. Click **Add** / **Add plugin marketplace**.
+2. 点击 **Create** 旁的箭头，然后选择 **Add marketplace**。
 3. Enter:
 
    | Field | Value |
@@ -208,7 +208,7 @@ Compound Engineering is not listed in Codex's built-in plugin marketplace yet. A
    | Sparse paths | leave blank |
 
 4. Click **Add marketplace**.
-5. Select **Compound Engineering**, install **compound-engineering**, then restart Codex.
+5. 搜索 **Compound Engineering**，安装 **compound-engineering-plugin**，然后重启 Codex。
 
 The Codex app install is self-contained for Compound Engineering. Specialist reviewer and research behavior lives inside the skills as local prompt assets; no separate custom-agent install step is required.
 

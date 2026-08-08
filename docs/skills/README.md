@@ -91,8 +91,8 @@ Skills 共享的 checkout-local defaults 记录在 [Compound Engineering 配置]
 | Skill | Description（说明） |
 |-------|-------------|
 | [`/ce-commit`](./ce-commit.md) | 创建单个精心组织的 git commit：convention-aware、sensitive-file-safe、file-level logical splitting |
-| [`/ce-commit-push-pr`](./ce-commit-push-pr.md) | 从 working changes 到 open PR，并生成 adaptive descriptions，保留 related references；支持三种 modes（full workflow / description update / description-only generation），并为本次 change 新引入的任何 concept 添加 concept-teaching section |
-| [`/ce-babysit-pr`](./ce-babysit-pr.md) | Watch open PR 并推动它走向 merge：comments-first 处理新 review comments（通过 `/ce-resolve-pr-feedback`）和 CI failures（通过 `/ce-debug`），使用 crash-safe、可恢复 tick；根据 harness 采用 continuous 或 checkpoint mode，并通过 settle window 避免过早报告 "ready to merge" |
+| [`/ce-commit-push-pr`](./ce-commit-push-pr.md) | 从 working changes 到 open PR，并生成 adaptive descriptions，保留 related references；支持三种 modes（full workflow / description update / description-only generation）、选择加入的 retrospective PR-stack construct/submit，并为本次 change 新引入的任何 concept 添加 concept-teaching section |
+| [`/ce-babysit-pr`](./ce-babysit-pr.md) | Watch open PR 并推动它走向 merge：comments-first 处理新 review comments（通过 `/ce-resolve-pr-feedback`）和 CI failures（通过 `/ce-debug`），对已确认的 managed stacks 提供 postures（`target` / `stack-ready` / `stack-land`），使用 crash-safe、可恢复 tick；根据 harness 采用 continuous 或 checkpoint mode，并通过 settle window 避免过早报告 "ready to merge" |
 | [`/ce-worktree`](./ce-worktree.md) | 确保 work 在 isolated git worktree 中进行：检测 existing isolation，优先使用 harness native worktree tool，最后 fallback 到 plain git |
 
 ---

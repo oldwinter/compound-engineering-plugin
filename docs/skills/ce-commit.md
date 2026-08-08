@@ -27,8 +27,8 @@
 - **错误的 commit convention**：repo 用 ticket-prefix style，却默认 conventional commits，或反过来
 - **混合 distinct concerns**：backend models + frontend components + docs 全塞进一个 commit，只因为没人拆
 - **Subject lines 只描述改了什么，不说明为什么**：`update foo.rb` 对未来读者没有帮助
-- **Detached-HEAD commits**：用户没意识到之后会很难找回
-- **Default-branch commits**：在 `main` 上 commit 前没有 warning，造成 surprise
+- **Detached-HEAD commits**：之后很难找回
+- **Default-branch commits**：与 PR workflow 和 branch protection 相冲突
 
 ## 解决方案
 
@@ -37,8 +37,7 @@
 - **Convention detection**：先看 context 中的 repo conventions，再看最近 10 个 commits，最后 fallback 到 conventional-commits
 - **Explicit staging**：绝不 `git add -A`/`git add .`；按文件名 stage
 - **File level logical splitting**：当存在 2-3 个 distinct concerns 时拆 commit（不 `git add -p`）；ambiguous 时一个 commit 即可
-- **Detached-HEAD handling**：commit 前询问是否先创建 feature branch
-- **Default-branch warning**：在 `main`/`master` 上 commit 前先询问
+- **Detached HEAD / default branch**：自动创建 feature branch（commit-only 场景也绝不能只把 work 留在 detached HEAD 或 default branch 上）
 - **Heredoc commit messages**：保留 multi-line formatting，避免 shell escaping pain
 
 ---
@@ -70,18 +69,11 @@ Skill 在单条命令中按文件名 stage（`git add file1 file2 file3`）。�
 
 Stage 前，skill 会扫描 changed files，寻找自然不同的 concerns。如果文件明显分成 2-3 个 logical changes（一个 directory 的 refactor，另一个 directory 的 new feature；或 test files 属于与 source files 不同的 change），skill 会创建 separate commits。Splits 只发生在 **file level**：不 `git add -p`，不做 hunk-level interactive splitting。拆分 ambiguous 时，一个 commit 就好。甜点区间是 2-3 个 commits，而不是很多 tiny commits。
 
-### 4. Detached-HEAD handling（detached HEAD 处理）
+### 4. Detached HEAD 和 default branch：自动创建 feature branch
 
-如果当前 branch 为空（detached HEAD），skill 会解释状况，并询问是否先创建 feature branch。用户可以：
+如果 HEAD 处于 detached 状态，或当前 branch 是 `main`/`master`/解析出的 default branch，skill 会根据 change content 创建 feature branch 并继续。它不会询问，也不会在 default branch 上 commit，或只把 work 留在 detached HEAD 上。
 
-- 创建 branch（skill 根据 change content 推导 name）
-- 继续 detached-HEAD commit（很少是正确答案）
-
-### 5. Default-branch warning（default branch 警告）
-
-如果当前 branch 是 `main`、`master` 或 resolved default branch，skill 会在 commit 前 warning，并提供先创建 feature branch 的选项。这能避免有人意外 commit 到有 branch protection 的 default branch，随后还要回退。
-
-### 6. Heredoc commit messages：干净的 multi-line formatting
+### 5. Heredoc commit messages：干净的 multi-line formatting
 
 Skill 使用 `cat <<'EOF'` heredoc 生成 commit message，确保 multi-line bodies 保留格式。示例：
 
@@ -97,9 +89,9 @@ EOF
 
 Quoted sentinel（`'EOF'`）防止 `$VAR`、backticks 和嵌入的 `EOF` 在 body 中被展开。
 
-### 7. Subject 关注 *why*，不只是 *what*
+### 6. Subject 关注 outcome，而不是 file inventory
 
-Skill 用 imperative mood 写 subject line，关注 motivation，而不是机械描述。"Fix double-submit on checkout" 比 "Update checkout.rb" 更好。Body 说明未来读者需要的 motivation、trade-offs 或 context；显而易见的 single-purpose changes 则省略 body。
+Skill 用 imperative mood 写 subject line，说明现在可能实现或修复了什么。"Fix double-submit on checkout" 比 "Update checkout.rb" 更好。只有当 motivation 无法从 subject 中明显看出时才添加 body。
 
 ---
 
@@ -177,8 +169,8 @@ feat(notifications): wire toggle UI to mute endpoint
 | 1 | Gather context（git status、diff、branch、recent commits、default branch） |
 | 2 | Determine commit message convention（instructions > recent history > conventional-commits） |
 | 3 | Consider logical commits（concerns 明显不同时 file-level split） |
-| 4 | Stage and commit（per-group；default branch warning；detached HEAD handling） |
-| 5 | 通过 `git status` 确认；报告 commit hashes |
+| 4–6 | Convention、logical split、message、stage/commit（需要时 auto-branch） |
+| 7 | 通过 `git status` 确认；报告 commit hashes |
 
 ---
 
@@ -193,8 +185,8 @@ feat(notifications): wire toggle UI to mute endpoint
 **如果我的 repo 使用 non-standard convention 怎么办？**
 Skill 先从 project instructions 检测（这是记录 conventions 的正确位置），再看 recent commit history（即使没有文档，它也是事实上的 convention）。Conventional commits 只是两者都不适用时的 fallback。
 
-**为什么在 default branch 上 commit 前要询问？**
-因为大多数带 branch protection 的 repos 会拒绝 default-branch commit，而且用户通常不想在那里 commit。Warning 会在不可逆操作前拦住这种情况。
+**为什么在 default branch 或 detached HEAD 上自动创建 feature branch？**
+因为在 default branch 上 commit 会与常规 PR workflow 和 branch protection 冲突；detached HEAD commit 容易丢失。创建 feature branch 是安全默认，且与 `ce-commit-push-pr` 一致。
 
 **如果之后我想 push 和 PR 怎么办？**
 使用 `/ce-commit-push-pr` 走完整 flow，或在此 skill commit 后手动运行 `git push` 和 `gh pr create`。

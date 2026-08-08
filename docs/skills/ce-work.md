@@ -81,7 +81,7 @@
 
 ### 3. Engine、workspace 与 scheduling 是独立决策
 
-普通 synchronous native work 留在 active checkout。Native subagents 使用当前 harness 提供的 isolation。Detached external worker 始终获得 private linked worktree；只有 host 可在 canonical checkout apply、verify、commit result。Scheduler 只有检查 dependencies、actual/expected paths、shared interfaces、generated/config surfaces、migrations 和 shared runtime resources 后，才能 concurrent author bounded wave。Results 随后针对 advancing canonical tree 逐个 fold in。Clean patch 不等于 semantic compatibility proof；出现 overlap 或 uncertainty 时，affected work 返回 host resolution、re-dispatch 或 serial execution。
+普通 synchronous native work 留在 active checkout。每个 implementation unit 都会获得一个 fresh、single-use 的 native worker context，使用当前 harness 提供的任何 isolation；worker 可以继续其 assigned unit，但完成该 unit 后会被 release，而不是被 retasked 到另一个 unit。Detached external worker 始终获得 private linked worktree；只有 host 可在 canonical checkout apply、verify、commit result。Scheduler 只有检查 dependencies、actual/expected paths、shared interfaces、generated/config surfaces、migrations 和 shared runtime resources 后，才能 concurrent author bounded wave。Results 随后针对 advancing canonical tree 逐个 fold in。Clean patch 不等于 semantic compatibility proof；出现 overlap 或 uncertainty 时，affected work 返回 host resolution、re-dispatch 或 serial execution。
 
 ### 4. 执行全程保持 U-ID anchoring
 

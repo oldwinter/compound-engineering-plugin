@@ -107,6 +107,8 @@ Primer 使用 evidence-snippet（每个 finding evidence 的前约 120 chars）�
 
 Walk-through 本身支持中途 "auto-resolve the rest" escape；当用户已经 review 足够内容、信任其余时可使用。
 
+**每个 choice 前都提供 decision context。** Interactive Phase 4 的 findings 会在 routing question 之前的同一轮中渲染——仅凭先前的 non-interactive envelope 或一行 count 是不够的。每个 per-finding 步骤都会打印一个 terminal block，*并*把紧凑的 What's wrong / Proposed fix / If left as-is 复制进 blocking-question 字符串，让 modal harnesses 无需滚动也能保持可决策。
+
 ### 5. Mass changes 前的 bulk-action preview
 
 当用户选择 "Auto-resolve with best judgment"、"Append to Open Questions"，或在 walk-through 中途 escape 到 "Auto-resolve the rest" 时，skill 会在 apply 前展示每个 change 的 preview。Preview 包含 section、finding title、action（apply / skip / defer / acknowledge）和 brief rationale。用户 confirm 或 cancel。这是 bulk operations 的 safety valve：用户在内容落地前看到将发生什么。

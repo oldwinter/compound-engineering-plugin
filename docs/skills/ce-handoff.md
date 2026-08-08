@@ -55,10 +55,11 @@
 
 - 一个扁平的 `ce-handoff/v1` frontmatter 索引，供以后发现
 - Objective 与最新 user intent
-- 有意义的进展、决策、约束、阻碍和验证
-- 对 authoritative plans、issues、commits、diffs、docs 和 repository files 的引用
+- 有意义的进展、决策、约束、阻碍、验证，以及已放弃的错误方向（abandoned wrong turns）
+- 区分 complete、in-progress 和 not-started 工作的 current-state 表述（当这些状态不同时）
+- 对 authoritative plans、issues、commits、diffs、docs 和 repository files 的引用，并说明其中每项的 load-bearing 内容
 - 对 machine-local paths 与 fragile worktree state 的清晰标注
-- 供 receiving agent 考虑的合理后续步骤（互斥 forks 作为 alternatives；相关的 sequential work 合并成一条 path）
+- 默认以 remaining status 和 dependencies 的形式给出合理的后续步骤；仅在被要求时才给出 user-requested directives；context-loading pointers（要读什么）仍然欢迎
 
 只有 managed-store frontmatter 具有固定 contract，因为 default discovery 依赖它。正文没有封闭的 section schema：agent 可以自行增加 section，或合并、重命名、重排、忽略示例，以便把具体 session 清楚地交给下一个 agent。
 

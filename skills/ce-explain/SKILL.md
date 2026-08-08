@@ -4,7 +4,7 @@ description: "Create a durable, visual teaching artifact — plus an optional ch
 argument-hint: "[a concept, a diff ref, an idea, or 'what happened this week?'] — or invoke bare to be asked"
 ---
 
-> **中文导读（下方英文为 canonical contract）：** 交付一份为明确 reader 构建、可长期保留的 self-contained visual document。Work recap 以 diff/history evidence grounding，但正文解释发生了什么和为什么，不把 raw tokens 当叙事。Optional check-in 只有用户 opt in 才运行；destination 按 capability 检测，local file 是最低保证。
+> **中文导读（下方英文为 canonical contract）：** 交付一份为明确 reader 构建、可长期保留的 self-contained visual document。Work recap 以 diff/history evidence grounding，但正文解释发生了什么和为什么，不把 raw tokens 当叙事。Optional check-in 只有用户 opt in 才运行；destination 按 capability 检测，local file 是最低保证。Scout dispatch 遇到 concurrency/active-agent limit 时按 backpressure 等待 slot；其他 launch failure 则以相同 read budget inline 完成，并用一行说明替代路径。
 
 # Explain It To Me
 
@@ -47,7 +47,7 @@ Dispatch is tiered by task shape, never hardcoded to a model name:
 - **Extraction tier** — the work-recap scout: search-and-quote work. Use the platform's cheapest capable model when the harness exposes a known override; otherwise inherit.
 - **Ceiling tier** — the explainer composition, the check-in reasoning, and the corrections. These run in the main conversation on the orchestrator's model; nothing is dispatched for them.
 
-**Degradation rule.** When the platform's subagent primitive cannot select per-agent models, dispatch scouts on the inherited model and keep their read budgets. When the platform has no subagent primitive at all, run the scout work inline with the same budgets.
+**Degradation rule.** When the platform's subagent primitive cannot select per-agent models, dispatch scouts on the inherited model and keep their read budgets. When the platform has no subagent primitive at all, run the scout work inline with the same budgets. When a dispatch fails, treat a concurrency or active-agent-limit error as backpressure — retry after a slot frees; a launch that fails for any other reason runs that scout's work inline with the same budgets, disclosed in one line.
 
 ## Artifact Root
 

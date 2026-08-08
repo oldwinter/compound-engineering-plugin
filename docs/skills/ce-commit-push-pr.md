@@ -17,7 +17,7 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 | 它做什么？ | Commit、push 并 open PR；或只重写 existing PR description；或只生成 description 而不触碰 git |
 | 何时使用 | 想要 commits + PR；重写 existing PR description；为 branch 起草 description |
 | 产出什么 | Open PR（返回 URL）；或 updated PR description；或打印 description 供你自己应用 |
-| 下一步 | 默认自动 handoff 到 [`/ce-babysit-pr`](./ce-babysit-pr.md)，watch CI 和新 review、推动 PR 走向 merge-ready（可用 `babysit:off` 或 `auto_babysit: false` opt out）；它报告 ready 后由你 merge |
+| 下一步 | 默认自动 handoff 到 [`/ce-babysit-pr`](./ce-babysit-pr.md)，watch CI 和新 review、推动 PR 走向 merge-ready（可用 `babysit:off` 或 `auto_babysit: false` opt out）；它报告 ready 后由你 merge。有明确 **stack intent** 时，它会通过 `gh stack` 提交，并以 `posture:stack-ready`（land intent 明确时为 `stack-land`）handoff bottom open non-draft PR |
 
 ---
 
@@ -64,6 +64,7 @@ Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-pla
 - **Related-reference preflight**：识别 work-item references，并且只在 PR 真正解决该 item 时才使用 closing magic words
 - **Concept teaching**：当 PR 向 codebase 引入新 concept（pattern、technique、library 或 domain idea）时，description 会增加用于讲解它的 `## New concepts` section，让 readers 无需打开 diff 也能理解并复述 change
 - **Explicit, non-disruptive branding**：只有传入 `branding:on` 时，新 PR 才会添加 generic Compound Engineering badge；bare 或自动选择的 invocation 不添加任何 branding，rewrite existing PR 时则保留当前 branding
+- **选择加入的 PR stack 构建与提交**：仅当 user intent（或 standing preference）想要 stack 时才进行；绝不会为一行的 fix 主动建议。复用已有 topology，或从已完成 work 推导出最小的有用 retrospective dependency layers，然后提交并以推导出的 posture handoff babysit
 
 ---
 
@@ -129,6 +130,10 @@ Agent-driven development 消除了亲手写 code 原本会带来的学习过程�
 
 当存在带 label 的 plan 时，PR body 会增加一行 static provenance，列出哪些 decisions 已在 session 中确定、各自属于哪个 class，以及它们取代了什么选项，让 reviewer 一眼看出用户已作出的选择。没有 plan 的 run 会省略该行。三个 PR settings 的完整说明参见[配置参考](./configuration.md)。
 
+### 12. 选择加入的 stack mode：构建或提交 managed stack，再按 posture handoff
+
+Stack mode **只按 intent 选择加入**，绝不是默认路径，也不会对 trivial single-concern change 主动建议。Intent 明确时，skill 会探测 `gh stack`。它会保留已有 managed topology；若已完成的 work 都在一个 branch 上，则推导最小且有用、可独立 review 的 linear layers，自 bottom 到 top 构建，并验证 top 仍包含完整 change set。Review boundaries 有歧义时必须确认；pipeline mode 会把 proposed topology 作为 residual 返回，而不是猜测。随后通过 `gh stack submit --auto --open` 提交，并在 **bottom open non-draft** PR 上 handoff `/ce-babysit-pr`：默认 posture 为 `stack-ready`，只有明确表达 land/merge-when-green intent 时才使用 `stack-land`。
+
 ---
 
 ## 快速示例
@@ -154,6 +159,7 @@ Composition pass 产出 title（`feat(notifications): add per-type mute with TTL
 - 需要 PR description draft，但还不想 commit 或 push
 - 想要 adaptive description sizing，而不是 cookie-cutter template
 - Changes 触及 distinct concerns，希望 smart commit splitting
+- 明确想要 multi-layer work 的 **PR stack**（且 `gh stack` 可用）
 
 以下情况跳过 `ce-commit-push-pr`：
 
@@ -220,7 +226,10 @@ Description-only 生成 description 并打印回来，不触碰任何东西（�
 Skill 尊重你的 git config 和 pre-commit hooks。它绝不会传 `--no-verify`、`--no-gpg-sign` 或类似 flags 来跳过它们。如果 hook fails，skill 会 investigate 并 surface underlying issue。
 
 **能创建 draft PR 吗？**
-使用 description-only mode 生成 body，然后自己用 `gh pr create --draft --title "..." --body-file "..."` apply。Full workflow 目前没有暴露 draft flag。
+使用 description-only mode 生成 body，然后自己用 `gh pr create --draft --title "..." --body-file "..."` apply。Full workflow 目前没有暴露 draft flag。Stack mode 会有意通过 `--auto --open` 提交 ready（non-draft）PR，以便 babysit 接管后续。
+
+**什么时候会 open PR stack？**
+只有你（或 standing preference）明确想要 stack 时才进行——绝不会为一行的 fix 主动建议。没有已有 topology 时，当 whole-file groups 或现有 commit boundaries 能给出清晰、安全的一个方案时，它可以把已完成的工作 retrospectively 拆成最小的有用线性 dependency layers。对 ambiguous split 或 published-history rewrite，它会先询问。提交后，它会在 bottom open non-draft PR 上以 `posture:stack-ready`（你要求 green 时 land 则为 `stack-land`）handoff babysit。
 
 **为什么我的 PR 没有 `## New concepts` section？**
 这是有意的设计：大多数 PR 都不应该有。只有当 change 引入的 concept 对当前 codebase 确实是新的（对照 base ref 检查），而且能够迁移到该 codebase 之外时，section 才会触发。常规使用 established repo patterns、refactors、renames 和 dependency bumps 都不符合条件。缺少 section 的代价很小；像说教一样的 section 却会训练 readers 直接跳过这个 feature。如果你永远不想生成该 section，请在 `.compound-engineering/config.local.yaml` 中设置 `pr_teaching_section: false`。
