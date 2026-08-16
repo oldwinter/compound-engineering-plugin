@@ -158,7 +158,7 @@ Evaluate activation separately from execution with a few positive triggers, adja
 
 ### Render user invocations at the output boundary
 
-Keep agent-to-agent routing capability-first: format formal skill names as inline code (for example, `ce-plan`) and invoke the named skill through the active harness's callable skill mechanism. Exact command spelling belongs only where the skill prints or copies a user-runnable invocation. At that output seam, default to `/skill-name`; use `$skill-name` only when the active harness is Codex or explicitly documents dollar-prefixed skill invocation. In prose, render only the invocation as inline code; use a fenced block only when the command stands alone. Output exactly one form. Built-in commands such as `/goal` are separate capabilities, not evidence that slash-prefixed skill names are callable in Codex.
+Keep agent-to-agent routing capability-first: format formal skill names as inline code (for example, `ce-plan`) and invoke the named skill through the active harness's callable skill mechanism. Exact command spelling belongs only where the skill prints or copies a user-runnable invocation. At that output seam, default to `/skill-name`; use `$skill-name` only when the active harness is Codex or explicitly documents dollar-prefixed skill invocation. On oh-my-pi (`omp`), keep the default form for model-visible targets; use native `/skill:<name>` only when the target is not model-visible because it declares `disable-model-invocation` or `hide` (for example, `/skill:ce-polish`). In prose, render only the invocation as inline code; use a fenced block only when the command stands alone. Output exactly one form. Built-in commands such as `/goal` are separate capabilities, not evidence that slash-prefixed skill names are callable in Codex.
 
 An authoring guide cannot supply runtime behavior to an installed skill. Put the smallest self-contained rendering rule immediately before the smallest section that contains all affected user-copy seams. Do not repeat it in every step; repeat it only in a separately loaded reference that independently owns output. Use a focused contract test when independently edited skills must preserve the same handoff, without duplicating the rationale or a harness matrix.
 
@@ -412,7 +412,11 @@ the approach. Add only the protocol needed to protect that outcome.
 3. Separate model behavior, harness mechanics, and authority context.
 4. Treat the name and description as an activation contract.
 5. Keep protocol explicit. Delete judgment guidance when the outcome is enough;
-   otherwise use the smallest supported principle or contrast pair.
+   otherwise use the smallest supported principle or contrast pair. Prescribe a
+   mechanism only where this skill owns it; a delegating skill states the
+   condition, the safe failure direction, and the non-derivable callee facts.
+   A finding that a prescribed command fails in some state, against a
+   delegating skill, is a representation finding: propose the deletion.
 6. Preserve local quantifiers, gates, stable fields, coverage floors, and
    completion branches.
 7. Describe capabilities and observable behavior before named tools. Preserve

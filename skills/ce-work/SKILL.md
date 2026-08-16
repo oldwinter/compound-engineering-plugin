@@ -26,7 +26,7 @@ fi
 
 - **Result:** A fully implemented, locally verified change set from a plan, specification, or concrete work prompt.
 - **Next consumer:** In standalone use, the shipping workflow takes the verified change through review and delivery. In Return-to-Caller Mode, the invoking workflow receives the structured implementation and verification envelope and owns its remaining gates.
-- **Done:** Every in-scope task is complete, required verification evidence is recorded, relevant checks pass, and the run reaches either its owned shipping handoff, a complete return envelope, or an explicit blocker.
+- **Done:** Every in-scope task is complete, required verification evidence is recorded, relevant checks pass, and the run reaches either its owned shipping handoff (with a code-review receipt or explicit skip phrase — see Phase 3-4), a complete return envelope, or an explicit blocker.
 - **Intent:** Finish the requested feature without renegotiating the plan or transferring canonical integration authority. Workers receive bounded units; the host orchestrator inspects actual changes and owns authoritative verification and canonical commits.
 
 ## Input Document
@@ -37,12 +37,12 @@ Invocation origin is not observable or relevant: apply the same source-resolutio
 
 ## Artifact Root
 
-This skill discovers plans under `<root>/plans/` and may write review residuals under `<root>/residual-review-findings/`. Resolve `<root>` when you first compose a `<root>/` path (per the block below), never before you need it. A write to `<root>/...` and a read of `<root>/solutions/` both count as composing a `<root>/` path, so either one triggers resolution; only a run that touches no `<root>/` path at all -- a scratch-only or no-repo flow -- skips it; pass the resolved path to any subagent, not the config.
+This skill discovers plans under `<root>/plans/`. Resolve `<root>` when you first compose a `<root>/` path (per the block below), never before you need it. A write to `<root>/...` and a read of `<root>/solutions/` both count as composing a `<root>/` path, so either one triggers resolution; only a run that touches no `<root>/` path at all -- a scratch-only or no-repo flow -- skips it; pass the resolved path to any subagent, not the config.
 
 <!-- ce-docs-root:start -->
 **Resolve the CE artifact root `<root>` before composing any artifact path.**
 
-- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml`; first non-empty value wins (`<repo-root>` = `git rev-parse --show-toplevel`). Unset -> `<root>` is `docs`, exactly as before.
+- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.yaml` only (`<repo-root>` = `git rev-parse --show-toplevel`). Do not read it from `config.local.yaml`. Unset -> `<root>` is `docs`, exactly as before.
 - **Validate** a set value: a repo-relative directory whose real, symlink-resolved path stays inside the repo and is neither the repo root nor under `.git/`. Otherwise stop with an error naming `docs_root` and the value -- never fall back to `docs`.
 - **Use** `<root>` as the sole artifact location: create it if absent, compose each path as `<root>/<subdir>` with this skill's own subdirectory, and never also read `docs`.
 <!-- ce-docs-root:end -->
@@ -63,7 +63,15 @@ When a valid `implementation_engine:` binding is present without recovery, **pre
 
 **Resolve a session-carried plan before blank or bare-prompt classification.** When the current request is continuation language such as "proceed" and the conversation identifies exactly one current plan/spec path that was authored, selected, or accepted for this work, treat that path as `<input_document>`. If multiple session plans are plausible, ask which one; do not choose by recency. Do not replace a concrete new work request with an unrelated earlier plan. This rule depends only on visible conversation state, never on whether invocation was explicit or automatic.
 
-**Every non-recovery code path must resolve its implementation engine before execution.** Once metadata or prompt triage identifies code work, but before reading active implementation units, creating tasks, writing files, or committing, read `references/execution-engines.md` and perform its route-resolution gate. This applies with or without an `implementation_engine:` carrier: inspect `.compound-engineering/config.local.yaml` when it exists, because standing configuration remains eligible in both standalone and carrierless Return-to-Caller Mode. Do not choose inline/native execution until that gate has ruled out or validly exhausted the applicable higher-authority routes.
+**Every non-recovery code path must resolve its implementation engine before execution.** Once metadata or prompt triage identifies code work, but before reading active implementation units, creating tasks, writing files, or committing, read `references/execution-engines.md` and perform its route-resolution gate. This applies with or without an `implementation_engine:` carrier: apply the ordinary-key rule below to `work_engine_mode` and `work_engine_preferences` independently, because standing configuration remains eligible in both standalone and carrierless Return-to-Caller Mode. Do not choose inline/native execution until that gate has ruled out or validly exhausted the applicable higher-authority routes.
+
+<!-- ce-config-layers:start -->
+**Resolve ordinary CE yaml keys from the two repo files.**
+
+- **Read** `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml` (`<repo-root>` = `git rev-parse --show-toplevel`). Missing files are skipped. Gitignore does not change resolution.
+- **Win** with the first active (non-commented) value. For scalars, empty is unset; an invalid value continues to the next layer, then the skill default. For lists and maps, a present key — including an empty list or map — replaces the whole key.
+- **Do not** use this rule for `docs_root` — that key is `config.yaml` only.
+<!-- ce-config-layers:end -->
 
 Determine how to proceed based on what was provided in `<input_document>` (after any mode token is stripped).
 
@@ -119,57 +127,13 @@ Determine how to proceed based on what was provided in `<input_document>` (after
 
 2. **Setup Environment**
 
-   First, check the current branch:
+   Two things must hold before the first edit: the work lands on a feature branch, and nothing the user did not offer up gets committed or published by this run. Neither is a question for the user — a branch move is a one-command undo, so do it and say so in one line.
 
-   ```bash
-   current_branch=$(git branch --show-current)
-   default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+   **Branch.** Determine the default branch (`origin/HEAD`; else what the host reports as the default, e.g. `gh repo view --json defaultBranchRef`; else `main`/`master` when one exists). If you are on it, detached, or cannot tell, create a feature branch named from the plan or work description (e.g. `feat/user-authentication`) and re-read `git branch --show-current`. Base it on the fresh remote tip (`git fetch origin <default>`, then `origin/<default>`) when `HEAD` has no commits beyond it, so the work builds on current code; base it on `HEAD` when it does (those commits stay visible to the idempotency check, and the shipping gate decides whether they publish) or when there is no remote; the safe direction when unsure is a spare branch, never incremental commits on the real default. Otherwise continue on the branch you were invoked on — that is where the work belongs; do not rename it and do not ask whether to. A worktree is used only when the user asked for one this session (`ce-worktree`); the default branch is committed to only when the user explicitly said so this session.
 
-   # Fallback if remote HEAD isn't set
-   if [ -z "$default_branch" ]; then
-     default_branch=$(git rev-parse --verify origin/main >/dev/null 2>&1 && echo "main" || echo "master")
-   fi
-   ```
-
-   **If already on a feature branch** (not the default branch):
-
-   First, check whether the branch name is **meaningful** — a name like `feat/crowd-sniff` or `fix/email-validation` tells future readers what the work is about. Auto-generated worktree names (e.g., `worktree-jolly-beaming-raven`) or other opaque names do not.
-
-   If the branch name is meaningless or auto-generated, suggest renaming it before continuing:
-   ```bash
-   git branch -m <meaningful-name>
-   ```
-   Derive the new name from the plan title or work description (e.g., `feat/crowd-sniff`). Present the rename as a recommended option alongside continuing as-is.
-
-   Then ask: "Continue working on `[current_branch]`, or create a new branch?"
-   - If continuing (with or without rename), proceed to step 3
-   - If creating new, follow Option A or B below
-
-   **If on the default branch**, choose how to proceed:
-
-   **Option A: Create a new branch**
-   ```bash
-   git pull origin [default_branch]
-   git checkout -b feature-branch-name
-   ```
-   Use a meaningful name based on the work (e.g., `feat/user-authentication`, `fix/email-validation`).
-
-   **Option B: Use a worktree (recommended for parallel development)**
-   ```bash
-   skill: ce-worktree
-   # Ensures isolation: detects an existing worktree, prefers the harness's
-   # native worktree tool, else creates one from the default branch
-   ```
-
-   **Option C: Continue on the default branch**
-   - Requires explicit user confirmation
-   - Only proceed after user explicitly says "yes, commit to [default_branch]"
-   - Never commit directly to the default branch without explicit permission
-
-   **Recommendation**: Use worktree if:
-   - You want to work on multiple features simultaneously
-   - You want to keep the default branch clean while experimenting
-   - You plan to switch between branches frequently
+   **Pre-work scope.** Before editing, record `git status --short --untracked-files=all` (the user's in-progress files) and whether `HEAD` carries commits not on the remote default (`git log origin/<default>..HEAD`; "unknown" without a remote). Nothing in that set is yours to commit or publish, and it rides along on the branch move untouched — no stash, no question, no effect on naming. It is enforced without a menu:
+   - Incremental commits stage only work-owned files and are path-limited (Phase 2), so untouched WIP never enters a commit; the Phase 4 handoff passes every pre-work file this run did not commit as `exclude:<paths>`, and ships locally via `ce-commit` when pre-existing unpushed commits are on the branch (`references/shipping-workflow.md`).
+   - A unit that must edit a file that was already dirty is the one case a commit cannot separate. Ask once, covering every such file, at the first commit that would include one: commit those files with the user's edits included, or leave them uncommitted (an exclusion for the rest of the run, named in the final summary as unshipped). In Return-to-Caller Mode do not ask and do not edit the file — return `status: blocked` naming it, so the user's WIP stays intact and commit-or-stash-and-rerun is a clean recovery.
 
 3. **Create Task List** _(skip if Phase 0 already built one, or if Phase 0 routed as Trivial)_
    - Use the platform's task-tracking capability when available (`TaskCreate`/`TaskUpdate`/`TaskList` in Claude Code, `update_plan` in Codex, or the equivalent on other harnesses) to break the plan into actionable tasks. If none is available, continue normally without simulating a task list in chat
@@ -187,7 +151,7 @@ Determine how to proceed based on what was provided in `<input_document>` (after
 
 4. **Choose Execution Engine, then Strategy**
 
-   **Route resolution is a mandatory pre-write gate.** Before any implementation write, native worker dispatch, or implementation commit, read `references/execution-engines.md`; inspect applicable live/session/project intent, any typed caller binding, and `.compound-engineering/config.local.yaml` when it exists; then resolve and record the engine. Do not infer native execution merely because no typed carrier was supplied. Native is eligible only after this gate finds no higher-authority cross-model selection or exhausts a `prefer` route under the reference's fallback contract.
+   **Route resolution is a mandatory pre-write gate.** Before any implementation write, native worker dispatch, or implementation commit, read `references/execution-engines.md`; inspect applicable live/session/project intent, any typed caller binding, and `.compound-engineering/config.local.yaml` then `config.yaml` when they exist; then resolve and record the engine. Do not infer native execution merely because no typed carrier was supplied. Native is eligible only after this gate finds no higher-authority cross-model selection or exhausts a `prefer` route under the reference's fallback contract.
 
    First pick the **engine** that runs implementation: inline/subagent, goal-mode, dynamic-workflow, or cross-model execution. When no applicable live intent, typed caller binding, or enabled standing configuration selects cross-model execution, native execution remains the default inline/subagent path. Goal-mode and dynamic-workflow remain limited to implementation-ready unified code plans and are usable only when the host exposes a callable primitive for them — Codex exposes `create_goal` (a skill can start a goal directly), while Claude Code exposes no goal tools, so on Claude Code they are prompt-emission only (never invoked from inside this skill). Prefer dynamic-workflow over goal-mode for large fan-out plans (many independent U-IDs, codebase-wide sweeps, migrations, adversarial cross-checking). The loaded reference defines authority-and-scope route resolution, the ordered standing preference contract, host-capability probe, plan-shape selection table, copyable goal-mode/`ultracode:` prompts, and resume-tail rules. An engine choice never changes tail ownership — after implementation, resume standalone quality gates in normal use, or return the return-to-caller envelope when invoked by `lfg`. Legacy and bare-prompt code work otherwise use the inline/subagent engine directly.
 
@@ -230,7 +194,7 @@ Determine how to proceed based on what was provided in `<input_document>` (after
    - Instruction to check whether the unit's test scenarios cover all applicable categories (happy paths, edge cases, error paths, integration) and supplement gaps before writing tests.
    - **Instruction to choose the unit's evidence strategy and gather the evidence** (see Evidence Strategy in Phase 2) — for behavior-bearing changes, honor the Execution note and default to proof-first or characterization-first: create/update/strengthen the test and observe the red failure or characterization baseline **before** changing production code. The worker is the only party that witnesses this, so it must capture it as it goes.
    - **Instruction to report, in its final message, both (a) the file paths it changed and (b) the unit's verification evidence** — `behavior_changed`, existing tests inspected, tests added/changed or used unchanged, the red failure or characterization observed (when applicable), the verification run and result, and any deliberate no-test exception with its reason. The handoff is a text summary on most harnesses with no guaranteed diff, so reported paths are the orchestrator's starting hint (it still verifies the actual tree); the evidence fields are **not** reconstructable from the tree afterward, so a worker that omits them forces the orchestrator to re-derive or leave `verification_evidence` incomplete.
-   - **Do not commit.** Ordinary native workers implement and may run their *own unit's* focused tests in isolation as a self-check, but the **orchestrator owns staging, committing, and the authoritative test runs**. An external cross-model worker may create isolated transport commits only under its conditional protocol; those are change transport, never canonical commits. (Capability note: a harness that *reaps* the isolated workspace on worker completion — none of our current targets do — would instead require the worker to commit to its branch; confirm before assuming it.)
+   - **Do not commit.** Ordinary native workers implement and may run their *own unit's* focused tests in isolation as a self-check, but the **orchestrator owns staging, committing, and the authoritative test runs**. An external cross-model worker also must not run `git add`, `git commit`, or another Git index write. Leave its working tree uncommitted; the host snapshots that tree into an isolated transport commit. Those are change transport, never canonical commits. (Capability note: a harness that *reaps* the isolated workspace on worker completion — none of our current targets do — would instead require the worker to commit to its branch; confirm before assuming it.)
 
    **Shared-workspace constraints** — when subagents share your working directory (no isolation): they must not `git add`, commit, or run the full test suite concurrently (index corruption + test interference); the orchestrator does all of that after the batch. A worker may run a single focused unit test only if it touches no shared state.
 
@@ -279,9 +243,11 @@ Before implementing the first task, you must read `references/implementation-loo
    # 2. Stage only files related to this logical unit (not `git add .`)
    git add <files related to this logical unit>
 
-   # 3. Commit with conventional message
-   git commit -m "feat(scope): description of this unit"
+   # 3. Commit with conventional message, limited to those same paths
+   git commit -m "feat(scope): description of this unit" -- <files related to this logical unit>
    ```
+
+   The path limit on `git commit` is load-bearing: a bare `git commit` takes the whole index, so anything the user had staged before this run started (Phase 1 Step 2's pre-work scope) would ride into the unit's commit. Naming the paths commits only them and leaves the user's staged entries in the index.
 
    **Handling merge conflicts:** If conflicts arise during rebasing or merging, resolve them immediately. Incremental commits make conflict resolution easier since each commit is small and focused.
 
@@ -345,7 +311,12 @@ Before implementing the first task, you must read `references/implementation-loo
 
 When all Phase 2 tasks are complete and execution transitions to quality check, you must read `references/shipping-workflow.md` for the full shipping workflow. Do not skip this.
 
-**Code review: one portable path.** Review with `ce-code-review`, which self-sizes (lite roster for small low-risk code-only diffs, full roster otherwise). No harness-native review detection and no escalation tiers — the size/sensitive-surface judgment lives inside `ce-code-review`. Skip dedicated review only for a purely mechanical diff (formatting, dep-bumps, lint-only, generated). Full rules (autonomous Residual Gate, infra fallback) in `shipping-workflow.md`.
+**Code-review completion gate (standalone shipping only — default on).** This standalone run is **not done** — and must not call `ce-commit-push-pr` / `ce-commit` or report ship-complete — until exactly one of:
+
+1. **Review receipt:** you invoked `ce-code-review` through the host's normal skill-invocation mechanism and hold a **completed** receipt — `mode:agent` JSON with `status: complete` plus `artifact_path` or `run_id`, or default-mode markdown with Actionable Findings, Coverage, and Verdict — then ran apply/residuals per `shipping-workflow.md`. Do **not** treat `status: failed`, `degraded`, or `skipped` as a completed receipt even if `artifact_path`/`run_id` is present; those enter the unavailable path in `shipping-workflow.md`; or
+2. **Explicit skip phrase** in the shipping summary, exactly one of: `Code review: skipped (mechanical diff)`, `Code review: skipped (ce-code-review unavailable)`, or (interactive only, after a real harness-native review ran because `ce-code-review` could not) `Code review: harness-native fallback`, each with a one-line reason.
+
+**Mechanical** means only formatting, dependency-version bumps, lint-only fixes, or generated artifacts — including multi-file mechanical-only diffs (e.g. package manifest + lockfile, formatter output across files). **Not mechanical:** behavior-bearing work (single- or multi-file), control-flow/error-class/tests-for-behavior changes, or applying external/prior review findings. **Never substitute** mental self-review, "findings already applied," or ad-hoc skimming. Harness-native `/review` alone is **not** a substitute when `ce-code-review` can load; it only satisfies the gate via the `harness-native fallback` phrase after the documented unavailable path. Full path lives in `shipping-workflow.md`. This gate does **not** apply in Return-to-Caller Mode — the caller owns review.
 
 **Review is two steps — review, then fix.** `ce-code-review` is review-only. It returns findings (markdown or `mode:agent` JSON); it never edits the checkout, commits, or applies fixes.
 
@@ -400,7 +371,7 @@ gates.
 
 - Get clarification once at the start, then execute
 - Don't wait for perfect understanding - ask questions and move
-- The goal is to **finish the feature**, not create perfect process
+- The goal is to **finish the feature**, not create perfect process — without dropping the code-review completion gate or other shipping receipts
 
 ### The Plan is Your Guide
 
@@ -417,13 +388,13 @@ gates.
 
 ### Quality is Built In
 
-- Review every non-mechanical diff with `ce-code-review` (it self-sizes; see `shipping-workflow.md`)
+- Standalone shipping holds a `ce-code-review` receipt or an explicit fixed-phrase skip before commit/PR (completion gate in Phase 3-4; details in `shipping-workflow.md`)
 
 ### Ship Complete Features
 
 - Mark all tasks completed before moving on
 - Don't leave features 80% done
-- A finished feature that ships beats a perfect feature that doesn't
+- A finished feature that ships beats a perfect feature that doesn't — ship still requires the review receipt or skip phrase; silent unreviewed ship is not finished
 
 ## Common Pitfalls to Avoid
 
@@ -433,5 +404,5 @@ gates.
 - **Testing at the end** - Test continuously or suffer later
 - **Forgetting to track progress** - Update task status as you go or lose track of what's done
 - **80% done syndrome** - Finish the feature, don't move on early
-- **Skipping review without reason** — review every non-mechanical diff with `ce-code-review`; skip only for a purely mechanical diff or when it is genuinely unavailable, and document the skip reason
+- **Skipping review without a receipt or fixed skip phrase** — standalone shipping is not done until a `ce-code-review` receipt exists or the shipping summary carries an exact skip phrase; mental self-review and "already applied external findings" do not count
 - **Re-scoping the plan into human-time phases** - The plan's Implementation Units define the scope of execution. Do not estimate human-hours per unit, propose multi-day breakdowns, or ask the user to pick a subset of units for "this session". Agents execute at agent speed, and context-window pressure is addressed by subagent dispatch (Phase 1 Step 4), not by phased sessions. If a plan-file input is genuinely too large for a single execution, say so plainly and suggest the user return to `ce-plan` to reduce scope — don't invent session phases as a workaround. For bare-prompt input, Phase 0's Large routing already handles oversized work

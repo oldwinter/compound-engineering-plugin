@@ -20,7 +20,7 @@ argument-hint: "[PR ref] [mode:pipeline] [archive:on|off] [branding:on|off] [bab
 
 ## Stack mode (opt-in)
 
-**Opt-in only.** Enter stack mode when user intent or standing preference wants a multi-PR stack. Prefer intent over keyword matching. **Do not** proactively suggest PR stacks. **Refuse** nonsense stacks (one logical change, artificial slices) and stay on the single-PR path.
+**Opt-in only.** Enter stack mode when user intent or standing preference wants a multi-PR stack. An explicit stack request is **required intent** — do not re-read it as a single PR with a custom `--base`. **Do not** proactively suggest PR stacks. When the user did **not** ask for one, **refuse** nonsense stacks (one logical change, artificial slices) and stay on the single-PR path.
 
 When stack mode is active, load `references/stack-submit.md` **before Step 3**. At this point follow only its Probe, Topology, and, when needed, Retrospective construction sections; do not submit. When that reference constructs a retrospective stack, its layer-by-layer commit flow replaces ordinary Step 3. Step 5 exclusively owns stack submission and the reference's post-submit metadata route for PRs created in this run. Soft-depend on `gh stack` CLI only. On missing/unavailable CLI: required stack intent → hard-stop with residual; soft intent → residual + ordinary single-PR create.
 
@@ -58,7 +58,7 @@ When PR concept-teaching archival is on, this skill writes an explainer under `<
 <!-- ce-docs-root:start -->
 **Resolve the CE artifact root `<root>` before composing any artifact path.**
 
-- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml`; first non-empty value wins (`<repo-root>` = `git rev-parse --show-toplevel`). Unset -> `<root>` is `docs`, exactly as before.
+- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.yaml` only (`<repo-root>` = `git rev-parse --show-toplevel`). Do not read it from `config.local.yaml`. Unset -> `<root>` is `docs`, exactly as before.
 - **Validate** a set value: a repo-relative directory whose real, symlink-resolved path stays inside the repo and is neither the repo root nor under `.git/`. Otherwise stop with an error naming `docs_root` and the value -- never fall back to `docs`.
 - **Use** `<root>` as the sole artifact location: create it if absent, compose each path as `<root>/<subdir>` with this skill's own subdirectory, and never also read `docs`.
 <!-- ce-docs-root:end -->
@@ -88,14 +88,16 @@ If on the default branch, branch creation needs to handle stale local `<base>`, 
 
 Scan changed files for naturally distinct concerns. If they clearly group into separate logical changes, create separate commits (2-3 max). Group at file level only — no `git add -p`. When ambiguous, one commit is fine.
 
-Stage and commit each group. **Avoid `git add -A` and `git add .`** — they sweep in `.env`, build artifacts, and generated files:
+Stage and commit each group. **Avoid `git add -A` and `git add .`** — they sweep in `.env`, build artifacts, and generated files. **Honor `exclude:<paths>` when the invocation carries it:** a caller names files that must stay uncommitted (typically a user's own in-progress edits it could not separate from its work); never stage or commit them, and say in the report that they were left out. When a plan Implementation Unit ID is already in hand for this commit (conversation, caller, or the files belong to one unit), append that unit's U-ID in parentheses — `(U3)` means unit 3. Do not hunt for a plan. Omit when the commit spans units, the unit is unclear, or no plan is in hand.
 
 ```bash
 git add file1 file2 file3 && git commit -m "$(cat <<'EOF'
 commit message here
 EOF
-)"
+)" -- file1 file2 file3
 ```
+
+The trailing path list on `git commit` is load-bearing: a bare `git commit` takes the whole index, so anything already staged before this run (a caller's `exclude:` paths, or work the user staged and did not name) would ride into the commit. Naming the paths commits exactly the group and leaves other index entries alone.
 
 Then push. Immediately before pushing, re-confirm you are on the intended feature branch (`git branch --show-current`) — the branch gathered in Context is a hint, and Step 1 may have created or switched branches since. Push the live `HEAD` so it reflects the current checkout, never a stale branch name:
 
@@ -116,7 +118,17 @@ If the working tree is clean and all commits are already pushed, this step is a 
 3. **No material observable claim** (internal plumbing, type-only, pure refactor, inert docs) — skip without asking. Classify by runtime purpose, not extension (runtime agent instructions / config / product content / policy YAML is not auto-skippable as "docs").
 4. **Otherwise** (UI, CLI, API, workflow, ranking, deploy/config behavior) — concise validation note of what was exercised; if a real run was impossible (credentials, paid services, deploy-only, hardware, missing setup), say so. Do not block PR creation for missing visuals; test/manual notes are fine — never label test output "Demo" or "Screenshots."
 
-**Concept teaching gate** before composition. Use the repo root gathered in Context (resolving it with `git rev-parse --show-toplevel` if you don't already have it — description-only/update can skip the Context snapshot) and read `<repo-root>/.compound-engineering/config.local.yaml` with the native file-read tool. Only an **active (non-commented)** `pr_teaching_section:` key counts — lines starting with `#` are YAML comments; matching commented template keys would silently flip the gate. Off only when the active value is exactly `false`; missing file/key or any other value → default **on**. Same read resolves `pr_teaching_archive:` — on only when active value is exactly `true`, else **off**; per-run `archive:on|off` overrides for this invocation.
+**Concept teaching gate** before composition. Use the repo root gathered in Context (resolving it with `git rev-parse --show-toplevel` if you don't already have it — description-only/update can skip the Context snapshot) and apply the ordinary-key rule below.
+
+<!-- ce-config-layers:start -->
+**Resolve ordinary CE yaml keys from the two repo files.**
+
+- **Read** `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml` (`<repo-root>` = `git rev-parse --show-toplevel`). Missing files are skipped. Gitignore does not change resolution.
+- **Win** with the first active (non-commented) value. For scalars, empty is unset; an invalid value continues to the next layer, then the skill default. For lists and maps, a present key — including an empty list or map — replaces the whole key.
+- **Do not** use this rule for `docs_root` — that key is `config.yaml` only.
+<!-- ce-config-layers:end -->
+
+Only an **active (non-commented)** `pr_teaching_section:` key counts — lines starting with `#` are YAML comments; matching commented template keys would silently flip the gate. Off only when the winning active value is exactly `false`; missing key or any other value → default **on**. Same cascade resolves `pr_teaching_archive:` — on only when the winning active value is exactly `true`, else **off**; per-run `archive:on|off` overrides for this invocation.
 
 - Gate **on** — judge novelty and compose per **Step B2** of the reference. When off, skip judgment, section, Step 5 trailer/offer, and archival entirely.
 - Gate **off** — compose without concept handling.
@@ -151,7 +163,7 @@ If the doc write, commit, or push fails, warn and continue to PR creation withou
 
 **Concept trailer** — when a body applied by this run contains a `## New concepts` section, print one line after the PR URL in every mode: `New concepts: <name>[, <name>]`. In interactive full-workflow runs follow it with one line per taught concept telling the user to invoke `ce-explain <name>` using the rendering rule above. No trailer when this run applied no body — including a rewrite that was declined or pipeline-defaulted to no — or no PR exists.
 
-**Babysit handoff — default on; completion gate.** After reporting a newly-created PR URL, a successful **stack submit**, or new commits landing on an existing open PR (interactive full workflow **or** `mode:pipeline` when stack mode submitted this run), this run is **not done** until `ce-babysit-pr` owns follow-on for that PR — or an explicit skip below applies. Reporting the PR URL alone is not success. **Auto-hand off by default:** announce in one non-blocking line (e.g. "Babysitting toward merge-ready — pass `babysit:off` to skip"), then invoke `ce-babysit-pr` through the host's normal skill-invocation mechanism with the PR URL — never ask yes/no. After **stack submit**, hand off the **bottom open non-draft** PR and include the derived posture (`posture:stack-ready` by default; `posture:stack-land` when land intent was explicit) plus stack-wide scope for `mode:pipeline` when applicable. Announce that stack babysit ownership transferred so an outer orchestrator (e.g. `lfg` step 9) does not start a second bare babysit on the current branch. **Success** = `ce-babysit-pr` has started on that PR; in `mode:pipeline`, wait for its pipeline stop and return the structured result to the caller (started-only is not enough for an orchestrator DONE). Never start babysit mechanics yourself (`pr-snapshot`, arming a watcher, reconstructing its loop). **Never substitute** `ci-watcher`, `gh pr checks --watch`, ad-hoc polls, or "I'll babysit later." **Handoff blocked:** if `ce-babysit-pr` cannot be loaded or started, stop and report blocked (name the failure). Do not invent a parallel or narrower watch. *Off is the explicit choice:* **`babysit:off`** skips this run; **`babysit:continuous`** / **`babysit:checkpoint`** forces that mode; **`auto_babysit: false`** in config.local.yaml is a standing opt-out (same active-key semantics as `pr_teaching_section`: only exact active `false` disables; missing/other → default **on**; `babysit:off` overrides for this run).
+**Babysit handoff — default on; completion gate.** After reporting a newly-created PR URL, a successful **stack submit**, or new commits landing on an existing open PR (interactive full workflow **or** `mode:pipeline` when stack mode submitted this run), this run is **not done** until `ce-babysit-pr` owns follow-on for that PR — or an explicit skip below applies. Reporting the PR URL alone is not success. **Auto-hand off by default:** announce in one non-blocking line (e.g. "Babysitting toward merge-ready — pass `babysit:off` to skip"), then invoke `ce-babysit-pr` through the host's normal skill-invocation mechanism with the PR URL — never ask yes/no. After **stack submit**, hand off the **bottom open non-draft** PR and include the derived posture (`posture:stack-ready` by default; `posture:stack-land` when land intent was explicit) plus stack-wide scope for `mode:pipeline` when applicable. Announce that stack babysit ownership transferred so an outer orchestrator (e.g. `lfg` step 9) does not start a second bare babysit on the current branch. **Success** = `ce-babysit-pr` has started on that PR; in `mode:pipeline`, wait for its pipeline stop and return the structured result to the caller (started-only is not enough for an orchestrator DONE). Never start babysit mechanics yourself (`pr-snapshot`, arming a watcher, reconstructing its loop). **Never substitute** `ci-watcher`, `gh pr checks --watch`, ad-hoc polls, or "I'll babysit later." **Handoff blocked:** if `ce-babysit-pr` cannot be loaded or started, stop and report blocked (name the failure). Do not invent a parallel or narrower watch. *Off is the explicit choice:* **`babysit:off`** skips this run; **`babysit:continuous`** / **`babysit:checkpoint`** forces that mode; **`auto_babysit: false`** in CE config (local then tracked) is a standing opt-out (same active-key semantics as `pr_teaching_section`: only exact winning active `false` disables; missing/other → default **on**; `babysit:off` overrides for this run).
 
 **Do not fire (auto-detected, no flag needed):** `mode:pipeline` **except** when this run completed a stack-mode submit (then hand off with derived posture as above), description-only / description-update, no PR created or updated this run, non-GitHub, **draft PR** this run created/updated (author not-ready signal — announce skip; can start `ce-babysit-pr` once ready; explicit `babysit:continuous` / `babysit:checkpoint` still forces watch — pass `watch` / `checkpoint` into the invocation so its draft boundary arms), or **a head branch you cannot push to**. **Fork PRs are drivable — not a hard-off** when you can push the head (common for a branch this skill just pushed): babysit reads state on the **base** repo and pushes fixes to the **head** repo. Hard-off only when the head is not pushable. **Soft-degrade (after successful handoff only):** checkpoint-only harness runs one tick + resume command — not a substitute for a failed handoff.
 

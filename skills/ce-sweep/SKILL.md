@@ -58,7 +58,7 @@ This skill records swept feedback under `<root>/feedback-sweep/`. Resolve `<root
 <!-- ce-docs-root:start -->
 **Resolve the CE artifact root `<root>` before composing any artifact path.**
 
-- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml`; first non-empty value wins (`<repo-root>` = `git rev-parse --show-toplevel`). Unset -> `<root>` is `docs`, exactly as before.
+- **Read** `docs_root` from `<repo-root>/.compound-engineering/config.yaml` only (`<repo-root>` = `git rev-parse --show-toplevel`). Do not read it from `config.local.yaml`. Unset -> `<root>` is `docs`, exactly as before.
 - **Validate** a set value: a repo-relative directory whose real, symlink-resolved path stays inside the repo and is neither the repo root nor under `.git/`. Otherwise stop with an error naming `docs_root` and the value -- never fall back to `docs`.
 - **Use** `<root>` as the sole artifact location: create it if absent, compose each path as `<root>/<subdir>` with this skill's own subdirectory, and never also read `docs`.
 <!-- ce-docs-root:end -->
@@ -67,10 +67,18 @@ This skill records swept feedback under `<root>/feedback-sweep/`. Resolve `<root
 
 ### Phase 0: Route by Config State
 
-**Resolve the repo root.** Run `git rev-parse --show-toplevel` with the shell tool to resolve `<repo-root>`. Read `<repo-root>/.compound-engineering/config.local.yaml` with the native file-read tool.
+<!-- ce-config-layers:start -->
+**Resolve ordinary CE yaml keys from the two repo files.**
+
+- **Read** `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml` (`<repo-root>` = `git rev-parse --show-toplevel`). Missing files are skipped. Gitignore does not change resolution.
+- **Win** with the first active (non-commented) value. For scalars, empty is unset; an invalid value continues to the next layer, then the skill default. For lists and maps, a present key — including an empty list or map — replaces the whole key.
+- **Do not** use this rule for `docs_root` — that key is `config.yaml` only.
+<!-- ce-config-layers:end -->
+
+**Resolve the repo root.** Run `git rev-parse --show-toplevel` with the shell tool to resolve `<repo-root>`, then apply the ordinary-key rule above. Read both files when they exist.
 
 **Route:**
-- Config file missing, or it has no `feedback_sources` key -> first run -> Phase 1.
+- `feedback_sources` unset after cascade -> first run -> Phase 1.
 - Argument token `setup` or `reconfigure` -> Phase 1, regardless of config state.
 - Otherwise -> Phase 2, using the config values below.
 
@@ -147,6 +155,7 @@ Resolve and create media scratch with this shell block, substituting the current
 
 ```bash
 SCRATCH_ROOT="/tmp/compound-engineering-$(id -u)";
+[ ! -L "$SCRATCH_ROOT" ] && (umask 077; mkdir -p "$SCRATCH_ROOT") 2>/dev/null && [ ! -L "$SCRATCH_ROOT" ] && [ -O "$SCRATCH_ROOT" ] && [ -w "$SCRATCH_ROOT" ] || SCRATCH_ROOT="${TMPDIR:-/tmp}/compound-engineering-$(id -u)";
 if [ -L "$SCRATCH_ROOT" ]; then echo "unsafe scratch root symlink: $SCRATCH_ROOT" >&2; exit 1; fi;
 (umask 077; mkdir -p "$SCRATCH_ROOT") || exit 1;
 if [ -L "$SCRATCH_ROOT" ] || [ ! -O "$SCRATCH_ROOT" ]; then echo "scratch root is not owned by the current user: $SCRATCH_ROOT" >&2; exit 1; fi;

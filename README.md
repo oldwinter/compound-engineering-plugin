@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `0a295785`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `57e586d66194585757ffa30a23dcd0f4ec0210a4`。
 
 在 Claude Code 中安装这个中文 fork：
 
