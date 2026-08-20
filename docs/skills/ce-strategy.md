@@ -1,229 +1,230 @@
 # `ce-strategy`
 
-> 创建或维护 `STRATEGY.md`：一个短小、durable anchor，记录 product 是什么、服务谁、如何成功，以及 team 正在投资哪里。
+> Create or maintain `STRATEGY.md`: what the product is, who it is for, how it succeeds, and where the team is investing.
 
-`ce-strategy` 是 **upstream anchor** skill。它在 repo root（与 `README.md` 同级）产出并维护一份 canonical document，供 downstream skills 作为 grounding 读取。这个 document 刻意短而 structured；几个 sharp questions 的好答案，比大量 prose 更能形成 strategy。此 skill 会提出这些问题、对 weak answers push back，并写出 doc。
+`ce-strategy` is the **upstream anchor**. It writes its sections of `STRATEGY.md`, the shared project document at the repo root next to `README.md` — a file other tools and people also write their own sections into, so the skill owns only what its template names and preserves the rest. It is not a step in `/ce-ideate` → `/ce-brainstorm` → `/ce-plan` → `/ce-work`. Those skills read `STRATEGY.md` when it exists and weight their suggestions toward the active tracks and the stated approach. `ce-product-pulse` also reads it to seed the metrics it measures.
 
-Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-plan -> /ce-work`。`STRATEGY.md` 位于 **chain 上游**：当它存在时，`ce-ideate`、`ce-brainstorm` 和 `ce-plan` 都把它作为 grounding 读取，让 suggestions 更偏向 active tracks 和 stated approach。`ce-product-pulse` 也会读取它，用于 seed 要测量的 metrics。
+The doc is short on purpose. The skill grounds itself in what the repo already says the product is, asks a handful of sharp questions, pushes back on slogans and feature lists, and writes what you actually said.
 
----
-
-## 摘要（TL;DR）
-
-| 问题 | 答案 |
-|----------|--------|
-| 它做什么？ | 运行带 pushback rules 的 interview，然后在 repo root 写入/更新 `STRATEGY.md` |
-| 何时使用？ | 开始新 product；更新 direction；"what are we working on?"；如果尚无 strategy，在启动 ideation 前 |
-| 产出什么？ | `STRATEGY.md`，包含 target problem、approach、persona、key metrics、tracks，以及可选 milestones / non-goals / marketing |
-| 下一步 | `/ce-ideate`、`/ce-brainstorm`、`/ce-plan` 或 `/ce-product-pulse`；它们都会查阅该 doc 作为 grounding |
-
----
-
-## 调用示例
+Skip this when you already know the one thing to build. That is `ce-ideate` (which directions), `ce-brainstorm` (what this needs to be), `ce-plan` (guardrails), or `ce-work` (build it).
 
 ```text
-# 不存在 STRATEGY.md 时，通过完整 interview 创建它
+/ce-strategy                 /ce-ideate         /ce-brainstorm      /ce-plan             /ce-work
+Write the durable            "What's worth      "What does this     "What's needed       "Build it."
+anchor, then stay out         exploring?"        need to be?"        to accomplish
+of the loop.                                                         this?"
+```
+
+---
+
+## TL;DR
+
+| Question | Answer |
+|----------|--------|
+| What does it do? | Reads what the repo already says the product is, interviews you with pushback rules, stress-tests the answers, then writes or updates `STRATEGY.md` at the repo root |
+| When to use it | New product; adding a strategy doc to an existing repo; direction changed; "what are we working on?" has no written answer; a downstream skill flagged missing strategy grounding |
+| What it produces | `STRATEGY.md` with purpose, positioning, users, 3-5 key metrics, 2-4 tracks, boundaries, and optional milestones / brand. Frontmatter carries `name` and `last_updated`. |
+| What's next | `/ce-ideate` or `/ce-brainstorm` if nothing downstream has run yet. `/ce-product-pulse` if you want those metrics measured. |
+
+---
+
+## Example invocations
+
+An empty invoke follows the file. A section name or scope hint jumps to that part and leaves the rest untouched.
+
+```text
+# No STRATEGY.md yet: interview the required sections, show a draft, offer one edit pass, then write the repo-root file
 /ce-strategy
 
-# 只重新审视一个 section，不重开完整 strategy
-/ce-strategy approach
+# File already exists: summarize what is on file in 3-5 lines, then ask which section to revisit
+/ce-strategy
 
-# 围绕具体问题更新某个 section
+# Jump to one section. Other sections stay as written.
+/ce-strategy positioning
+/ce-strategy metrics
+/ce-strategy tracks
+
+# Narrower than a whole section
 /ce-strategy metrics for retention
 
-# 已有 strategy 时无参数调用，interactive 选择 sections
-/ce-strategy
+# Rewrite the diagnosis after a direction change
+/ce-strategy purpose
 ```
 
-Targeted maintenance 最好提供 section 或 scope hint；`STRATEGY.md` 已存在时，无参数调用会有意采用更宽 scope。
+Prefer a section or scope hint for maintenance. A bare invoke on an existing file is the broader path: it asks which section to open.
 
 ---
 
-## 问题
+## The Problem
 
-多数 teams 要么没有 strategy doc，要么有一份太长以至没人读。Failure shapes：
+Most teams have no strategy doc, or have one so long nobody opens it.
 
-- **Missing entirely**：每个 new piece of work 都重新争论 "are we even working on the right thing?"
-- **Slogan, not strategy**："we delight users" 对 agent（和 humans）都没有 actionable 意义
-- **Goals dressed up as strategy**："grow ARR by 30%" 是 goal，不是 guiding choice
-- **Feature lists in place of guiding policy**："we're building X, Y, and Z" 没说 *why*
-- **Stale and untouched**：strategy doc 写过一次后被遗忘，如今描述的是 team 已不再 build 的 product
-- **Too long to scan**：日常工作中没人打开的 20 页 strategy anchor 不了任何东西
+- Missing entirely: every new piece of work re-litigates whether you are working on the right thing
+- Slogan, not strategy: "we delight users" gives the agent (and humans) nothing to act on
+- A goal dressed as strategy: "grow ARR by 30%" is a target, not a guiding choice
+- A feature list in place of policy: "we're building X, Y, and Z" does not say why
+- Written once and left: the doc describes a product the team is no longer building
+- Too long to scan: a 20-page strategy does not get read during day-to-day work
 
-好的 strategy doc 短、sharp，并且经常被读。难点在于产出它；多数 "write a strategy" prompts 会塌缩成 prose generation，用文字掩盖 weak thinking。
+A useful strategy doc is short and opened often. A generic "write a strategy" prompt usually produces prose that hides weak thinking.
 
-## 解决方案
+## The Solution
 
-`ce-strategy` 运行带 explicit pushback rules 的 interview：
+`ce-strategy` runs a repo-grounded interview with named pushback rules.
 
-- **Anchor, not plan**：strategy 是 product 是什么以及为什么；features 属于 `ce-brainstorm`，schedules 属于 issue tracker
-- **Rigor in the questions, not the headings**：section headers 用 plain English；interview 负责 enforce discipline
-- **Short is a feature**：template 有约束；对 expansion push back
-- **Durable across runs**：re-runs in place update，保留有效部分，只重访 weak sections
-- **Pushback rules per section**：每个 section 有 named anti-patterns 和 probe questions，越过 slogans、goals-as-strategy 和 feature lists
+- It reads the README, `CONCEPTS.md`, and `docs/` first, so the interview opens from a working model of the product instead of a blank page. Recent commits and PRs are read separately, as a signal of where attention has gone lately - useful for tracks, not for what the product is.
 
-灵感来自 Richard Rumelt 的 *Good Strategy Bad Strategy*，尤其是他的 diagnosis、guiding policy 和 coherent action kernel。Interview questions 旨在越过 Rumelt 所说的 "bad strategy" patterns。
+- Strategy is what the product is and why. Features belong in `ce-brainstorm`. Schedules belong in the issue tracker.
+- Section headers are plain English. The interview is where the discipline lives.
+- The template is constrained. Extra sections get pushback.
+- Re-runs update in place. Accurate sections stay; weak ones get the same pushback as a first write.
+- Each section has anti-patterns and probe questions that catch slogans, goals-as-strategy, and feature lists.
 
----
-
-## 新颖之处
-
-### 1. Interview 中的 pushback discipline
-
-每个 section 中，skill 先问 opening question，再应用 named pushback rules：越过 fluff、slogans、vanity goals 和 feature lists。每个 section 最多两轮 pushback；如果之后答案仍弱，就记录用户给出的内容，并 note 该 section 值得下次 revisiting。Pushback 是 skill 核心；没有它，interview 会变成 passive transcription。
-
-### 2. 原地更新：durable across runs
-
-在 existing `STRATEGY.md` 上重新运行 skill，不会从头重写。Phase 2 读取 existing doc，用 3-5 行 summary 当前 state，让用户看到已记录内容，并询问要 revisit 哪个 section（或当 argument 指明 section 时直接跳转）。用户确认仍准确的 sections 保持不动。YAML frontmatter 中的 `last_updated` field 更新为 today。Strong sections 不被二次质疑；weak sections 获得完整 pushback。
-
-### 3. 被 downstream skills 作为 grounding 读取
-
-当 repo root 存在 `STRATEGY.md` 时，downstream skills 会读取它：
-
-- **`ce-ideate`**：codebase-scan grounding agent 读取它；ideation 自动偏向 strategy-aligned directions
-- **`ce-brainstorm`**：Phase 1.1 constraint check 读取它；product/scope decisions 锚定 active tracks
-- **`ce-plan`**：repo-research-analyst 读取它；plan 会 flag 拉离 active tracks 或 stated approach 的 decisions
-- **`ce-product-pulse`**：first-run interview 从 doc seed product name 和 key metrics，然后 wiring data sources 实际测量这些 metrics
-
-Doc 与 `README.md` 同级（canonical、well-known location at repo root），skills 能 predictable 找到它。
-
-### 4. 受 Rumelt 启发的 structure
-
-"Target problem / Our approach / Tracks" structure 对应 Rumelt 的 kernel：**diagnosis**（情况是什么、哪里坏了、代价是什么）、**guiding policy**（chosen approach、strategic bet）、**coherent action**（从 policy 流出的 active tracks of work）。Interview questions 旨在越过 slogans，抵达这个 kernel。
-
-### 5. 有界的 section 数量
-
-Required template 有五个 sections（Target problem、Our approach、Who it's for、Key metrics、Tracks）。另有三个 optional sections（Milestones、Not working on、Marketing），但如果它们没有承载 weight，skill 会 push back。Constraint 本身就是 feature：需要 12 个 sections 的 strategy 通常不是 strategy。
-
-### 6. 用 frontmatter 跟踪 staleness
-
-`STRATEGY.md` 带 YAML frontmatter 的 `last_updated` field。Downstream skills 可根据 age flag doc 可能 stale；重新运行 skill 会更新时间戳。
+The "Purpose / Positioning / Tracks" shape follows Richard Rumelt's kernel in *Good Strategy Bad Strategy*: diagnosis, guiding policy, and coherent action.
 
 ---
 
-## 快速示例
+## What Makes It Novel
 
-你正在开始一个 new product，想在启动 `ce-ideate` 前写 strategy doc。调用 `/ce-strategy`。
+### Grounded in the repo, decided by you
 
-Skill 检查 existing `STRATEGY.md`（未找到），宣布 "Strategy doc not found — let's write it." 它读取 `references/interview.md`，按 section order 运行 interview。
+Before the first question the skill shows a three-to-five-line repo model - what it takes the product to be, who it seems to serve, where recent attention has gone - with sources named, and asks you to correct it. Evidence seeds the questions and sharpens the pushback ("the README says X; you just said Y - which is it?"). It never fills in a section on its own, and a burst of recent work in one area is offered as a question about tracks, not treated as the product's focus. A new or empty repo runs the interview ungrounded; that is a normal path.
 
-**Target problem.** "What problem are you solving and for whom?" 你答 "we help teams ship faster." Pushback 触发：这是 slogan。"Whose teams? Shipping what? What does 'faster' mean — saving time per task, fewer bugs, less coordination overhead?" 你 sharpen："we help engineering managers at 50-200 person companies cut PR-review cycle time from days to hours." 这就足够 specific。
+### Pushback in the interview
 
-**Our approach.** "What's the strategic bet — the choice that shapes everything else?" 你答 "use AI." Pushback 触发：这是 tool，不是 bet。"What's the bet about AI specifically — that AI can review better than juniors? That AI can pre-process review concerns before humans see them? That review doesn't need humans at all?" 你继续 sharpen。
+For each section the skill asks the opening question, then applies that section's pushback rules. Two rounds maximum. If the answer is still weak, it captures what you gave and notes the section is worth another pass next run. Without that step the interview is just transcription.
 
-Interview 继续经过 Who it's for、Key metrics、Tracks。每个 section 最多两轮 pushback。所有 required sections 捕获后，skill 读取 `references/strategy-template.md`，填充它，在 chat 中展示完整 draft，提供一轮 edits，然后写入 `STRATEGY.md`。
+Required sections, in the document's order: Purpose, Positioning, Users, Boundaries (always written, even if only to say nothing is named yet), Key metrics, Tracks - the universal sections first, then direction. The interview asks Boundaries after the stress test, since that is where its content comes from. Optional: Milestones, Brand - skipped when nothing came up. Unused optional sections are omitted, not left as empty headers. Metrics stay at 3-5. Tracks stay at 2-4.
 
-Phase 3 note doc 已就位，`ce-ideate`、`ce-brainstorm`、`ce-plan` 和 `ce-product-pulse` 下次运行会读取它。自然 next step 建议 `/ce-ideate`。
+On a first run, the filled draft is shown in chat and you get one edit pass before anything is written.
+
+### Stress test before the draft
+
+After the five required sections, the skill poses three to five concrete proposals aimed at the draft's fault lines - a tempting feature just off the approach, a second persona pulling the other way, a track that would starve another - chosen so your answer is not predictable from the draft. If the strategy already decides a proposal, it is confirmed. If it cannot, the approach or a track gets sharpened. Proposals you resist become Boundaries entries and feed a one-line "Resist a change when ..." test, so that section carries real content a downstream agent can apply.
+
+### Updates in place
+
+A second run does not start over. It reads the existing doc, summarizes it in 3-5 lines, checks it for drift against the repo and what has landed since `last_updated`, names any section that looks stale as a candidate, and either jumps to the section you named or asks which to revisit. The menu is Purpose; Positioning; Users; or Metrics, tracks, boundaries, or other. Sections you confirm are still accurate are left alone. `last_updated` is set to today.
+
+### Read by downstream skills
+
+When `STRATEGY.md` is at the repo root:
+
+- `ce-ideate` weights toward strategy-aligned directions
+- `ce-brainstorm` keeps product and scope decisions on the active tracks
+- `ce-plan` flags decisions that pull away from the tracks or the stated positioning, or land inside the stated boundaries
+- `ce-product-pulse` seeds product name and key metrics, then wires sources to measure them
+
+The skills work without the file. With it, they have a signal for what kind of work matters right now. `ce-ideate`, `ce-brainstorm`, and `ce-plan` read by section meaning rather than exact heading and fall back to a legacy `PRODUCT.md` or `VISION.md` only for meanings `STRATEGY.md` lacks; `ce-dogfood` reads the persona section (`Users`, or `Who it's for` in older files) and then a legacy sibling; `ce-strategy` itself reads those as stated intent when grounding. `ce-product-pulse` reads `STRATEGY.md` (or, when absent, the first of `VISION.md`, `PRODUCT.md` that exists); it takes metrics from `## Key metrics` when `ce-strategy` wrote it, otherwise from whichever section lists the success measures — following a linked legacy doc when `STRATEGY.md` defers them there — and says when none are on file yet.
+
+The skill does not compute metric values, update the issue tracker, prioritize a backlog, or write requirements or plans.
 
 ---
 
-## 何时使用
+## Quick Example
 
-在以下情况使用 `ce-strategy`：
+You are adding a strategy doc to a repo you have worked in for a year. You run `/ce-strategy`. No file exists. The skill reads the README and docs, shows a short repo model ("a PR-review tool for engineering teams; recent work is mostly in the GitHub integration") and asks you to correct it, then starts the interview.
 
-- 正在开始 new product，想在 ideation 前拥有 strategy doc
-- Product direction 已 shift，existing strategy stale
-- "What are we working on?" 经常出现，因为答案没记录在任何地方
-- 某个 specific section 感觉 weak，想 revisit（`/ce-strategy approach`）
-- Downstream skill（`ce-ideate`、`ce-brainstorm`）flag 缺少 `STRATEGY.md` 作为 missing grounding
+Purpose: you answer "we help teams ship faster." That is a slogan, so the pushback asks whose teams, shipping what, and what "faster" means. You sharpen to engineering managers at 50-200 person companies cutting PR-review cycle time from days to hours.
 
-以下情况跳过 `ce-strategy`：
+Positioning: you answer "use AI." That is a tool, not a bet. The pushback asks what you are betting AI does here that the obvious alternative does not. You name the actual choice.
 
-- Strategy 已记录且仍准确；重新运行只会增加 noise
-- 正在 plan 单个 feature -> `/ce-brainstorm`
-- 正在 schedule work -> 那是 issue tracker，不是 strategy
-- 想要带 dates 的 roadmap -> strategy 是 direction；roadmaps 是 sequencing
+The interview continues through Users, Key metrics, and Tracks - where the skill asks whether the recent GitHub work is a track or a push, and you say push. Then three proposals test the draft; you resist one ("a Slack bot for review nudges"), and it lands under Boundaries. You see the full draft, get one edit pass, and the file is written to `STRATEGY.md`.
+
+The skill notes that `ce-ideate`, `ce-brainstorm`, and `ce-plan` will pick the file up on their next run, and suggests `ce-ideate` or `ce-brainstorm` if nothing downstream has run yet.
 
 ---
 
-## 作为工作流的一部分使用
+## When to Reach For It
 
-`ce-strategy` 位于 chain 上游。新 product 或 major direction shift 的推荐顺序：
+Reach for `ce-strategy` when:
+
+- You are starting a product and want an anchor before ideation
+- You are adopting the workflow in an existing repo and want the strategy written down
+- Direction has shifted and the existing file is stale
+- "What are we working on?" keeps coming up because the answer is not written down
+- One section is weak and you want to reopen just that part (`/ce-strategy positioning`)
+- `ce-ideate` or `ce-brainstorm` flagged the missing file as missing grounding
+
+Skip `ce-strategy` when:
+
+- The file is on disk and still accurate. Re-running adds noise.
+- You are shaping one feature → `/ce-brainstorm`
+- You are scheduling work. That is the issue tracker.
+- You want a dated roadmap. Strategy is direction. Sequencing lives elsewhere.
+
+---
+
+## Use as Part of the Workflow
+
+`ce-strategy` sits above the loop. Recommended sequence on a new product or a major direction change:
 
 ```text
-/ce-strategy → /ce-ideate (consults STRATEGY.md) → /ce-brainstorm → /ce-plan → /ce-work
-                                                              ↑
-                                          all read STRATEGY.md as grounding
+/ce-strategy → /ce-ideate → /ce-brainstorm → /ce-plan → /ce-work
+                   ↑              ↑              ↑
+                   all read STRATEGY.md when it exists
 ```
 
-Downstream skills 不 *require* `STRATEGY.md`；没有它也能工作。但当 doc 存在时，active tracks 和 stated approach 会自动把 ideation、brainstorming 和 planning 拉向 strategy-aligned directions。缺少 `STRATEGY.md` 时，`ce-ideate` 仍能从 codebase grounding，但没有 signal 说明当前最重要的是 *哪类* work。
+Downstream skills do not require the file. When it exists, the tracks and the positioning pull ideation, brainstorming, and planning toward aligned work. Without it, `ce-ideate` can still ground in the codebase, but it has no signal for what kind of work matters most right now.
 
-`ce-product-pulse` 也会从 `STRATEGY.md` 的 key metrics seed first-run interview，将 data sources 接上，测量 strategy 说重要的东西。
-
----
-
-## 单独使用
-
-Skill 总是 standalone 调用；strategy 不是 chain 中任何其他 skill 的下游。
-
-- **First run**：`/ce-strategy`（不存在 `STRATEGY.md`）
-- **Targeted update**：`/ce-strategy approach` 直接跳到该 section
-- **Open update**：`/ce-strategy`（file exists，无 argument）询问要 revisit 哪些 section
+`ce-product-pulse` seeds its first-run interview from the key metrics in `STRATEGY.md`.
 
 ---
 
-## 输出产物（Output Artifact）
+## Use Standalone
 
-```text
-STRATEGY.md  (repo root, peer of README.md)
-```
+This skill is always invoked on its own. Nothing in the loop produces `STRATEGY.md`.
 
-Sections（除非注明 optional，否则 required）：
+- First run: `/ce-strategy` (no file yet)
+- Targeted update: `/ce-strategy positioning` jumps to that section
+- Open update: `/ce-strategy` (file exists, no argument) asks which section to revisit
 
-- **Target problem**：diagnosis：什么坏了、对谁坏、代价是什么
-- **Our approach**：guiding policy：塑造一切的 strategic bet
-- **Who it's for**：persona；specific 到 design decisions 可以引用
-- **Key metrics**：product 用什么衡量自己
-- **Tracks**：coherent action（协调行动）：active tracks of work
-- **Milestones** _(optional)_：有意义的 upcoming markers
-- **Not working on** _(optional)_：explicit non-goals；当 team 面临 "should we do X?" pressure 时有用
-- **Marketing** _(optional)_：相关时的 positioning 和 messaging direction
-
-YAML frontmatter 带 `last_updated: YYYY-MM-DD`。Doc 刻意短，通常 1-2 页，而不是 chapter book。
+The sections this skill writes are meant to be readable in under five minutes; other tools' sections in the shared file are their own.
 
 ---
 
-## 参考
+## Reference
 
-| 参数 | 效果 |
+| Argument | Effect |
 |----------|--------|
-| _(empty)_ | 没有 `STRATEGY.md` 时 first run；否则询问 revisit 哪个 section |
-| `<section name>` | 例如 `metrics`、`approach`、`tracks`；跳到该 section |
-| `<scope hint>` | 例如 "metrics for retention"；聚焦 revisit |
+| _(empty)_ | No file: full interview, draft in chat, then write. File exists: summarize and ask which section to revisit. |
+| `<section name>` | Jump to that section and preserve the rest. Names include `metrics`, `positioning`, `tracks`, `purpose`, `users`, `boundaries`, plus the optional `milestones` and `brand`; older names (`approach`, `target problem`, `who it's for`, `not working on`, `marketing`) still resolve. |
+| `<scope hint>` | Focus a revisit, e.g. `metrics for retention` |
+
+Output: `STRATEGY.md` at the repo root (not under `docs/`). YAML frontmatter has `name` and `last_updated: YYYY-MM-DD`.
+
+Required sections, in order: Purpose, Positioning, Users, Boundaries, Key metrics (3-5), Tracks (2-4). Optional: Milestones (external dates only), Brand. Files written with the older headings are read as-is and renamed in place on the next update. A `STRATEGY.md` in any other shape (hand-written, or from another tool) is read by meaning and updated in its own shape, never restructured into the template.
 
 ---
 
-## 常见问题（FAQ）
+## FAQ
 
-**为什么 doc 这么短？**
-因为 long strategy docs 没人读。Discipline 强迫对少数问题给出 sharp answers。如果你想加更多 sections，通常答案是 "those belong in ce-brainstorm or the issue tracker, not in strategy."
+**Why is the doc so short?**
+Long strategy docs are not read. The template forces short answers to a small set of questions. Extra sections usually belong in `ce-brainstorm` or the issue tracker.
 
-**Strategy 和 roadmap 有什么区别？**
-Strategy 是 direction（我们做什么以及为什么）。Roadmap 是 sequencing（什么何时发生）。Strategy 放在 `STRATEGY.md`；roadmaps 放在 issue tracker、planning tools 或 team 使用的 scheduling 工具里。Skill 明确保持在 strategy lane。
+**What's the difference between strategy and a roadmap?**
+Strategy is direction (what you are doing and why). A roadmap is sequencing (what comes when). This skill stays in the strategy lane.
 
-**如果我的 answers 很 weak 怎么办？**
-Skill 会按 section 应用 pushback rules，每个最多两轮。如果之后仍弱，skill 会记录你给出的内容，并 note 该 section 值得下次 revisiting。Strategy 是 iterative；第一次不需要完美。
+**What if my answers are weak?**
+Two rounds of pushback per section, then it records what you gave and marks the section for a later pass. The first write does not have to be final.
 
-**为什么 doc 放在 repo root？**
-这样 downstream skills 可以无需配置地 predictable 找到它。像 `README.md` 一样，`STRATEGY.md` 是 canonical、well-known location。
+**Why does the file go at the repo root?**
+So downstream skills can find it without configuration, the same way they find `README.md`.
 
-**如果我不想让 downstream skills 读取它怎么办？**
-只要它存在，它们就会读。这是 intentional behavior：把 chain 锚定到 stated strategy 是价值所在。如果要 suppress，请删除该 doc；以后可以重新创建。
+**What if I don't want downstream skills to read it?**
+They will if the file exists. That is the point of the anchor. Delete the file to suppress it; you can recreate it later.
 
-**它对 non-software product 有用吗？**
-有。Structure（target problem、approach、persona、metrics、tracks）可以泛化到任何 product。Pushback rules 同样适用于 SaaS feature roadmap、consulting practice 或 non-profit initiative。
+**Is it useful for a non-software product?**
+The same sections (purpose, positioning, users, metrics, tracks, boundaries) apply to a consulting practice or a non-profit initiative as well as a SaaS product.
 
----
-
-## 了解更多
-
-"Target problem / Our approach / Tracks" structure 受 Richard Rumelt 的 *Good Strategy Bad Strategy* 启发，尤其是 diagnosis、guiding policy 和 coherent action kernel。`references/interview.md` 中的 interview questions 旨在越过 Rumelt 所说的 "bad strategy" patterns：fluff、伪装成 strategy 的 goals，以及代替 guiding choice 的 feature lists。如果 slogan 和 strategy 的区别还不够 sharp，这本书是推荐 follow-up reading。
+**Does it compute the current metric values?**
+No. It records which metrics matter and, when you know, where they live. `ce-product-pulse` is the skill that queries sources.
 
 ---
 
-## 另见（See Also）
+## See Also
 
-- [`ce-ideate`](./ce-ideate.md) - 读取 `STRATEGY.md` 作为 ideation grounding
-- [`ce-brainstorm`](./ce-brainstorm.md) - scope work 时读取它以感知 constraints
-- [`ce-plan`](./ce-plan.md) - 读取它；flag 偏离 active tracks 的 plan decisions
-- [`ce-product-pulse`](./ce-product-pulse.md) - 从 strategy 的 key metrics seed first-run setup
+- [`ce-ideate`](./ce-ideate.md): reads `STRATEGY.md` as grounding for ideation
+- [`ce-brainstorm`](./ce-brainstorm.md): reads it for constraint awareness during scope work
+- [`ce-plan`](./ce-plan.md): reads it and flags plan decisions that pull away from active tracks
+- [`ce-product-pulse`](./ce-product-pulse.md): seeds first-run setup from the strategy's key metrics

@@ -1,89 +1,112 @@
-# Divergent Ideation（Phase 2）
+# Divergent Ideation (Phase 2)
 
-在 Phase 2 开始时读取本文件：Phase 1 grounding 和任何 Phase 1.5 evidence scouts 完成之后，且在构建任何 ideation dispatch prompt 之前。它定义 ideation fleet、dispatch payload、frames、per-idea output contract，以及 post-merge synthesis steps。Model tier names（extraction / generation / ceiling）在 SKILL.md 的 Model Tiers 中定义。
+Read this file at the start of Phase 2 — after Phase 1 grounding and any Phase 1.5 evidence scouts complete, and before building any ideation dispatch prompt. It defines the ideation fleet, the dispatch payload, the frames, the per-idea output contract, and the post-merge synthesis steps. Model tier names (extraction / generation / ceiling) are defined in the model tiers in `references/grounding.md`.
 
 ## Fleet
 
-按 Model Tiers fleet dispatch parallel ideation sub-agents。省略 `mode` 参数，让用户配置的 permission settings 生效。默认 fleet 是 **5 个 agents 覆盖全部六个 frames**：
+Dispatch parallel ideation sub-agents per the model-tier fleet in `references/grounding.md`. Omit the `mode` parameter so the user's configured permission settings apply. The default fleet is **5 agents covering all six frames**:
 
-- **3 个 generation-tier agents**，每个对应一个 evidence-driven frame（Pain and friction；Inversion, removal, or automation；Leverage and compounding）。这些 frames 依赖 evidence，dossiers 承担 heavy lifting，因此 mid-tier model 在这里表现足够好。
-- **2 个 ceiling-tier agents** 负责 ceiling frames，也就是 strong model 的 reasoning 本身就是产物、不能 tier down 的地方：一个处理 Cross-domain analogy；另一个同时处理 Assumption-breaking and reframing **plus** Constraint-flipping（两者是 cousins，都会 invert givens；一个 agent 同时持有二者作为 starting biases）。
+- **3 generation-tier agents**, one per evidence-driven frame (Pain and friction; Inversion, removal, or automation; Leverage and compounding). These frames live on evidence — the dossiers do the heavy lifting, so the mid-tier model performs well here.
+- **2 ceiling-tier agents** for the ceiling frames, where the strong model's reasoning is the product and must not be tiered down: one takes Cross-domain analogy; the other takes Assumption-breaking and reframing **plus** Constraint-flipping (cousins — both invert givens; one agent holds both as starting biases).
 
-Fleet variants：**surprise-me** 和 **`go deep`** dispatch 6 个 agents，每个 frame 一个，全部 ceiling-tier。**Issue-tracker mode** 只有当 Phase 0.2 检测到 issue-tracker intent 且 issue intelligence agent 返回 usable themes 时，才 dispatch 4 个 agents（见下方 override：cluster-derived frames capped at 4，使用 generation tier；padded frames 保留其 native tier）。Phase 1 的 insufficient-issue-signal fallback 使用默认 5-agent fleet。
+Fleet variants. **Every variant that uses the default frame set covers all six** — scaling changes the agent count, the tier, or the per-frame volume, never how many lenses run. Issue-tracker mode is the one variant that *replaces* the frame set (themes become the frames), so the six-frame floor does not apply to it:
 
-每个 frame 目标约 6-8 个 ideas（two-frame agent 对每个 frame 都以此为目标），default path 约产生 36-48 个 raw ideas，issue-tracker mode 的 4 frames 约产生 24-32 个；default path 中 dedupe 后大约 25-30 个 survive，4-frame path 更少。当 volume overrides 适用时调整 per-frame targets（例如 "100 ideas" 提高目标，"top 3" 可能改为降低 survivor count）。
+- **surprise-me** and **`go deep`** — 6 agents, one frame each, all ceiling-tier.
+- **tactical scope** (Phase 0.5 signals) — **the same 5 agents over 6 frames as the default.** Tactical does not repack the fleet; it lowers each frame's target to 3-4 ideas and each agent's verification budget to 2-3 reads. Packing frames into fewer agents was tried and reverted: per-frame targets stay the same under packing (see the volume line below), so it barely reduces generated output, while the verification budget below is **per agent** — an agent holding three frames verifies about a third as much per idea. Cost comes out of volume and reads; it never comes out of the basis check or the lens count.
+- **issue-tracker mode** — 4 agents, only when issue-tracker intent was detected in Phase 0.2 AND the issue intelligence agent returned usable themes (see the override below — cluster-derived frames capped at 4, dispatched on the generation tier; padded frames keep their native tier). This is the one variant that legitimately narrows the frame set, because the themes *are* the surface.
 
-## Dispatch Payload（cache-friendly, long-context ordered）
+**When two variants fire at once, the surface and the budget are decided separately.** Whichever variant owns the *surface* picks the frames and the agent count; tactical contributes only **its dials** (`references/scope-gates.md` Phase 0.5) — it never repacks another variant's fleet.
 
-构建一个 shared grounding block，并让它在本 run 的每个 ideation dispatch 中 byte-identical。相同 prefixes 可让带 prompt caching 的平台复用昂贵部分。Longform shared material 放前面；agent-specific task 放最后：
+| Both fired | Frames | Agents | Volume / reads |
+|---|---|---|---|
+| issue-tracker + tactical | theme frames (issue-tracker owns the surface) | 4 (issue-tracker owns its fleet) | tactical's dials |
+| issue-tracker + `go deep` | theme frames | 4, all ceiling-tier | `go deep`'s doubled reads (10) |
+| issue-tracker + surprise-me | theme frames | 4, all ceiling-tier | default |
+| tactical + `go deep` | six frames | 6, all ceiling-tier (`go deep` wins outright per Phase 0.5) | default; tactical is suppressed |
+| tactical + surprise-me | six frames | 6, all ceiling-tier — surprise-me owns the fleet | tactical's dials |
 
-- `<grounding>` — consolidated grounding summary，包括 evidence gists 和 `<scratch-dir>` 下 dossier files 的 absolute paths（所有 agents 字节完全一致）。指示每个 agent 在生成前读取 dossier files：它们是 bases 会引用的 evidence layer；gists 只是 orientation，不是 evidence。Elsewhere modes 中唯一的 dossiers 是 user-supplied research dossiers（如存在）；否则 grounding summary 本身就是 evidence layer。
-- `<constraints>` — 用户 prompt、focus hint，以及任何 *User-named references*：违反这些的 ideas 无论 basis 如何都 out。
-- `<background>` — grounding 中的其他一切（codebase context、additional context、learnings、external context、user-supplied research）：informative，不 directive。它可以提供 idea 的 basis，但当用户命名了不同 focus 时，不能把 ideation 拉向 corpus 中最 loud 的内容。
-- `<axes>` — Phase 1.5 axis list（如存在）。
-- `<task>` — frame assignment、per-frame volume target、ambition charter、verification-read budget 和 per-idea output contract；只生成 raw candidates（critique 之后再做）。
+**tactical + surprise-me** is reachable whenever a vague tactical prompt (`quick wins`) sends the user to the 0.2 subject gate and they pick "Surprise me." Surprise-me owns the fleet and tier — its subject discovery is the mode's entire value. Tactical still contributes **its dials** (`references/scope-gates.md` Phase 0.5), since the user did ask for small wins. Its axis and scout caps are moot here, because surprise-me skips decomposition entirely.
 
-`<constraints>`/`<background>` split 是防止 grounding noise（用户未命名的无关 `FEEDBACK.md`、tangentially-cited prior-art result）违背 user intent 塑造 survivors 的主要防线。用 tags 机械地保持这一区分，而不是 prose hedging。用户提供的 *research* artifacts 即使被用户命名，也属于 background：提供 evidence 不等于下 directive；只有 directive files（按 Phase 1 routing test）进入 `<constraints>`。
+The insufficient-issue-signal fallback from Phase 1 drops back to the six-frame default: **a fallback re-derives only what the abandoned surface determined, and never re-resolves anything else.** Carry forward Phase 0.5's **already-resolved** scaling state — which overrides ended up active *after* its collisions, plus the raw total or explicit survivor count. Do not re-read the prompt's raw signals: a `go deep` run that also said `quick wins` has already had tactical suppressed, and re-deriving from the raw signal would resurrect the waived floor and lowered volume on a maximum-depth run. Re-derive **only** the two values the frame count determined — the agent count and the per-frame split — because the surface changes from at most 4 themes to the 6 defaults. Carrying the old agent count would leave 4 agents holding 6 frames, the packing this skill rejects; carrying the old per-frame volume would multiply a requested total by the new frame count.
 
-**Ambition charter（逐字包含在每个 ideation dispatch 中）：**
+Each frame targets ~6-8 ideas — **3-4 under tactical scope** — and a two-frame agent targets that per frame, yielding ~36-48 raw ideas in the default path (~18-24 tactical) or ~24-32 across 4 frames in issue-tracker mode; roughly 25-30 survive dedupe in the default path and fewer in the 4-frame path. **A raw-number volume request is a total, not a per-frame multiplier.** Divide it across the frames in play — `100 ideas` over six frames is ~16-17 each, not 100 each — and adjust the per-frame target to hit that total. Requests shaped like `top 3` constrain the *survivor* count instead and leave generation alone.
+
+**A total too small to spread across the frames is a survivor limit, not a generation target.** `3 ideas about auth` cannot mean three raw candidates divided six ways — that would either overshoot the ask or leave frames unrun, and the six-frame floor is not negotiable. Read any total at or below roughly one per frame the way `top 3` reads: generate normally, then cut to that many survivors.
+
+## Dispatch Payload (cache-friendly, long-context ordered)
+
+Build one shared grounding block and keep it byte-identical across every ideation dispatch this run — identical prefixes let platforms with prompt caching reuse the expensive part. Longform shared material goes first; the agent-specific task goes last:
+
+- `<grounding>` — the consolidated grounding summary, including the evidence gists and the absolute paths of the dossier files under `<scratch-dir>` (identical bytes across agents). Instruct each agent to read the dossier files before generating — they are the evidence layer its bases cite; the gists are orientation, not evidence. In elsewhere modes the only dossiers are user-supplied research dossiers (when present); otherwise the grounding summary itself is the evidence layer.
+- `<constraints>` — the user's prompt, the focus hint, and any *User-named references*: ideas that violate these are out regardless of basis
+- `<background>` — everything else in the grounding (codebase context, additional context, learnings, external context, user-supplied research): informative, not directive — it can supply an idea's basis, but it must not pull ideation toward whatever was loudest in the corpus when the user named a different focus
+- `<axes>` — the Phase 1.5 axis list, when present
+- `<task>` — the frame assignment, per-frame volume target, ambition charter, verification-read budget, and the per-idea output contract; generate raw candidates only (critique comes later)
+
+The `<constraints>`/`<background>` split is the primary defense against grounding noise (an unrelated `FEEDBACK.md` the user did not name, a tangentially-cited prior-art result) shaping survivors against user intent — keep it mechanical via the tags, not prose hedging. User-supplied *research* artifacts are background even though user-named — supplying evidence is not issuing a directive; only directive files (per the Phase 1 routing test) ride in `<constraints>`.
+
+**Ambition charter (include verbatim in every ideation dispatch):**
 
 > This ideation exists so the user can choose a direction worth building — the output's value is decided by whether one idea changes what they do next. Generate the smartest, most inventive ideas your frame can reach: ideas a strong team would say "we have to do this" about. Your first few ideas will be the obvious ones — treat them as warm-up, and keep only the ones that still earn their place after the non-obvious ideas exist. If an idea would appear in a generic listicle about this topic, sharpen it with grounding evidence or drop it. Anchor every idea in specific entries from the grounding.
 
-**Verification reads（repo mode）。** Agent 做完 internal cut 后，可以花最多 5 次 targeted reads（`go deep` 下 10 次），沿 dossier `file:line` pointers 验证或加深将要提交 ideas 的 bases。`direct:` basis 必须 quote agent 实际读过的一行（在 dossier 或 repo 中），绝不能是 guessed citation。Elsewhere modes 对 user-supplied context 做 verification（包括按需读取 user-research dossiers），而不是读取 repo files。
+**Verification reads (repo mode).** After an agent makes its internal cut, it may spend up to **5 targeted reads** — 10 under `go deep`, 2-3 under tactical scope — following dossier `file:line` pointers to verify or deepen the bases of ideas it will submit. A `direct:` basis must quote a line the agent actually read — in a dossier or in the repo — never a guessed citation. Elsewhere modes verify against the user-supplied context — including reading user-research dossiers when present — instead of reading repo files.
 
+**The tactical budget is paired with the tactical volume cut, so an override that raises volume returns the ordinary budget.** Where tactical scope is still **active** after Phase 0.5 resolves collisions, a run with an explicit volume request generates at the override's level and verifies at 5 reads, not 2-3 — never raised volume against the lowered cap.
+
+**Budgets are ceilings, not guarantees of uniform scrutiny.** A two-frame agent, and any run at a raised volume target, submits more ideas against the same ceiling, so per-idea depth is lower there. That is an accepted trade, not a defect — but the artifact says so rather than implying every basis got equal verification. An unverified basis presented as verified is the failure this whole mechanism exists to prevent.
 ## Frames
 
-为每个 sub-agent 分配其 frame（或 frame pair），作为 **starting bias，而不是 constraint**。Prompt 每个 agent 从 assigned perspective 开始，但跟随任何 promising thread；跨多个 frames 的 cross-cutting ideas 很有价值。
+Assign each sub-agent its frame (or frame pair) as a **starting bias, not a constraint**. Prompt each to begin from its assigned perspective but follow any promising thread -- cross-cutting ideas that span multiple frames are valuable.
 
-**Frame selection（mode-symmetric：repo 和 elsewhere modes 使用相同六个 frames）：**
+**Frame selection (mode-symmetric — same six frames in repo and elsewhere modes):**
 
-1. **Pain and friction** — user、operator 或 topic-level pain points；持续 slow、broken 或 annoying 的内容。
-2. **Inversion, removal, or automation** — invert 某个 painful step、完全 remove it，或 automate it away。
-3. **Assumption-breaking and reframing** — 哪些被当作 fixed，其实是 choice；向上一级或侧向 reframe。
-4. **Leverage and compounding** — 一旦做出就让许多 future moves 更便宜或更强的 choices；second-order effects。
-5. **Cross-domain analogy** — 通过询问 completely different fields 如何解决 structurally analogous problem 来生成 ideas。grounding domain 是用户 topic；analogy domain 可以是任何其他地方（other industries、biology、games、infrastructure、history）。越过 obvious analogy，推进到 non-obvious ones。
-6. **Constraint-flipping** — 将 obvious constraint 反转到 opposite 或 extreme。如果 budget 是 10x 或 0 呢？如果 team 是 100 人或 1 人呢？如果没有 users，或有 1M 呢？即使 constraint flip 本身不现实，也使用 resulting design 作为 candidate。
+1. **Pain and friction** — user, operator, or topic-level pain points; what is consistently slow, broken, or annoying.
+2. **Inversion, removal, or automation** — invert a painful step, remove it entirely, or automate it away.
+3. **Assumption-breaking and reframing** — what is being treated as fixed that is actually a choice; reframe one level up or sideways.
+4. **Leverage and compounding** — choices that, once made, make many future moves cheaper or stronger; second-order effects.
+5. **Cross-domain analogy** — generate ideas by asking how completely different fields solve a structurally analogous problem. The grounding domain is the user's topic; the analogy domain is anywhere else (other industries, biology, games, infrastructure, history). Push past the obvious analogy to non-obvious ones.
+6. **Constraint-flipping** — invert the obvious constraint to its opposite or extreme. What if the budget were 10x or 0? What if the team were 100 people or 1? What if there were no users, or 1M? Use the resulting design as a candidate even if the constraint flip itself is not realistic.
 
-**Issue-tracker mode override（仅 repo mode）。** 当 issue-tracker intent active 且 issue intelligence agent 返回 themes 时：**highest-leverage themes 成为 frames**。Leverage 是 analyst 根据 prevalence + severity + recurrence + breadth 给出的排名，因此不要仅因 confidence 低就丢弃 top-leverage theme；confidence 只用于在 leverage 相近的 themes 之间打破平局。如果 cluster-derived frames 少于 3 个，按上方顺序从 6-frame default pool 补齐。总数上限为 4；issue-tracker mode 有意保持 tighter dispatch。Theme frames 使用 generation tier 分派（themes 是 evidence-driven）；padded frames 保留其 native tier。
+**Issue-tracker mode override (repo mode only).** When issue-tracker intent is active and themes were returned by the issue intelligence agent: the **highest-leverage themes become frames** — leverage is the analyst's ranking (prevalence + severity + recurrence + breadth), so do not drop a top-leverage theme merely because its confidence is low; use confidence only to break ties among comparable-leverage themes. Pad with frames from the 6-frame default pool (in the order listed above) if fewer than 3 cluster-derived frames. Cap at 4 total — issue-tracker mode keeps its tighter dispatch by design. Theme frames dispatch on the generation tier (themes are evidence-driven); padded frames keep their native tier.
 
-**Axis spread instruction。** 当 axis list 存在时，指示每个 sub-agent 将 ideas 分布到多个 axes：frame 的 lens 适用于每个 axis，但 ideas 不应全部 cluster 在一个 axis 上。每个 idea 都必须标记其 target axis。Frame 是 lens；axis list 是 surface map。一个 plausibly reaches 某 axis 的 frame，应先在那里产出至少一个 idea，再在不同 axis 上 double up。当 decomposition 被跳过（atomic subject 或 surprise-me）时，完全省略 axis instruction：不要在 dispatch time 发明 axes。
+**Axis spread instruction.** When an axis list is present, instruct each sub-agent to distribute its ideas across multiple axes — the frame's lens applies to every axis, but ideas should not all cluster on one. Each idea must be tagged with the axis it targets. The frame is a lens; the axis list is the surface map. A frame that plausibly reaches an axis should produce at least one idea there before doubling up on a different axis. When decomposition was skipped (atomic subject or surprise-me), omit the axis instruction entirely — do not invent axes at dispatch time.
 
-**Surprise-me mode addendum。** 当 Phase 0.2 路由到 surprise-me 时，在每个 sub-agent 的 dispatch prompt 中包含此额外指令：
+**Surprise-me mode addendum.** When Phase 0.2 routed to surprise-me, include this additional instruction in each sub-agent's dispatch prompt:
 
 > No user-specified subject. Through your frame's lens, explore the Phase 1 material and identify the subject(s) you find most interesting for this frame. Different frames finding different subjects is the feature — cross-subject divergence is what makes surprise-me valuable. Each idea still carries a basis; the basis may include identification of the subject itself (why *this* subject is worth ideating on through your lens, citing what in the Phase 1 material signals it).
 
-## Per-Idea Output Contract（所有 frames、所有 modes 统一）
+## Per-Idea Output Contract (uniform across all frames, all modes)
 
-每个 sub-agent 对每个 idea 返回此结构：
+Each sub-agent returns this structure per idea:
 
 - **title**
-- **summary**（2-4 句）
-- **axis** — 当 Phase 1.5 产出 axis list 时必需。选择该 idea 最核心 target 的一个 axis；不要跨越。decomposition 被跳过时完全省略。
-- **basis**（required, tagged）— 以下之一：
+- **summary** (2-4 sentences)
+- **axis** — required when Phase 1.5 produced an axis list. Pick the one axis this idea most centrally targets; do not span. Omit entirely when decomposition was skipped.
+- **basis** (required, tagged) — one of:
   - `direct:` quoted line / specific file / named issue / explicit user-supplied context
   - `external:` named prior art, domain research, adjacent pattern, with source
-  - `reasoned:` explicit first-principles argument for why this move likely applies — not a gesture；argument 要写出来
-- **why_it_matters** — 将 basis 连接到该 move 的 significance
-- **meeting_test** — 一行确认这值得 team discussion（当 Phase 0.5 检测到 tactical focus signals 时豁免）
+  - `reasoned:` explicit first-principles argument for why this move likely applies — not a gesture; the argument is written out
+- **why_it_matters** — connects the basis to the move's significance
+- **meeting_test** — one line confirming this would warrant team discussion (waived when tactical scope is active — Phase 0.5)
 
-Basis 是 required，不是 optional。如果 sub-agent 无法阐明至少一种 basis，该 idea 不 surface。要防止的 failure mode 是 generic "AI-slop" ideas：听起来 plausible，但缺少用户可验证的 basis。
+Basis is required, not optional. If a sub-agent cannot articulate a basis of at least one type, the idea does not surface. The failure mode to prevent is generic "AI-slop" ideas that sound plausible but lack a basis the user can verify.
 
-**Generation rules（所有 frames、所有 modes 统一）：**
+**Generation rules (uniform across frames, all modes):**
 
-- 每个 idea 都携带 articulated basis。Unjustified speculation 不 surface，无论听起来多 plausible。
-- 偏向你的 frame 自然产生的 basis type：pain/inversion/leverage 倾向 `direct:`；analogy 和 constraint-flipping 倾向 `reasoned:`；assumption-breaking 混合。但不要排除其他 basis types。
-- 将 meeting-test 作为 default floor：这个 idea 是否值得 team discussion？如果不值得，它低于 floor，不 surface。只有 Phase 0.5 检测到 tactical focus signals 时，floor 才放松。
-- 保持在 subject identity 内。Product expansions、new surfaces、new markets、retirements 和 architectural pivots 在 basis 支持时都是 fair game。Subject-replacement moves（abandoning the project、pivoting to unrelated domains、becoming a different organization）无论 basis 如何都 out。
-- **Honor the asked scope。** 当 focus hint 命名 subject 的某一部分（larger product 中的 flow、stage、section 或 feature，例如 "account settings"、"onboarding flow"、"pricing page copy"、"gameplay rules"）时，在 *该 scope 内* 以 full ambition ideate。将 surface 扩展到整个 subject：当用户命名一个 slice 时，却提出 broader product 的 fundamental changes，即使没有发生 subject-replacement，也是 scope mismatch。Big-picture thinking 仍适用；它只是运行在用户命名的 bounded surface 内，而不是扩大 surface。
+- Every idea carries an articulated basis. Unjustified speculation does not surface, regardless of how plausible it sounds.
+- Bias toward the basis type your frame naturally produces — pain/inversion/leverage tend toward `direct:`; analogy and constraint-flipping tend toward `reasoned:`; assumption-breaking is mixed — but don't exclude other basis types.
+- Apply the meeting-test as a default floor: would this idea warrant team discussion? If not, it's below the floor and does not surface. The floor is relaxed only when tactical scope is active (Phase 0.5) — a `go deep` run that also carried a tactical word is not tactical.
+- Stay within the subject's identity. Product expansions, new surfaces, new markets, retirements, and architectural pivots are fair game when the basis supports them. Subject-replacement moves (abandoning the project, pivoting to unrelated domains, becoming a different organization) are out regardless of basis.
+- **Honor the asked scope.** When the focus hint names a part of the subject (a flow, a stage, a section, a feature within a larger product — e.g., "account settings", "onboarding flow", "pricing page copy", "gameplay rules"), ideate at full ambition *within that scope*. Expanding the surface to the whole subject — proposing fundamental changes to the broader product when the user named one slice — is a scope mismatch even when no subject-replacement occurred. Big-picture thinking still applies; it just operates inside the bounded surface the user named, not by widening the surface.
 
 ## After All Sub-Agents Return
 
-1. Merge and dedupe 成一个 master candidate list。
-2. Synthesize cross-cutting combinations：扫描来自不同 frames、组合后更强的 ideas。在 specified mode 中，预计最多 3-5 个 additions。**在 surprise-me mode 中，cross-cutting 是 magic layer**：frames 经常收敛到 overlapping subjects，或发现 complementary angles；预计 5-8 个 additions，并更关注此步骤。将跨多个 frame-chosen subjects 的 combinations 作为 distinctive surprise-me output pattern 呈现。
-3. **Axis-coverage check（当 Phase 1.5 产出 axis list 时；否则跳过）。** dedupe 后统计每个 axis 的 ideas。对任何 zero ideas 的 axis，dispatch 一个 recovery sub-agent（任何 unused frame，或 lens 最适合 missing axis 的 frame，例如 usability axes 用 Pain & friction，distribution 或 compounding axes 用 Cross-domain analogy；使用该 frame 的 native tier）专门 target 该 axis。Recovery dispatch 携带相同 per-idea output contract，目标约 3-5 个 ideas。**Recovery 总数 cap 为 2 axes**：如果第一轮后超过 2 个 axes 为空，接受 thin coverage 而不是进一步 fan out。Recovery 返回后，merge 进 master list 并再次 dedupe。在 rejection summary 中将未 recovered 的 empty axes 记录为 "axis: <name> — recovery skipped (cap reached)"，让 gap 对用户可见。
-4. 如果提供了 focus，将 merged list 向其加权，但不排除更强的 adjacent ideas。
-5. 有理由时，让 ideas 分布到多个 dimensions：workflow/DX、reliability、extensibility、missing capabilities、docs/knowledge compounding、quality/maintenance、leverage on future work。
+1. Merge and dedupe into one master candidate list.
+2. Synthesize cross-cutting combinations -- scan for ideas from different frames that combine into something stronger. In specified mode, expect 3-5 additions at most. **In surprise-me mode, cross-cutting is the magic layer** — frames often converge on overlapping subjects or find complementary angles; expect 5-8 additions and give this step more attention. Surface combinations that span multiple frame-chosen subjects as a distinctive surprise-me output pattern.
+3. **Axis-coverage check (when Phase 1.5 produced an axis list; skipped otherwise).** Count ideas per axis after dedupe. For any axis with zero ideas, dispatch one recovery sub-agent (any unused frame, or the frame whose lens fits the missing axis best — e.g., Pain & friction for usability axes, Cross-domain analogy for distribution or compounding axes; dispatched on that frame's native tier) targeting that axis specifically. The recovery dispatch carries the same per-idea output contract and ~3-5 ideas as its target. **Cap recovery at 2 axes total** — if more than 2 axes are empty after the first round, accept thin coverage rather than fanning out further. After recovery returns, merge into the master list and dedupe again. Note empty axes that were not recovered in the rejection summary as "axis: <name> — recovery skipped (cap reached)" so the gap is visible to the user.
+4. If a focus was provided, weight the merged list toward it without excluding stronger adjacent ideas.
+5. Spread ideas across multiple dimensions when justified: workflow/DX, reliability, extensibility, missing capabilities, docs/knowledge compounding, quality/maintenance, leverage on future work.
 
-**Checkpoint A (V17)。** cross-cutting synthesis step 完成且 raw candidate list consolidated 后，立即写入 `<scratch-dir>/raw-candidates.md`（使用 Phase 1 捕获的 absolute path），内容包含带 sub-agent attribution 的完整 candidate list。这会在 Phase 3 critique 可能 compact context 之前，保护最昂贵的 output（parallel ideation dispatches + dedupe）。Best-effort：如果写入失败（disk full、permissions），log warning 并继续；checkpoint 不是 load-bearing。run 结束时不 cleanup（run directory 会保留，让 V15 cache 在同一 session 中跨 run-ids 可复用：见 Phase 5）。
+**Checkpoint A (V17).** Immediately after the cross-cutting synthesis step completes and the raw candidate list is consolidated, write `<scratch-dir>/raw-candidates.md` (using the absolute path captured in Phase 1) containing the full candidate list with sub-agent attribution. This protects the most expensive output (the parallel ideation dispatches + dedupe) before Phase 3 critique potentially compacts context. Best-effort: if the write fails (disk full, permissions), log a warning and proceed; the checkpoint is not load-bearing. Not cleaned up at the end of the run (the run directory is preserved so the V15 cache remains reusable across run-ids in the same session — see Phase 5).
 
-当 merge、synthesis 和 axis-coverage steps 完成后，回到 SKILL.md Phase 2 的 closing instruction，并在任何 critique 开始前加载 `references/post-ideation-workflow.md`。
+When the merge, synthesis, and axis-coverage steps are complete, load `references/post-ideation-workflow.md` before any critique begins. That read is required: the filtering rubric, the Phase 4 auto-write, and the Phase 5 menu live only there.

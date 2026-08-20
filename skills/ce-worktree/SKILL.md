@@ -1,7 +1,11 @@
 ---
 name: ce-worktree
-description: Set up isolated git worktrees — create a new branch for fresh work, or attach a worktree to an existing branch/PR/commit to work on it in isolation. Use when starting isolated work or isolating an existing ref; detects existing isolation first.
+description: Set up isolated git worktrees — create a new branch for fresh work, or attach a worktree to an existing branch, PR, or commit. Use when starting isolated work or isolating an existing ref.
 ---
+
+## 中文执行导读
+
+这是中文 fork 的 runtime 入口。先按本文件的阶段顺序和 references 执行；命令、参数、文件路径、schema、精确字符串和安全边界保持原样，英文契约仍是权威。
 
 # Worktree Isolation
 

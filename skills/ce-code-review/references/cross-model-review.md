@@ -1,12 +1,10 @@
 # Cross-Model Adversarial Pass
 
-**中文导读：** 本 reference 是所属 skill 的 load-bearing execution detail。请先阅读对应 `SKILL.md` 的中文导读；下方英文内容是 canonical executable contract，命令、字段、阶段顺序和安全边界必须按原文执行。
-
 Runs the **adversarial** review through one separately routed model target in a read-only process. The peer gets the **same** `references/personas/adversarial-reviewer.md` brief the in-process reviewer uses, returns the same `findings-schema.json` shape, and folds into Stage 5 as reviewer `adversarial-<provider>`. It counts as independent corroboration and can promote agreement only when its receipt records `independence_verified: true`; otherwise it remains attributed review evidence without a promotion bonus.
 
 This pass is **adversarial-only**. No other persona gets a cross-model twin, and there is no whole-diff generalist peer. Cost stays gated on the existing Stage 3 adversarial selection.
 
-Host 在 egress 前解析并批准一条具体 route；`scripts/cross-model-adversarial-review.sh` 强制使用该固定 route、应用 read-only controls、捕获符合 schema 的 JSON，并记录 identity receipts。分派前，它会保守估算 diff tokens 和 file count。Oversized diffs 不会 inline：worker 向 peer 提供 orchestrator 的精简 semantic review map，并把 exact diff 保留为私有、可选择读取的 artifact。Tool-limited routes 会把该 temp directory 作为额外 read root；Codex 在现有 read-only sandbox 下选择性调用 `git diff <base> -- <path>`。失败的 route 不写入 artifact，也绝不在内部切换 recipients。
+The host resolves and sanctions one concrete route before egress; `scripts/cross-model-adversarial-review.sh` enforces that fixed route, applies read-only controls, captures schema-shaped JSON, and records identity receipts. Before dispatch it conservatively estimates diff tokens and file count. Oversized diffs are not inlined: the worker gives the peer the orchestrator's compact semantic review map and keeps the exact diff as a private, selectively readable artifact. Tool-limited routes receive that temp directory as an additional read root; Codex uses selective `git diff <base> -- <path>` calls under its existing read-only sandbox. A failed route writes no artifact and never switches recipients internally.
 
 ## Gates — run only when all hold
 
@@ -28,57 +26,67 @@ else XHOST_HARNESS=unknown; XHOST_FAMILY=unknown; fi
 
 Pass `XHOST_HARNESS` as `CROSS_MODEL_HOST_HARNESS`; pass `XHOST_FAMILY` as the first worker argument. Claude Code maps to harness/family `claude`; Codex to `codex`. Cursor maps to harness `cursor` and family `unknown` unless an observable serving-family attestation lets you set `XHOST_FAMILY` to `codex`, `claude`, `grok`, or `composer`. An unknown host family cannot satisfy automatic same-family exclusion, so skip the automatic cross-model pass. Never infer serving family from the Cursor brand.
 
+<!-- ce-config-layers:start -->
+**Resolve ordinary CE yaml keys from the two repo files.**
+
+- **Read** `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml` (`<repo-root>` = `git rev-parse --show-toplevel`). Missing files are skipped. Gitignore does not change resolution.
+- **Win** with the first active (non-commented) value. For scalars, empty is unset; an invalid value continues to the next layer, then the skill default. For lists and maps, a present key — including an empty list or map — replaces the whole key.
+- **Do not** use this rule for `docs_root` — that key is `config.yaml` only.
+<!-- ce-config-layers:end -->
+
+**Checkout egress policy — evaluate first.** Read `cross_model_review_mode:` from the same two repo CE config files under the ordinary-key rule. Valid values are `auto` (default) and `off`; anything else is invalid and continues to the next layer, then `auto`. When it resolves to `off`, skip the automatic cross-model pass here — before peer resolution, disclosure, or any job start — unless the user explicitly asked for a cross-model peer for this run in conversation (a `cross_model_peer` value or a project-instruction preference is not that opt-in). Record the skip reason as **disabled by checkout config**, distinct from an un-attestable host or an unavailable or non-independent route; the in-process `adversarial-reviewer` keeps the lens exactly as it does for any peer that never started. A live user prohibition still overrides `auto`.
+
 Resolve the preference in this order:
 
 1. A preference the user **states in conversation** (e.g. "use grok for the cross-model pass").
-2. `cross_model_peer:` in `.compound-engineering/config.local.yaml` (the only file the script/skill reads for this).
+2. `cross_model_peer:` from the two repo CE config files (`config.local.yaml` then `config.yaml`). Apply the ordinary-key rule: first active supported target wins; an invalid value continues to the next layer, then step 3.
 3. A preference already in your **project instructions** (the active instructions in your context) — consumed from context, **never** read from a named file.
 4. **Default:** first available attested-different target in `codex → claude → grok → composer`; Cursor-default participates only when explicitly preferred.
 
-在 egress 之前，将 target 解析为一个具体的已安装 route，依据 `CROSS_MODEL_PEERS` 验证每个 recipient，先公布该 route，再将其作为 `CROSS_MODEL_FIXED_ROUTE` 传入。`CROSS_MODEL_FIXED_ROUTE` accepts exactly these tokens（只接受以下 token）；其他值（包括 `codex-cli` 这类看起来像 route 的猜测）都会让 worker fail-closed：
+Before egress, resolve the target to one concrete installed route, announce it, and pass it as `CROSS_MODEL_FIXED_ROUTE`. `CROSS_MODEL_PEERS` is an optional egress restriction, not a required approval: when it is set, every recipient (target and intermediary) must be sanctioned by it under the alias rule below, and an unsanctioned recipient is a named skip; when it is unset or empty, no recipient is filtered and the pass proceeds — this skill invocation plus the pre-egress disclosure is the sanction. Do not inspect the worker source to rediscover this; it implements exactly this contract. `CROSS_MODEL_FIXED_ROUTE` accepts exactly these tokens — the worker fail-closes on anything else (including route-shaped guesses like `codex-cli`):
 
-| 目标 | Route token(s) |
+| Target | Route token(s) |
 |--------|----------------|
 | `codex` | `codex` |
 | `claude` | `claude` |
-| `grok` | `grok-cli`（原生 CLI）或 `grok-cursor`（经 Cursor intermediary） |
+| `grok` | `grok-cli` (native CLI) or `grok-cursor` (via Cursor intermediary) |
 | `cursor` | `cursor` |
 | `composer` | `composer` |
 
-失败的 route 不会返回 artifact，也不会在内部改变 provider 或 intermediary。重试属于新的 dispatch，必须重新披露并获得 sanction。为兼容旧配置，`CROSS_MODEL_PEERS` 中的 `cursor` 或 `composer` 任一项都允许 Cursor 作为 intermediary；但选择 Cursor-default 时 target 必须是 `cursor`，仅有 `grok` 永远不会允许 Grok-via-Cursor。
+A failed route returns no artifact and never changes provider or intermediary internally. A retry is a new disclosed and sanctioned dispatch. For backward compatibility, either `cursor` or `composer` in `CROSS_MODEL_PEERS` sanctions Cursor as an intermediary, but selecting Cursor-default requires target `cursor`; `grok` alone never sanctions Grok-via-Cursor.
 
-`CROSS_MODEL_PEERS` is an optional restriction: when unset, it leaves the resolved route unfiltered and this skill invocation plus the concrete pre-egress disclosure sanctions that route; when set, the selected target/intermediary must appear. Use this contract directly. Do not inspect the worker source to rediscover its allowlist behavior.
+**Checkout-configured model and effort.** After the target is resolved, read `cross_model_model:` and `cross_model_effort:` from the same two repo CE config files under the ordinary-key rule. When `cross_model_model` is set, pass `CROSS_MODEL_MODEL_OVERRIDE_TARGET=<resolved-target>` and `CROSS_MODEL_MODEL_OVERRIDE=<value>`; when `cross_model_effort` is set, pass `CROSS_MODEL_EFFORT_OVERRIDE=<value>`. Both ride the `env` prefix of the start invocation below. The worker validates each against the route it actually runs — a model must be the resolved target's own family (an alias such as `fable` or a full id such as `claude-opus-5` for `claude`), an effort must be a level that CLI documents, and cursor-agent routes accept no effort override — and an incompatible value fails the pass closed with a named skip reason rather than substituting. Unset keys leave the script's editorial mapping unchanged. Announce the configured model and effort in the Step 3 line exactly as requested. A model or effort the user states in conversation outranks the config keys.
 
 Preferred mappings run first. Only after an observed unavailable, obsolete, or incompatible model may the host choose the closest compatible same-target/same-family replacement. Bind it with `CROSS_MODEL_MODEL_OVERRIDE_TARGET=<target>` and `CROSS_MODEL_MODEL_OVERRIDE=<model-id>`. Never substitute across families, leak an override to another route, silently change an explicit model, or add a recipient.
 
 ## Step 2 — Provider model + reasoning tier (owned by the script)
 
-Peer 按 **每个 provider 一个经审慎选择的 model 和 reasoning tier** 运行。具体 model IDs 和 route effort flags 集中在 `scripts/cross-model-adversarial-review.sh` 的单一 mapping 中；本 reference 不重复定义。目前 Claude Opus 和 native Grok 使用 high，Codex 使用 extra-high；cursor-agent routes 使用其 model 隐含的 tier 或 ceiling。用户选择 peer target，而不是任意 model/effort matrix。绝不继承 harness 配置的默认 model。只有在有区分度的 effectiveness eval 之后才能采用较低 tier，绝不能仅凭成本决定。
+The peer runs on **one editorially selected model and reasoning tier per provider**. The concrete model IDs and route effort flags live in one mapping in `scripts/cross-model-adversarial-review.sh`; this reference does not duplicate them. Claude Opus and native Grok currently use high, Codex uses extra-high; cursor-agent routes use their model-implied tier or ceiling. Users choose the peer target, and may pin that target's model and effort through `cross_model_model` / `cross_model_effort` (Step 1); the script validates and never substitutes. Never inherit a harness-configured default model. A lower tier is adopted only after a discriminating effectiveness eval, never from cost alone.
 
 The script always uses the adversarial persona brief; fold-in forces `reviewer` to `adversarial-<provider>`.
 
 ## Step 3 — Announce
 
-The ce-code-review invocation authorizes the selected configured/allowlisted route after this disclosure. The announce is a transparent notice, not a second confirmation gate. Skip for an explicit user prohibition or an observed scope/allowlist/route/authentication failure, never solely because the user did not separately authorize the external pass in the same prompt.
+The ce-code-review invocation authorizes the selected configured/allowlisted route after this disclosure. The announce is a transparent notice, not a second confirmation gate. Skip for an explicit user prohibition, a checkout `cross_model_review_mode: off` without a live opt-in, or an observed scope/allowlist/route/authentication failure, never solely because the user did not separately authorize the external pass in the same prompt.
 
 - **Interactive host, default mode:** surface a **prominent standalone line** that frames it as an **independent cross-model adversarial review** (say "cross-model" / "independent model" — not the internal "peer" jargon), names the requested **model and reasoning level** from the in-script mapping, and — because two different models can arrive over the *same* `cursor-agent` CLI — names **the route as well as the model** for cursor-agent routes, and states that reviewed code/diff content is sent to that provider. **Announce wording follows the receipt:** name a model as serving only where the route carries a served-model receipt; on receipt-less routes say "requested <model> at <effort>; serving model/effort unverified on this route." Placed with the Stage 3 team announce, not buried after it.
   - Call the pass **independent** only when host and target serving families are attestably different. For Cursor default/Auto or an unknown host family, call it a cross-harness review and state that independence is unverified; do not promise agreement promotion before the receipt exists.
   - Announce the one fixed route and every recipient before dispatch. A failure may be retried only after resolving, sanctioning, and disclosing a new route. Reconcile target, harness, route, requested model, and actual model from the artifact.
-- **Interactive host, no peer resolved** (host serving family un-attestable, or no different provider installed/authed): one quiet line that the cross-model pass was skipped and why. Never an error.
+- **Interactive host, no peer resolved** (host serving family un-attestable, no different provider installed/authed, or disabled by checkout config): one quiet line that the cross-model pass was skipped and why — name the checkout policy when that is the reason. Never an error.
 - **`mode:agent`:** emit no user-facing prose. The script still emits a one-line stderr audit log per send that review content was sent cross-model to the named provider, so the third-party data egress is auditable.
 
 ## Step 4 — Start the detached peer job before local dispatch
 
 The script is a CLI shell-out, not a subagent, so it doesn't consume the subagent concurrency budget. **Never hold a tool call open for the peer's runtime** — some harnesses kill long tool calls, which silently vanishes the pass. At the Stage 3d routing boundary, start it as a **detached, supervised job** through the bundled runner in one short Bash call (prints the job id in under ~2s). Only after that call returns may the host finalize the local roster and enter Stage 4. The detached worker still overlaps the local reviewers; binding it first prevents the host from accidentally dispatching the in-process adversarial fallback too.
 
-`start` 前，orchestrator 写入 `<run-dir>/adversarial-review-brief.md`。内容保持精简（最多 32 KiB）且聚焦语义：
+Before `start`, the orchestrator writes `<run-dir>/adversarial-review-brief.md`. Keep it compact (at most 32 KiB) and semantic:
 
-- Stage 2 intent summary；
-- 从当前 file inventory 和 diff 中选出的 2-8 个 material risk divisions，每个附一行 reason 和代表性 paths 或 path prefixes；
-- 哪些 divisions 属于明确的 generated repetition，应通过 generator inputs、manifests、tests 和 representative outputs 覆盖；
-- adversarial lens 必须测试的任何 cross-division interaction。
+- the Stage 2 intent summary;
+- 2-8 material risk divisions chosen from the current file inventory and diff, each with a one-line reason and representative paths or path prefixes;
+- which divisions are explicit generated repetition and should be covered through generator inputs, manifests, tests, and representative outputs;
+- any cross-division interaction the adversarial lens must test.
 
-该 map 是 agent judgment，不是确定性的 directory taxonomy。不要把完整 file list、diff hunks 或按扩展名机械拆分的结果复制进去。简单 change 只需一个 division。存在该 brief 时，worker 会把它嵌入 peer prompt。其 transport preflight 只在 prompt 外测量并暂存 exact diff；绝不拆分 semantic shards，也不选择或改写 orchestrator 的 divisions。
+This map is agent judgment, not a deterministic directory taxonomy. Do not copy the full file list, diff hunks, or a mechanical extension split into it. On a simple change, one division is enough. The worker embeds this brief in the peer prompt when it is present. Its transport preflight only measures and stages the exact diff outside the prompt; it never cuts semantic shards or chooses or rewrites the orchestrator's divisions.
 
 Invoke via the skill-dir anchor — set `SKILL_DIR` to the absolute directory of **this** skill's `SKILL.md` (the Bash tool's CWD is the user's project, not the skill dir, on every host):
 
@@ -100,19 +108,19 @@ echo "peer-deadline-secs=$(( ${CROSS_MODEL_HARD_SECS:-1200} + 10 ))";
 CE_PEER_HARD_SECS= CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" start --skill ce-code-review --run-id "<run-id>" --label adversarial -- env CROSS_MODEL_HOST_HARNESS="<host-harness>" CROSS_MODEL_FIXED_ROUTE="<fixed-route>" bash "$SKILL_DIR/scripts/cross-model-adversarial-review.sh" "<host-serving-family>" "<target>" "<base-ref>" "<run-dir>"
 ```
 
-这些嵌套 window 共用一份预算和一个 knob：`CROSS_MODEL_HARD_SECS`。Runner 会自动根据 ambient knob 派生 supervisor hard window（`max(1230, knob + 30)`）。在 start 前缀中清空 `CE_PEER_HARD_SECS`（`CE_PEER_HARD_SECS=`），避免上一次 session 或 harness 导出的旧值压低该派生值；如果某个 skill 有意设置了显式数值（例如 ce-work / elevation），显式的 `CE_PEER_HARD_SECS` 仍然优先，但本路径不得这样做。必须像上例一样，在调用 `start` 的同一个 shell call 中打印 `knob + 10` 得到 orchestrator deadline，并使用打印出的 `peer-deadline-secs=<n>` 作为下方共享 deadline；绝不能硬编码，否则 knob 改变后旧字面量仍会回收健康 peer，浪费它的全部执行成本。
+When Step 1 resolved a configured model or effort, add `CROSS_MODEL_MODEL_OVERRIDE_TARGET="<target>" CROSS_MODEL_MODEL_OVERRIDE="<model>"` and/or `CROSS_MODEL_EFFORT_OVERRIDE="<effort>"` to the `env` prefix after `CROSS_MODEL_FIXED_ROUTE`; omit them when unset.
 
-**不要把 `CROSS_MODEL_HARD_SECS` 转发给 worker。** Runner 已经透传 ambient environment，因此用户实际设置的 knob 会自行到达 worker。若重新导出 orchestrator 解析后的值，会把 fallback 变成显式 override，并破坏 worker 必须保留的区别：带 idle guard 的 route（codex 以及 streaming claude/cursor-family）使用提高后的 `HARD_SECS` 默认值，而 `grok-cli` 因为其 `--json-schema` 路径无法 stream，仍保留较低的 `UNGUARDED_HARD_SECS` 上限。强制统一值会让这个仅支持 hard timeout 的 route 再次出现加倍 hang。
+The nested windows are one budget with one knob, `CROSS_MODEL_HARD_SECS`. The runner derives its supervisor hard window from that ambient knob automatically (`max(1230, knob + 30)`). Clear `CE_PEER_HARD_SECS` on the start prefix (`CE_PEER_HARD_SECS=`) so a stale ambient value from an earlier session or harness export cannot undercut that derivation — an explicit numeric `CE_PEER_HARD_SECS` still wins when a skill deliberately sets one (ce-work / elevation), which this path must not do. Print the orchestrator deadline as `knob + 10` in the same shell as `start` (as above) and use that printed `peer-deadline-secs=<n>` below; never hardcode it, because a literal survives a knob change and then reaps a healthy peer.
+
+**Do not forward `CROSS_MODEL_HARD_SECS` to the worker.** The runner already passes the ambient environment through, so a knob the user actually set reaches the worker on its own. Re-exporting the orchestrator's *resolved* value would convert a fallback into an explicit override and destroy the one distinction the worker still needs: idle-guarded routes (codex + streaming claude/cursor-family) use the raised `HARD_SECS` default, while `grok-cli` keeps the lower `UNGUARDED_HARD_SECS` bound because its `--json-schema` path cannot stream. Forcing one value would silently restore the doubled hang on that hard-only route.
 
 - `<run-id>` = the Stage 3d run id (the same one that forms `<run-dir>`); job state lives under `<run-dir>/jobs/<job-id>/`.
 - `<host-serving-family>` is `codex`, `claude`, `grok`, `composer`, or `unknown`; `<host-harness>` is `codex`, `claude`, `grok`, `cursor`, or `unknown`.
-- `<target>` 是 `codex`、`claude`、`grok`、`cursor` 或 `composer` 之一；`<fixed-route>` 是 Step 1 表中已 sanction 的具体 route token（`codex`、`claude`、`grok-cli`、`grok-cursor`、`cursor` 或 `composer`）。
+- `<target>` is one of `codex`, `claude`, `grok`, `cursor`, or `composer`; `<fixed-route>` is its already-sanctioned concrete route token from the Step 1 table (`codex`, `claude`, `grok-cli`, `grok-cursor`, `cursor`, or `composer`).
 - `<base-ref>` = the Stage 1 `BASE` (the diff base the peer reviews via `git diff <base-ref>`).
 - `<run-dir>` = the absolute Stage 4 run dir. The script writes `adversarial-<provider>.json` there **only after** forcing `reviewer` to `adversarial-<provider>` and downgrading peer `safe_auto` → `gated_auto`.
 
-**单次收尾回收。** Runner 把 worker 分离到独立的受监督 session。`start` 后立即捕获 epoch time（`date +%s`），local reviewers 活跃期间不要轮询。收集完 local returns 后只检查一次 status。若仍在运行，就重复执行 bounded `wait` slice，直到 job 进入 terminal，或从 `start` 起已经耗尽共享 deadline（取自该次 `start` 输出的 `peer-deadline-secs`，默认 1210 秒）；每个 slice 前都要用 `date +%s` 对比 anchor，绝不能启动会越过 deadline 的 slice。每个 slice 最长 480 秒（Luna xhigh run 合理情况下可能耗时约 419 秒，更短的 slice 可能在健康 peer 返回前结束），并允许重复 slice：单个 slice 远短于派生出的 deadline，如果限制总等待时间，反而会因为本次预算扩大的同一个原因提前回收健康 peer。一个 slice 不算一次轮询 turn；slice 之间不要插入 status 读取、shell 空操作或“仍在等待”turn。进入 terminal 后纳入 artifact。达到 deadline 时运行 `reap <job-id>`，并执行最后一次 `wait --max-secs 10`，因为 reap 是异步的。Script 会在该 deadline 内自行限制运行（idle timeout 为 480 秒；hard backstop 为 `CROSS_MODEL_HARD_SECS`，默认 1200 秒），所以 deadline reaping 应属例外。Done detection 仍以文件是否存在为准：worker 只在 normalization 后发布 `<run-dir>/adversarial-<provider>.json`。Script 从 skill dir 读取 persona brief 和 schema，并依据 `<base-ref>` review 当前 work tree。Large-diff preflight 只处理 transport：它在 prompt 外测量并暂存 exact diff；orchestrator 选择 semantic divisions，reviewer 在其中选择 representatives 和 evidence。
-
-默认派生出的共享 deadline 为 1210 秒（1210s by default）。
+**Single-reap finish.** The runner detaches the worker into its own supervised session. Capture the epoch time right after `start` (`date +%s`) and do not poll while local reviewers are active. After local returns are collected, check status once. If still running, issue bounded `wait` slices until the job is terminal **or** the shared deadline (`peer-deadline-secs` from the `start` call; 1210s by default) has elapsed since `start` — compare `date +%s` against the anchor before each slice and never begin a slice that would cross the deadline. Size each slice at up to 480s (Luna xhigh runs can legitimately take up to ~419s, so a shorter slice can end before a healthy peer returns), and let the slices repeat: one slice is far shorter than the derived deadline, so capping the *total* wait would reap a healthy peer for exactly the reason this budget was widened. A slice is not a polling turn — do not interleave status reads, shell no-ops, or "still waiting" turns between slices. Fold in the artifact when terminal. At the deadline, `reap <job-id>` and perform one final `wait --max-secs 10` because reap is asynchronous. The script self-bounds (idle timeout 480s; hard backstop `CROSS_MODEL_HARD_SECS`, default 1200s) *inside* that deadline, so deadline reaping is exceptional. Done detection stays presence-keyed: the worker publishes `<run-dir>/adversarial-<provider>.json` only after normalization. The script reads the persona brief and schema from the skill dir and reviews the current work tree against `<base-ref>`. Its large-diff preflight is transport only: it measures and stages the exact diff outside the prompt; the orchestrator chooses the semantic divisions, and the reviewer chooses representatives and evidence within them.
 
 The `start` command's returned job ID is the successful-start receipt. Do not immediately call `status`, inspect `--help`, or otherwise verify that receipt; persist it and continue to local dispatch. Status collection begins only after the local wave completes.
 
@@ -126,7 +134,7 @@ PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c 
 "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" status "<job-id>" --json
 ```
 
-如果 job 仍在运行且还有时间，每个 `wait` slice 必须严格使用：
+If it is still running and time remains, each `wait` slice is exactly:
 
 ```bash
 SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
@@ -134,7 +142,7 @@ PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c 
 "$PY" "$SKILL_DIR/scripts/peer-job-runner.py" wait --max-secs <remaining-slice-secs> --json "<job-id>"
 ```
 
-重复调用，直到 job 进入 terminal 或派生出的 deadline 用完；不要自创其他 status flag，也不要检查 help。
+Repeat that call until the job is terminal or the derived deadline is spent; do not invent alternate status flags or inspect help.
 
 ## Step 5 — Fold into Stage 5
 
@@ -148,12 +156,20 @@ PY="$(for c in python3 python py; do command -v "$c" >/dev/null 2>&1 && "$c" -c 
 
   Its findings enter ordinary dedup, but agreement promotion is allowed **only when `independence_verified` is `true`**. A false or absent value may contribute findings but never raises confidence. `independence_verified` attests a different serving family; it does not claim the exact served model was verified. `receipt_supported`, `model_actual`, and `effort_actual` carry that separate identity evidence. Peer findings never grant silent-apply authority.
 - In final Coverage, name `cross_model_route`, `model_requested`, `effort_requested`, `receipt_supported`, `model_actual`, `effort_actual`, and `independence_verified` from the artifact. Keep the literal `unverified`; never compress a request into a serving claim such as "via Codex high" when actual model or effort is unverified.
-- **Never started / not run** — the job was never started (gates not met, host un-attestable, no different provider reachable, CLI missing/unauthed): the pass simply didn't run. Note "cross-model pass: not run" in Coverage for human-facing markdown; stay silent in `mode:agent`. Ignore any `*.raw.json` leftovers — they are not fold-in artifacts.
+- **Never started / not run** — the job was never started (gates not met, disabled by checkout config, host un-attestable, no different provider reachable, CLI missing/unauthed): the pass simply didn't run. Note "cross-model pass: not run" in Coverage for human-facing markdown — or "cross-model pass: disabled by checkout config" when Step 1's egress policy was the reason; stay silent in `mode:agent`. Ignore any `*.raw.json` leftovers — they are not fold-in artifacts.
 - **Dispatch-infrastructure failure** — the runner or worker itself crashed: a non-zero exit before any job starts, a preflight/detach failure, or an unresolved `$SKILL_DIR`/script path. This is distinct from the gate-not-met skips above (there, no dispatch was attempted), so do not fold it into the silent not-run bucket on the first error. The two failure shapes recover at different points. A **no-job-id** preflight failure (exit before any job id, unresolved `$SKILL_DIR`) is recovered entirely at **Stage 3d's no-job branch**, before the local roster is materialized — the only point where re-running the start can still recover cross-model corroboration and, failing that, cleanly fall to the in-process reviewer (which then covers the lens; only corroboration is lost). Do **not** re-attempt that case here at fold-in: Stage 4 may already have dispatched the in-process `adversarial-reviewer`, so a fold-in peer re-run would put both on the same brief and violate the exclusive routing boundary. This step handles only the **job-id-returned-then-failed** crash — its failed job is reaped here and the in-process reviewer is already gone. For it, re-run the **same resolved fixed route** by hand — holding the target and model, the `git diff <base-ref>` read scope, and the adversarial persona brief fixed — while each failure is a new, plausibly recoverable one and the shared peer deadline holds. This is a same-route retry, deliberately distinct from the quota rule below, which requires a newly disclosed route. Stop once a failure repeats or the deadline is spent; the hand recovery is then the adversarial lens's only cover, so the Coverage line must report the adversarial lens as **degraded**, not merely cross-model corroboration lost. A hand recovery may not substitute a different target or provider, widen the read scope, or relax the read-only trust boundary — those make the recovered peer untrustworthy, not merely unavailable.
-- **Ran but produced no usable output** — the job reached `done` (or any terminal state) yet no `adversarial-<provider>.json` exists (the peer ran and egressed but returned nothing schema-shaped — unparseable output, empty findings the script dropped). Distinct from not-run: note "cross-model pass: peer ran, no usable output" in human-facing markdown Coverage. Never fail the review.
-- **Started but not `done`** — the final status read reports `failed`, `timeout`, or `died-without-result` (a job reaped at the shared deadline records `timeout`, with the reap noted in its reason) → still non-blocking, but never silent: name the peer and its terminal state in Coverage (e.g. "cross-model adversarial peer: timeout"). Silent absence stays correct only for passes that never started or were skipped.
+- **Ran but produced no usable output** — the job reached `done` (or any terminal state) yet no `adversarial-<provider>.json` exists (the peer ran and egressed but returned nothing schema-shaped — unparseable output, empty findings the script dropped). Distinct from not-run: note "cross-model pass: peer ran, no usable output" in human-facing markdown Coverage. Never fail the review. If skip evidence is session/usage quota or execution-context auth, this is not merely empty output — run the did-not-run fallback below before treating the lens as covered.
+- **Started but not `done`** — the final status read reports `failed`, `timeout`, or `died-without-result` (a job reaped at the shared deadline records `timeout`, with the reap noted in its reason) → still non-blocking, but never silent: name the peer and its terminal state in Coverage (e.g. "cross-model adversarial peer: timeout"). Silent absence stays correct only for passes that never started or were skipped. If skip evidence is session/usage quota or execution-context auth, run the did-not-run fallback below rather than leaving the lens uncovered.
 - Empty `findings` → note "cross-model pass: no additional issues" in Coverage.
-- **删除前先归类 skip reason。** Cleanup 前读取 `out.log`，包括以 `peer skip evidence:` 为前缀的有界行，并指出观察到的 quota、authentication 或 capability failure。Authentication-shaped peer failure（`not logged in`、`please log in`、401 或提示登录的 CLI 文本）只描述 peer 的 execution context：sandboxed host，例如限制 spawned commands 访问 network 或 keychain 的 Codex task，会产生与真实 account logout 完全相同的 signal。因此应归类为 cross-model execution-context authentication failure；绝不要据此报告用户 account 已退出登录，或提示用户运行 login command。Cross-model pass 是附加项，local review 仍已完成；要获取该 pass，需要 peer CLI 可访问 network 的 context（例如 restricted sandbox 之外）。同一 quota 或 usage-limit evidence 在本 session 出现超过一次后，不要自动重试该 route。重试必须使用新解析、已披露且获批准的固定 route；绝不静默转向另一个 recipient。
+- **Classify the skip reason before deleting.** Read `out.log` before cleanup, including bounded lines prefixed `peer skip evidence:`. Judge the full diagnostic; do not grep for a closed phrase list. Login-shaped peer text describes only the peer's execution context: a sandboxed host produces the same signal as a genuine logout, so never report it as the user's account being logged out or prompt a login command.
+  - Session or usage quota (the route cannot review now): do not retry that route; run the did-not-run fallback.
+  - Execution-context authentication: same — the peer did not review; run the did-not-run fallback.
+  - Transient rate limit (throttle, retry shortly, without quota/session exhaustion): one same-route retry of the already disclosed route. If that retry still produces no review, dispatch in-process `adversarial-reviewer`. Do not run the did-not-run fallback and do not switch recipients.
+  - Anything else: name the observed failure; do not run the did-not-run fallback.
+- **Did-not-run fallback** (first quota or execution-context-auth observation, including the first one): the started job did not cover the adversarial lens. Do not retry that same route. Then:
+  1. If this is the first replacement attempt, the failed recipient was **not** an explicit user-stated preference (Step 1 item 1), and another attested-different installed+allowlisted target remains: announce that new recipient and start a new job with a new `CROSS_MODEL_FIXED_ROUTE`. Wait for it with the remaining shared deadline and fold its artifact the same way as the first job. That job owns the lens. Never switch recipients inside the worker. If this replacement also ends in quota or execution-context auth, do not start a third peer; take step 2.
+  2. Otherwise (explicit recipient, or no other eligible peer): dispatch in-process `adversarial-reviewer` now. Coverage records the peer as not-run for quota/auth and that the lens used the local fallback.
+  A config or default selection is not an explicit user-stated preference. One replacement only; never silently continue to another recipient.
 - After fold-in (or after deadline reaping), delete the consumed job directory (`<run-dir>/jobs/<job-id>/`) — its log and result are review content and must not outlive their use.
 - A finding sharing a fingerprint with in-process `adversarial` promotes only when the artifact records `independence_verified: true`. Cursor-default artifacts default false; an unattested host skips automatic dispatch.
 

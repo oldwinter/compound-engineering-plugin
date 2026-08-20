@@ -1,8 +1,8 @@
-# `.claude/launch.json` schema（结构说明）
+# `.claude/launch.json` schema
 
-Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server start command。该 schema 是 VS Code `launch.json` format 的 subset；选择它是因为 Claude Code、Cursor 和 VS Code 都能理解它，而且用户通常已经为了 editor integration 拥有一个。
+Polish reads `.claude/launch.json` at the repo root to resolve the dev-server start command. The schema is a subset of VS Code's `launch.json` format — chosen because Claude Code, Cursor, and VS Code all understand it and because users often already have one for editor integration.
 
-## Top-level shape（顶层结构）
+## Top-level shape
 
 ```json
 {
@@ -20,22 +20,22 @@ Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server st
 }
 ```
 
-## Fields polish consumes（polish 会消费的字段）
+## Fields polish consumes
 
-| Field（字段） | Required（必需） | Purpose（用途） |
+| Field | Required | Purpose |
 |-------|----------|---------|
-| `name` | yes (when multiple configurations) | 当 array 有多个 entry 时用于 disambiguate。Polish 让用户按 `name` 选择。 |
-| `runtimeExecutable` | yes | polish 启动的 binary（例如 `bin/dev`、`npm`、`overmind`、`bun`）。 |
-| `runtimeArgs` | no | 传给 `runtimeExecutable` 的 arguments array。默认：空 array。 |
-| `port` | yes | dev server 会监听的 port。Polish 会 probe `http://localhost:<port>` 的 reachability，并将其用于 IDE browser handoff。 |
-| `cwd` | no | dev server 的 repo-relative working directory。默认：repo root。适用于 monorepos（`apps/web`、`packages/frontend`）。 |
-| `env` | no | dev-server process 的 additional environment variables。默认：继承 polish 的 environment。 |
+| `name` | yes (when multiple configurations) | Used to disambiguate when the array has more than one entry. Polish asks the user to pick by `name`. |
+| `runtimeExecutable` | yes | The binary polish spawns (e.g., `bin/dev`, `npm`, `overmind`, `bun`). |
+| `runtimeArgs` | no | Array of arguments passed to `runtimeExecutable`. Default: empty array. |
+| `port` | no | The dev-server port. A numeric value completes the tuple's port fact; when the command, working directory, and environment are also usable, no project detection or resolver runs. When omitted, polish resolves only the missing port from the selected project type. The port seeds `http://localhost:<port>` as the default endpoint candidate; server evidence or a user correction may replace that candidate, so the schema does not lock the URL scheme. |
+| `cwd` | no | Repo-relative working directory for the dev server. Default: repo root. Useful for monorepos (`apps/web`, `packages/frontend`). |
+| `env` | no | Additional environment variables for the dev-server process. Default: inherit polish's environment. |
 
-## Stub template（用户首次接受时写入）
+## Stub template (written on first run when user accepts)
 
-当 polish auto-detects project type，且用户确认 "Save this as `.claude/launch.json`?" 时，polish 会写入一个由 detected type 派生的 minimal stub。这些 templates 刻意 hard-code 常见 defaults；用户之后可编辑。
+When auto-detection completes a missing tuple fact and the user confirms "Save this as `.claude/launch.json`?", polish writes the completed tuple. Preserve facts from a selected configuration and add only what was resolved; use the recipe templates below when auto-detection supplied the command. These templates intentionally hard-code common defaults — users can edit them later.
 
-### Rails stub（Rails stub，Rails 模板）
+### Rails stub
 
 ```json
 {
@@ -51,7 +51,7 @@ Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server st
 }
 ```
 
-### Next.js stub（Next.js stub，Next.js 模板）
+### Next.js stub
 
 ```json
 {
@@ -67,7 +67,7 @@ Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server st
 }
 ```
 
-### Vite stub（Vite stub，Vite 模板）
+### Vite stub
 
 ```json
 {
@@ -83,7 +83,7 @@ Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server st
 }
 ```
 
-### Procfile / Overmind stub（Procfile / Overmind stub，Procfile / Overmind 模板）
+### Procfile / Overmind stub
 
 ```json
 {
@@ -99,7 +99,7 @@ Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server st
 }
 ```
 
-### Nuxt stub（Nuxt stub，Nuxt 模板）
+### Nuxt stub
 
 ```json
 {
@@ -115,7 +115,7 @@ Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server st
 }
 ```
 
-### Astro stub（Astro stub，Astro 模板）
+### Astro stub
 
 ```json
 {
@@ -131,7 +131,7 @@ Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server st
 }
 ```
 
-### Remix stub（Remix 模板）
+### Remix stub
 
 ```json
 {
@@ -147,7 +147,7 @@ Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server st
 }
 ```
 
-### SvelteKit stub（SvelteKit 模板）
+### SvelteKit stub
 
 ```json
 {
@@ -163,15 +163,15 @@ Polish 读取 repo root 下的 `.claude/launch.json`，以 resolve dev-server st
 }
 ```
 
-## Why a subset of VS Code's schema（为什么只采用 VS Code schema 的子集）
+## Why a subset of VS Code's schema
 
-Polish 不使用 `type`、`request`、`console`、`stopOnEntry` 或其他 VS Code fields。包含它们无害；polish 会忽略它们；但 stub writer 永远不会添加它们。polish 关心的 fields 描述的是*如何在已知 port 上启动 long-running dev server*，这比 VS Code 用于 debug-stepping 的 surface 更小。
+Polish does not use `type`, `request`, `console`, `stopOnEntry`, or any of the other VS Code fields. Including them is harmless — polish ignores them — but the stub writer never adds them. The fields polish cares about are the ones that describe *how to start a long-running dev server on a known port*, which is a smaller surface than what VS Code uses for debug-stepping.
 
-## Cross-IDE notes（跨 IDE 说明）
+## Cross-IDE notes
 
-`.claude/launch.json` 还不是 Claude Code、Cursor、VS Code 和 Codex 之间完全统一的 standard。Polish 优先使用 `.claude/launch.json`，因为：
-- Claude Code、Cursor 和 VS Code 都能将它作为 launch config 读取
-- 它位于干净的 repo-root trust boundary（user-authored，而非 auto-detected）
-- 偏好 `.vscode/launch.json` 的用户可以手动 symlink 或 mirror 这两个文件
+`.claude/launch.json` is not yet a fully unified standard across Claude Code, Cursor, VS Code, and Codex. Polish leads with `.claude/launch.json` because:
+- Claude Code, Cursor, and VS Code can all read it as a launch config
+- It sits at a clean repo-root trust boundary (user-authored, not auto-detected)
+- Users who prefer `.vscode/launch.json` can symlink or mirror the two files manually
 
-如果出现 cross-IDE standard（例如 `.workspace/launch.json`），stub writer 和 reader 可替换 paths，而无需触及 skill 的其余部分。
+If a cross-IDE standard emerges (e.g., `.workspace/launch.json`), the stub writer and reader can swap paths without touching the rest of the skill.

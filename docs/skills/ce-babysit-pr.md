@@ -1,222 +1,221 @@
 # `ce-babysit-pr`
 
-> Watch open PR 并持续推动它走向 merge。Review feedback、CI 和 base-branch movement 到达时分别响应，并在它*看起来* ready 时报告——或在明确 stack posture 下，继续处理已确认的 managed stack（只有你要求 land 时才 land）。
+> Watch an open GitHub PR and keep it moving toward merge-ready. Report when it *looks* ready. Land only if you asked.
 
-`ce-babysit-pr` 是 **PR 打开后的 watch loop**。`/ce-commit-push-pr` 打开 PR 后，该 skill 会同时 watch 三条独立 attention stream：新到达的 review comments、CI status，以及 PR 相对 base 的 branch currency，直到 PR 看起来 merge-ready、需要 human decision，或进入 terminal state。它是一个轻量 conductor，不自行 resolve feedback 或 fix CI，而是把 review comments 委派给 `/ce-resolve-pr-feedback`，把 CI failures 委派给 `/ce-debug`；自身负责 loop、ordering、跨 tick dedup、settle window、安全 branch maintenance 和 stop decision。
+`ce-babysit-pr` is the **post-open watch**. It is a git-workflow skill, not a core-loop step. After `/ce-commit-push-pr` opens a PR, this skill watches three streams (review comments, CI, base-branch movement) until the PR looks ready, is blocked, hits a budget, or is merged/closed.
 
-**Posture 限定本次 run 的范围。** 默认是 `target`（仅指定 PR）。在已确认的 managed stack 上，你可以选择 `stack-ready`（settle 后继续 upstack，不 merge）或 `stack-land`（同样的遍历，外加对 bottom-most open settled prefix 的授权 `gh stack merge`）。**Settled ≠ merged**——某个 layer 可能看起来 ready 但仍处于 OPEN 状态；继续 babysit 并不要求先 land。
+It is a conductor. It does **not** fix comments or diagnose CI itself. Comments go to `/ce-resolve-pr-feedback`. Real CI failures go to `/ce-debug`. This skill owns the loop, the order, dedup across ticks, the settle window, bounded branch maintenance, and the stop.
 
-**它无法保证 merge-readiness，也不会假装能保证。** Reviewer 随时可能新增 feedback，required checks 也可能变化。在 `target` 和 `stack-ready` 下，skill 会推动 PR 走向 ready，merge 仍由你决定。在 `stack-land` 下，选择该 posture *即* 是对 managed prefix 的 land 授权。“这个 fix 会不会改变我原本想要的 behavior？”这一 safety judgment 属于 `/ce-resolve-pr-feedback`，后者会把此类 fix 升级为 `needs-human`，因此 babysit loop 可以自主运行，而不会静默改变 intended behavior。
+That is the contrast with `/ce-resolve-pr-feedback`, which is a one-pass "fix the comments now" skill. Use that when you want a single round you watch. Use this when you want the PR driven over time.
 
-Compound-engineering 的 shipping chain 是 `/ce-work -> /ce-commit-push-pr -> (reviewers comment) -> /ce-resolve-pr-feedback`。`ce-babysit-pr` 位于最后一步之上，按 schedule 调用它，并穿插处理 CI fixes。
+**Posture** sets the scope. Default is `target` (the named PR only). On a confirmed managed stack you can choose `stack-ready` (advance upstack as soon as a layer has nothing actionable — even while its CI is still running — with lower layers kept under probe; no merge) or `stack-land` (same walk, plus `gh stack merge` of the bottom-most open **settled** prefix). **Settled is not merged.** A layer can look ready and still be OPEN.
+
+It cannot promise merge-readiness. A reviewer can still comment later. Required checks can change. Under `target` and `stack-ready`, you merge. Selecting `stack-land` *is* land authorization for that managed prefix.
+
+GitHub only, including GitHub Enterprise that `gh` is configured for.
 
 ---
 
-## 摘要（TL;DR）
+## TL;DR
 
-| 问题 | 回答 |
+| Question | Answer |
 |----------|--------|
-| 它做什么？ | Watch open PR（或 posture 下已确认的 managed stack），持续推动它走向 merge-ready，并在 review comments、CI 和 base-branch movement 到达时响应 |
-| 何时使用 | PR 已打开，希望 hands-off 推动它走向 merge 时（`/ce-commit-push-pr` 结束时会自动提供 handoff）；当你拥有 managed stack 时使用 stack postures |
-| 产出什么 | 委派完成的 feedback/CI fixes、需要 human decision 的 escalations、stack posture 下的 layer transitions，以及 high-level summary |
-| 如何工作 | Comments 委派给 `/ce-resolve-pr-feedback`，CI 委派给 `/ce-debug`；自身负责 bounded branch-currency maintenance、posture 和 loop |
-| 模式 | Self-sustaining in-session watch（default），或 Checkpoint；postures 为 `target` / `stack-ready` / `stack-land` |
+| What does it do? | Watches an open PR (or a confirmed managed stack) and reacts to comments, CI, and base movement |
+| When to use it | A PR is open and you want it driven toward merge without handling each round yourself |
+| What it produces | Delegated comment and CI fixes, surfaced `needs-human` items, optional stack-layer moves, and an outcome-first summary |
+| How it works | Delegates comments to `/ce-resolve-pr-feedback` and CI to `/ce-debug`. Owns the loop, posture, and stop. |
+| Modes | In-session watch (default) or Checkpoint. Postures: `target` / `stack-ready` / `stack-land`. |
 
 ---
 
-## 调用示例
+## Example invocations
+
+Empty invoke watches the current branch's PR. A number or URL pins the PR. `watch` / `checkpoint` force the loop style. `posture:` is separate from that.
 
 ```text
-# Watch 当前 branch 的 pull request，直到 ready 或 blocked
+# Current branch's PR. In-session watch if the harness can wake you; else one checkpoint tick.
 /ce-babysit-pr
 
-# 按 number 或 URL watch 指定 pull request
+# Named PR
 /ce-babysit-pr 1234
 /ce-babysit-pr https://github.com/acme/widgets/pull/1234
 
-# 运行一个 checkpoint tick，并返回可复制的 resume command
+# One tick, persist, print the exact resume command. Monitoring is paused.
 /ce-babysit-pr 1234 checkpoint
 
-# 负责一个已确认的 managed stack，直到 merge-ready（不自动 merge）
+# Force the in-session watch even if the harness would have picked checkpoint
+/ce-babysit-pr 1234 watch
+
+# Cap the active-time budget (default is 8 hours of active watch time)
+/ce-babysit-pr 1234 2 hours
+
+# Confirmed managed stack: walk upstack as layers go quiet (CI may still run). Do not merge.
 /ce-babysit-pr posture:stack-ready
 
-# 负责整个 stack，并在 green 时 land settled prefixes
+# Same walk, and land the settled prefix when green
 /ce-babysit-pr posture:stack-land
 ```
 
----
-
-## 问题
-
-手动 babysit PR，或使用 naive loop，通常会以这些方式失败：
-
-- **Serialized timelines**：常见错误是“等整轮 CI 完成，*再*读 comments”。Comment fix 本来就会 push 新 commit 并重新触发 CI，这样每轮都会浪费一个完整 CI cycle。应当在 CI 运行时处理 comments。
-- **过早宣告 ready to merge**：CI green 后 loop 立即宣布成功，随后 review feedback 才到达；真正 merge 时才看到 surprise。
-- **重复实现 engines**：Monolithic babysitter 重新实现已有专用 skill 的 feedback resolution 和 CI debugging，最终与它们 drift。
-- **Loop 无法适配 harness**：In-session `sleep` loop 无法在会 sandbox turn 的 GUI app harness 中运行，Claude Code 也会阻止 foreground `sleep`。
-- **Opaque endings**：Run 停止后不知道它做了什么，或得到一整面逐 thread receipts。
-
-## 方案
-
-`ce-babysit-pr` 使用 **stateless、可恢复 tick**，由当前 harness 实际具备的 background-and-wake capability 驱动：
-
-- **Comments-first ordering + stale-SHA cancellation**：每个 tick 先处理新 review threads，再处理 CI；comment pass 后重新 snapshot。如果它 push 了 commit，就丢弃针对旧 SHA 的 CI failure，不会修复 dead SHA。
-- **Delegation，不重复实现**：Comments 交给 `/ce-resolve-pr-feedback`，真实 CI failures 交给 `/ce-debug`；每个新 failure signature 只 dispatch 一次，不会每次 poll 都 dispatch。Inline CI logic 只做低成本 flaky-vs-real classification，以决定调用哪个 skill。
-- **Bounded branch-currency maintenance**：Eligible PR 落后于普通 base 时，会成为第三条 attention stream。只有 update 能机械地保留 PR 已确立的 intent，skill 才会自动 converge；任何存在合理争议的 resolution 都会变成 sticky `needs-human` residual。
-- **带 bounded stalled-review path 的 settle window**：只有 GitHub 报告 PR mergeable（`mergeStateStatus == CLEAN`）、没有 open feedback，并且达到足够 quiet time，才报告 “looks ready”。Review signal 持续存在或消失却没有完成标记时，至少等待 15 分钟、允许一次有 evidence 支撑的延长，并以 30 分钟为上限，避免永久阻塞。
-- **CI 等待 maintainer approval 时的有界 review drain**：approval-gated CI 会阻止 readiness，但不会阻止独立 review。Interactive watch 会在没有 in-flight review 时自动 drain 5 分钟，有一个 review in flight 时 drain 15 分钟，之前一轮 timing 支持时 drain 30 分钟；到期后 hand back，不会立即停止，也不会无限 watch。Pipeline mode 仍立即返回 external blocker。
-- **Self-sustaining in-session watch（default）**：Token-free background change detector（`pr-snapshot watch`）仅在发生 actionable change 时唤醒 agent，并保留 conversation 中的所有 decisions。不支持 background-and-wake 的 harness fallback 到 checkpoint：执行一个 tick 并输出精确 resume command。
-- **单一 authoritative watcher**：较新的 invocation 会取消仍在 preflight 的旧 invocation，但只有自己的首次 snapshot 成功后才接管 active ownership，并立即停止 prior watcher。Wake 会携带 persisted generation，因此被 supersede process 延迟发出的 notifications 会基于 fresh snapshot 合并，不会重置 session 或 settle clocks。
-- **完整分页的 source of truth**：`pr-snapshot` 会把 review-thread connection 翻到最后一页。`reviewThreads(first:50)` 之类的 one-shot diagnostic query 永远不能覆盖 canonical snapshot。
-- **High-level final summary**：Outcome-first，按组计数，不输出 receipts。
-- **Managed stacks 的 Run posture**：`target` 停在指定 PR（可提供一次 stack-wide offer）；`stack-ready` 在 settle 后继续 upstack 而不 merge；`stack-land` 继续，并通过 `gh stack merge` + sync 合并 bottom-most open settled prefix。
+For a single pass over comments you want to watch yourself, use `/ce-resolve-pr-feedback` instead.
 
 ---
 
-## 独特之处
+## The Problem
 
-### 1. Comments-before-CI，然后取消 stale SHA
+Hand-babysitting, or a naive loop, usually fails in the same ways:
 
-Ordering invariant 是该 skill 的核心。一个 tick 内按以下顺序执行：terminal check -> resolve new comments -> **重新 snapshot** -> 处理 CI。只有 comment pass 没有 push 时才处理当前 CI failure，因此 CI fix 永远不会应用到 pre-comment SHA。这样 comment 和 CI timelines 会被折叠，而不是串行化。
+- Wait for the whole CI run, *then* read comments. A comment fix pushes and retriggers CI, so that wait burned a cycle
+- CI goes green, the loop says ready, and review lands after
+- The watcher reimplements feedback resolution and CI debugging, then drifts from those skills
+- An in-session `sleep` loop cannot run in a sandboxed GUI harness, and Claude Code blocks foreground `sleep`
+- The run stops and you cannot tell what it did, or you get a wall of per-thread receipts
 
-### 2. Stateless、可恢复 tick：一个 loop，任意 driver
+## The Solution
 
-所有 state 都写入磁盘（`/tmp/compound-engineering-<effective-uid>/ce-babysit-pr/<owner>-<repo>-<pr>/state.json`），因此 tick 是 idempotent 的，任何 reinvocation 都能继续驱动它：in-session background-and-wake wait、`/loop`、durable scheduler，或用户一小时后重新运行 skill。Single authored-once skill 因而能跨 CLI 和 app harnesses 使用，loop mechanics 不依赖某个可能不存在的 driver。
+Each tick is stateless and resumable from disk. The harness only has to wake the agent when something changed.
 
-### 3. Self-sustaining in-session watch，不依赖特定 harness scheduler
+- **Comments first.** New review threads and non-thread comments are handled before CI. After that pass, if a commit was pushed, the old CI failure is against a dead SHA and is skipped
+- **Delegation.** `/ce-resolve-pr-feedback` for comments, `/ce-debug` for real failures (once per new signature). The only inline CI work is a cheap flaky-vs-real split
+- **Consumption-only branch currency.** The base is merged or updated into the PR only when the snapshot emits a `branch_currency` item (`BEHIND` via GitHub's update-branch endpoint, `DIRTY` via an exact-base local repair) and only after it is claimed; ordinary base movement on a CLEAN PR, a sibling merging, or someone saying "update the branch" never triggers one. A disputable conflict becomes a sticky `needs-human`; an unrequested base merge on the head is flagged as a defect
+- **Settle window.** "Looks ready" needs GitHub `CLEAN`, no open feedback, no parked `needs-human`, and enough quiet time. A started-but-unfinished review waits at least 15 quiet minutes and at most 30
+- **In-session watch by default.** `pr-snapshot watch` polls with no agent tokens and prints `BABYSIT_WAKE` only on an actionable change. If the harness cannot background-and-wake, the skill runs one checkpoint tick and prints the resume command
+- **Posture for confirmed managed stacks.** `target` stops at the named PR. `stack-ready` continues upstack without merging. `stack-land` continues and lands the settled prefix
 
-Skill return 后 turn 就结束，所以它必须自己建立 loop，没有机制会凭空 re-invoke 它。可靠且经过 cross-harness 验证的方法，不是调用某个特定 scheduler，而是后台运行低成本 deterministic change detector `pr-snapshot watch`。它执行相同的 fetch -> diff，**不消耗 agent tokens**，只在 actionable change 或 stop condition 出现时打印一个 `BABYSIT_WAKE` sentinel，并让 agent 保持在当前 session 内等待唤醒。
+A `needs-human` item blocks the ready call. It does **not** end the watch. New comments and CI still get handled.
 
-所需 capability 是通用的：“运行 background process，并在它输出一行时唤醒当前 turn，而不是结束 turn”。Skill 会描述 capability，再使用 harness 提供的对应 tool。保持 in-session 能保留 conversation decisions，例如 declined nits、被判定错误的 reviewer suggestion 和 mid-run steering；只有发生变化时才消耗 reasoning。没有该 capability 时 fallback 到 **checkpoint**：执行一个 tick、persist state、打印 resume command，并明确说明 monitoring 已暂停。无人值守的 multi-day watch 可升级到 durable scheduler，但 fresh headless run 需要从磁盘重建，且不了解原 conversation context。
+---
 
-### 4. Quiet time 为不可靠的 bot signals 设置边界
+## What Makes It Novel
 
-Skill 不维护脆弱的 per-bot format matrix，但会记住 current head 上是否出现过 in-progress signal。若 👀 持续存在，或没有 completion marker 就消失，review lifecycle 仍视为 incomplete：首次 stale judgment 至少等待 15 分钟；之前 round 的具体 timing evidence 可支持一次延长；最后一次可观察变化后 quiet 30 分钟是终止上限。任何新 comment、signal transition、check change 或 new head 都会重置 quiet time。
+### Comments before CI, then drop the stale SHA
 
-该 window 仍是 **cooling-off judgment，而不是 guarantee**。Skill 会报告 “cautiously looks ready” 并解释 stalled reviewer，不会声称 review 已获批准。
+Within a tick: terminal check, then comments, then re-check the head SHA, then CI only if that SHA did not move. A CI fix is never applied against a pre-comment commit.
 
-### 5. Branch currency 保留 intent，而不只是得到绿色 merge box
+The same rule applies to an in-progress review (an 👀 or a "reviewing…" note). Already-posted comments are handled immediately. The signal only withholds the "looks ready" call.
 
-对每个未变化的 head/base/status observation，skill 最多 claim 一次 autonomous branch-changing repair，随后根据 remote truth 确认结果。Run 如果被打断或结果 ambiguous，下一次运行会 reconcile 实际发生的事情，而不是盲目重复 operation。只有能证明 local 和 remote state 都没有变化时，才允许重试一次。
+### One tick, any driver
 
-两条 repair path 的 authority 不同。`BEHIND` PR 只有在 hosting service 明确报告 ordinary branch-update capability 时，才能使用该能力。存在 conflict 的 `DIRTY` PR 还需要独立证明 authenticated Git route 能正常 push 到精确 PR head，并对精确 observed base 完成 clean preview。Host update capability 不能证明 direct push authority。
+State lives under `/tmp/compound-engineering-<effective-uid>/ce-babysit-pr/<host>-<owner>-<repo>-<pr>/` (under `$TMPDIR/compound-engineering-<effective-uid>/` instead when `/tmp` cannot host a writable private root, as in a sandbox that only allowlists `$TMPDIR`). A later invoke, a checkpoint resume, or a durable scheduler all drive the same tick. That is why the skill can run in a CLI session or fall back in a GUI harness that cannot keep a background wait.
 
-Automatic conflict resolution 仅限于 PR intent、tests 或 authoritative generated source 已经固定唯一答案的场景。如果仍有两种合理 behavior，skill 会 abort preview，并把 conflict 作为 `needs-human` parking，说明 competing intents 和所需 decision。该 residual 在 restarts 和无关 base movement 后仍会阻断 merge；只有 head、route、status 或 conflict 本身发生实质变化时才会自动 reopen。
+Default budget is **8 hours of active watch time** (laptop-sleep gaps are excluded). A **3-calendar-day** wall-clock backstop caps every run. You can pass a shorter duration at invoke.
 
-### 6. Claim -> act -> confirm（crash-safe dedup）
+### Looks ready is a cooling-off judgment
 
-Snapshot 不会因为“观察到 item”就将它标记为 handled。只有 agent 确认已 action（resolve/debug pass 后执行 `mark`），或 remote truth 让该 item 消失时，item 才会离开 actionable set。因此 resolve pass 若 crash、error 或提前返回，该 item 在下一 tick 仍 actionable，不会静默丢失。Failing check 在 current head 上持续 actionable，直到被标记 dispatched；新 head SHA 会清除该状态，并重新评估所有 checks。Escalated thread 出现 edited/added comment 时也会自动重新激活。
+Ready is not "CI is green." GitHub must report the PR mergeable against the current base, the attention set must be empty, and the quiet window (default 5 minutes when no review signal was seen) must have elapsed. An incomplete review lifecycle uses the 15 / 30 minute bounds above. Even then the summary says "looks ready, your call" or "cautiously looks ready."
 
-### 7. 可信任的 ending
+When a fork PR's CI is waiting on maintainer approval, the skill drains review for a bounded window (5, 15, or 30 minutes) and then hands back. It never approves the workflow run. Pipeline mode returns that blocker immediately.
 
-每个 stop 和 checkpoint tick 都输出 outcome-first summary：looks-ready / cautiously looks-ready / blocked / paused，然后按组计数已完成工作，例如 N rounds 中 resolved threads 数、fixed CI failures 数和完成的 branch maintenance，最后给出 specific blocker 或 resume command。不会输出 per-thread receipts。
+### Posture is a run value, not a keyword guess
 
-关键是它会显示 **judgment calls**：loop 没有照字面 ask 行动的地方、reviewer signal stalled，或 branch movement 无法机械 resolve，都会带一行原因；常规 changes 只计入 aggregate。你看到的是代表你做出的 decisions，不是每次 edit 的 transcript。
+Only a fresh probe with `manager_status == "confirmed"` activates stack-wide continuation. A manual base/head chain never does.
 
-### 8. Posture：不 merge 地继续，只在明确要求时 land
-
-在已确认的 managed stack（`manager_status == "confirmed"`）上，posture 是一等 run value，而不是通过关键词猜测：
-
-| Posture | Behavior（行为） |
+| Posture | Behavior |
 |---------|----------|
-| `target` | 只处理 named PR，在 looks-ready 时停止。可以提供一次继续 upstack 的选项；拒绝后仍停在 target-local scope。绝不 merge。 |
-| `stack-ready` | 当前 layer settle 后，继续处理下一个需要工作的 open、non-draft upstack layer。绝不 merge。 |
-| `stack-land` | 遍历方式同 `stack-ready`，并提供 run-level land 授权：settle 后通过 `gh stack merge` 合并 bottom-most open settled PR，再运行 `gh stack sync` 并继续。 |
+| `target` | Named PR only. Stop at looks-ready. May offer once to continue upstack. Never merges. |
+| `stack-ready` | Once a layer is quiescent (zero actionable backlog, no standing residual), continue to the next open non-draft layer that needs work; lower layers stay probed and pull the walk back if they re-open. Never merges. |
+| `stack-land` | Like `stack-ready`, plus `gh stack merge` of the bottom-most open settled PR, then `gh stack sync`. |
 
-在 `stack-ready` 下，settled layers 仍保持 OPEN。`stack-land` 下刚 land 的 `MERGED` 是 layer transition，不是整个 run 的 terminal stop。Manual dependency chains 永远不会启用 stack-wide continuation。
-
----
-
-## 何时使用
-
-以下情况适合 `ce-babysit-pr`：
-
-- PR 已打开，希望无需逐轮 hand-holding 也能推动它走向 merge
-- 准备 context-switch，但希望 CI failures 和 review comments 到达时得到处理
-- `/ce-commit-push-pr` 刚打开 PR，并提供 babysit handoff
-- 你拥有已确认的 managed stack，希望 sequential babysit（`stack-ready`）或 green 时 land（`stack-land`）
-
-以下情况跳过：
-
-- Repo **不在 GitHub**。该 skill 当前仅支持 GitHub；它和 delegates 使用 `gh`、review threads 和 Actions。检测到 GitLab/Bitbucket remote 时会在开始前停止，不会只运行一半。
-- PR 尚不存在，或已 merged/closed
-- 希望每次 fix push 前亲自 review/approve；改为逐次运行 `/ce-resolve-pr-feedback`
-- 唯一问题是一个已知 bug；改用 `/ce-debug`
-
-**Platform support：** 当前仅支持 GitHub。GitLab 原理上可映射到 `glab`、merge requests、MR discussions、pipelines 和 `detailed_merge_status`，但需要同时为 `pr-snapshot` fetch layer 和 `ce-resolve-pr-feedback` resolve scripts 提供 `glab` variants，目前尚未实现或测试。Platform-specific seam 是 `pr-snapshot` 的 `fetch` / `fetch_threads`。
+A just-landed `MERGED` under `stack-land` is a layer transition, not the end of the whole run.
 
 ---
 
-## 作为 Workflow 的一部分使用
+## Quick Example
+
+`/ce-commit-push-pr` opens PR #1234 and hands off. `/ce-babysit-pr` confirms GitHub, checks out the PR head, and starts `pr-snapshot watch`.
+
+A review bot posts three inline threads while CI is still running. The next tick sends them to `/ce-resolve-pr-feedback`, which fixes two and parks one as `needs-human`. That push invalidates the in-flight CI SHA, so the skill does not debug the old failure.
+
+New CI comes back red on a real test. `/ce-debug` fixes and pushes. Base moves; the PR is `BEHIND`. Host branch-update succeeds because the merge is mechanical.
+
+The parked thread still blocks "ready." A reviewer answers it. The next tick resolves the rest, waits out the settle window, and reports looks-ready. You merge.
+
+---
+
+## When to Reach For It
+
+Use `ce-babysit-pr` when:
+
+- A PR is open and you want it driven toward merge without handling each round
+- You are about to context-switch and still want comments and CI handled
+- `/ce-commit-push-pr` just opened a PR (handoff is the default)
+- You own a confirmed managed stack and want `stack-ready` or `stack-land`
+
+Skip it when:
+
+- The remote is not GitHub (GitLab, Bitbucket). The skill stops up front rather than half-running
+- No PR exists, or the PR is already merged or closed
+- An automatic handoff landed on a draft. A direct invoke that resolves to that draft is fine; `watch` / `checkpoint` also arms it
+- You want to approve each fix before it is pushed -> `/ce-resolve-pr-feedback` one pass at a time
+- The only issue is one known bug -> `/ce-debug`
+
+---
+
+## Chain Position
+
+On-demand, after a PR exists.
 
 ```text
-/ce-work -> /ce-commit-push-pr -> /ce-babysit-pr
-                                     |-- new review comments -> /ce-resolve-pr-feedback
-                                     |-- real CI failure      -> /ce-debug
-                                     `-- base branch moved    -> bounded branch maintenance
+/ce-work  ->  /ce-commit-push-pr  ->  /ce-babysit-pr
+                                       |-- new comments -> /ce-resolve-pr-feedback
+                                       |-- real CI      -> /ce-debug
+                                       |-- base moved   -> bounded branch maintenance
 ```
 
-它与以下 skills 配合：
-
-- **`/ce-resolve-pr-feedback`**：`ce-babysit-pr` 每轮处理 comments 时调用的 engine；需要单次 manual pass 时直接运行
-- **`/ce-debug`**：处理 genuine CI failures 的 engine
-- **`/ce-commit-push-pr`**：打开 PR 并提供 babysit handoff
+Use `/ce-resolve-pr-feedback` directly when you want one manual pass. Use this skill when you want that pass (and CI, and base movement) repeated until ready.
 
 ---
 
-## 单独使用
+## Use Standalone
 
-- **Current branch 的 PR**：`/ce-babysit-pr`
-- **指定 PR**：`/ce-babysit-pr 1234` 或 `/ce-babysit-pr <PR-url>`
-- **强制 mode**：`/ce-babysit-pr 1234 checkpoint`（或 `watch`）
-- **Stack postures**：`/ce-babysit-pr posture:stack-ready` 或 `posture:stack-land`
+- Current branch: `/ce-babysit-pr`
+- Specific PR: `/ce-babysit-pr 1234` or a URL
+- One tick: `/ce-babysit-pr 1234 checkpoint`
+- Stack: `/ce-babysit-pr posture:stack-ready` or `posture:stack-land`
 
 ---
 
-## 参考
+## Reference
 
-| 参数 | 效果 |
+| Argument | Effect |
 |----------|--------|
-| _(empty)_ | Current branch 的 PR；根据 harness capability 推断 mode |
-| `<PR number or URL>` | 指定 PR |
-| `watch` / `checkpoint` | 强制 execution mode |
-| `posture:target\|stack-ready\|stack-land` | 已确认 managed stacks 的 run scope（未命名 / 无 stack 语言时默认 `target`） |
+| _(empty)_ | Current branch's PR. Mode from harness capability. Posture `target`. |
+| `<PR number or URL>` | That PR |
+| `watch` / `checkpoint` | Force the execution mode |
+| `<duration>` | Active-time budget (default 8 hours). Example: `2 hours`. |
+| `posture:target\|stack-ready\|stack-land` | Run scope on a confirmed managed stack |
+| `mode:pipeline` | Bounded synchronous ticks for an orchestrator. No settle wait. Structured return. |
 
-`scripts/pr-snapshot` 是 deterministic snapshot + state helper：它完整分页 review threads、fetch review、CI 和 branch-currency state，在 lock 下 atomic read/write state，并输出每个 tick 的 actionable set 和 settle window 所需的 `quiet_seconds`。其 `watch` subcommand 是支持 in-session loop 的 token-free change detector。Watch ownership 采用 latest-valid-wins：成功 prefetch 的 replacement 会记录新的 `watch_generation`、终止 predecessor，并成为唯一可 persist polls 或发出 `BABYSIT_WAKE` 的 process。旧 generation 的 queued wakes 只是触发 refresh 的 stale hints，不是独立工作；handoff 会保留原来的 session 和 settle clocks。`references/watch-loop.md` 记录 watch 如何维持自身、state schema、dedup identities、settle window 和 edge cases。
-
----
-
-## 常见问题
-
-**它会替我 merge PR 吗？**
-在 `target` 和 `stack-ready` 下，不会。它会持续推动 PR，并在它*看起来* ready 时告诉你；merge 仍由你决定（对 managed stacks，它会在 ready-as-next 时打印精确的 `gh stack merge` 命令）。在 `stack-land` 下，选择该 posture 即授权通过 `gh stack merge` + sync land bottom-most open settled prefix。它无法保证后续不会再有 feedback。
-
-**为什么不先等 CI，再处理 comments？**
-因为 comment fix 会 push commit，并重新触发 CI。在 CI 运行时处理 comments 可以折叠两条 timeline；等待会把它们串行化，每轮浪费一个完整 CI cycle。
-
-**它如何避免 “green 后突然出现 feedback”？**
-它不会根据一次 green snapshot 就宣告 ready。没有观察到 review signal 时，PR 必须至少 quiet 5 分钟并由 GitHub 报告 mergeable；已经开始但未完成的 review 至少等待 15 分钟、最多等待 30 分钟。Late activity 会重置 clock。即使这样，它也只说 “looks ready, your call” 或 “cautiously looks ready”，不会保证之后没有 review。
-
-**它会永远在后台运行吗？**
-Default 是 **self-sustaining in-session watch**：token-free background change detector（`pr-snapshot watch`）只在 actionable change 发生时唤醒 agent，因此 quiet polls 不消耗 reasoning，但它受 session 生命周期约束，重新调用后可从 disk state 干净恢复。Harness 不支持 background-and-wake 时 fallback 到 **checkpoint**：执行一个 tick 并给出 resume command。无人值守 multi-day watch 可升级到 durable scheduler。它不会用 blocked/foreground sleep 或会被 reaped 的 `nohup` 假装 loop。
-
-**它会自己修复 CI failures 吗？**
-它只做低成本 classification：flaky 时 rerun 一次，真实 failure 交给 `/ce-debug`；comment fixes 交给 `/ce-resolve-pr-feedback`。它不会重复实现这两个 skill。
-
-**遇到 merge conflicts 怎么办？**
-对于以普通 base branch 为目标的 eligible PR，它会先对精确 observed base 做 preview，不修改 PR。只有每个 conflict 都存在一个机械确定、能保留 PR 已确立 intent 的答案，并且已明确确认对精确 head 的普通 push authority 时，才会完成 merge。否则它会 abort，并用自然语言报告 sticky `needs-human` decision、competing intents 和 tradeoffs。它绝不 rebase 或 force-push。
-
-Managed stack 始终走其 manager 的 refresh/restack path；普通 branch-maintenance route 不会重构它。带 open parent 的 manual dependency target 也会排除。Eligible root 可以存在 open child dependents，但 skill 只更新 target，绝不 rebase、rewrite 或 mutate child heads，并会报告因此 stale 的 dependent。
-
-**Base branch 持续移动时会怎样？**
-每个不同的 head/base/status observation 都有 bounded claim-and-reconcile lifecycle，而不是靠 wall-clock guess 或 lifetime update limit。Routine movement 可以在长时间 watch 中多次自动 converge，但同一个未变化 observation 不能在 restarts 后重复触发 branch-changing attempt。已经 parking 的 semantic conflict 不会被无关 base commits 伪装成新问题；final summary 会说明观察到什么、自动化了什么，以及仍需什么 decision。
-
-对于 behind PR，host update 会把 claimed head SHA 作为 precondition。如果另一 actor 先 push，GitHub 会拒绝 stale operation，而不是把它应用到新的 head；skill 会重新 snapshot，再决定剩余工作。
+`scripts/pr-snapshot` is the snapshot and state helper: it paginates review threads, records CI and branch currency, and emits the per-tick attention set. Its `watch` subcommand is the token-free change detector (with `--downstack-pr` it also probes lower stack layers so the walk returns when one re-opens). A newer successful invoke takes ownership; older wakes are stale hints. The skill body itself is a short always-loaded kernel; the tick commands, currency routes, stack contract, settle policy, and report shape live in the skill's `references/` (`tick.md`, `branch-currency.md`, `stack.md`, `settle.md`, `report.md`, `watch-loop.md`).
 
 ---
 
-## 另见
+## FAQ
 
-- [`ce-resolve-pr-feedback`](./ce-resolve-pr-feedback.md) - 该 skill 每轮调用的 feedback engine
-- [`ce-debug`](./ce-debug.md) - CI-failure engine
-- [`ce-commit-push-pr`](./ce-commit-push-pr.md) - 打开 PR 并提供 babysit handoff
+**Does it merge the PR?**
+Under `target` and `stack-ready`, no. It tells you when the PR *looks* ready. For a managed stack it prints the exact `gh stack merge` command when ready-as-next. Under `stack-land`, that posture authorizes landing the bottom-most open settled prefix via `gh stack merge` + sync.
+
+**Why not wait for CI, then handle comments?**
+A comment fix pushes and retriggers CI. Handling comments during the run collapses the two timelines.
+
+**How does it avoid "green, then surprise review"?**
+It never calls ready on one green snapshot. It needs `CLEAN`, an empty attention set, and a settle window. A started review gets 15 to 30 quiet minutes. Late activity resets the clock. The wording stays "looks ready, your call."
+
+**Does it run forever in the background?**
+The default is an in-session watch: a token-free detector wakes the agent only when something changed. Close the session and re-invoke to resume from disk. For a multi-day unattended watch, use a durable scheduler (or cron running the resume command). It never fakes a loop with foreground `sleep`.
+
+**Does it fix CI itself?**
+It classifies (flaky -> one rerun; real -> `/ce-debug`) and delegates. Comments go to `/ce-resolve-pr-feedback`.
+
+**What about merge conflicts?**
+It previews the exact observed base first. It completes a merge only when every conflict has one mechanical answer that preserves the PR's intent, and when push authority to that head is known. Otherwise it parks a `needs-human`. It never rebases or force-pushes. Managed stacks stay on the manager's restack path.
+
+**What happens when the base keeps moving?**
+Each distinct head/base/status observation has a bounded claim-and-confirm cycle. Routine movement can be applied many times. The same unchanged observation is not retried across restarts. A parked semantic conflict stays parked when later base commits do not change the conflict.
+
+---
+
+## See Also
+
+- [`/ce-resolve-pr-feedback`](./ce-resolve-pr-feedback.md): the per-round comment engine this skill calls
+- [`/ce-debug`](./ce-debug.md): the CI-failure engine this skill calls
+- [`/ce-commit-push-pr`](./ce-commit-push-pr.md): opens the PR and offers this handoff

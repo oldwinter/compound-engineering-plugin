@@ -1,5 +1,5 @@
 ---
-title: Frontier-model skill 现代化方法论
+title: Frontier-model skill modernization methodology
 date: 2026-06-10
 category: skill-design
 module: compound-engineering
@@ -7,11 +7,11 @@ problem_type: design_pattern
 component: development_workflow
 severity: medium
 applies_when:
-  - "根据当前 frontier-model prompting guidance review 或 modernize 现有 skill"
-  - "决定压缩枚举式 judgment examples，还是在 SKILL.md 中保留 protocol text 原文"
-  - "设计 model-tier vocabulary 和 sub-agent fleets 的 degradation rules"
-  - "把 load-bearing skill content 抽取到 reference files，并配套 inline load stubs"
-  - "用 injected-subagent evals 验证 skill prose changes，而不是依赖 cached plugin dispatch"
+  - "Reviewing or modernizing an existing skill against current frontier-model prompting guidance"
+  - "Deciding whether to compress enumerated judgment examples or keep protocol text verbatim in SKILL.md"
+  - "Designing model-tier vocabulary and degradation rules for sub-agent fleets"
+  - "Extracting load-bearing skill content into reference files with inline load stubs"
+  - "Verifying skill prose changes with injected-subagent evals instead of cached plugin dispatch"
 tags:
   - skill-design
   - prompting-guidance
@@ -23,165 +23,165 @@ tags:
   - subagent-evals
 ---
 
-# Frontier-Model Skill 现代化方法论
+# Frontier-Model Skill Modernization Methodology
 
-## Context（背景）
+## Context
 
-我们根据 Claude Fable 5 prompting guide 和 Claude prompting best-practices doc，modernize 了 `ce-ideate` skill（一个约 13-agent 的 ideation orchestrator），随后用 transcript-graded eval 验证结果。Review 浮现了一套可重复的方法论，可把任何 orchestration-heavy skill 提升到 frontier-model 标准：该 skill 从 424 行降到 372 行（-12%），同时还 *增加* 了 capability（model tiering、file-based data flow、ceiling-raising dispatch mechanics），eval 的 8 个 mechanical assertions 中 6 个通过、0 个失败。本文把这套 sequence 泛化，让下一个 skill review（ce-plan、ce-brainstorm、ce-code-review 等）从 playbook 开始，而不是重新发现。
-
----
-
-## Guidance（指导）
-
-按顺序执行这些步骤。每一步都有命名 test 或 rule：应用 test，不要即兴判断。
-
-### 1. Audit：把每个 prescriptive block 分类为 PROTOCOL 或 JUDGMENT
-
-从头到尾读取 skill，并标注每个 instruction block：
-
-- **PROTOCOL** — *要做什么*：output-format resolution order、cache file shapes、scratch paths、read budgets、agent counts、checkpoint mechanics。它们清晰明确，不消耗强模型能力，而且没有它们 workflow 会机械性破坏。**完整保留 prescription。**（`git-workflow-skills-need-explicit-state-machines.md` 是 canonical example：这类 protocol content 一旦 softening 成 prose 就会退化。）
-- **JUDGMENT** — *如何思考*：枚举式 example lists、多行 sample classification tables、围绕单一原则的多段阐释。Frontier model 已经具备该能力；prescription 只会收窄它。**可以考虑压缩。**
-
-Test：*只给 principle，强模型是否会正确行动？* 如果是，它就是 JUDGMENT。如果没有它 skill 会产生错误 file paths、错误 agent counts 或 broken handoffs，它就是 PROTOCOL。
-
-这细化了（而不是替代）plugin `AGENTS.md` Skill Design Principles 中的三层 prescription model：hard rules / strong guidance / trust。Protocol 对应 hard rules；protocol-vs-judgment test 决定其他 block 应落在哪一层。
-
-### 2. 删减任何内容前，先确立 orchestrator-model floor
-
-只有当 skill 现实中会运行在 frontier models 上时，裁剪 JUDGMENT prescription 才安全。在 review notes 中明确写出 floor argument。对 ce-ideate 来说：任何在任何平台上启动 13-agent workflow 的用户都会选择 frontier model，所以 floor 成立。如果某个 skill 可能运行在 small models 上（例如轻量 formatting skill），就保留更多 scaffolding。Fable guide 的 warning 是锚点："Skills developed for prior models are often too prescriptive for Claude Fable 5 and can degrade output quality."
-
-### 3. Prune：把每个 JUDGMENT block 压缩成 principle + 一个 contrast pair
-
-压缩规则：用底层 principle 和一个最小 contrast pair 替换 enumeration，让边界清楚到无法误解。ce-ideate 中的一个例子：vague-phrase examples 列表被压缩为 "`browser sniff` is identifiable, `quick wins` is not — vagueness is about referent, not length." 一个 pair 足以承载 distinction；七行 table 不会承载更多。也要去重：三处重复 boilerplate 变成一个完整副本 + pointers。这匹配更广泛的原则：优先用 principles + named test，而不是枚举 specifics；specifics 会 drift。（auto memory [claude]）
-
-### 4. Tier：语义化定义 cost tiers，一次定义，到处按名称引用
-
-在 SKILL.md 中集中定义三档；其他地方只引用 tier name，不引用 model name：
-
-- **Extraction tier** — 最便宜的 capable model。用于 scouts、retrieval、quoting。
-- **Generation tier** — mid-tier model。用于 evidence-driven generation、mechanical verification。
-- **Ceiling tier** — *通过省略 model parameter 继承 orchestrator 的模型*。永远不要为 ceiling 命名具体 model。
-
-随 tiers 一起传递的规则：
-
-- Per-platform model hints 遵循 plugin 现有的 platform-enumeration pattern（与 blocking-question tools 使用相同 shape）；不要在 pass-through skill content 中固定其他 vendors 的 model names，命名 drift 比 release cadence 更快。注意：converter 会把 `model:` params 传播到所有 targets（见 `best-practices/ce-pipeline-end-to-end-learnings.md`），所以 tier hints 不是 Claude-only decoration。
-- **Degradation rule**：当平台的 subagent primitive 缺少 per-agent model selection 时，所有 dispatch 都使用 inherited model，同时保留 read budgets / output caps。成本控制来自结构，而不是 tiering。把这条 rule 写进 skill；它在我们的 eval 中正确触发（harness 没有 nested dispatch）。
-- **Architecture principle**：分离 evidence-gathering（cheap extraction scouts 产出 quote+pointer dossiers）和 ceiling reasoning（强模型只用于 choke points：ceiling framing、cross-cutting synthesis、final arbitration）。这比把 uniform fleet 喂给 thin summary 更便宜，也更 grounded。
-
-### 5. 优化 context：只抽取 conditional / late content，并把 bulk data 移到文件
-
-两个独立杠杆：
-
-- **Reference extraction 只对 CONDITIONAL 或 LATE-SEQUENCE content 有收益。** 早期 unconditional content 没有收益：它一开始就会被读取并随身携带，还多一次 read round-trip。Test：*这段 content 执行前会发生多少 turns 的其他工作？它是否可能完全不执行？* ce-ideate 的 Phase 2（约 100 行，占文件约 22%，在 5-8 turns grounding 后运行）符合；Phase 0 gating 不符合。
-- **Data flows 通常比 prose 更占 context。** 两者都要估算：5 个 scouts × 150 行 dossiers ≈ 10k tokens，如果 inline 返回，后续每 turn 都要携带，超过整个 SKILL.md（约 6k）。修复：subagents 把 outputs 写入 scratch files（`/tmp/compound-engineering/<skill>/<run-id>/...`），只返回 3-5 行 gist；downstream agents 接收 paths 并自己读取文件。这在既有 path-passing pattern（`skill-design/pass-paths-not-content-to-subagents.md`）基础上加入 gist refinement：orchestrator 只保留足够 routing 的 orientation，不携带 bulk。
-
-### 6. Load-stub design：让抽取出的 references 信息不对称
-
-Soft pointer（"see references/X.md for details"）会被跳过。抽取 load-bearing content 时，inline stub 必须满足五个属性：
-
-1. **Load-instruction-only** — 没有 spec、没有 contract、没有可 improvisation 的内容。把 "should load" 变成 "不 load 就无法继续"。
-2. **准确说明 reference 包含什么**，并说明这些 details 在 main body 中没有出现。
-3. **用 skill 自己的术语说明 skipping 的 failure mode**（例如 "improvising produces unverifiable candidates — the precise failure this skill exists to prevent"）。
-4. **关闭 inline-information leaks** — 任何因其他原因仍保留 inline 的数字或 detail，都要明确 disclaimer（例如 "the fleet counts in Phase 0.6 are cost transparency, not the dispatch spec"）。
-5. **预先阻断 rationalizations**（例如 "'Quickly' means smaller volume targets, not skipping the reference"）。
-
-Defense in depth：让 downstream phases 锚定在 *不同* reference files 上（rejection criteria、section contract），这样 skipped load 会显性失败，而不是静默退化。
-
-这是 `skill-design/post-menu-routing-belongs-inline.md` 的补充：always-on content 要 inline；真正 conditional 或 late-sequence、但触发时必须读取的内容，使用 information-asymmetric stub。
-
-### 7. Eval verification：fresh subagent + mechanical transcript grading
-
-- **绕过 cache。** Plugin skill / agent definitions 会在 session start 时 cache；typed invocation 测到的是 stale copy。改为 spawn fresh subagent，让它从 disk 读取 skill source 并遵循它。
-- **从 transcript grading，不从 self-report grading。** 把 JSONL parse 成 tool-call timeline，并做 mechanical assertions：Read-event ordering against generation checkpoints（例如 extracted-reference Read 落在 scout writes 之后、candidates checkpoint 之前）；orchestrator 对 bulk data files 的 Reads 为零；filesystem artifacts 存在、名称正确、section contract 完整。
-- **知道 harness limits 并记录。** 没有 nested dispatch 的 eval subagent *无法* 验证 dispatch payload shape 或 fleet tiering；把这些 assertions 标为 "not testable"，不要糊弄。它 *可以* 验证 load ordering、file contracts、volume/format overrides 和 degradation-rule behavior。要补齐缺口，需要 main-session run。
-- 跟随 skill 时遇到的 errors 是 skill findings，不是噪声。（auto memory [claude]）
-
-### 8. Ceiling mechanics：在 dispatches 中显式要求 above-and-beyond behavior
-
-Floor-guarding（basis requirements、rejection criteria）能防止坏 output；它不会产生 ambitious output。来自 best-practices doc：
-
-- **Ambition charter**，逐字包含在每个 generation dispatch 中：intent framing（为什么 output 重要）、warm-up framing（"your first few ideas are warm-up; keep only those that earn their place after the non-obvious ones exist"），以及 anti-genericness test（"if it would appear in a generic listicle, sharpen or drop"）。
-- **Fresh-context verifiers over self-critique**（按 Fable guide）：orchestrator 给自己的 synthesis 打分会被 anchor；一个从没看过 generation、被 prompt 去 *refute* 的 verifier 不会。
-- **Dispatch payload structure**：XML tags（`<grounding> <constraints> <background> <task>`）；longform shared material 放前，task 放最后（documented long-context gain）；parallel dispatches 使用 byte-identical shared prefix 以复用 prompt cache；通过 tags 机械区分 constraint-vs-background，而不是靠 prose。
+We modernized the `ce-ideate` skill (a ~13-agent ideation orchestrator) against the Claude Fable 5 prompting guide and the Claude prompting best-practices doc, then verified the result with a transcript-graded eval. The review surfaced a repeatable methodology for bringing any orchestration-heavy skill up to frontier-model standards: the skill went from 424 to 372 lines (-12%) while *gaining* capability (model tiering, file-based data flow, ceiling-raising dispatch mechanics), and the eval passed 6/8 mechanical assertions with 0 failures. This doc generalizes that sequence so the next skill review (ce-plan, ce-brainstorm, ce-code-review, ...) starts from the playbook instead of rediscovering it.
 
 ---
 
-## Why This Matters（为什么重要）
+## Guidance
 
-为 prior model generations 编写的 skills 会同时积累两种相反债务：过多 JUDGMENT prescription（Fable guide 警告这会主动降低 frontier-model output 质量），以及过少面向 cost、context、verification 的 PROTOCOL infrastructure。朴素的 "shorten it" 会砍错东西；朴素的 "harden it" 会膨胀错东西。PROTOCOL/JUDGMENT split 加上有序 sequence 解决了这个张力：在模型强的地方 prune，在 workflow 机械化的地方 prescribe。
+Run the steps in order. Each has a named test or rule — apply the test, don't improvise the judgment.
 
-ce-ideate 应用该方法后的可量化结果：
+### 1. Audit: classify every prescriptive block as PROTOCOL or JUDGMENT
 
-- SKILL.md：424 -> 372 行（-12%），同时增加 model tiering、file-based dossier flow、information-asymmetric stub 和 ambition charter。仅三处 judgment-prescription cuts 就回收约 16 行，verification run 中没有 behavior loss。
-- Context math：inline dossiers 会让每 turn 多携带约 10k tokens，超过整个 SKILL.md（约 6k）。file+gist pattern 把这部分完全移出 orchestrator window。
-- Eval：8 个 mechanical assertions 中 6 个通过，2 个正确报告为 untestable（dispatch-less harness 中的 nested-dispatch assertions），0 个失败。Degradation rule 按设计触发。Degraded inline run：14 分钟，208k tokens。
-- Cost architecture：cheap extraction scouts 将 quote+pointer dossiers 输入 ceiling-tier choke points，比 uniform inherited-model fleet 喂 thin summary 更便宜，也更 grounded。
+Read the skill top to bottom and tag each instruction block:
+
+- **PROTOCOL** — *what to do*: output-format resolution order, cache file shapes, scratch paths, read budgets, agent counts, checkpoint mechanics. Unambiguous, costs a strong model nothing, and the workflow mechanically breaks without it. **Keep at full prescription.** (`git-workflow-skills-need-explicit-state-machines.md` is the canonical example of protocol content that regressed whenever it was softened to prose.)
+- **JUDGMENT** — *how to think*: enumerated example lists, multi-row sample classification tables, multi-paragraph elaborations of a single principle. A frontier model already has the capability; the prescription only narrows it. **Candidate for compression.**
+
+The test: *would a strong model behave correctly given only the principle?* If yes, it's JUDGMENT. If the skill produces wrong file paths, wrong agent counts, or broken handoffs without it, it's PROTOCOL.
+
+This refines (not replaces) the prescription-calibration framework in `docs/solutions/skill-design/portable-agent-skill-authoring.md` section "Separate protocol from judgment." Protocol maps to hard rules; the protocol-vs-judgment test decides which of the other two levels a block deserves.
+
+### 2. Establish the orchestrator-model floor before cutting anything
+
+Pruning JUDGMENT prescription is only safe if the skill realistically runs on frontier models. State the floor argument explicitly in your review notes. For ce-ideate: anyone launching a 13-agent workflow on any platform picks a frontier model, so the floor holds. If a skill plausibly runs on small models (e.g., a lightweight formatting skill), keep more scaffolding. The Fable guide's warning is the anchor: "Skills developed for prior models are often too prescriptive for Claude Fable 5 and can degrade output quality."
+
+### 3. Prune: compress each JUDGMENT block to principle + ONE contrast pair
+
+The compression rule: replace the enumeration with the underlying principle and a single minimal contrast pair that makes the boundary unmistakable. Example from ce-ideate: a list of vague-phrase examples became "`browser sniff` is identifiable, `quick wins` is not — vagueness is about referent, not length." One pair carries the distinction; seven rows of table did not carry more. Also deduplicate: triplicated boilerplate becomes one full copy + pointers. This matches the broader principle: prefer principles + a named test over enumerated specifics — specifics drift. (auto memory [claude])
+
+### 4. Tier: define cost tiers semantically, once, and reference by name
+
+Define three tiers in one place in SKILL.md; everywhere else refers to the tier name, never a model name:
+
+- **Extraction tier** — cheapest capable model. Scouts, retrieval, quoting.
+- **Generation tier** — mid-tier model. Evidence-driven generation, mechanical verification.
+- **Ceiling tier** — *inherit the orchestrator's model by omitting the model parameter*. Never name a model for the ceiling.
+
+Rules that travel with the tiers:
+
+- Per-platform model hints follow the plugin's existing platform-enumeration pattern (the same shape used for blocking-question tools); never pin other vendors' model names in pass-through skill content — naming drifts faster than release cadence. Note: the converter does propagate `model:` params to all targets (see `best-practices/ce-pipeline-end-to-end-learnings.md`), so tier hints are not Claude-only decoration.
+- **Degradation rule**: when the platform's subagent primitive lacks per-agent model selection, dispatch everything on the inherited model and keep read budgets/output caps — cost control comes from structure, not tiering. Write this rule into the skill; it fired correctly in our eval (the harness had no nested dispatch).
+- **Architecture principle**: separate evidence-gathering (cheap extraction scouts producing quote+pointer dossiers) from ceiling reasoning (strong model only at choke points: ceiling framing, cross-cutting synthesis, final arbitration). This is cheaper *and* better grounded than a uniform fleet fed a thin summary.
+
+### 5. Optimize context: extract only conditional/late content, and move bulk data to files
+
+Two independent levers:
+
+- **Reference extraction pays only for CONDITIONAL or LATE-SEQUENCE content.** Early unconditional content gains nothing — it would be read at start and carried anyway, plus a read round-trip. The test: *how many turns of other work happen before this content executes, and might it never execute?* ce-ideate's Phase 2 (~100 lines, ~22% of the file, runs after 5-8 turns of grounding) qualified; Phase 0 gating did not.
+- **Data flows usually dominate prose.** Measure both: 5 scouts × 150-line dossiers ≈ 10k tokens carried every subsequent turn if returned inline — more than the entire SKILL.md (~6k). Fix: subagents write outputs to scratch files (`/tmp/compound-engineering/<skill>/<run-id>/...`), return a 3-5-line gist; downstream agents receive paths and read the files themselves. This extends the established path-passing pattern (`skill-design/pass-paths-not-content-to-subagents.md`) with the gist refinement: the orchestrator keeps just enough orientation to route, never the bulk.
+
+### 6. Load-stub design: make extracted references information-asymmetric
+
+A soft pointer ("see references/X.md for details") gets skipped. When extracting load-bearing content, the inline stub must satisfy all five properties:
+
+1. **Load-instruction-only** — no spec, no contract, nothing to improvise from. Converts "should load" into "cannot proceed without loading."
+2. **Names exactly what the reference contains** and states those details appear nowhere in the main body.
+3. **Names the failure mode of skipping** in the skill's own terms (e.g., "improvising produces unverifiable candidates — the precise failure this skill exists to prevent").
+4. **Closes inline-information leaks** — any number or detail that remains inline for other reasons gets explicitly disclaimed ("the fleet counts in Phase 0.6 are cost transparency, not the dispatch spec").
+5. **Pre-empts rationalizations** ("'Quickly' means smaller volume targets, not skipping the reference").
+
+Defense in depth: anchor downstream phases on *different* reference files (rejection criteria, section contract) so a skipped load fails visibly, not silently.
+
+This is the complement of `skill-design/post-menu-routing-belongs-inline.md`: inline the content when it is always-on; use an information-asymmetric stub when it is genuinely conditional or late-sequence but must load when its branch fires.
+
+### 7. Eval verification: fresh subagent, mechanical transcript grading
+
+- **Bypass the cache.** Plugin skill/agent definitions cache at session start; typed invocation tests the stale copy. Instead, spawn a fresh subagent told to read the skill source from disk and follow it.
+- **Grade from the transcript, not the self-report.** Parse the JSONL into a tool-call timeline and assert mechanically: Read-event ordering against generation checkpoints (e.g., the extracted-reference Read landing after scout writes and before the candidates checkpoint); zero orchestrator Reads of bulk data files; filesystem artifacts present with correct names and the full section contract.
+- **Know the harness limits and record them.** An eval subagent without nested dispatch *cannot* verify dispatch payload shape or fleet tiering — mark those assertions "not testable," don't fudge them. It *does* verify load ordering, file contracts, volume/format overrides, and degradation-rule behavior. Closing the gap requires a main-session run.
+- Errors encountered while following the skill during the eval are findings about the skill, not noise. (auto memory [claude])
+
+### 8. Ceiling mechanics: explicitly request above-and-beyond behavior in dispatches
+
+Floor-guarding (basis requirements, rejection criteria) prevents bad output; it does not produce ambitious output. From the best-practices doc:
+
+- **Ambition charter**, included verbatim in every generation dispatch: intent framing (why the output matters), warm-up framing ("your first few ideas are warm-up; keep only those that earn their place after the non-obvious ones exist"), and an anti-genericness test ("if it would appear in a generic listicle, sharpen or drop").
+- **Fresh-context verifiers over self-critique** (per the Fable guide): the orchestrator grading its own synthesis is anchored; a verifier that never saw generation, prompted to *refute*, is not.
+- **Dispatch payload structure**: XML tags (`<grounding> <constraints> <background> <task>`); longform shared material first, task last (documented long-context gain); byte-identical shared prefix across parallel dispatches for prompt-cache reuse; constraint-vs-background made mechanical by tags rather than prose.
 
 ---
 
-## When to Apply（何时应用）
+## Why This Matters
 
-Review 满足以下一项或多项的 skill 时，运行这套 sequence：
+Skills written for prior model generations accumulate two opposite debts simultaneously: too much JUDGMENT prescription (which the Fable guide warns actively degrades frontier-model output) and too little PROTOCOL infrastructure for cost, context, and verification. A naive "shorten it" pass cuts the wrong things; a naive "harden it" pass bloats the wrong things. The PROTOCOL/JUDGMENT split plus the ordered sequence resolves the tension: prune where the model is strong, prescribe where the workflow is mechanical.
 
-- **Multi-agent orchestration skills** — 任何 dispatch subagent fleets 的 skill（tiering、file-flow、dispatch-payload steps 只在这里重要）。
-- **超过约 300 行的 skills** — 大到 conditional/late-sequence extraction 和 judgment pruning 有可衡量收益。
-- **frontier models 之前写成的 skills**（或当前 Fable guide 之前）— 很可能 judgment over-prescribed、protocol under-built。
-- **把 bulk data inline 到 dispatch prompts 或 return values 的 skills** — 任何 subagent output 作为 content 而不是 path 重新进入 orchestrator window 的地方。
-- **用 soft "see reference" pointers 保护 load-bearing content 的 skills** — 即使不应用其余步骤，也要应用 step 6。
+Measured outcomes from the ce-ideate application:
 
-当 skill 很短且 unconditional（extraction 不会有收益），或它可能运行在 non-frontier models 上（step-2 floor 不成立，需要保留 scaffolding）时，跳过或缩小规模。结构性 changes 一定要配合 step-7 eval；永远不要只凭 agent self-report 就 ship。
+- SKILL.md: 424 → 372 lines (-12%) while adding model tiering, file-based dossier flow, the information-asymmetric stub, and the ambition charter. ~16 lines recovered from three judgment-prescription cuts alone, with no behavior loss in the verification run.
+- Context math: inlined dossiers would have cost ~10k tokens carried every turn — more than the whole SKILL.md (~6k). The file+gist pattern removed that entirely from the orchestrator's window.
+- Eval: 6/8 mechanical assertions passed, 2 correctly reported untestable (nested-dispatch assertions in a dispatch-less harness), 0 failures. The degradation rule fired as designed. Degraded inline run: 14 minutes, 208k tokens.
+- Cost architecture: cheap extraction scouts feeding quote+pointer dossiers to ceiling-tier choke points was both cheaper and better grounded than a uniform inherited-model fleet fed a thin summary.
 
 ---
 
-## Examples（示例）
+## When to Apply
 
-**1. Judgment enumeration -> principle + one contrast pair**
+Run this sequence when reviewing a skill that matches one or more of:
 
-Before（vague phrases 的枚举列表，加上 7 行 sample classification table）：
+- **Multi-agent orchestration skills** — anything dispatching subagent fleets (the tiering, file-flow, and dispatch-payload steps only matter here).
+- **Skills over ~300 lines** — large enough that conditional/late-sequence extraction and judgment pruning have measurable payoff.
+- **Skills written before frontier models** (or before the current Fable guide) — likely over-prescribed on judgment, under-built on protocol.
+- **Skills inlining bulk data into dispatch prompts or return values** — any place subagent output re-enters the orchestrator's window as content rather than a path.
+- **Skills with soft "see reference" pointers guarding load-bearing content** — apply step 6 even without the rest.
 
-```text
+Skip or scale down when: the skill is short and unconditional (extraction won't pay), or it plausibly runs on non-frontier models (the step-2 floor fails — keep the scaffolding). Always pair structural changes with the step-7 eval; never ship on the agent's self-report.
+
+---
+
+## Examples
+
+**1. Judgment enumeration → principle + one contrast pair**
+
+Before (enumerated list of vague phrases plus a 7-row sample classification table):
+
+```
 Vague subjects include: "quick wins", "low-hanging fruit", "improvements",
 "polish", "cleanup", "things to fix", ...
 [+ 7-row table classifying sample subjects as vague/identifiable]
 ```
 
-After：
+After:
 
-```text
+```
 A subject is workable when it names an identifiable referent:
 `browser sniff` is identifiable, `quick wins` is not — vagueness is
 about referent, not length.
 ```
 
-**2. Inline bulk data -> file + gist**
+**2. Inline bulk data → file + gist**
 
-Before（scout 返回完整 dossier，orchestrator 永久携带它）：
+Before (scout returns its full dossier; orchestrator carries it forever):
 
-```text
+```
 Return your complete evidence dossier (~150 lines of quotes + pointers)
 in your final message.
 ```
 
-After：
+After:
 
-```text
+```
 Write your dossier to /tmp/compound-engineering/<skill>/<run-id>/evidence-<axis-slug>.md.
 Return only a 3-5 line gist plus the file path. Downstream agents read
 the file themselves; the orchestrator never does.
 ```
 
-**3. Soft pointer -> information-asymmetric stub**
+**3. Soft pointer → information-asymmetric stub**
 
-Before：
+Before:
 
-```text
+```
 Phase 2: Divergent ideation. See references/divergent-ideation.md for details
 on the fleet structure. Dispatch the agents and collect candidates.
 ```
 
-After：
+After:
 
-```text
+```
 Phase 2: Read references/divergent-ideation.md now. It contains the fleet
 spec, per-agent dispatch contract, and volume targets — none of which appear
 in this main body. Dispatch prompts cannot be correctly constructed without
@@ -191,17 +191,18 @@ transparency, not the dispatch spec. "Quickly" means smaller volume targets,
 not skipping the reference.
 ```
 
-Before version 留下了足够 inline 内容（phase name、"dispatch the agents"），让 agent 可以即兴补全；after version 让未读取时无法继续，命名 skip-failure，关闭 leak，并预先阻断 "we're in a hurry" 的 rationalization。
+The before version leaves enough inline (phase name, "dispatch the agents") to improvise from; the after version makes proceeding without the read impossible, names the skip-failure, closes the leak, and pre-empts the "we're in a hurry" rationalization.
 
 ---
 
-## Related（相关）
+## Related
 
-- `docs/solutions/skill-design/pass-paths-not-content-to-subagents.md` — 向 subagents 传 path 的既有 precedent；step 5 在此基础上加入 gist refinement。
-- `docs/solutions/skill-design/post-menu-routing-belongs-inline.md` — 同一 load-reliability failure 的互补杠杆：always-on content inline；conditional content 使用 load-stub（step 6）。
-- `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md` — 必须保留完整 prescription 的 PROTOCOL content canonical example（step 1）。
-- `docs/solutions/skill-design/script-first-skill-architecture.md` — 互补的 token-optimization pattern（用 bundled scripts 替代 model-context work）。
-- `docs/solutions/skill-design/safe-auto-rubric-calibration.md` — 早期 eval-methodology precedent（fixture-based grading、variance awareness），与 step 7 一致。
-- `docs/solutions/best-practices/ce-pipeline-end-to-end-learnings.md` — 证明 `model:` params 会传播到所有 conversion targets（step 4）。
-- Plugin `AGENTS.md` -> Skill Design Principles — 本方法论细化的 prescription-calibration framework；以及 step 5 operationalize 的 conditional/late-sequence extraction rule。
-- GitHub issues #714 和 #374 — 与 step 6 处理的问题同属一类的历史 reference-load failures。
+- `docs/solutions/skill-design/pass-paths-not-content-to-subagents.md` — established precedent for path-passing to subagents; step 5 extends it with the gist refinement.
+- `docs/solutions/skill-design/post-menu-routing-belongs-inline.md` — the complementary lever for the same load-reliability failure: inline always-on content; load-stub conditional content (step 6).
+- `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md` — canonical example of PROTOCOL content that must keep full prescription (step 1).
+- `docs/solutions/skill-design/script-first-skill-architecture.md` — complementary token-optimization pattern (bundled scripts instead of model-context work).
+- `docs/solutions/skill-design/safe-auto-rubric-calibration.md` — earlier eval-methodology precedent (fixture-based grading, variance awareness) consistent with step 7.
+- `docs/solutions/skill-design/paired-old-vs-new-injection-skill-evals.md` — sharpens step 7's fresh-subagent grading into a controlled old-vs-new blind A/B that separates demonstrated improvement from no-regression.
+- `docs/solutions/best-practices/ce-pipeline-end-to-end-learnings.md` — evidence that `model:` params propagate to all conversion targets (step 4).
+- `docs/solutions/skill-design/portable-agent-skill-authoring.md` → "Separate protocol from judgment" — the prescription-calibration framework this methodology refines; "Load instructions when they can change behavior" is the live conditional/late-sequence extraction rule that step 5 operationalizes.
+- GitHub issues #714 and #374 — historical reference-load failures in the same family step 6 addresses.

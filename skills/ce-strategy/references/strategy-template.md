@@ -1,19 +1,19 @@
-# Strategy Template（策略模板）
+# Strategy Template
 
-Interview 完成后由 `SKILL.md` 加载。使用 captured answers 填写，并写入 `STRATEGY.md`。
+Loaded by `SKILL.md` after the interview is complete. Fill it in using the captured answers and write to `STRATEGY.md`.
 
-## 填写规则
+## Rules for filling in
 
-- 尽可能使用用户自己的语言。不要改写成 generic PM-speak。
-- 每个 section 保持 compact。整篇 doc 应能在 5 分钟内读完。
-- Section order 已锁定。不要添加新的 top-level sections。
-- Optional sections：未使用时完整删除。不要留下 empty headers。
-- 将 YAML frontmatter 中的 `last_updated` 设置为今天的 ISO date（YYYY-MM-DD）。不要在 prose 中重复 date。
-- 将 frontmatter 中的 `name` 设置为 product 或 initiative name（与 H1 title 使用同一值）。
+- Use the user's own language where possible. Do not paraphrase into generic PM-speak.
+- Each section this skill writes stays compact - together they should read in under 5 minutes. Sections other writers contribute are theirs; do not shorten them to hit that bound.
+- Write the sections below in this order. Sections you did not write — added by the user or another skill — are preserved as found and stay where they are; do not add sections of your own beyond this template.
+- Optional sections (Milestones, Brand): delete entirely if unused. Do not leave empty headers. Boundaries is always present.
+- Set `last_updated` in the YAML frontmatter to today's ISO date (YYYY-MM-DD). Do not duplicate the date in prose.
+- Set `name` in the frontmatter to the product or initiative name (the same value used in the H1 title).
 
-## Template（模板）
+## Template
 
-下面的 block 是要写入的 literal file（不包括本行和 fences）。用 captured answer 替换每个 `{{placeholder}}`。删除所有 placeholder 未被回答的 optional section。
+The block below is the literal file to write (minus this line and the fences). Replace every `{{placeholder}}` with the captured answer. Delete any optional section whose placeholder wasn't answered.
 
 ~~~markdown
 ---
@@ -23,19 +23,29 @@ last_updated: {{YYYY-MM-DD}}
 
 # {{product_name}} Strategy
 
-## Target problem
+{{If a legacy sibling doc from another tool still exists at the repo root - VISION.md, PRODUCT.md - and the user chose to link to it rather than fold it in (a folded sibling is redundant: no pointer, nothing deferred to it), one line here pointing to it, e.g. "See VISION.md for the project's principles; this document carries direction." Then do not restate what that doc already says: where a section below would repeat it, keep this doc's section to what is specific to strategy and defer to the sibling for the rest. Omit the line when no sibling exists. Sections other tools have already written into this file stay where they are; this skill's sections are placed around them in the order below without moving them.}}
 
-{{1-2 sentence diagnosis. Names the user situation and the crux that makes it hard. No solution language.}}
+## Purpose
 
-## Our approach
+{{1-2 sentence diagnosis. Names the user situation and the crux that makes it hard, and so why the product exists. No solution language.}}
 
-{{1-2 sentence guiding policy. What this product commits to, so that the target problem becomes tractable.}}
+## Positioning
 
-## Who it's for
+{{1-2 sentence guiding policy. The choice this product commits to that a neighboring product could not truthfully claim, so that the purpose becomes tractable.}}
+
+## Users
 
 **Primary:** {{Persona name}} - {{one-sentence JTBD, e.g. "They're hiring {{product_name}} to..."}}
 
 <!-- Duplicate the block above for additional personas only if truly necessary. Fewer is better. -->
+
+## Boundaries
+
+- {{one line per item the team is tempted by and has decided against; "Nothing named yet." if none}}
+
+_Resist a change when:_ {{one line, from the proposals the user resisted in the stress test; omit the line if none}}
+
+<!-- Always present. Things the team keeps being tempted by, plus the resist test. Not a blocker list. -->
 
 ## Key metrics
 
@@ -61,13 +71,7 @@ _Why it serves the approach:_ {{one line}}
 
 <!-- Optional. Delete the section if unused. Only externally visible milestones: launches, fundraises, conferences, renewals. -->
 
-## Not working on
-
-- {{one line per item}}
-
-<!-- Optional. Delete the section if unused. Use only for things the team keeps being tempted by. -->
-
-## Marketing
+## Brand
 
 **One-liner:** {{single-sentence pitch}}
 
@@ -76,14 +80,15 @@ _Why it serves the approach:_ {{one line}}
 <!-- Optional. Delete the section if unused. -->
 ~~~
 
-## Post-write checklist（写入后检查清单）
+## Post-write checklist
 
-确认写入前，扫描 draft：
+Before confirming the write, scan the draft for:
 
-- [ ] Frontmatter 位于顶部，并包含 `name` 和 `last_updated` keys。
-- [ ] `last_updated` 使用今天的 ISO format date（YYYY-MM-DD）。
-- [ ] 除 Tracks 外，没有 section 超过 4 句话（Tracks 中每个 track 有自己的 short block）。
-- [ ] 没有剩余 placeholders（`{{...}}`）。
-- [ ] 没有内容的 optional sections 已删除，而不是留空。
-- [ ] Metric count 在 3 到 5 之间。Track count 在 2 到 4 之间。
-- [ ] Target problem 和 Our approach 相互连接：后者清楚回应前者。
+- [ ] Frontmatter present at the top with `name` and `last_updated` keys.
+- [ ] `last_updated` carries today's date in ISO format (YYYY-MM-DD).
+- [ ] No section this skill wrote has more than 4 sentences except Tracks (where each track has its own short block); sections other writers contribute are not measured.
+- [ ] No placeholders remain (`{{...}}`).
+- [ ] Optional sections (Milestones, Brand) with no content have been deleted, not left empty; Boundaries is present.
+- [ ] Sections this skill did not write are unchanged and still in place.
+- [ ] Metric count is between 3 and 5 and track count between 2 and 4 - counting a meaning explicitly deferred to a linked legacy doc as carried there, not as missing here.
+- [ ] Purpose and Positioning are connected - one clearly responds to the other.

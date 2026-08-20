@@ -6,7 +6,7 @@
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `57e586d66194585757ffa30a23dcd0f4ec0210a4`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `15ab6f76`（compound-engineering-v3.22.4）。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -192,6 +192,18 @@ In Cursor Agent chat, install from the plugin marketplace:
 ```
 
 Or search for "compound engineering" in the plugin marketplace.
+
+### Grok Bot
+
+Grok Bot is its own app, but it uses your Cursor account and plugin library. There is no separate Grok Bot login. Install Compound Engineering once on that account and Grok Bot agents can load it.
+
+In Cursor Agent chat:
+
+```text
+/add-plugin compound-engineering
+```
+
+Or search for "compound engineering" in the Cursor plugin marketplace. Do not run `/add-plugin` in the Grok Bot chat, and do not clone this repository onto the Grok Bot computer.
 
 ### Codex App
 
@@ -475,6 +487,10 @@ There is no `codex plugin update`; re-running `add` reinstalls from the refreshe
 **Codex App**
 
 Refresh the marketplace from the **Plugins** panel (remove and re-add the `EveryInc/compound-engineering-plugin` marketplace if there is no refresh control), then reinstall **compound-engineering** and restart Codex.
+
+**Grok Bot**
+
+Reinstall or refresh Compound Engineering on that Cursor account (`/add-plugin compound-engineering` in Cursor Agent chat, or marketplace search). Grok Bot then loads the new snapshot from the shared plugin library. Do not clone this repository onto the Grok Bot computer for a normal update.
 
 If you configured a host with a direct path or sparse path under `plugins/compound-engineering`, edit or reinstall that source so it points at the repository root with no sparse path.
 

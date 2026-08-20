@@ -1,248 +1,238 @@
 # `ce-product-pulse`
 
-> 生成 time-windowed pulse report，说明用户体验到了什么、product 表现如何：usage、quality、errors、值得 investigating 的 signals。每次一页。
+> A time-windowed pulse on what users experienced and how the product performed: usage, quality, errors, and signals worth investigating. One page, every time.
 
-`ce-product-pulse` 是 **observation-loop** skill。它针对给定 time window（24h、7d、1h 等）查询 product data sources，并生成一页 report，覆盖 usage、performance、errors 和 follow-ups。Report 保存到 `docs/pulse-reports/`，成为 what users experienced 的 browseable timeline：team 对 product 在真实世界表现的 working memory。
+`ce-product-pulse` is the **observation** skill. After work has shipped, it queries the product's data sources for a lookback window and writes a single-page report. It is not a step in `/ce-ideate` → `/ce-brainstorm` → `/ce-plan` → `/ce-work`. The loop decides and builds; this skill reports what users actually hit.
 
-Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-plan -> /ce-work`。`ce-product-pulse` **closes the outer loop**：features shipped 后，pulse 从 real usage surface signals，反馈到 ideation（"what's worth exploring?"）和 brainstorming（"what does this need to be?"）。结合 upstream anchor `ce-strategy` 和捕获 learnings 的 `ce-compound`，这条 chain 成为 feedback system，而不是 one-way pipeline。
+You invoke it yourself (it is not model-invoked). Combined with `ce-strategy` as the upstream anchor, follow-ups from the pulse can feed `ce-ideate` ("what's worth exploring?") or `ce-brainstorm` ("what does this need to be?"). It does not replace Sentry, PostHog, or your dashboards. It consolidates one page so you are not re-deriving "what happened" from four tools.
+
+```text
+/ce-strategy (metrics seed the pulse)
+        |
+        v
+/ce-product-pulse  -->  follow-ups  -->  /ce-ideate or /ce-brainstorm or /ce-debug
+        ^
+        |  shipped work, measured in production
+        +-------------------------------------------- /ce-work
+```
 
 ---
 
 ## TL;DR
 
-| 问题 | 回答 |
+| Question | Answer |
 |----------|--------|
-| 它做什么？ | 针对 time window 查询 analytics、tracing、payments（以及可选 read-only DB），生成 single-page report |
-| 何时使用 | "Run a pulse"、weekly recap、launch-day check、"how are we doing"、`/ce-product-pulse 7d` |
-| 产出什么 | 保存到 `docs/pulse-reports/YYYY-MM-DD_HH-MM.md` 的 report；chat 中 surface key points |
-| 下一步 | 将 follow-ups 送到 `/ce-ideate` 或 `/ce-brainstorm`；用 native tools investigate specific issues |
+| What does it do? | Queries analytics, tracing, payments, and optionally a read-only DB for a time window, then writes a single-page report |
+| When to use it | "Run a pulse", weekly recap, launch-day check, "how are we doing" |
+| What it produces | `docs/pulse-reports/YYYY-MM-DD_HH-MM.md` (local time; `docs/` is the default artifact root). Headlines and the top follow-up also appear in chat. |
+| What's next | Take follow-ups to `/ce-ideate` or `/ce-brainstorm`, or investigate a specific error with `/ce-debug` or the native tool |
 
 ---
 
-## 调用示例
+## Example invocations
+
+Windows are trailing lookbacks. An empty invoke on an unconfigured repo runs setup first. `setup` / `reconfigure` / `edit config` re-run the interview, then still run a pulse.
 
 ```text
-# 使用已配置的默认窗口；未配置时使用 24 小时
+# Unconfigured: interview (seeds from STRATEGY.md when present), write pulse_* keys, then run the first pulse
 /ce-product-pulse
 
-# Review 一周窗口
+# Configured: use pulse_lookback_default, or 24h if that key is unset
+/ce-product-pulse
+
+# Weekly operating review
 /ce-product-pulse 7d
 
-# 运行较窄的 launch check，同时仍考虑 ingestion delay
+# Launch check. The 15-minute trailing buffer still applies, so this is not "right now."
 /ce-product-pulse 1h
 
-# 重新运行 source 与 metric setup interview
+# Weekend or other multi-day window
+/ce-product-pulse 72h
+
+# Monthly recap
+/ce-product-pulse 30d
+
+# Re-run the source and metric interview, then pulse with the new config
 /ce-product-pulse reconfigure
+
+# Same interview path as reconfigure
+/ce-product-pulse setup
+/ce-product-pulse edit config
 ```
 
-选择能回答问题的最短窗口：launch check 和每周 operating review 不应使用同一时间跨度。
+Pick the shortest window that answers the question. A launch check and a weekly review should not share a horizon.
 
 ---
 
-## 问题
+## The Problem
 
-多数 "how are we doing?" reports 以可预测方式失败：
+"How are we doing?" reports fail in familiar ways:
 
-- **Dashboard sprawl**：6 个 tools 上 40 个 metrics；没人读
-- **Threshold theater**：基于猜测 thresholds 的 red/yellow/green，不匹配 product 真实 operating ranges
-- **Stale by ingestion lag**：最近 15 分钟 analytics under-reported，导致 "what just happened?" 答案错误
-- **PII bleed into reports**：emails、account IDs、message content 进入 saved files 和 Slack threads
-- **Mutating side effects**：一个 "report generation" tool 意外写 database 或 marks events
-- **No memory**：pulses 留在 chat 里，不在 disk 上；无法比较 last week 和 this week
-- **No anchor**：pulse 测量碰巧 instrumented 的东西，而不是 strategy 说重要的东西
+- Forty metrics across six tools, and nobody reads any of them
+- Red / yellow / green based on guessed thresholds that do not match how the product actually runs
+- The last 15 minutes of analytics are under-reported, so "what just happened?" is wrong
+- Emails, account IDs, and message content land in saved files and Slack threads
+- A "report" tool that can write to the database or mark events
+- Pulses live in chat, so you cannot compare last week to this week
+- The pulse measures whatever happens to be instrumented, not what the strategy says matters
 
-## 方案
+## The Solution
 
-`ce-product-pulse` 以 explicit invariants 运行 structured observation pass：
+`ce-product-pulse` is a structured observation pass with a few hard rules:
 
-- **Single-page output**（30-40 lines）：sprawl 是 attention 的敌人
-- **Read like a founder**：没有 thresholds、没有 red/yellow/green；呈现 numbers，由 reader 判断
-- **15-minute trailing buffer**：每个 query 的 upper bound 是 `now - 15m`，避免 ingestion-lag under-reporting
-- **No PII in saved reports**：emails、account IDs、message content 不写入 disk
-- **Read-only invariant**：每个 data source 都以 read-only 查询；如果配置 database，connection 必须 read-only（interview 拒绝 read-write credentials）
-- **Strategy-seeded**：存在 `STRATEGY.md` 时，interview 读取它并从中 seed metrics；data-source setup 连接实际测量 strategy 说重要的指标
-- **Memory through saved reports**：每次运行写入 `docs/pulse-reports/`，让 past pulses 成为 browseable timeline
-
----
-
-## 独特之处
-
-### 1. Single-page constraint：硬性 30-40 lines
-
-Report 限定为四个 sections（Headlines、Usage、System performance、Followups），目标 30-40 lines。薄的 sections 保持薄；不会为了填空间 padding。Constraint 强迫 report surface what matters，而不是 what is available。
-
-### 2. "Read like a founder"：无 thresholds
-
-Skill 从不标记 "good" 或 "bad"。它呈现 numbers，让 reader 判断。Hardcoded thresholds（例如 "p95 > 500ms is red"）会制造 theater：那是 threshold-setter 的猜测，不是 product signal。读 pulse 的 founder 知道自己的 product 什么算正常；skill 尊重这一点。
-
-### 3. Strategy-seeded interview（由 strategy seed 的访谈）
-
-当 `STRATEGY.md` 存在时，first-run setup 会先读取它，再提问。它 surface seeded product name 和 key metrics list，interview 将 data sources 接上，使这些 metrics 被实际测量。结果：pulse reports 测量 strategy 说重要的内容，而不是 coincidentally instrumented 的内容。没有 strategy doc 时，skill 会明确 note，并从头 setup。
-
-### 4. Read-only invariant（只读不变式）
-
-Skill 永不 mutate product、database 或任何 external system。唯一 writes 是追加 pulse settings 到 `.compound-engineering/config.local.yaml`（gitignored、machine-local）和 report file（`docs/pulse-reports/...`）。MCP 和其他 data-source tools 都 read-only 调用；如果 tool 提供 write modes，不使用。
-
-对于 database access，interview **拒绝** read-write credentials，并指向 alternatives（read replicas、BI views、snapshot exports）。DB access 是 optional；很多 products 只用 analytics + tracing 就能完成 pulse。
-
-### 5. 15-minute trailing buffer（15 分钟尾部缓冲）
-
-许多 analytics 和 tracing tools 有 ingestion lag；query 到 `now` 会 under-report 最近 events。每个 query window 的 upper bound 都是 `now - 15m`。对于 `24h` window，skill 查询 `[now - 24h - 15m, now - 15m]`。Buffer 对 reader 不可见，但消除了 "why does the pulse say zero events in the last hour?" 的常见困惑。
-
-### 6. PII-free saved reports（无 PII 的保存报告）
-
-Saved reports 只包含 count distributions 和 anonymized notes：没有 user emails、account IDs 或 message content。启用 optional quality scoring（AI products）时，低分 sessions 只得到简短 anonymized note 描述 failure mode，而不是 message text。这让 saved reports 可安全 commit、share 或 browse。
-
-### 7. Parallel + serial query dispatch（并行加串行查询）
-
-Phase 2.1 并行分派 analytics、tracing 和 payments queries（不同 tools、无 shared load），然后 serially 运行 read-only DB queries（一次一个，scoped，无 full-table scans）。这种 split 避免对 production database 造成意外 load，同时有效利用 wall-clock budget。
-
-### 8. SMART metric pushback（SMART metric 反推）
-
-Interview 对用户提出的每个 metric、event 和 signal 应用 SMART bar（specific、measurable、actionable、relevant、timely）。Vanity metrics 会被 push back，vague metrics 会被 sharpen。结果是 config 产出 signal，而不是 noise。
-
-### 9. Optional quality scoring with discipline（有纪律的可选 quality scoring）
-
-对于 AI products，sampled sessions 的 quality scoring（按 defined dimension 1-5）是 opt-in。Discipline：normal sessions 默认给 4 或 5；1-3 只用于 clear failure modes（wrong answer、user got stuck、error surfaced）。如果所有 session 都是 3，bar 太严格；如果全是 5，bar 太松。Report 携带 score distribution，而不是 session content。
-
-### 10. Memory through saved reports（通过保存报告形成记忆）
-
-每次 pulse 都写入 `docs/pulse-reports/YYYY-MM-DD_HH-MM.md`（local time）。Past pulses 可 grep、diff、discard：它们是 team 对 product 表现的 working memory。Saved-reports folder 是 working memory，不是 data warehouse。100 个 reports 后，这条 timeline 就成了可滚动查看的真实 artifact。
+- One page, about 30-40 lines. Thin sections stay thin.
+- Numbers only. No "good" / "bad" labels and no hardcoded thresholds. You judge.
+- Every query's upper bound is `now - 15m`, so ingestion lag does not under-count the tail of the window
+- Saved reports hold counts and anonymized notes. No emails, account IDs, or message text.
+- Every data source is queried read-only. The interview refuses read-write database credentials.
+- When a strategy doc exists (`STRATEGY.md`, or when absent the first of `VISION.md`, `PRODUCT.md`), setup seeds product name and key metrics from it, then wires sources to measure those metrics
+- Every run writes `docs/pulse-reports/` so past pulses are a browseable timeline
 
 ---
 
-## 快速示例
+## What Makes It Novel
 
-周一早晨，你想看看周末表现。运行 `/ce-product-pulse 72h`。
+### One page, no scoreboard
 
-Skill 检测到这是 configured project（`.compound-engineering/config.local.yaml` 中设置了 `pulse_product_name`），所以跳过 interview，直接进入 Phase 2。它应用 15-minute trailing buffer：`[Friday 5:45pm — Monday 8:45am]`。
+The report has four sections: Headlines (2-3 lines), Usage, System performance, Followups (1-5 items). Target length is 30-40 lines. If a tracing tool was never configured, System performance is omitted rather than padded.
 
-Phase 2.1 并行分派：PostHog query（primary engagement event count、value-realization、completion ratio）、Sentry query（error counts by category、latency p50/p95/p99、top error signatures）、Stripe query（new customers、churn、revenue delta）。然后 serially 运行 read-only DB query（按 tier 查询 active-user count 的小 scoped query）。
+Deltas compare this window to the previous equal-length window. If a comparison is impossible, the delta is omitted.
 
-Phase 2.2 抽样 10 个 sessions 做 quality scoring（你的 product 是 AI，且 quality scoring enabled）。分布返回：7x5、2x4、1x2：一个 session 因明显 wrong answer 走偏。
+### Strategy-seeded setup
 
-Phase 2.3 填充 report template：Headlines（3 lines）、Usage section（engagement、value、completion、quality sample）、System performance（latency、top 5 errors with one-line explanations）、Followups（failed-quality session 值得 investigating；一个 error pattern 周环比上升）。
+On first run (or `reconfigure`), the interview reads the strategy doc when present (`STRATEGY.md`, else the first of `VISION.md`, `PRODUCT.md` that exists; metrics are found by meaning, and a linked legacy doc is followed when `STRATEGY.md` defers them there), shows the seeded product name and key metrics, and lets you correct them before wiring sources. Metrics that are not instrumented yet are not silently dropped: each one is either marked pending (`no data` in every report) or explicitly excluded from the pulse while staying in `STRATEGY.md`.
 
-Report 写到 `docs/pulse-reports/2026-05-04_08-45.md`。Headlines 和 top Followup 在 chat 中 surface。你看到 followup，决定用 `/ce-debug` 调查上升的 error pattern。
+When none of those docs exists, setup says so and starts from scratch. It also notes that `ce-strategy` can seed a later reconfigure.
+
+Every metric, event, and signal you propose is checked for being specific, measurable, actionable, relevant, and timely. Vanity metrics get a sharper question. The interview never uses the word "SMART" with you.
+
+### Read-only, and a trailing buffer
+
+The only writes are `pulse_*` keys in `.compound-engineering/config.local.yaml` and the report file. MCP and other tools are called read-only even when they offer a write mode.
+
+Database access is optional. Many products finish the pulse on analytics and tracing alone. If you offer a read-write credential, the interview refuses and points at a read replica, a BI view, or a snapshot export.
+
+Analytics, tracing, and payments queries run in parallel. Database queries run one at a time, scoped, never as a full-table scan. An expensive DB query is skipped and noted.
+
+The 15-minute buffer is why a `24h` run queries `[now - 24h - 15m, now - 15m]`. Without it, every short window under-states recent activity.
+
+### Optional quality scoring
+
+For AI products, you can opt in to scoring up to 10 sampled sessions 1-5 on one dimension you define. Normal sessions default to 4 or 5. Scores 1-3 are for a clear failure (wrong answer, user stuck, error shown). The report carries the distribution and a short anonymized note on anything below 4, not the transcript.
 
 ---
 
-## 何时使用
+## Quick Example
 
-在以下情况使用 `ce-product-pulse`：
+Monday morning, you want the weekend. The project is already configured, so `/ce-product-pulse 72h` skips the interview.
 
-- 想获得某个 time window 内用户体验的 snapshot（24h、7d、post-launch）
-- Launch 刚发生，想做 1h 或 4h early signal check
-- Team 做 weekly "how are we doing" recap
-- 想 surface follow-ups 供 ideation 或 debugging，而不是盯四个 dashboards
+The skill applies the buffer and queries the 72 hours ending 15 minutes ago. Analytics, tracing, and payments (if configured) run together. A read-only DB query, if enabled, runs after that, one scoped statement.
 
-以下情况跳过 `ce-product-pulse`：
+If quality scoring is on, it samples up to 10 sessions. A distribution like 7×5, 2×4, 1×2 means one session had a clear failure.
 
-- 正在 deep investigation specific issue -> 使用 native tools（Sentry、PostHog 等）
-- 需要 real-time alerting -> 那是 monitoring，不是 pulse
-- 想知道 "what shipped" -> 那是 git log + PR list，不是 pulse（pulse 关注 user experience 和 system performance，不是 changelog content）
+The report lands at `docs/pulse-reports/2026-05-04_08-45.md` with Headlines, Usage (engagement, value, completions, any strategy metrics, the quality sample), System performance (p50 / p95 / p99 and the top 5 errors), and Followups. Chat shows the Headlines, the top follow-up, and the path, not the whole file.
+
+A climbing error pattern is a `/ce-debug` follow-up. A product-shaped gap is `/ce-ideate` or `/ce-brainstorm`.
 
 ---
 
-## 作为 Workflow 的一部分使用
+## When to Reach For It
 
-`ce-product-pulse` 闭合 outer feedback loop：
+Reach for `ce-product-pulse` when:
+
+- You want a snapshot of what users experienced over a window (24h, 7d, post-launch)
+- A launch just happened and you want a short check such as `1h`
+- The team does a weekly "how are we doing" recap
+- You want follow-ups for ideation or debugging without opening four dashboards
+
+Skip `ce-product-pulse` when:
+
+- You are investigating one known issue → the native tool (Sentry, PostHog, and so on) or `/ce-debug`
+- You need real-time alerting. That is monitoring.
+- You want "what shipped" → git log and the issue tracker. Pulse is user experience and system performance, not a changelog.
+- You want item-level customer feedback triaged into a plan → `/ce-sweep`
+
+---
+
+## Use as Part of the Workflow
+
+`ce-product-pulse` sits outside the build loop and feeds it.
 
 ```text
-                    /ce-strategy ──┐
-                                    ↓ (key metrics seed pulse)
-   ↗── /ce-product-pulse ──────────┐
-   │       (followups)             ↓ (signals feed into)
-   │                          /ce-ideate → /ce-brainstorm → /ce-plan → /ce-work
-   │                                                                      ↓
-   └──────────────────────────────────────────────────── shipped ─────────┘
-                       (the pulse measures what shipped, in production)
+                    /ce-strategy
+                         |
+                         v  (key metrics seed pulse)
+   /ce-product-pulse ----+---- follow-ups ----> /ce-ideate --> /ce-brainstorm --> /ce-plan --> /ce-work
+         ^                                                                              |
+         +------------------------ shipped, observed in production ---------------------+
 ```
 
-在 configured project 中：
+In a configured project:
 
-- `STRATEGY.md`（来自 `/ce-strategy`）seed 被测量的 metrics
-- `/ce-product-pulse` 产出 report 并 surface follow-ups
-- Follow-ups 反馈到 `/ce-ideate`（what's worth exploring）、`/ce-debug`（what's broken）或 `/ce-brainstorm`（what to build next）
+- `STRATEGY.md` (from `/ce-strategy`, or a legacy `VISION.md`/`PRODUCT.md` in its absence) names the metrics
+- `/ce-product-pulse` writes the report and surfaces follow-ups
+- Follow-ups go to `/ce-ideate`, `/ce-debug`, or `/ce-brainstorm`
 
-Pulse 不替代 dashboards、tracing 或 analytics；它把它们 consolidation 成 single-page read，让 team 把 attention 花在少数重要内容上，而不是从四个 sources 重新推导 "what happened"。
+The pulse does not decide what to build. It reports what happened so you can choose the next loop step.
 
----
-
-## 单独使用
-
-Skill 直接用 lookback window 调用：
-
-- **Default 24h（默认 24 小时）**：`/ce-product-pulse`
-- **Specific window（指定窗口）**：`/ce-product-pulse 7d`、`/ce-product-pulse 1h`（launch check）、`/ce-product-pulse 30d`
-- **Reconfigure**：`/ce-product-pulse setup`（或 `reconfigure`、`edit config`）重新运行 interview
-- **First run**：没有 config 时运行 `/ce-product-pulse` 会触发 setup interview，然后运行 pulse
+First-run setup offers a recurring run via the harness scheduler (the in-plugin `schedule` skill when present, otherwise cron or GitHub Actions). It never schedules unless you confirm. After three or more manual runs with no schedule on file, it mentions the offer once.
 
 ---
 
-## 输出 Artifact（产物）
+## Use Standalone
 
-```text
-docs/pulse-reports/YYYY-MM-DD_HH-MM.md  (local time)
-```
+- Default window: `/ce-product-pulse` (configured default, or 24h)
+- Named window: `/ce-product-pulse 7d`, `/ce-product-pulse 1h`, `/ce-product-pulse 30d`
+- Reconfigure: `/ce-product-pulse setup` (or `reconfigure`, `edit config`)
+- First run: `/ce-product-pulse` with no `pulse_product_name` starts the interview, then pulses
 
-四个 sections（总目标 30-40 lines）：
-
-- **Headlines**：2-3 行总结 window
-- **Usage**：primary engagement、value realization、completions、quality sample distribution（启用时）
-- **System performance**：latency（p50/p95/p99）和 top 5 errors by count，附 one-line explanations
-- **Followups**：1-5 个值得 investigating 的事项
-
-Past reports 保留在 folder 中，形成 browseable timeline。该 folder 用于 grep、diff 和偶尔 prune，而不是 curated。
+Reports stay in `docs/pulse-reports/` as working memory: greppable, diffable, and safe to prune. The folder is not a warehouse.
 
 ---
 
-## 参考
+## Reference
 
-| Argument（参数） | Effect（效果） |
+| Argument | Effect |
 |----------|--------|
-| _(empty)_ | 使用 config 中的 `pulse_lookback_default`（未设则 `24h`） |
-| `24h`, `48h`, `72h`, `7d`, `30d`, `1h` | Trailing time window |
-| `setup` / `reconfigure` / `edit config` | 无视 config state，重新运行 interview |
+| _(empty)_ | Unconfigured (`pulse_product_name` unset): interview, then pulse. Configured: use `pulse_lookback_default`, or `24h` if unset. |
+| `24h`, `48h`, `72h`, `7d`, `30d`, `1h` | Trailing time window. Upper bound is always `now - 15m`. An unparseable argument asks you to clarify. |
+| `setup` / `reconfigure` / `edit config` | Re-run the interview regardless of config state, then run a pulse |
 
-Configuration 位于 `.compound-engineering/config.local.yaml`（gitignored、machine-local）的 `pulse_*` keys 下：product name、primary event、value event、completion events、quality scoring、quality dimension、analytics source、tracing source、payments source、DB enabled、per-metric source overrides、pending metrics、excluded metrics、default lookback。完整 key list 参见[配置参考](./configuration.md)。
+Configuration lives in CE config (`config.local.yaml` then `config.yaml`; the interview writes local) under `pulse_*` keys: product name, default lookback, primary / value / completion events, quality scoring and dimension, analytics / tracing / payments sources, DB enabled, per-metric source overrides, pending metrics, excluded metrics. See the [configuration reference](./configuration.md).
 
----
-
-## 常见问题
-
-**为什么 report 中没有 thresholds？**
-因为 thresholds 除非针对 specific product 校准，否则就是 theater；为每个 metric 校准 thresholds 比 pulse 本身还麻烦。读 pulse 的 founder 知道什么算正常；report 尊重这一点。如果数字不对，reader 会注意到；如果没问题，就不打扰。
-
-**为什么有 15-minute trailing buffer？**
-多数 analytics 和 tracing tools 有 ingestion lag，最近 15 分钟 events 会 under-reported。没有 buffer 时，每个 "what just happened?" pulse 都会低估 recent activity。Buffer 不可见，但消除常见混淆。
-
-**为什么 database access 必须 read-only？**
-因为 "generate a report" tool 绝不应意外 mutate production data。Interview 拒绝 read-write credentials，并指向 alternatives（read replicas、BI views、snapshot exports）。很多 products 完全不需要 DB access；analytics + tracing 足够。
-
-**为什么 report 是 single page？**
-Sprawl 是 attention 的敌人。40 metrics 的 dashboards 会产生 attention sprawl；带四个正确 sections 的一页 report 强迫 reader 注意重要内容。需要更深时，native tools 仍然在那里。
-
-**它和 `STRATEGY.md` 有什么关系？**
-First-run interview 会在 `STRATEGY.md` 存在时 seed product name 和 key metrics。Pulse 测量 strategy 说重要的东西，而不是碰巧 instrumented 的东西。没有 strategy doc 时，skill 会 note 并从头 setup。
-
-**支持 scheduling 吗？**
-支持。First-run setup 会提供通过 harness available scheduling primitive 设置 recurring pulse 的选项（存在时用 in-plugin `schedule` skill，或 cron/GitHub Actions 等 platform-native options）。Scheduling 永不自动发生；需要 explicit confirmation。
-
-**Non-Claude-Code platforms 呢？**
-只要有 read-only data-source tools，skill 就可在任何 platform 上工作。Config 在 runtime resolve：skill 使用 shell tool 运行 `git rev-parse --show-toplevel`，然后读取 config file，因此这里没有 harness-specific 机制。Interview 永不 inline schedule；它 hand off 给 harness 暴露的 scheduling primitive。
+Default report path: `docs/pulse-reports/YYYY-MM-DD_HH-MM.md`. If `docs_root` is set, that folder moves with the other CE artifacts.
 
 ---
 
-## 了解更多
+## FAQ
 
-"Read like a founder" posture 和 single-page constraint 都是 deliberate。40 metrics dashboards 会产生 attention sprawl；带正确四个 sections 的一页 report 让 reader 关注重要内容。Saved-reports folder 设计为 working memory：past pulses 可 grep、diff、discard。
+**Why no thresholds in the report?**
+Thresholds are theater unless they are calibrated for this product, and calibrating every metric is more work than the pulse. You already know what is normal. If a number looks wrong, you notice.
+
+**Why a 15-minute trailing buffer?**
+Most analytics and tracing tools under-report the last few minutes. Without the buffer, every short window understates recent activity.
+
+**Why is database access read-only?**
+A report skill should not be able to mutate production. The interview refuses read-write credentials. Many products never enable the DB at all.
+
+**Why is the report a single page?**
+A 40-metric dashboard spreads attention. Four sections on one page force a choice about what matters. Depth still lives in the native tools.
+
+**What's the relationship to `STRATEGY.md`?**
+The first-run interview seeds product name and key metrics from it (or, when it is absent, from the first of `VISION.md`, `PRODUCT.md` that exists — the same rule every report re-resolves). Each later pulse re-reads those metrics from that source. Pending ones render as `no data`. Excluded ones stay in the strategy file and do not appear.
+
+**Does it support scheduling?**
+Yes, as an offer during setup (and a one-time reminder after several manual runs). Confirmation is required. The skill does not schedule itself.
+
+**What about non-Claude-Code platforms?**
+It runs anywhere you have read-only data-source tools. Config is resolved from the repo at runtime. The interview hands scheduling off to whatever the harness exposes.
 
 ---
 
-## 另见
+## See Also
 
-- [`ce-strategy`](./ce-strategy.md) - seed pulse 测量的 metrics
-- [`ce-ideate`](./ce-ideate.md) - surfaced signals 的常见 follow-up destination
-- [`ce-debug`](./ce-debug.md) - pulse surface error patterns 后的常见 follow-up
-- [`ce-brainstorm`](./ce-brainstorm.md) - pulse follow-up 需要 scope clarification before fixing 时使用
+- [`ce-strategy`](./ce-strategy.md): seeds the metrics the pulse measures
+- [`ce-ideate`](./ce-ideate.md): common follow-up for a product-shaped signal
+- [`ce-debug`](./ce-debug.md): common follow-up for an error pattern
+- [`ce-brainstorm`](./ce-brainstorm.md): when a follow-up needs scope before you build
+- [`ce-sweep`](./ce-sweep.md): item-level feedback triage, not a time-windowed metrics report

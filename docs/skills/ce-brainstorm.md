@@ -1,12 +1,12 @@
 # `ce-brainstorm`
 
-> 通过协作思考定义某件事应该成为什么，一次只问一个问题，然后写出 right-sized requirements doc。
+> Think through what something should become, one question at a time, then write a right-sized requirements-only unified plan.
 
-`ce-brainstorm` 是 **definition** skill。它是 thinking partner：一次问一个问题，用 named gap lenses pressure-test 你的 premises，在推荐之前探索 2-3 个 concrete approaches，并产出 right-sized requirements document，强到 planning 不需要再发明 product behavior。
+`ce-brainstorm` is the **definition** skill. Use it when you have a direction and the open question is "what does this need to be?" It asks one question per turn, pressure-tests premises against named gap lenses, lays out 2-3 concrete approaches before recommending one, and, for software, writes a requirements-only unified plan so planning does not invent product behavior.
 
-它同样适用于 software features、完全 non-software topics（event planning、business decisions、personal-project framing、travel itineraries、naming briefs），以及两者之间的任何主题。相同的 one-question-at-a-time discipline；相同的 right-sized template；任何 artifact 落地前都有相同的 Synthesis Summary。
+It runs on software features, on non-software topics (events, business decisions, travel, naming briefs), and on work in between. Software runs write the requirements-only unified plan. Non-software runs stay in facilitation mode: a chat synthesis, then an optional handoff to `ce-plan` for a domain-appropriate plan.
 
-这是 compound-engineering ideation chain 的中间步骤：
+This is the middle step in the compound-engineering ideation chain. Skip it when you already have requirements, or when you do not yet have a direction:
 
 ```text
 /ce-ideate         /ce-brainstorm      /ce-plan             /ce-work
@@ -15,255 +15,280 @@
                                         this?"
 ```
 
-它也是最常见的 standalone entry point：适用于任何 feature、decision 或 project，其中问题不是 "how do I do it?"，而是 "what am I really doing, and is it the right shape?"
+It is also a common standalone entry when the question is not "how do I do it?" but "what am I actually doing, and is that the right shape?"
+
+It does not render a verdict. If the request is a whether-to-adopt decision on a named external candidate (a technology, library, pattern, platform, or architecture, judged against this project), the skill offers `/ce-pov` instead of scoping work you have not committed to. That is an offer, not a silent switch. Open-ended design with no single candidate stays here.
 
 ---
 
-## 摘要（TL;DR）
+## TL;DR
 
-| 问题 | 答案 |
+| Question | Answer |
 |----------|--------|
-| 它做什么？ | 通过 collaborative dialogue clarify scope、pressure-test premises、explore approaches，并写出 right-sized requirements doc |
-| 何时使用？ | Vague feature ideas、"let's brainstorm"、多个 plausible directions、unclear scope；non-software brainstorm 也支持 |
+| What does it do? | Collaborative dialogue to clarify scope, pressure-test premises, explore approaches, and write a requirements-only unified plan |
+| When to use it | Vague feature ideas, multiple plausible directions, unclear scope, work in unfamiliar territory, non-software decisions |
+| What it produces | Software: a requirements-only unified plan in `docs/plans/` with `artifact_readiness: requirements-only` and R/A/F/AE IDs. Non-software: chat synthesis, optional save, optional Proof publish, optional handoff to `ce-plan`. Lightweight alignment can skip the doc. |
+| What's next | Software: create the implementation plan (`ce-plan`, recommended), ship autonomously with `lfg`, pressure-test the requirements or prototype a remaining feel-question, open an HTML artifact in the browser, or keep asking. Non-software: create a plan, save the summary, publish to Proof, or stop. |
 
 ---
 
-## 调用示例
+## Example invocations
+
+An empty invoke asks what to explore. A path to an existing requirements-only plan offers resume. `output:html` changes the artifact format. A named model elevates only approach generation.
 
 ```text
-# 在承诺具体计划前，先塑造一个有挑战性的功能或项目
-/ce-brainstorm 为企业客户设计一个自助迁移平台
+# Ask what to explore, then start the dialogue
+/ce-brainstorm
 
-# 把粗略的功能想法转成 requirements artifact
-/ce-brainstorm 增加一种让用户暂停通知的方式
+# Shape an ambitious feature or project before committing to a plan
+/ce-brainstorm design a self-serve migration platform for enterprise customers
 
-# 不预设解决方案，先探索问题
-/ce-brainstorm support agents 会因为非紧急事件在夜间被呼叫
+# Turn a rough feature idea into a requirements artifact
+/ce-brainstorm add a way for users to pause notifications
 
-# 用同样的 scope 和 decision discipline 讨论非软件工作
-/ce-brainstorm 规划一场为期两天的客户顾问研讨会
+# Explore a problem without prescribing the solution up front
+/ce-brainstorm support agents get paged overnight for non-urgent events
 
-# 用自然语言要求输出自包含 HTML artifact
-/ce-brainstorm 增加账户级通知设置，并把 artifact 做成自包含 HTML 页面
+# Resume or continue an existing requirements-only plan instead of starting a duplicate
+/ce-brainstorm docs/plans/2026-08-10-feat-notification-mute-plan.md
 
-# 可重复 automation 中的等价简写
-/ce-brainstorm 增加账户级通知设置 output:html
+# Name an ideate survivor already in this conversation. Its tagged basis,
+# rationale, and tradeoffs travel with it (same as picking "Brainstorm one idea")
+/ce-brainstorm the per-channel mute idea
 
-# Session 继续使用 Opus 等 model，只把 approaches 交给 Fable 生成，
-# 仅在 heavy reasoning step 精准使用强但昂贵的 model
-/ce-brainstorm 增加账户级通知设置, use fable
+# Brainstorm non-software work with the same one-question discipline
+/ce-brainstorm plan a two-day customer advisory workshop
+
+# Unfamiliar territory: offer a blindspot map before questioning that area
+/ce-brainstorm I know nothing about color grading but need a review workflow for it
+
+# Verdict-shaped: offer ce-pov rather than scoping an adoption you have not made
+/ce-brainstorm should we adopt Biome in this repo?
+
+# Ask for a self-contained HTML artifact in plain language
+/ce-brainstorm add account-level notification settings and make the artifact a self-contained HTML page
+
+# Equivalent shorthand when a repeatable automation needs it
+/ce-brainstorm add account-level notification settings output:html
+
+# Keep the session on your usual model; generate the approaches on a named one
+/ce-brainstorm add account-level notification settings, use fable
 ```
 
----
-
-## 问题
-
-从 vague idea 直接进入 implementation 会产生：
-
-- Code（或 work）解决了错误问题，因为没人 pressure-tested premise
-- Scope creep，因为 boundaries 从未 explicit
-- Plans 每次有人碰它们时都重新争论 product decisions
-- Requirements docs 要么是没人更新的 over-ceremonial PRDs，要么是 planning 必须靠猜补全的 one-line briefs
-
-典型的 "let's brainstorm" AI 也有形状问题：一条消息问五个问题；你回答两个，其余丢失。它立刻选择一个 approach，而不是展示 alternatives。它把 implementation details 烤进 product discussion。Output 是 conversation，不是可 hand off 的 artifact。
-
-## 解决方案
-
-`ce-brainstorm` 运行 structured but conversational flow，并以 durable artifact 结束：
-
-- **One question per turn**，即使 sub-questions 看起来相关
-- **Right-sized ceremony**：Lightweight / Standard / Deep / Deep-product tiers
-- **Named gap lenses** 在生成 approaches 前强迫 premises 严谨
-- **Opt-in blindspot pass** 在 interview 继续探讨用户不熟悉的领域前，先映射其 decision surface
-- **Background grounding scout** 在你回答开场问题时，用 cheap model 收集逐字 repo evidence
-- **2-3 个 concrete approaches**，列出 tradeoffs 并明确 recommendation
-- **Opt-in visual probes** 用于那些通过粗略 sketch 比 prose 更快做出判断的 decisions
-- **Synthesis Summary** 作为 doc 落地前最后一次纠正 scope 的机会
-- **Fresh-context claim verification** 在 doc 落地前检查 repo claims
-- **每个 artifact 一个 coherent work unit**，并用 plain language 说明单独规划的 work 当前如何配合
-- **Ready for Planning Check** 在 handoff 前修复 completeness、consistency、focus 和 planning-readiness defects
-- **Right-sized Product Contract** 内置于 unified plan，并使用会流入 planning 的 stable identifiers（R/A/F/AE）
+Use `ce-ideate` when you do not yet have a direction. Use `ce-pov` when the candidates are already named and you need a verdict. Use `ce-plan` when the product shape is already settled.
 
 ---
 
-## 新颖之处
+## The Problem
 
-### 1. 一次一个问题，blocking-tool first
+Going straight from a vague idea to implementation produces:
 
-一条消息堆三个问题会稀释回答。`ce-brainstorm` 每 turn 只问一个问题，并在存在自然 choices 时默认使用平台 blocking question tool 和 single-select options。精心选择的 options 会 scaffold answer 而不限制它（free-text fallback 始终可用）。
+- Work that solves the wrong problem, because nobody pressure-tested the premise
+- Scope creep, because boundaries were never written down
+- Plans that re-litigate product decisions every time someone touches them
+- Requirements that are either over-ceremonial PRDs nobody updates, or one-line briefs that planning has to fill in by guessing
 
-### 2. Tier classification 根据 work 缩放 ceremony
+A typical "let's brainstorm" with an AI has shape problems too. It asks five questions in one message; you answer two and the rest get lost. It picks one approach immediately instead of showing alternatives. It bakes implementation into product discussion. The output is conversation, not a handoff-able artifact.
 
-不是每次 brainstorm 都一样。Lightweight 覆盖小而边界清楚、ambiguity 低的 ideas。Standard 处理带有一些 decisions 的正常 features。Deep 为 cross-cutting work 增加 systemic-move probes。Deep-product 还要求建立 product shape：actors、core outcome、positioning、durability，而不是默认继承它。Ceremony 随 work 缩放，而不是压在 work 上。
+## The Solution
 
-### 3. Product Pressure Test（产品压力测试）：named gap lenses
+`ce-brainstorm` runs a structured conversation that can end in a durable artifact:
 
-生成 approaches 前，skill 会扫描用户 opening 中的 rigor gaps。每个 gap 有名称，并 probe 它捕捉的 confusion：
-
-- **Evidence**："users want X" 没有 observable behavior 支撑
-- **Specificity**：beneficiary 以抽象方式描述；design 会 silently invent 他们是谁
-- **Counterfactual**：看不出 users 今天怎么做，或如果什么都不 ship 会发生什么
-- **Attachment**：某个 specific solution shape 被当成正在 build 的东西
-- **Durability**（仅 Deep-product）：value 依赖当前 world state，而该状态可能变化
-
-这些 probes 以 **prose，而不是 menus** 触发：4-option menu 会暗示哪些 evidence 算数，让用户选择而不是产出。Prose 会迫使真实 observation。
-
-### 4. Approach exploration 要求包含 non-obvious angles
-
-Phase 2 会浮现 2-3 个 concrete approaches，其中至少一个是 **non-obvious angle**：inversion、constraint removal 或 cross-domain analogy。Approaches 在 mechanism / product-shape granularity 呈现，不是 architecture。（基于 intentionally-shallow research 做 architecture decisions 容易提前 commit 到坏选择；这些属于 `ce-plan`。）Approaches 会在 recommendation 前展示，让用户先看到 alternatives，而不是被 anchor。
-
-### 5. Display-only visual probes：看图比读文字更快时
-
-当 decision 本质上是 spatial、behavioral 或 visual 时，`ce-brainstorm` 可以提供一个选择：继续用文字探索，或创建粗糙的 local visual probe。Visual probes 不是 implementation，也不是 final UI；它们是低成本决策 artifact，用于让用户看见 drawing/canvas behavior、annotation tools、layout comparisons、state/flow placement、charts、diagrams、animation、maps、timelines 或 spatial flows 的候选形态。
-
-写 doc 前，`ce-brainstorm` 会发出 **scoping synthesis**，形状像两个 product collaborators 在写 PRD 前会确认的内容。它浮现正在 build 的东西、对话产生的 key trade-offs、deferred 内容，以及用户应 weigh in 的真实 forks。每个 section 只有在有内容时才渲染；不会为了 ceremony 填空 bucket。当上游对话 short-circuited（Phase 0.2 fast path、requirements 已清楚、没有 questions）时，scoping synthesis 会压缩为一个 forward-looking sentence，并保留 end-of-turn interrupt window。
-
-### 6. Synthesis Summary：落笔前最后一次低成本纠偏
-
-写文档前，`ce-brainstorm` 会输出一份 **scoping synthesis**，形状类似两位 product collaborators 在写 PRD 前确认的内容：要构建什么、对话产生的关键 trade-offs、哪些内容已 deferred，以及真正需要用户表态的 forks。只有有内容的 sections 才会 render，不会为了 ceremony 填充 empty buckets。只有未提出 blocking questions 的 Lightweight brainstorm 才会压缩为一句 forward-looking summary，并在 turn end 留出 interrupt window；其他情况（Standard、Deep，或提出过 blocking question 的任意 tier）都会给出完整 synthesis 和 explicit confirmation gate，包括无需对话、但已预加载充分 substance 的 Phase 0.2 fast path。
-
-### 7. 会向下游流动的 stable identifiers
-
-Requirements doc 携带 plan-feeding identifiers：R-IDs（Requirements）、A-IDs（Actors）、F-IDs（Key Flows）、AE-IDs（Acceptance Examples）。`ce-plan` 会消费这些，并把每个 implementation unit 和 test scenario trace 回它们。Origin scope boundaries（尤其是 "Outside this product's identity"）会原样向下游流动。
-
-### 8. 面向 non-software 的 universal brainstorming
-
-构建 software feature？Standard flow。命名 product？选择 vacation？决定 career move？`ce-brainstorm` 会路由到 domain-agnostic facilitator，同时保留 one-question-at-a-time discipline 和 right-sized output。
-
-### 9. 默认把 implementation 排除在 requirements doc 之外
-
-Requirements 描述从用户视角期待的 **what** behavior。默认不描述 libraries、schemas、endpoints、file layouts 或 code structure，除非 brainstorm 本身就是 technical 或 architectural decision。这让 planning 的工作保持干净：发明 **how**，而不是 **what**。
-
-### 10. 陌生领域的 Blindspot pass
-
-Interview 机制假设你能评估它问的内容，而当你要在不熟悉的领域里划定 scope 时，这个假设恰好会失效。当你表明自己不熟悉（例如 "I know nothing about the auth modules" 或 "I don't know what color grading is"），或者连续回答显示你是 *无法权衡 options* 而不是只是还没决定时，`ce-brainstorm` 会在继续追问该领域前提供 **blindspot pass**：一张 grounded map，列出 3-7 个你尚不知道该问的 decisions 和 hazards，并说明它们为何与你的 topic 相关、有哪些 realistic options，以及 recommended default。你选择要逐一走过哪些；其余项采用 default，并记为 explicit assumptions。它把 unknown unknowns 转成 known unknowns，让 interview 提取的是 choices 而非 guesses。Software 和 non-software routes 都适用。
-
-### 11. 把 session-settled decisions 带入 requirements
-
-Requirements 阶段会运行相同的 settlement test：用户在对话中已经检查并选择的 decision（trade-off 已明确，用户在知情后作出选择）会写成带标签的 Key Decision，例如 `session-settled: user-directed` 或 `user-approved`，同时注明它取代了哪个 alternative；后续对话不会重复询问。`ce-plan` enrichment 会继承标签及 rejected-alternative provenance，因此这里已经作出的选择不会在 requirements 转为 implementation-ready plan 时被重新争论。
-
-### 12. Grounding 和 verification 嵌入你的思考时间
-
-On Standard and Deep brainstorms, a cheap extraction-tier scout is dispatched in the background while you answer the first question. It writes a grounding dossier — verbatim quotes with `file:line` pointers — to scratch storage and hands back a short gist, so the dialogue stays lean while the evidence stays available on demand. Before the requirements-only unified plan is written, a fresh-context verifier (a mid-tier model that never saw the dialogue) checks the Product Contract's repo claims — absence claims, file references — against the codebase, running while you review the synthesis confirmation. Refuted claims are corrected before the plan lands; unverifiable ones become explicit assumptions. The dossier path is handed to `ce-plan` so planning starts from verified quotes instead of re-scanning. On platforms without per-agent model selection, both run on the inherited model with the same read budgets; with no subagent support at all, the skill falls back to inline scanning and verification.
+- One question per turn, defaulting to the platform's blocking question tool
+- Facts the environment can answer are looked up, not asked; a running lookup does not stall independent questions
+- User terms or system-behavior claims that conflict with existing `CONCEPTS.md` or verified code are challenged when they would change a product decision
+- Ceremony matched to the work: Lightweight, Standard, Deep, or Deep-product
+- Named gap lenses on premises before approaches are generated
+- An opt-in blindspot pass when you do not know the territory well enough to weigh options
+- A background grounding scout that gathers verbatim repo evidence while you answer the opening questions
+- 2-3 concrete approaches with tradeoffs, then a stated recommendation
+- Opt-in visual probes for decisions that are faster to judge as rough sketches than as prose
+- An optional `ce-prototype` offer when committing an approach would be expensive to unravel and neither talk nor a cheap sketch can settle it
+- A Synthesis Summary as the last cheap moment to correct scope before a doc lands
+- Fresh-context claim verification of the doc's repo claims before it lands
+- One coherent work unit per artifact
+- A Ready for Planning Check that repairs completeness, consistency, focus, and planning-readiness before handoff
+- A right-sized Product Contract inside a unified plan, with stable R/A/F/AE identifiers that flow into planning
 
 ---
 
-## 快速示例
+## What Makes It Novel
 
-你以 vague feature idea 开始："I want to add a way for users to pause notifications." `ce-brainstorm` 读取 project constraint files，将 work 分类为 Standard scope，并在你回答第一个问题时派出便宜的 background scout 收集 repo evidence。
+### 1. One question at a time
 
-Pressure test 检测到 specificity gap（这些 "users" 是谁？）和 attachment gap（"pause" 已经是具体 solution shape）。它以 prose 一次 probe 一个。你说出真实 pain：support team 会在凌晨 3 点被 non-urgent stuff ping；并描述能解决它的 smallest version。
+Stacking several questions in one message produces diluted answers. `ce-brainstorm` asks one question per turn and defaults to the platform's blocking question tool with single-select options when natural choices exist. Free-text is always available. It also asks only decisions: if the repo, the grounding dossier, or another reachable source can settle the answer, it looks that up instead of putting it to you. A lookup in flight does not stall questions that do not depend on it. When your wording conflicts with existing `CONCEPTS.md` or with verified code in a way that would change a product decision, it surfaces that conflict before treating the wording as settled. It does not create `CONCEPTS.md`; glossary writes still land after the plan.
 
-三个 approaches 浮现：per-notification-type mute with TTL、global do-not-disturb schedule、mute on the rule rather than the channel，附带 tradeoffs 和 recommendation。Synthesis Summary 读回出现的形状（"per-channel mute on notification rules, 24h preset for the 3 AM support pings"），列出对话中的 trade-offs（per-channel over per-user、mute lives on the rule）、deferred 内容（presence-based mute、quiet-hours schedules），以及关于 rule-delete loss path 的单个 call-out。你确认并添加 24h preset。
+### 2. Ceremony scales with the work
 
-Right-sized requirements doc 写入，Phase 4 menu 提供 next steps：`/ce-plan`（recommended）、agent doc review、publish to Proof，或对 trivial scope skip-to-build。
+Lightweight covers small, well-bounded ideas. Standard handles ordinary features with some decisions. Deep adds probes for cross-cutting work. Deep-product also has to establish product shape (actors, core outcome, positioning, durability) rather than inherit it.
+
+### 3. Named gap lenses, then approaches
+
+Before generating approaches, the skill scans the opening for rigor gaps and probes only the ones that are present:
+
+- Evidence: "users want X" with no observable behavior behind it
+- Specificity: the beneficiary is abstract, so design will invent who they are
+- Counterfactual: no visibility into what people do today, or what changes if nothing ships
+- Attachment: a specific solution shape is already being treated as the thing being built
+- Durability (Deep-product only): value rests on a current state of the world that may shift
+
+These probes fire as prose, not menus. A 4-option menu would tell you which kinds of evidence count. Prose forces a real observation.
+
+Phase 2 then surfaces 2-3 concrete approaches, including at least one non-obvious angle (inversion, constraint removal, or cross-domain analogy). Approaches sit at mechanism or product-shape granularity, not architecture. Architecture on thin research belongs in `ce-plan`. Approaches are shown before the recommendation so you see the alternatives first.
+
+### 4. Visual probes, then prototype when a sketch is not enough
+
+When a decision is spatial, behavioral, or visual, the skill can offer a rough local visual probe. Those probes are disposable sketches for product feedback, display-only. You respond in chat. A decision a rough sketch cannot settle (finish or motion), or one a sketch was built for and failed to settle, routes to `ce-prototype` instead.
+
+### 5. Synthesis, identifiers, and a last check before handoff
+
+Before writing the doc, the skill emits a scoping synthesis: what is being built, the trade-offs the dialogue produced, what was deferred, and any genuine forks. Lightweight runs that asked no blocking questions compress this to a single forward-looking sentence. Standard, Deep, and any run that asked a blocking question get the full synthesis and an explicit confirmation gate, including a richly pre-loaded opener that needed no dialogue.
+
+The Product Contract carries R-IDs (Requirements), A-IDs (Actors), F-IDs (Key Flows), and AE-IDs (Acceptance Examples). `ce-plan` traces every implementation unit and test scenario back to them. Origin scope boundaries, including "Outside this product's identity", flow through unchanged.
+
+Requirements describe expected behavior from the user's perspective. They do not describe libraries, schemas, endpoints, file layouts, or code structure unless the brainstorm itself is about a technical decision.
+
+A decision you examined and chose during the dialogue lands as a labeled Key Decision (`session-settled: user-directed` or `user-approved`) and is not re-asked. `ce-plan` inherits the label.
+
+On Standard and Deep software runs, a cheap scout gathers a grounding dossier (verbatim quotes with `file:line` pointers) while you answer the first question. Before the plan is written, a verifier that never saw the dialogue checks the Product Contract's repo claims. Refuted claims are corrected; unverifiable ones become explicit assumptions. The dossier path is handed to `ce-plan`.
+
+### 6. Blindspot pass and non-software facilitation
+
+When you flag unfamiliarity, or consecutive answers show you cannot weigh the options, the skill offers a blindspot pass before questioning that territory further: a map of 3-7 decisions and hazards, each with why it matters, the realistic options, and a recommended default. You pick which to walk through. The rest take defaults recorded as explicit assumptions. This works on both software and non-software routes.
+
+Non-software work uses a domain-agnostic facilitator with the same one-question discipline. It does not write a software unified-plan artifact.
 
 ---
 
-## 何时使用
+## Quick Example
 
-在以下情况使用 `ce-brainstorm`：
+You start with "I want to add a way for users to pause notifications." The skill classifies the work as Standard and sends a cheap background scout for repo evidence while you answer the first question.
 
-- Feature idea 部分成形，但你还无法 sketch implementation
-- Request 有多个 valid solutions，需要选择
-- Scope unclear（"add notifications"：什么 kind？for whom？when？）
-- 想要可以 hand 给其他 contributor 或 planning 的 structured artifact
-- Vague problem statement 需要变成真正的 product decision
-- 必须在你不熟悉的领域中划定 scope，由 blindspot pass 在提问前映射 decision surface
-- 你正在做 non-software 工作（named products、roadmap choices、decisions）
+The pressure test finds a specificity gap (who are these "users"?) and an attachment gap ("pause" is already a solution shape). It probes both as prose, one at a time. You name the actual pain (support gets pinged at 3 AM for non-urgent stuff) and the smallest version that would solve it.
 
-以下情况跳过 `ce-brainstorm`：
+Three approaches surface: per-notification-type mute with TTL, a global do-not-disturb schedule, mute on the rule rather than the channel. Tradeoffs and a recommendation follow. The Synthesis Summary reads back the shape ("per-channel mute on notification rules, 24h preset for the 3 AM support pings"), the trade-offs (per-channel over per-user, mute lives on the rule), what is deferred (presence-based mute, quiet-hours schedules), and a call-out about the rule-delete loss path. You confirm and add a 24h preset.
 
-- 你还不知道该做什么 -> 先 `/ce-ideate`
-- Requirements 已经 specified（已有 PRD、GitHub issue 很详细）-> 直接 `/ce-plan`
-- Bug 有 known root cause -> `/ce-debug`
-- Change trivial 且 obvious -> 直接做
+A requirements-only unified plan is written under `docs/plans/`. The Phase 4 menu then offers: create the implementation plan with `ce-plan` (recommended), ship autonomously with `lfg`, pressure-test the requirements or prototype a remaining feel-question, open the file if it is HTML, or keep asking clarifying questions.
 
 ---
 
-## 作为链式工作流的一部分使用
+## When to Reach For It
+
+Reach for `ce-brainstorm` when:
+
+- A feature idea is partly formed and you cannot yet sketch the implementation
+- A request has several valid solutions and you need to choose
+- The scope is unclear ("add notifications": what kind, for whom, when)
+- You want a structured artifact you can hand to another person or to planning
+- You have to scope work in territory you do not know (the blindspot pass maps the decision surface first)
+- The topic is not software (naming, events, roadmap choices)
+
+Skip `ce-brainstorm` when:
+
+- You do not yet know what to work on → `/ce-ideate`
+- Requirements are already specified (a PRD exists, the issue is detailed) → `/ce-plan`
+- The request is whether to adopt a named external candidate → `/ce-pov`
+- You have a known root cause for a bug → `/ce-debug`
+- The change is trivial and obvious → just do it
+
+---
+
+## Use as Part of the Chained Workflow
 
 ```text
-/ce-ideate          (optional — discover candidate directions)
-   |  picks one survivor + carries warrant + rationale
+/ce-ideate          (optional: discover candidate directions)
+   |  picks one survivor and carries its basis, rationale, and tradeoffs
    v
 /ce-brainstorm
-   |  produces requirements-only unified plan
-   |  software mode: R-IDs, A-IDs, F-IDs, AE-IDs + scope boundaries
-   |  universal mode: a domain-appropriate brief
+   |  produces a requirements-only unified plan
+   |  software: R-IDs, A-IDs, F-IDs, AE-IDs and scope boundaries
+   |  non-software: chat synthesis, optional handoff to ce-plan
    v
 /ce-plan
    |  enriches the same plan to implementation-ready
    |  R-IDs flow into Requirements; A/F/AE-IDs trace into units and tests
-   |  origin scope boundaries are preserved verbatim
+   |  origin scope boundaries are preserved
    v
 /ce-work
 ```
 
-当 `ce-plan` 以 requirements doc 作为 input 加载时，它不会重新争论 product behavior。Doc 是 authoritative。Plan-time decisions 关乎 execution guardrails，而不是正在 build 什么。
+When `ce-plan` loads with a requirements-only unified plan, it does not re-litigate product behavior. The Product Contract is authoritative. Plan-time decisions are about execution guardrails, not what is being built.
+
+In a repo, acting on an ideate survivor always comes here, not to `ce-plan`. `ce-plan` wants a brainstorm-grounded Product Contract.
 
 ---
 
-## 单独使用
+## Use Standalone
 
-`ce-brainstorm` 是最常见的 standalone entry point。很多 teams 跳过 `ce-ideate`（他们已经知道要探索什么），也跳过 `ce-plan`（brainstorm 就是他们完整 thinking artifact）。
+Many teams skip `ce-ideate` (they already know what to explore). Some also stop here and treat the brainstorm as the thinking artifact, then plan later.
 
-- **Feature briefs**：把 vague idea 转成给 stakeholders 或 new contributors 的 stable artifact
-- **Onboarding existing work**：feature 已 in flight，但 rationale 从未写下
-- **Pre-PR alignment**：多人需要在 code start 前就 scope 达成一致
-- **Strategic decisions**：Deep-product tier 浮现 durability 和 adjacent-product risks
-- **Non-software brainstorms**：命名 product、规划 event、决定 roadmap
+- Feature briefs: turn a vague idea into a stable artifact for stakeholders or new contributors
+- Onboarding existing work: the feature is in flight but the rationale was never written down
+- Pre-PR alignment: several people need to agree on scope before code starts
+- Strategic decisions: Deep-product surfaces durability and adjacent-product risks
+- Non-software: name a product, plan an event, decide a roadmap
 
-Phase 4 handoff 提供 planning、agent doc review、publish to Proof、lightweight scope 的 direct-to-work、更多 clarifying questions，或 pause。
+The software Phase 4 menu offers planning, autonomous ship with `lfg` (when a unified plan exists and no blockers remain), document review or a prototype, an HTML open-in-browser option, or more questions. There is no skip-to-`ce-work` from this menu. Non-software wrap-up offers `ce-plan`, save the summary, publish to Proof, or stop.
+
+If a related requirements-only plan already exists, the skill offers to resume it instead of starting a duplicate.
 
 ---
 
-## 参考
+## Reference
 
-| 参数 | 效果 |
+| Argument | Effect |
 |----------|--------|
-| _(empty)_ | 询问 feature description |
+| _(empty)_ | Asks what you would like to explore |
 | `<feature idea>` | Open-ended brainstorm |
-| `<problem>` | 通过 product pressure test 路由 |
-| Existing requirements-only plan path、legacy `*-requirements.md` path 或 topic | Resume offer |
-| `output:html` | 将 requirements-only unified plan 写成单个 self-contained HTML file，而不是 markdown。互斥：artifact 是 `.md` 或 `.html`，绝不同时生成。Default 为 markdown。在 `.compound-engineering/config.local.yaml` 设置 `brainstorm_output: html` 可令 HTML 成为 default。Pipeline mode（LFG、`disable-model-invocation`）始终强制 markdown，使 downstream automation 获得 stable text shape。参见[配置参考](./configuration.md)。 |
+| `<problem>` | Routes through the product pressure test |
+| Existing requirements-only plan path, legacy `*-requirements.md` path, or matching topic | Resume offer |
+| Ideate survivor already in this conversation | Loads with that idea's tagged basis, rationale, and tradeoffs |
+| Verdict-shaped prompt (`should we adopt X`) | Offers `ce-pov`; decline and the brainstorm continues |
+| `output:html` | Write the requirements-only unified plan as a single self-contained HTML file instead of markdown. Exclusive: the artifact is `.md` or `.html`, never both. Default is markdown. Set `brainstorm_output: html` in CE config (`config.local.yaml` then `config.yaml`) to make HTML the default. Pipeline mode (LFG, `disable-model-invocation`) always forces markdown. See the [configuration reference](./configuration.md). |
+| `use fable` / `have opus generate these` | Elevate only approach generation to that model. Also settable as `brainstorm_model: <model>` in CE config. A prompt request overrides the config key. |
 
 ---
 
-## 常见问题（FAQ）
+## FAQ
 
-**为什么一次只问一个问题？这不会慢吗？**
-每 turn 堆三个问题会稀释回答：users 会选择容易的那个，其余丢失。一次一个问题会产生更 sharp 的 answers，经验上也更快收敛。
+**Why one question at a time? Isn't that slow?**
+Stacking three questions per turn produces diluted answers. People pick the easy one and the rest get lost. One question per turn produces sharper answers and usually converges faster.
 
-**为什么要 pressure-test 我的 premise？我只是想 brainstorm。**
-Named gap lenses 捕捉 feature briefs 在下游失败的最常见方式。它们只在 opening 中确实存在 gap 时触发；具体且 well-framed 的 prompt 可能零 probes。
+**Why does it pressure-test my premise? I just want to brainstorm.**
+The named gap lenses catch the usual ways feature briefs fail downstream. They fire only when the gap is actually present. A concrete, well-framed prompt can earn zero probes.
 
-**我可以跳过 requirements doc 吗？**
-可以。Lightweight tier 和 announce-mode fast path 支持这种做法。如果你只需要 brief alignment，就不会写 doc。
+**Can I skip the requirements-only plan?**
+Yes. The Lightweight tier and the announce-mode fast path support that. If you only need brief alignment, no doc is written. The `lfg` menu option is hidden when there is no artifact, because `lfg` cannot prompt for the missing file.
 
-**如果我已经有 PRD 或详细 GitHub issue 怎么办？**
-跳过 `ce-brainstorm`，直接到 `/ce-plan`。Plan skill 可以消费任何类型的 input。
+**What if I already have a PRD or detailed GitHub issue?**
+Skip `ce-brainstorm` and go to `/ce-plan`. The plan skill consumes any kind of input.
 
-**Synthesis 中的 "Inferred" 是什么意思？**
-Agent 在呈现 scoping synthesis 前，会把 internal draft 分成三类（Stated / Inferred / Out of scope）作为 thinking step。Inferred items 是 agent 填补 dialogue gaps 的 bets。通过 keep test 的内容会以 call-outs 形式出现在 scoping synthesis 中；其余在用户确认后融入 requirements doc 的 Key Decisions。
+**What does "Inferred" mean in the synthesis?**
+The agent composes an internal three-bucket draft (Stated / Inferred / Out of scope) before presenting the scoping synthesis. Inferred items are bets that fill dialogue gaps. Those that survive the keep test surface as call-outs; the rest dissolve into the Product Contract when you confirm.
 
-**它适用于 non-software topics 吗？**
-是。Domain-agnostic facilitator 会为 naming、decisions、planning 等保留 one-question-at-a-time discipline 和 right-sizing。
+**Does it work for non-software topics?**
+Yes. A domain-agnostic facilitator keeps the one-question discipline. The wrap-up can hand the synthesis to `ce-plan`, save a summary, or publish to Proof. It does not write a software unified-plan artifact.
 
----
-
-## Model elevation（模型提升）
-
-需要为 heavy reasoning step 指定 model 时，`ce-brainstorm` 可以用你选择的 model 而非 session model 生成 approaches。它只把 approach generation dispatch 给该 model，并提供 read access 以验证 brief；skill 其余部分留在 session model。可以在 prompt 中为单次 run 指定 model（“use fable”“have opus generate these”），或在 `.compound-engineering/config.local.yaml` 中用 `brainstorm_model: <model>` 设置 default。Prompt request 会覆盖 config key。
-
-这适用于任何 harness：host 能原生提供 chosen model 时走原生，否则调用已安装并认证的 Claude CLI，再否则在 session model 上运行该 step，并说明未满足的 precondition。**因此，设置 `brainstorm_model` 会在每个运行 `ce-brainstorm` 的 harness 中生效**，不只 Claude Code。详见 `references/reasoning-elevation.md`。
+**Can I go straight to `ce-work` from here?**
+Not from the Phase 4 menu. Software next steps are `ce-plan` or `lfg` (which plans first). Skip-to-build is not offered here, even for Lightweight scope.
 
 ---
 
-## 另见（See Also）
+## Model elevation
 
-- [`ce-ideate`](./ce-ideate.md) - 上游 "what's worth exploring" discovery
-- [`ce-plan`](./ce-plan.md) - 将 requirements doc 转成 implementation plan
-- [`ce-doc-review`](./ce-doc-review.md) - requirements doc 的 persona-based review
-- [`ce-work`](./ce-work.md) - 直接从 brainstorm 执行 lightweight changes
-- [`ce-strategy`](./ce-strategy.md) - 将 brainstorms 锚定到 documented product strategy
+When you want a specific model for the heavy reasoning step, `ce-brainstorm` can generate approaches on that model instead of your session model. Only approach generation is dispatched, with read access so it can verify its brief. The rest of the skill stays on your session model. Name a model in the prompt (`use fable`, `have opus generate these`), or set `brainstorm_model: <model>` in CE config (`config.local.yaml` then `config.yaml`). A prompt request overrides the config key.
+
+This works on any harness. The host serves the chosen model natively where it can, otherwise it invokes the Claude CLI (which must be installed and authenticated), otherwise it runs the step on your session model and says which precondition was unmet. Setting `brainstorm_model` therefore takes effect in every harness you run `ce-brainstorm` in, not just Claude Code.
+
+---
+
+## See Also
+
+- [`ce-ideate`](./ce-ideate.md): upstream "what's worth exploring" discovery; survivors arrive here with a tagged basis
+- [`ce-pov`](./ce-pov.md): a decisive verdict on a named external candidate, not a new scope
+- [`ce-plan`](./ce-plan.md): enrich the requirements-only unified plan into an implementation-ready plan
+- [`ce-doc-review`](./ce-doc-review.md): persona-based review of the Product Contract in markdown or HTML
+- [`ce-prototype`](./ce-prototype.md): decide how something should work or feel before committing an approach
+- [`ce-strategy`](./ce-strategy.md): anchor brainstorms to a documented product strategy
+- [`lfg`](./lfg.md): autonomous plan-then-ship from a requirements-only artifact
+- [`ce-proof`](./ce-proof.md): publish a non-software summary (or any markdown file you ask to share)

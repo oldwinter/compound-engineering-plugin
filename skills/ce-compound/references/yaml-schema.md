@@ -9,6 +9,10 @@
 - category mapping（类别映射）
 - track classification（track 分类：bug vs knowledge）
 
+## Corpus-First Vocabulary（以现有 corpus 为先的词汇）
+
+`component` and `root_cause` are open vocabulary, and the category directories are a default layout, not a fixed one. Before classifying, sample existing docs under `<root>/solutions/` and reuse the corpus's established values and directory taxonomy. Use the schema defaults only when no existing doc covers the area or cause; do not coin a near-synonym.
+
 ## Tracks（Track 分类）
 
 `problem_type` 决定适用哪个 **track**。每个 track 有不同 required 和 optional fields。
@@ -23,14 +27,14 @@
 - **module**：受影响的 module 或 area
 - **date**：`YYYY-MM-DD` 格式的 ISO date
 - **problem_type**：上方 Tracks table 中列出的值之一
-- **component**：`rails_model`、`rails_controller`、`rails_view`、`service_object`、`background_job`、`database`、`frontend_stimulus`、`hotwire_turbo`、`email_processing`、`brief_system`、`assistant`、`authentication`、`payments`、`development_workflow`、`testing_framework`、`documentation`、`tooling` 之一
+- **component**：受影响的 component 或 area；这是 open vocabulary（见 Corpus-First Vocabulary）。没有现有 corpus 值时，可使用 `data_model`、`api_layer`、`service_layer`、`background_job`、`database`、`frontend`、`messaging`、`infrastructure`、`observability`、`authentication`、`payments`、`development_workflow`、`testing_framework`、`documentation`、`tooling` 等 suggested defaults。
 - **severity**：`critical`、`high`、`medium`、`low` 之一
 
 ## Bug Track Fields（Bug Track 字段）
 
 Required（必填）：
 - **symptoms**：包含 1-5 个 observable symptoms（errors、broken behavior）的 YAML array
-- **root_cause**：`missing_association`、`missing_include`、`missing_index`、`wrong_api`、`scope_issue`、`thread_violation`、`async_timing`、`memory_leak`、`config_error`、`logic_error`、`test_isolation`、`missing_validation`、`missing_permission`、`missing_workflow_step`、`inadequate_documentation`、`missing_tooling`、`incomplete_setup` 之一
+- **root_cause**：根本技术原因；这是 open vocabulary（见 Corpus-First Vocabulary）。可在没有 corpus 值时参考 `wrong_api`、`data_integrity`、`concurrency`、`async_timing`、`memory_leak`、`config_error`、`logic_error`、`test_isolation`、`missing_validation`、`missing_permission`、`missing_workflow_step`、`inadequate_documentation`、`missing_tooling`、`incomplete_setup`。
 - **resolution_type**：`code_fix`、`migration`、`config_change`、`test_fix`、`dependency_update`、`environment_setup`、`workflow_improvement`、`documentation_update`、`tooling_addition`、`seed_data_update` 之一
 
 ## Knowledge Track Fields（Knowledge Track 字段）
@@ -49,16 +53,19 @@ Required（必填）：
 
 ## Optional Fields（bug track only，仅 bug track）
 
-- **rails_version**：`X.Y.Z` 格式的 Rails version
+- **framework_version**：`X.Y.Z` 格式的 framework version
 
 ## Backward Compatibility（向后兼容）
 
 Track system 之前创建的 docs 可能在 knowledge-type problem_types 上带有 `symptoms`/`root_cause`/`resolution_type`。这些是 valid legacy docs：
 
 - Knowledge-track doc 上存在 bug-track fields 是 harmless 的。除非该 doc 因其他原因正在重写，否则 refresh 时不要 strip 它们。
+- 旧 doc 可能仍使用早期 closed list 或 `rails_version`；它们保持有效。新 doc 必须遵循上面的 open vocabulary 规则。
 - 创建 **new** docs 时，遵循上方 track rules。
 
 ## Category Mapping（类别映射）
+
+Default layout for a repo with no existing learnings. When `<root>/solutions/` already has an established directory taxonomy, place the doc in the existing directory that covers this area rather than creating a new directory from this table that nothing else uses.
 
 - `build_error` -> `<root>/solutions/build-errors/`
 - `test_failure` -> `<root>/solutions/test-failures/`
@@ -88,7 +95,7 @@ Track system 之前创建的 docs 可能在 knowledge-type problem_types 上带�
 6. Enum fields 必须精确匹配 allowed values。
 7. Array fields 必须遵守 min/max item counts。
 8. `date` 必须匹配 `YYYY-MM-DD`。
-9. `rails_version` 如存在，必须匹配 `X.Y.Z`，且只适用于 bug-track docs。
+9. `framework_version` 如存在，必须匹配 `X.Y.Z`，且只适用于 bug-track docs。
 
 ## YAML Safety Rules（YAML 安全规则）
 

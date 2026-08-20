@@ -51,17 +51,29 @@ The methodology this project embodies: structure engineering work so each unit m
 ### Pipeline
 The chained progression of Skills that carries a piece of work from strategy and ideation through brainstorm, plan, execution, and review, and closes by capturing what was learned. Each stage hands a durable artifact to the next, and research is gathered at the stage that needs it rather than re-gathered downstream.
 
+### Visual probe
+A disposable, display-only decision sketch used during brainstorming for one shape, layout, or relationship question. The user looks at it and answers in chat. It is not a prototype or a spec: a decision a rough sketch cannot settle — anything turning on real finish or motion — goes to an experience prototype instead.
+
+### Experience prototype
+A throwaway prototype of the product, built so a human can experience it — by driving it, or by seeing it at real finish — and decide how something should work, feel, or read before that choice is encoded in a plan and code. Modality, fidelity, and medium all follow one rule: do not fake the dimension being tested. Throwaway means unmaintained and unshipped rather than discarded — a scratch prototype is left in place as a best-effort reference for what gets built next, alongside the decisions, though an in-app overlay run is undone and leaves nothing behind. Distinct from a visual probe (rough, one decision) and from polish (a feature that already works).
+
 ### Learning
 A documented solution to a past problem — a bug fix, a convention, or a workflow pattern — stored as the unit of compounded knowledge so future work can find and reuse it. Also called a solution doc. Carries structured metadata (category, tags, problem type) for retrieval; its creation date lives in the entry, not the filename.
 
 ### Pattern doc
 Guidance generalized from several Learnings into a broader rule. Higher-leverage than any single incident-level Learning, and higher-risk when stale, because future work treats it as broadly applicable.
 
+### Knowledge track
+One of the two classifications a Learning carries, set by its problem type: the knowledge track holds guidance — conventions, workflow patterns, practices, decisions — while the bug track holds diagnosed defects. The track decides which metadata a Learning must carry and which maintenance checks apply to it; procedure-shaped checks, such as comparing a Learning against the Guidance layer, key on the knowledge track.
+
+### Guidance layer
+The agent-facing instructions an agent loads at the moment it acts — a skill's instructions, a runbook, a root instruction file. Because an agent reads it at the moment of acting, a Learning that disagrees with it is not merely stale but liable to be overridden in practice, so a contradiction there outranks ordinary staleness. Maintenance skills compare a Learning only against guidance the Learning itself names or links, resolve the disagreement by which side current code follows, and report a wrong guidance file rather than editing it.
+
 ### Explainer
 A dense, visual teaching artifact written for the developer personally — explaining a concept, a change, an idea, or a window of their own recent work — so the human keeps learning when agents do the writing. The complement of a Learning: a Learning teaches the repo's future work; an explainer teaches the human.
 
-### Session handoff（会话 handoff）
-一种 immutable continuity artifact，让新 agent 无需 prior session transcript，也能恢复 objective、decisions、current state 和 unfinished work。CE 创建的 handoff 默认使用 managed temporary Markdown，并指向 authoritative project artifacts，而不是替代它们。Receiving agent 也可以从用户选定、具有足够 continuity context 的任意 source resume；selection 只提供 context，不授予自动继续的 authority。
+### Session handoff
+An immutable continuity artifact that lets a fresh agent recover the objective, decisions, current state, and unfinished work without the prior session transcript. CE-created handoffs use managed temporary Markdown by default and point to authoritative project artifacts rather than replacing them. A receiving agent may also resume from any user-selected source with sufficient continuity context; selection supplies context but no authority to continue automatically.
 
 ### Check-in
 The active-recall step that can follow an explainer in the same session: the developer predicts or answers first and the explanation confirms or corrects — predict-then-reveal for changes, checked exercises for concepts. Skippable when the material does not warrant retention work.
@@ -90,18 +102,38 @@ A bulk evidence artifact — verbatim quotes with source pointers, gathered by a
 ### Load stub
 The inline remnant left in a Skill when load-bearing content moves to a reference file: a load instruction that names what the reference contains and the failure mode of skipping it, while keeping no detail an agent could improvise from — making the load structurally necessary rather than advisory.
 
-### Detached job（脱离式任务）
-Delegated worker process 会在自己的 session 中启动，因此能活过发起它的 shell tool call。它的状态（status word、log、identity 和 result）保存在 durable job directory 中；orchestrator 在 turns 之间轮询该目录，而不是原地等待。
+### Skill-eval cell
+One graded scenario that runs a Skill on a real coding-agent host and scores the surviving artifacts of that run — actions taken, files written, required reads the Skill itself declared undefendable — not whether the model's essay mentioned a command or opened a procedure file.
 
-Job 一经创建，launching call 就立即返回。Supervision（idle/hard limits、process-tree reaping）在 detached worker 内运行；caller 维护自己的 aggregate deadline，超时后会在没有该 job 的情况下继续。每个 job 只会 atomic 地发布一条 terminal record，detached path 中的任何环节都不得请求用户输入。Process-tree reaping 必须由 host OS 的 process-grouping primitive 保证，不能由 job contract 想当然地假设；如果某种 grouping 不会活过其 leader process，就必须换用真正持久的 primitive 重新建立 reaping，否则 descendants 会在 terminal record 发布后继续存活。
+A required-read miss fails the cell only when the always-loaded body makes the decision undefendable without that file. Omitting the probe is the correct negative when the body still states the gate; a complementary cell is what measures extraction on a path the reference actually owns.
 
-Liveness 与 progress 是不同信号，idle window 只能检测 watched stream 实际携带的那一种。Worker 发出的 heartbeat 只证明 supervising process 仍 alive，并不说明 delegate 是否有产出；相反，将 output 缓冲到 completion 才输出的 delegate，看起来与 wedged delegate 完全相同。某个 delegate 能提供哪种 signal，是应先测量而非假设的自身属性；完成测量前，不能信任 idle window 区分 working run 与 stalled run。
+### Detached job
+A delegated worker process launched into its own session so it outlives the shell tool call that started it, with its state — status word, log, identity, and result — kept in a durable job directory the orchestrator polls between turns instead of awaiting in place.
 
-### Cross-model pass（跨模型 pass）
-一种 additive delegated run：把 host workflow 的 review 或 judgment brief 交给不同的 model-provider route，再把 structured result 合并回 host synthesis。Peer 无法运行时该 pass 保持 non-blocking；只有 serving model family 得到验证、而不只是被 request 时，才算 independent corroboration。
+The launching call returns as soon as the job exists; supervision (idle and hard limits, process-tree reaping) runs inside the detached worker, while the caller keeps its own aggregate deadline and proceeds without the job when that passes. A job publishes exactly one terminal record, atomically, and nothing in the detached path may prompt for input. Process-tree reaping is a guarantee supplied by the host operating system's process-grouping primitive rather than one the job contract can assume: where a grouping does not outlive the process that leads it, reaping must be re-derived from a primitive that does, or descendants survive the terminal record.
 
-### Model identity receipt（模型身份回执）
-Serving backend 对“实际由哪个 model 处理 delegated run”的自有报告。它与 requested model 一同记录，因此两者不一致时会明确显示。只有这种 receipt 才能验证 run 的 model identity；request parameters 或 model 自己生成的文本都不能作为验证依据。没有 receipt 的 output 会标为 requested-but-unverified；为 cross-model agreement 加权的 logic 依据 receipt，而不是 request。
+Liveness and progress are distinct signals, and an idle window detects only whichever one its watched stream actually carries. A worker-emitted heartbeat proves the supervising process is alive while saying nothing about whether the delegate is producing; conversely a delegate that buffers its output until completion looks identical to a wedged one. Which signal a given delegate can supply is a property of that delegate to be measured, not assumed, before an idle window is trusted to distinguish a working run from a stalled one.
+
+### Cross-model pass
+An additive delegated run that sends the host workflow's review or judgment brief through a different model-provider route and folds the structured result back into the host's synthesis. It stays non-blocking when the peer cannot run, and it counts as independent corroboration only when the serving model family can be verified rather than merely requested.
+
+A peer result is usable only when it is a settled answer to the framed question — a settled Blocked verdict with its reason included. Settledness is declared by the peer in the output contract itself, never inferred from its prose; a result that satisfies the schema but is not declared final is a placeholder: it earns one bounded retry on the same route with the same target, model, and scope, inside the same time window, and if it recurs the voice is dropped with the observed reason rather than folded in as a position.
+
+### Terminalize
+The host-owned step that turns a finished external worker's working tree into one inspectable Transport commit, without requiring the worker to stage or commit.
+
+The snapshot includes committed, uncommitted, and untracked output. The worker may edit and test; the host alone creates the Transport commit and later the canonical checkout commit.
+
+### Transport commit
+A synthetic, base-parented commit the host builds from an external worker's complete final tree so the host can inspect and fold the result. It is intermediate evidence, not the canonical checkout commit, and it is never the worker's own tip.
+
+### Warm checkout
+A checkout whose git-ignored inventory already contains what the project's verification command needs to run: installed dependencies, virtualenvs, build caches. It is the normal state of a developer's canonical checkout, and it is the opposite of a fresh clone or newly added worktree, where verification cannot run until something installs those artifacts.
+
+Ignored state in a warm checkout is large, symlink-heavy, and owned by tooling the controller never ran, so any host-side guarantee about it can only be detection and disclosure, never byte-exact custody.
+
+### Model identity receipt
+The serving backend's own report of which model actually handled a delegated run, recorded alongside the requested model so the two can disagree visibly. A run's model identity is verified only by such a receipt — never by the request parameters or the model's own text — and outputs without one are labeled as requested-but-unverified; logic that weights cross-model agreement follows the receipt, not the request.
 
 ### Handoff seam
 The point in a calling Skill where completed work triggers a follow-on Skill in the same run — distinct from a Session handoff, which carries continuity to a fresh session. A seam that states only intent ("auto-invoke X") invites the caller's agent to reproduce the callee's mechanics from memory; a hardened seam pins the invocation mechanism (the platform's skill-invocation primitive, so the callee's instructions actually load) and, when the callee runs a stateful protocol, explicitly forbids starting that protocol's mechanics directly.
@@ -117,28 +149,46 @@ A single-lens reviewer role that evaluates work from one specific perspective �
 ### Confidence anchor
 A discrete, self-scored confidence value on a fixed small scale, each level tied to a behavioral criterion the model can honestly apply, used to gate and rank review findings instead of a continuous score that invites false precision. Each review Skill sets its own actionable threshold; corroboration across personas promotes a finding by one level, but only when those personas meet the bar in Independence.
 
-### Independence（独立性）
-它描述 reviewer 或 researcher 运行时的 *execution context*，而不是采用的 lens：只有来自分别 dispatch 的 context，两个 finding 才算独立。在同一 context 中采用两个 persona，只代表两个视角，不代表两个独立见证者。
+### Independence
+A property of the *execution context* a reviewer or researcher ran in, not of the lens it applied: two findings count as independent only when they came from separately dispatched contexts. Two personas reasoned inside one context are two perspectives, not two witnesses.
 
-只有这种意义上的 independence 才能作为 corroboration 依据，例如提升 Confidence anchor、统计共识，或声称结果获得独立确认。没有发生 dispatch、工作以内联方式执行时，finding 仍然有效，但不存在 corroboration signal；该次运行必须说明损失了哪些 coverage，不能据此提升 confidence。
+Only independence in this sense licenses corroboration — promoting a Confidence anchor, counting agreement, or describing a result as independently confirmed. When dispatch does not happen and the work runs inline, the findings remain valid but the corroboration signal does not exist, and the run says what coverage was lost rather than promoting on it.
 
 ### Autofix class
 The classification of a review finding by how safely its proposed fix can be applied: applied silently, applied only after user confirmation, left for a human to resolve, or recorded as advisory with no action.
 
-### Rendering floor（渲染底线）
-跨 skill 所有输出 surface（interactive walkthrough、batch report、unattended envelope、one-line preview）向人类呈现 review finding 时，共享的一份 surface-agnostic contract。它固定 decision-first 字段顺序：先给 recommendation 和 plain-language consequence，最后才给有长度上限的 mechanism；对于不打开被 review 文档或代码就无法理解的 opaque tokens，则按 navigation、provenance 或 mechanism 功能加以解释，或移出 decision block。每个 surface 只把自己的 layout 映射到这份 floor，避免某一 surface 加强后，其余 surface 悄然落后。
+### Rendering floor
+The single, surface-agnostic contract for how a review finding is presented for a human decision across every output surface a Skill emits — interactive walkthrough, batch report, unattended envelope, one-line preview. It fixes a decision-first field order (recommendation and a plain-language consequence first; mechanism capped and last) and a domain-agnostic policy for opaque tokens: identifiers a reader cannot resolve without opening the reviewed document or code are glossed by their function (navigation, provenance, or mechanism) or moved out of the decision block. Each surface maps its own layout onto the floor instead of carrying its own copy of the rules, so strengthening one surface cannot silently leave the others behind.
 
-### Headless mode（无交互模式）
-一种 explicit opt-in mode：Skill 无人值守运行，不向用户提问，以 written report 作为 deliverable；真正 ambiguous 的 decisions 会 conservatively defer，而不是猜测。当 automation 需要显式 coverage tradeoff 时，Skill 可以在 headless mode 内额外提供独立的 depth selector；non-interactive contract 与 work depth 始终是两个不同 decisions。
+### Headless mode
+An explicit opt-in mode that runs a Skill unattended, with no user prompts — it produces a written report as its deliverable and conservatively defers genuinely ambiguous decisions rather than guessing. A Skill may expose a separate depth selector inside headless mode when automations need an explicit coverage tradeoff; the non-interactive contract and the work depth remain distinct decisions.
 
-### Session-settled decision（会话中已确定的决策）
-用户在触发会话中审视并选定的 decision，也就是 tradeoff 或 alternative 已被明确展示，随后由用户作出选择。它会作为带 provenance label 的 constraint 贯穿 Pipeline（annotation stem 为 `session-settled:`，classes 为 `user-directed` 和 `user-approved`）；下游 skills 可以补充，但绝不重复询问，且只有 evidence 才能与其冲突。未经审视的 assertion 属于 directive，而不是 settled decision，只会在 pipeline 中接受一次 challenge；agents 绝不为自己未经审视的 proposals 添加该标签。
+### Session-settled decision
+A decision examined and chosen by the user in the invoking conversation — a surfaced tradeoff or alternative followed by the user's choice — carried through the Pipeline as a provenance-labeled constraint (annotation stem `session-settled:`, classes `user-directed` and `user-approved`) that downstream skills augment but never re-ask, and contradict only on evidence. An unexamined assertion is a directive, not a settled decision, and receives exactly one in-pipeline challenge; agents never label their own unexamined proposals.
 
-### Settlement test（已定决策判定）
-Writer skill（ce-plan、ce-brainstorm）对 conversation 中携带的 decisions 所作的 classification judgment：若 decision 在 conversation record 中经受过审视，则标记为 settled；若只是 assertion，则属于 directive；若始终只是 agent inference，则不加标签。Test 的 outcome rules 属于 protocol，具体 classification 则由 agent judgment 决定。
+### Settlement test
+The classification judgment a writer skill (ce-plan, ce-brainstorm) applies to conversation-carried decisions: settled if the decision survived examination in the conversation record, a directive if merely asserted, unlabeled if only ever agent-inferred. The test's outcome rules are protocol; the classification itself is agent judgment.
 
 ### Feedback source
-A configured origin of customer or user feedback — a Slack channel, a GitHub Issues repo, an email inbox — declared once in the shared local config under a generic key so any Skill can read the list. Each source entry has its own identity and ingestion cursor; the Skill that ingests from it owns the per-item state, not the source declaration.
+A configured origin of customer or user feedback — a Slack channel, a GitHub Issues repo, an email inbox — declared in repo CE config (`config.yaml`, optionally overridden in `config.local.yaml`) under a generic key so any Skill can read the list. Each source entry has its own identity and ingestion cursor; the Skill that ingests from it owns the per-item state, not the source declaration.
 
 ### Beta skill
 A parallel copy of a stable Skill, suffixed `-beta`, used to trial a new version alongside the stable one without disrupting users. Invoked manually (model auto-invocation is disabled); promoting it to stable is more than a rename — every caller must move in the same change so none silently inherits stale defaults, and the retired beta name must be registered for stale-artifact cleanup so upgrading users don't keep a dead duplicate of the skill alongside the promoted one.
+
+### Offered work
+Work the user has put up for review, as distinct from work that merely exists in the tree or on a remote. Commits in an open pull request are offered; uncommitted edits, local commits, and commits pushed only for backup or to trigger CI are not.
+
+The distinction is what a shipping gate tests before publishing anything, and it is not the same as pushed — a push moves bytes to a remote, review is what makes work offered. Because the skill that ships pushes the whole branch and its pull request spans every commit on that branch, a gate that admits unoffered work publishes it alongside the change it was asked to ship.
+
+### Fix-owned files
+The tests and implementation a run changed to fix the bug it was invoked on, as distinct from files that were already modified when the run began.
+
+Recorded before any edit so later phases can scope to them: the commit takes fix-owned files and nothing else, and a quality pass is handed that scope explicitly rather than a branch diff, since a pass that rewrites what it is given would otherwise reach work in progress that was never offered. A fix-owned file that already carried the user's own edits cannot be separated by a file-level commit, and that entanglement is the one case the handoff stops to ask about.
+
+### Issue of record
+Whichever tracker or monitor item the user supplied as a bug's entry point, treated as that bug's canonical record regardless of which system it lives in — an error-monitor issue counts the same as a tracker ticket.
+
+Later phases link it rather than opening a second record for the same bug elsewhere, and never ask whether to. Discovering the project's own tracker serves reading prior work, not establishing a new home. An input carrying no such reference simply has none, which is an ordinary state rather than a gap to fill.
+
+### Residual
+A review finding a run accepted or deferred rather than fixed, which must reach a durable sink before the run reports itself done — a section in the pull request body, or a ticket in the project's tracker. A finding that lives only in the session is lost when the session ends, so an accepted residual blocks a merge-ready claim until it is recorded somewhere a human will find it.

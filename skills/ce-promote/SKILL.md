@@ -5,6 +5,10 @@ disable-model-invocation: true
 argument-hint: "[optional: what shipped and/or channels, e.g. 'a tweet thread and a LinkedIn post']"
 ---
 
+## 中文执行导读
+
+这是中文 fork 的 runtime 入口。先按本文件的阶段顺序和 references 执行；命令、参数、文件路径、schema、精确字符串和安全边界保持原样，英文契约仍是权威。
+
 # Promotion Copy
 
 Turn a feature that just shipped into copy-pasteable, user-facing announcement copy, right inside the engineering workflow — so the messaging doesn't wait for a separate marketing pass.

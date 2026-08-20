@@ -28,16 +28,19 @@ GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/get-pr-comments" PR_NUMBER OWNER
 
 **Pass the base `OWNER/REPO`** (parsed from the PR URL, when one was given) as the second arg. `get-pr-comments` otherwise falls back to `gh repo view` in the *current checkout* — so for a fork→upstream PR handed in as a URL, omitting it would fetch review feedback from the fork (or fail) instead of the upstream base repo. Every `get-pr-comments` call below (fetch and verify) takes the same `OWNER/REPO`.
 
-返回一个包含四个 keys 的 JSON object：
+Returns a JSON object with these keys:
 
-| Key | 内容 | 是否有 file/line？ | 是否可 resolve？ |
+| Key | Contents | Has file/line? | Resolvable? |
 |-----|----------|---------------|-------------|
-| `pending_review` | 你自己在此 PR 上尚未提交的（PENDING）review 的 Node ID，或 `null` | n/a | n/a |
-| `review_threads` | 未解决的 inline code review threads（包括 outdated；每项都带有 `isOutdated` flag，以便处理行漂移） | 是 | 是（GraphQL） |
-| `pr_comments` | 顶层 PR conversation comments（排除 PR author） | 否 | 否 |
-| `review_bodies` | 文本非空的 review submission bodies（排除 PR author） | 否 | 否 |
+| `pending_review` | Node ID of your own unsubmitted (PENDING) review on this PR, or `null` | n/a | n/a |
+| `review_threads` | Unresolved inline code review threads (includes outdated; each carries its `isOutdated` flag so line drift can be accounted for) | Yes | Yes (GraphQL) |
+| `pr_comments` | Top-level PR conversation comments | No | No |
+| `review_bodies` | Review submission bodies with non-empty text | No | No |
+| `pr_author` / `viewer` | The PR author's login and the acting account's login, for judging identity in step 2 | n/a | n/a |
 
-**如果 `pending_review` 非 null，在这里停止。** 当你持有尚未提交的 review 时，发布的 thread replies 会被吸收到该 draft：reply 调用会像成功一样返回 comment ID 和 URL，但 draft 提交前 reviewer 看不到任何内容。不要进入 steps 2-8；否则 fixes 会落地，而所有 replies 都会静默消失。告诉用户该 PR 上有一个尚未提交的 review，必须先提交或丢弃，skill 才能回复，然后停止。不要自行提交或丢弃；draft review 是尚未发送的人工内容。
+**All three feedback surfaces are in scope.** `review_threads`, `pr_comments`, and `review_bodies` are judged the same way in step 3; only the reply and resolve mechanics differ (step 7). The fetch excludes nothing by identity — a top-level comment from the PR author is the ordinary way a human asks for a change on an agent-opened PR, so it is feedback like any other.
+
+**Stop here if `pending_review` is non-null.** Thread replies posted while you hold an unsubmitted review are absorbed into that draft: the reply call returns a comment ID and URL as if it succeeded, but nothing is visible to the reviewer until the draft is submitted. Do not proceed into steps 2-8 — the fixes would land while every reply silently disappeared. Tell the user they have an unsubmitted review on the PR, that it must be submitted or discarded before this skill can reply, and stop. Do not submit or discard it yourself; a draft review is unsent human writing.
 
 If the script fails, fall back to:
 ```bash
@@ -53,18 +56,18 @@ Before processing, classify each piece of feedback as **new** or **already handl
 
 **PR comments and review bodies**: These have no resolve mechanism, so they reappear on every run. Apply two filters in order:
 
-1. **Actionability**: Skip items that contain no actionable feedback or questions to answer. Examples: review wrapper text ("Here are some automated review suggestions..."), approvals ("this looks great!"), status badges ("Validated"), CI summaries with no follow-up asks. If there's nothing to fix, answer, or decide, it's not actionable -- drop it from the count entirely.
+1. **Actionability**: An item is actionable when it is someone's open request to this PR — something to fix, answer, or decide. This is also what keeps the run from looping on its own output: a reply posted by this run or an earlier one is a record of handling, not a request, so it drops here whether it reports a fix or carries a parked `needs-human` decision — that parked item is already tracked as itself, and re-reading its own write-up as fresh feedback is how the loop would never settle. Who posted an item never decides this, including the account that opened the PR. Examples: review wrapper text ("Here are some automated review suggestions..."), approvals ("this looks great!"), status badges ("Validated"), CI summaries with no follow-up asks. If there's nothing to fix, answer, or decide, it's not actionable -- drop it from the count entirely.
 2. **Already replied**: For actionable items, check the PR conversation for an existing reply that quotes and addresses the feedback. If a reply already exists, skip. If not, it's new.
 
 The distinction is about content, not who posted what. A deferral from a teammate, a previous skill run, or a manual reply all count. Similarly, actionability is about content -- bot feedback that requests a specific code change is actionable; a bot's boilerplate header wrapping those requests is not.
 
-**Silent drop.** Non-actionable items are dropped without narration. Do not announce, list, or count dropped items in conversation, the task list, or the step 9 summary. Review-bot wrappers from CodeRabbit, Codex, Gemini Code Assist, and Copilot (bodies like "Here are some automated review suggestions...") commonly appear here -- recognize them by their boilerplate content, drop silently. The fetch layer pre-filters only blank bodies and messages from the known PR author. All external identities and surfaces, including CI/status bots such as Codecov, rely on this content-aware check so identity reuse or format changes cannot silently hide actionable feedback.
+**Silent drop.** Non-actionable items are dropped without narration. Do not announce, list, or count dropped items in conversation, the task list, or the step 9 summary. Review-bot wrappers from CodeRabbit, Codex, Gemini Code Assist, and Copilot (bodies like "Here are some automated review suggestions...") commonly appear here -- recognize them by their boilerplate content, drop silently. The fetch layer pre-filters only blank bodies. Every identity and surface — the PR author, CI/status bots such as Codecov, review bots — relies on this content-aware check, so identity reuse or format changes cannot silently hide actionable feedback.
 
 If there are no new items across all feedback types, skip steps 3-8 and go straight to step 9.
 
 ## 3. Consolidate & Decide (the legitimacy gate)
 
-This is the gate. Judge every **new** item here, in your own context, before any fix is dispatched. Apply the rubric in [references/evaluation-rubric.md](evaluation-rubric.md) (read it now) across the whole batch at once.
+This is the gate. Judge every **new** item here, in your own context, before any fix is dispatched. Apply the rubric in [references/evaluation-rubric.md](evaluation-rubric.md) (read it now) across the whole batch at once. When the invocation carries a `trajectory`, apply the non-convergence test in [references/pipeline-mode.md](pipeline-mode.md) before dispatching anything — a demonstrated shared root is answered once, at the root, instead of fixing each instance.
 
 Working over the full set lets you do what a per-thread subagent can't:
 - **Dedup reads by file** — read a file once and judge all its threads together.
@@ -100,9 +103,9 @@ Each fixer receives:
 
 For `pr_comment` / `review_body` fix-list items (no file/line), the fixer identifies the relevant files from the comment text and the PR diff.
 
-**没有 subagent capability 时，按顺序自行应用修复。** Harness 无法 dispatch（或 dispatch 失败）时，在当前 context 中逐项处理 fix-list；把 fixer prompt 当作自己的执行指令，并生成相同的逐项结果。这是受支持的路径，不属于需要披露 coverage 损失的降级：legitimacy judgment 已在 step 3 集中完成，fixer 只负责实现已批准的变更，因此 inline 执行损失的只是并行度和 context headroom，不是 correctness。继续遵守 dispatch 路径的纪律：一次只处理一个 item，每次编辑前重新读取文件；实现过程中若发现矛盾，停止并重新评估（`blocked` 处理保持不变）。
+**No subagent capability — apply the fixes yourself, sequentially.** When the harness exposes no way to dispatch (or a dispatch fails), work the fix-list in this context one item at a time, using the fixer prompt as your own instructions and producing the same per-item result. This is a supported path, not a degradation to disclose as lost coverage: the legitimacy judgment already happened centrally in step 3, and fixers only *implement* changes you approved, so running them here costs parallelism and context headroom — never correctness. Keep the dispatch path's discipline: one item at a time, re-read each file before editing it, and stop to re-evaluate if implementing surfaces a contradiction (the `blocked` handling applies unchanged).
 
-因此，本 skill 不依赖 agent-tool authorization 也能完成 review。这是有意设计：它会在 `ce-babysit-pr` 下无人值守运行，权限提示会卡住整个 loop，所以 tool surface 保持收敛，且没有 dispatch 时 fixer 路径仍然可用。
+This skill therefore does not depend on agent-tool authorization to complete a review. That is deliberate: it runs unattended under `ce-babysit-pr`, where a permission prompt would stall the whole loop, so its tool surface stays narrow and its fix path stays viable without dispatch.
 
 ### Fixer return format
 
@@ -176,8 +179,8 @@ GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/get-thread-for-comment" PR_NUMBE
 ```
 The returned `id` is the authoritative thread ID to use for reply and resolve. If it differs from what `get-pr-comments` returned, use the one from this script.
 
-1. 使用 [scripts/reply-to-pr-thread](../scripts/reply-to-pr-thread) **回复**。如果 bundled script 缺失，针对 thread 的第一条 comment 调用 `gh api --method POST repos/{owner}/{repo}/pulls/PR_NUMBER/comments/COMMENT_ID/replies -f body=...`；绝不要使用 `gh pr review` 或向 `/reviews` POST，否则会打开一个未提交的 draft review，吞掉当前及之后所有回复：
-通过带引号的 heredoc 传入 body，绝不要使用 `echo "..."` 或 `printf`。Reply 是多行 Markdown（quote line、blank line、response）；`echo` 既不会解释 `\n`，也无法可靠处理带 escape sequences 的 body，reviewer 最终会看到一整行包含字面 `\n` 的文本。带引号的 delimiter（`<<'EOF'`）还会阻止 shell 展开引用代码中的 backticks、`$` 和 `!`：
+1. **Reply** using [scripts/reply-to-pr-thread](../scripts/reply-to-pr-thread). If the bundled script is missing, reply with `gh api --method POST repos/{owner}/{repo}/pulls/PR_NUMBER/comments/COMMENT_ID/replies -f body=...` against the thread's first comment — never `gh pr review` or a `/reviews` POST, which open an unsubmitted draft review that swallows this reply and every one after it:
+Feed the body through a quoted heredoc, never `echo "..."` or `printf`. A reply is multi-line Markdown (a quote line, a blank line, then the response), and `echo` neither interprets `\n` nor survives a body composed with escape sequences — the reviewer then sees a single run-on line containing literal `\n` characters. The quoted delimiter (`<<'EOF'`) also stops the shell from expanding backticks, `$`, and `!` inside quoted code:
 ```bash
 SKILL_DIR="<absolute path of the directory containing the ce-resolve-pr-feedback SKILL.md>";
 GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/reply-to-pr-thread" THREAD_ID <<'EOF'
@@ -186,13 +189,13 @@ GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/reply-to-pr-thread" THREAD_ID <<
 Fixed in abc1234 — the lookup now null-checks before dereferencing.
 EOF
 ```
-继续前，检查返回的 comment URL 是否包含正确的 `OWNER/REPO` 和 PR number。
+Check that the returned comment URL contains the correct `OWNER/REPO` and PR number before proceeding.
 
-2. Resolve 前，**验证已发布的 body 能渲染为 Markdown**。从返回的 URL fragment 中取得 numeric ID（`#discussion_r2589700` → `2589700`），并读回 GitHub 实际存储的内容：
+2. **Verify the posted body renders as Markdown** before resolving. Take the numeric ID from the returned URL fragment (`#discussion_r2589700` → `2589700`) and read back what GitHub actually stored:
 ```bash
 GH_HOST=<derived-host> GH_REPO=OWNER/REPO gh api repos/{owner}/{repo}/pulls/comments/COMMENT_ID --jq .body
 ```
-输出必须包含真正的换行。如果它反而在单行内显示字面 backslash-n 字符 `\n`（或 `\n\n`），说明 body 以 escaped 形式发布：**不要 resolve thread（do not resolve）**。先通过 heredoc 重写 body，再重新验证：
+The output must show real line breaks. If instead it shows `\n` (or `\n\n`) as literal backslash-n characters inside one line, the body was posted escaped: **do not resolve the thread**. Fix it first by rewriting the body through a heredoc, then re-verify:
 ```bash
 GH_HOST=<derived-host> GH_REPO=OWNER/REPO gh api --method PATCH repos/{owner}/{repo}/pulls/comments/COMMENT_ID -f body="$(cat <<'EOF'
 > the specific sentence being addressed from the reviewer's comment
@@ -202,7 +205,7 @@ EOF
 )"
 ```
 
-3. 使用 [scripts/resolve-pr-thread](../scripts/resolve-pr-thread) **Resolve**（如果 bundled script 缺失，在支持时使用 `gh api` resolve thread）：
+3. **Resolve** using [scripts/resolve-pr-thread](../scripts/resolve-pr-thread) (if the bundled script is missing, resolve the thread with `gh api` if supported):
 ```bash
 SKILL_DIR="<absolute path of the directory containing the ce-resolve-pr-feedback SKILL.md>";
 GH_HOST=<derived-host> bash "$SKILL_DIR/scripts/resolve-pr-thread" THREAD_ID
@@ -221,7 +224,7 @@ EOF
 )"
 ```
 
-这里适用同样的 escaping rule：使用带引号的 heredoc 组成 body，使段落分隔成为真正换行，并确认发布后的 comment 渲染为 Markdown，而不是包含字面 `\n` 的单行文本。
+The same escaping rule applies here: compose the body in a quoted heredoc so paragraph breaks are real newlines, and confirm the posted comment renders as Markdown rather than one line containing literal `\n`.
 
 Include enough quoted context in the reply so the reader can follow which comment is being addressed without scrolling.
 
@@ -289,4 +292,4 @@ If a blocking question tool is available, use it to ask about all pending decisi
 
 Use the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_question` in Antigravity CLI (`agy`), `ask_user` in Pi (requires the `pi-ask-user` extension). Use it to present the decisions and wait for the user's response. After they decide, process the remaining items: fix the code, compose the reply, post it, and resolve the thread.
 
-Fall back to presenting the decisions in the summary output and waiting in conversation only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip. If the user doesn't respond, the items remain open on the PR for later handling.
+Fall back to presenting the decisions in user-visible summary output and waiting in conversation only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip. If the user doesn't respond, the items remain open on the PR for later handling.

@@ -1,127 +1,137 @@
-# `/ce-optimize` 使用指南
+# `ce-optimize` Usage Guide
 
-## 此 skill 用途
+## What This Skill Is For
 
-`/ce-optimize` 用于以下 hard engineering problems：
+The `ce-optimize` skill is for hard engineering problems where:
 
-1. 可以尝试多个 code 或 config variants。
-2. 可以对每个 variant 运行相同 evaluation。
-3. 希望 skill 保留 good variants，并 reject bad ones。
+1. You can try multiple code or config variants.
+2. You can run the same evaluation against each variant.
+3. You want the skill to keep the good variants and reject the bad ones.
 
-它最适合 "search the space and score the results" 类工作，而不是 one-shot implementation work。
+It is best for "search the space and score the results" work, not one-shot implementation work.
 
-## 何时使用
+## When To Use It
 
-当 problem 类似以下情况时使用 `/ce-optimize`：
+Reach for `ce-optimize` when the problem looks like:
 
-- "找到能阻止 OOM crashes 且不浪费 RAM 的最小 memory limit。"
-- "调优 clustering parameters，但不要把所有东西都坍缩成一个垃圾 cluster。"
-- "找到更便宜、但仍能产出足够好 summaries 供 downstream clustering 使用的 prompt。"
-- "在同一个 harness 下比较多种 ranking、retrieval、batching 或 threshold strategies。"
+- "Find the smallest memory limit that stops OOM crashes without wasting RAM."
+- "Tune clustering parameters without collapsing everything into one garbage cluster."
+- "Find a prompt that is cheaper but still produces summaries good enough for downstream clustering."
+- "Compare several ranking, retrieval, batching, or threshold strategies against the same harness."
 
-当 success 是 objective 且测量成本低时，选择 `type: hard`：
+Choose `type: hard` when success is objective and cheap to measure:
 
-- Memory usage（内存使用）
-- Latency（延迟）
-- Throughput（吞吐量）
-- Test pass rate（测试通过率）
-- Build time（构建时间）
+- Memory usage
+- Latency
+- Throughput
+- Test pass rate
+- Build time
 
-当 numeric metric 可能被 game，或 human usefulness 很重要时，选择 `type: judge`：
+Choose `type: judge` when a numeric metric can be gamed or when human usefulness matters:
 
-- Cluster coherence（cluster 一致性）
-- Search relevance（搜索相关性）
-- Summary quality（summary 质量）
-- Prompt quality（prompt 质量）
-- Classification quality with semantic edge cases（带 semantic edge cases 的分类质量）
+- Cluster coherence
+- Search relevance
+- Summary quality
+- Prompt quality
+- Classification quality with semantic edge cases
 
-## 何时不使用
+## When Not To Use It
 
-以下情况中，`/ce-optimize` 通常不是合适工具：
+`ce-optimize` is usually the wrong tool when:
 
-- fix 很 obvious，不需要 experimentation
-- 没有 repeatable measurement harness
-- search space 是假的，只有一个 plausible answer
-- evaluating variants 成本太高，不值得 multiple runs
+- The fix is obvious and does not need experimentation
+- There is no repeatable measurement harness
+- The search space is fake and only has one plausible answer
+- The cost of evaluating variants is too high to justify multiple runs
 
-## 如何理解
+## How To Think About It
 
-Pattern 是：
+The pattern is:
 
-1. 定义 target。
-2. 先 build 或 validate measurement harness。
-3. 生成多个 plausible variants。
-4. 对每个 variant 运行相同 evaluation loop。
-5. 保留在不违反 guard rails 前提下改善 target 的 variants。
+1. Define the target.
+2. Build or validate the measurement harness first.
+3. Generate multiple plausible variants.
+4. Run the same evaluation loop against each variant.
+5. Keep the variants that improve the target without violating guard rails.
 
-Core rule 很简单：
+The core rule is simple:
 
-- 如果 hard metric 能捕获 "better"，优化 hard metric。
-- 如果 hard metric 可以被 game，添加 LLM-as-judge。
+- If a hard metric captures "better," optimize the hard metric.
+- If a hard metric can be gamed, add LLM-as-judge.
 
-示例：降低 clustering threshold 可能提高 cluster coverage。听起来不错，直到所有东西都进入一个 giant cluster。Hard metrics 可能说 "improved"；而 sampling real clusters 的 LLM judge 可以说 "this is trash."
+Example: lowering a clustering threshold may increase cluster coverage. That sounds good until everything ends up in one giant cluster. Hard metrics may say "improved"; an LLM judge sampling real clusters can say "this is trash."
 
-## First-Run Advice（首次运行建议）
+## First-Run Advice
 
-首次运行时：
+For the first run:
 
-- 优先使用 `execution.mode: serial`
-- 设置 `execution.max_concurrent: 1`
-- 保持 `stopping.max_iterations` 较小
-- 保持 `stopping.max_hours` 较小
-- 在 baseline trustworthy 前避免 new dependencies
-- 在 judge mode 中，使用 small sample 和 low cost cap
+- Prefer `execution.mode: serial`
+- Set `execution.max_concurrent: 1`
+- Keep `stopping.max_iterations` small
+- Keep `stopping.max_hours` small
+- Avoid new dependencies until the baseline is trustworthy
+- In judge mode, use a small sample and a low cost cap
 
-首次运行的目标是 validate harness，而不是立刻赢得 optimization。
+The goal of the first run is to validate the harness, not to win the optimization immediately.
 
-## Example Prompts（示例 prompts）
+## Example Prompts
 
-### 1. Memory Tuning（内存调优）
-
-```text
-使用 /ce-optimize 找到能让这个 service 在我们的 load test 下保持稳定的最小 memory setting。
-
-当前 container limit 是 512 MB，app 有时会 OOM-crash。不要直接跳到 8 GB。尝试一小组 realistic memory limits，对每个 limit 运行相同 load test，并用以下标准评分：
-- process 是否 OOM
-- tail latency 是否严重 spike
-- GC pauses 是否变得 excessive
-
-优先选择通过 guard rails 的最小 memory limit。
-```
-
-### 2. Clustering Quality（聚类质量）
+### 1. Memory Tuning
 
 ```text
-使用 /ce-optimize 改善 issue 和 PR clustering quality。
+Run the `ce-optimize` skill to find the smallest memory setting that keeps this service stable under our load test.
 
-我们大约有 18k 个 open issues 和 PRs。我们想测试能改善 clustering quality、减少 singleton clusters，并提升每个 cluster 内 match quality 的 changes。
+The current container limit is 512 MB and the app sometimes OOM-crashes. Do not just jump to 8 GB. Try a small set of realistic memory limits, run the same load test for each one, and score the results using:
+- did the process OOM
+- did tail latency spike badly
+- did GC pauses become excessive
 
-不要修改 shared default database。为本次 run 复制它，然后在需要时使用 per-experiment copies。
-
-不要只针对 coverage optimize。使用 LLM-as-judge 对 clusters 采样，确认它们仍保留真实 semantic similarity，而不是坍缩成巨大的 low-quality clusters。
+Prefer the smallest memory limit that passes the guard rails.
 ```
 
-### 3. Prompt Optimization（Prompt 优化）
+### 2. Clustering Quality
 
 ```text
-使用 /ce-optimize 为 issues 和 PRs 创建 summarization prompt，在尽量降低 token spend 的同时，仍产出足够好、可供 downstream clustering 使用的 summaries。
+Run the `ce-optimize` skill to improve issue and PR clustering quality.
 
-我希望这个 loop 比较 prompt variants，测量 token cost，并判断 summaries 是否保留了把 related issues 聚在一起、同时不合并 unrelated issues 所需的区分度。
+We have about 18k open issues and PRs. We want to test changes that improve clustering quality, reduce singleton clusters, and improve match quality within each cluster.
+
+Do not mutate the shared default database. Copy it for the run, then use per-experiment copies when needed.
+
+Do not optimize only for coverage. Use LLM-as-judge to sample clusters and confirm they still preserve real semantic similarity instead of collapsing into giant low-quality clusters.
 ```
 
-## 在 Hard Metrics 和 Judge Mode 之间选择
+### 3. Prompt Optimization
 
-以下情况只用 hard metrics：
+```text
+Run the `ce-optimize` skill to create a summarization prompt for issues and PRs that minimizes token spend while still producing summaries that are good enough for downstream clustering.
 
-- "better" 从 numbers 中显而易见。
+I want the loop to compare prompt variants, measure token cost, and judge whether the summaries preserve the distinctions needed to cluster related issues together without merging unrelated ones.
+```
 
-以下情况添加 judge mode：
+## Choosing Between Hard Metrics And Judge Mode
 
-- numbers 可能改善，但真实 output 变差。
+Use hard metrics alone when:
 
-常见 pattern：
+- "Better" is obvious from the numbers.
 
-- Hard gates（硬门禁）reject broken outputs。
-- Judge mode 对 surviving candidates 的实际 usefulness 打分。
+Add judge mode when:
 
-这种 hybrid setup 通常是 ranking、clustering 和 prompt work 的最佳 default。
+- The numbers can improve while the real output gets worse.
+
+Common pattern:
+
+- Hard gates reject broken outputs.
+- Judge mode scores the surviving candidates for actual usefulness.
+
+That hybrid setup is often the best default for ranking, clustering, and prompt work.
+
+## First-run defaults
+
+A first run optimizes for signal and safety, not throughput:
+
+- Start from `references/example-hard-spec.yaml` when the metric is objective and cheap to measure; use `references/example-judge-spec.yaml` only when quality genuinely requires semantic judgment.
+- Prefer `execution.mode: serial` with `execution.max_concurrent: 1`.
+- Cap the run with `stopping.max_iterations: 4` and `stopping.max_hours: 1`.
+- Add no new dependencies until the baseline and measurement harness are trusted.
+- For judge mode, start at `sample_size: 10`, `batch_size: 5`, and `max_total_cost_usd: 5`.

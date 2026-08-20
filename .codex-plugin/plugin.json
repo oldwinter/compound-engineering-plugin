@@ -1,7 +1,7 @@
 {
   "name": "compound-engineering",
-  "version": "3.22.0",
-  "description": "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具",
+  "version": "3.22.4",
+  "description": "Brainstorm, plan, debug, review, and compound learnings with AI agents",
   "author": {
     "name": "Kieran Klaassen and Trevin Chow"
   },
@@ -20,8 +20,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Compound Engineering",
-    "shortDescription": "用于 brainstorming、planning、debugging、review 和沉淀 learnings 的 AI agents 工程工具",
-    "longDescription": "Compound Engineering 引导 AI agents 完成 strategy、ideation、requirements、planning、execution、debugging、review、PR feedback 与 learnings 沉淀，让后续工程工作更容易。",
+    "shortDescription": "Brainstorm, plan, debug, review, and compound learnings with AI agents",
+    "longDescription": "Compound Engineering guides AI agents through the full engineering loop: strategy, ideation, requirements, planning, execution, debugging, review, PR feedback, and captured learnings that make future work easier.",
     "developerName": "Kieran Klaassen and Trevin Chow",
     "category": "Coding",
     "capabilities": [

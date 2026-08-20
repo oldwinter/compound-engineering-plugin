@@ -1,244 +1,240 @@
 # `ce-commit-push-pr`
 
-> 从 working changes 到 open PR，并生成 adaptive、value-first description，深度随 change 缩放。也可重写现有 PR description，或只生成 description 而不触碰 git。
+> Commit, push, and open a PR. Or rewrite an existing PR description. Or print a description and leave git alone.
 
-`ce-commit-push-pr` 是 **shipping** skill。三种 modes：full workflow、description update on existing PR、description-only generation，覆盖常见的 "I want to ship" 形态，而不会强迫你走不必要步骤。PR descriptions 会按 change complexity 自适应（不是 cookie-cutter templates），并覆盖 **full PR commit range**，不只是 invocation 时的 working-tree diff。
+`ce-commit-push-pr` is the **shipping** skill. It is a git-workflow tool, not a core-loop step. Use it when the code is already written and you want a PR, or when you only want the description.
 
-Skill 对几个曾经坑过 contributors 的具体点很 opinionated：绝不 `git add -A`，当存在自然不同 concerns 时拆成 separate commits，并通过 temp files 写 PR bodies（绝不通过 stdin pipes；它们可能静默产出 empty PR bodies，而 `gh` 仍 exit 0）。
+Three modes cover that range: full workflow, description update on an existing PR, and description-only generation. Descriptions cover the **full PR commit range**, not just the working-tree diff at invoke time. After a new PR (or new commits on an open one), the skill hands off to `/ce-babysit-pr` by default.
 
-Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-plan -> /ce-work`。`ce-commit-push-pr` 是 `/ce-work` 的 Phase 4 handoff target：它生成带 summary、testing notes、evidence（behavior observable 时）和 operational validation section 的 PR。它也常在你已经写完 code、想 ship 时直接调用。
+It never runs `git add -A`. Distinct file groups can become separate commits. Related work references keep close-vs-link intent. PR bodies go through a temp file (`--body-file`), not a stdin pipe that can succeed with an empty body.
+
+`/ce-commit` is the local-only sibling: same commit pass, no push, no PR.
 
 ---
 
 ## TL;DR
 
-| Question（问题） | Answer（答案） |
+| Question | Answer |
 |----------|--------|
-| 它做什么？ | Commit、push 并 open PR；或只重写 existing PR description；或只生成 description 而不触碰 git |
-| 何时使用 | 想要 commits + PR；重写 existing PR description；为 branch 起草 description |
-| 产出什么 | Open PR（返回 URL）；或 updated PR description；或打印 description 供你自己应用 |
-| 下一步 | 默认自动 handoff 到 [`/ce-babysit-pr`](./ce-babysit-pr.md)，watch CI 和新 review、推动 PR 走向 merge-ready（可用 `babysit:off` 或 `auto_babysit: false` opt out）；它报告 ready 后由你 merge。有明确 **stack intent** 时，它会通过 `gh stack` 提交，并以 `posture:stack-ready`（land intent 明确时为 `stack-land`）handoff bottom open non-draft PR |
+| What does it do? | Commits, pushes, and opens a PR; or rewrites an existing description; or prints a description without touching git |
+| When to use it | You want a PR, a refreshed description, or a draft body for a branch |
+| What it produces | An open PR URL, an updated description, or a printed body |
+| What's next | Hands off to [`/ce-babysit-pr`](./ce-babysit-pr.md) by default (`babysit:off` or `auto_babysit: false` to skip). You merge when babysit reports ready. A clear **stack** request submits via `gh stack` and babysits the bottom open non-draft PR with `posture:stack-ready` (or `stack-land` when land intent is explicit). |
 
 ---
 
-## 调用示例
+## Example invocations
+
+Empty invoke is the full ship. Phrasing picks description-only vs rewrite. A PR URL or number alone is description-only. Stack language is opt-in.
 
 ```text
-# Commit 当前工作、push branch 并打开 PR
+# Commit, push, open a PR, then start /ce-babysit-pr
 /ce-commit-push-pr
 
-# 起草 PR description，但不实际应用
+# Same ship, but do not start babysit
+/ce-commit-push-pr babysit:off
+
+# Print a description. No commit, no push, no gh pr edit.
 /ce-commit-push-pr draft a PR description for this branch
 
-# 以特定重点重写当前 PR description
+# Rewrite the open PR on this branch. Preview first, then confirm.
 /ce-commit-push-pr update the PR description to include benchmark results
 
-# 根据完整 branch scope 描述另一个 PR
+# Description-only for that PR's complete commit range
 /ce-commit-push-pr https://github.com/acme/widgets/pull/1234
+
+# Force babysit mode on the PR this run just opened or updated
+/ce-commit-push-pr babysit:checkpoint
+
+# Opt-in stack rooted on that PR, then babysit the bottom open non-draft PR
+/ce-commit-push-pr stack this on top of PR #123
+
+# Same stack path, and tell babysit to land when green
+/ce-commit-push-pr stack this and land when green
 ```
 
----
-
-## 问题
-
-从 "code written" 到 "PR open" 本应一步完成，但常以可预测方式失败：
-
-- **Cookie-cutter PR descriptions** 不随 complexity 缩放：one-line bug fix 和 2,000-line refactor 得到同样 Summary / Test Plan / Notes 形状
-- **`git add -A`** 会扫入 unintended files（`.env`、build artifacts、generated files）
-- **Description 只覆盖 invocation 时的 working-tree diff**，漏掉已经 pushed 的 commits
-- **Empty PR bodies via stdin pipes**：`--body-file -`、heredoc-to-stdin 或 `--body "$(cat ...)"` 可能静默产生 empty PR body，同时 `gh` 仍 exit 0 并返回 URL
-- **Convention detection 错误**：即使 repo 有清晰 established style，也 fallback 到 default convention
-- **Branch state surprises**：在 default branch commit、在 detached HEAD 创建 commits、push 到 stale base
-
-## 方案
-
-`ce-commit-push-pr` 明确处理这些问题：
-
-- **Three-mode dispatch（三模式分发）**：full workflow / description update / description-only generation
-- **Adaptive PR descriptions**：深度随 change 缩放；one-line fixes 得到 tight description，large refactors 得到应有结构
-- **Smart commit splitting at file level**：自然 distinct concerns 变成 separate commits（最多 2-3 个），不使用 `git add -p`
-- **Branch state decision tree**：明确处理 detached HEAD、default branch、unpushed commits、no upstream、existing PR cases
-- **Body-file safety**：每个 PR description 写入 temp file，并通过 `--body-file <path>` 传递，绝不通过 stdin
-- **Convention detection**：context 中的 repo conventions > recent commit history > conventional-commits default
-- **Full PR commit-range resolution**：descriptions 覆盖 PR 中所有 commits，而不只是 working-tree diff
-- **Related-reference preflight**：识别 work-item references，并且只在 PR 真正解决该 item 时才使用 closing magic words
-- **Concept teaching**：当 PR 向 codebase 引入新 concept（pattern、technique、library 或 domain idea）时，description 会增加用于讲解它的 `## New concepts` section，让 readers 无需打开 diff 也能理解并复述 change
-- **Explicit, non-disruptive branding**：只有传入 `branding:on` 时，新 PR 才会添加 generic Compound Engineering badge；bare 或自动选择的 invocation 不添加任何 branding，rewrite existing PR 时则保留当前 branding
-- **选择加入的 PR stack 构建与提交**：仅当 user intent（或 standing preference）想要 stack 时才进行；绝不会为一行的 fix 主动建议。复用已有 topology，或从已完成 work 推导出最小的有用 retrospective dependency layers，然后提交并以推导出的 posture handoff babysit
+`/ce-commit` if you only want the local commit.
 
 ---
 
-## 它的新意
+## The Problem
 
-### 1. Three-mode dispatch：选择真正想要的形状
+"Code is done, open a PR" fails in a few repeatable ways:
 
-Skill 会 upfront 检测 intent，并走匹配 path：
+- A one-line fix and a large refactor get the same Summary / Test Plan / Notes template
+- `git add -A` picks up `.env` files, build artifacts, and generated files
+- The description only covers the working-tree diff, and misses commits already on the branch
+- Issue and tracker references get dropped, or a magic word closes work the PR does not resolve
+- `--body` via stdin can return a URL while the body is empty (`gh` still exits 0)
+- The commit lands on the default branch, on detached HEAD, or against a stale base
 
-- **Full workflow**：commit pending work、push、open PR。是 "ship this" / "create a PR" / "commit push PR" 的默认模式。
-- **Description update on existing PR**：refresh、rewrite 或 refocus existing PR description，不触碰 git state。
-- **Description-only generation**：生成 PR description 并打印回来，不 commit、不 push、不 apply。由 "draft a PR description"、"describe this PR"，或单独粘贴 PR URL 触发。
+## The Solution
 
-当用户不想 commit/push/edit 时跳过这些步骤，符合人们实际表达的意思，而不是每次强行 full workflow。
+The skill picks a mode, then runs only that path:
 
-### 2. Adaptive PR descriptions：随 change 缩放
+- **Full workflow** (default): commit pending work, push, and open a PR (or push onto the one that already exists)
+- **Description update**: rewrite an existing PR body without a commit or push
+- **Description-only**: print a body. Apply only if you ask.
 
-PR descriptions 不是从 fixed template 渲染的。Composition step 会按 change 选择 structure 和 depth：
-
-- Trivial typo fix 得到 one-line summary，不需要 test plan 或 notes section
-- Medium feature 得到 summary + test plan + relevant context
-- Large refactor 得到 summary、motivation、key decisions、test plan、evidence、operational notes 和 risks
-- Composition 读取 **full PR commit range**（不只是 invocation 时 working-tree diff），所以 multi-commit PR 的 description 反映所有会 land 的 commits
-
-### 3. File level 的 smart commit splitting
-
-当 changes 触及自然不同 concerns（例如 backend models + frontend components + docs），skill 会创建 separate commits，通常最多 2-3 个，并按 file level grouping。不使用 `git add -p`（interactive hunk-level staging 可能把 hunks 跨 commits split，破坏 atomicity）。当 split ambiguous，一个 commit 就好。
-
-### 4. Branch state decision tree（分支状态决策树）
-
-每种怪 branch state 都有 explicit branch：
-
-- Detached HEAD -> 询问是否创建 feature branch
-- On default branch with unpushed commits -> 询问是否创建 feature branch
-- On default branch、all pushed、no PR -> "no feature branch work" 并停止
-- Feature branch、no upstream -> push 并继续
-- Feature branch、all pushed、no open PR -> skip commit/push、生成 description、open PR
-- Feature branch、all pushed、open PR -> 报告 up to date
-
-没有 silent commits to default，没有 surprise re-pushes，没有 flow 中途才出现的 missing-upstream errors。
-
-### 5. Body-file safety：避免 empty-PR-body 陷阱
-
-每个 PR description 都写入 temporary file，使用 quoted heredoc sentinel，并通过 `gh ... --body-file "$BODY_FILE"` 传入。Skill 明确不使用 `--body-file -`、stdin pipes、heredoc-to-stdin 或 `--body "$(cat ...)"`；这些 wrappers 会静默产出 empty PR body，而 `gh` 仍 exit 0 并返回 URL。Quoted sentinel 防止 body 中的 `$VAR`、backticks 和 stray `EOF` markers 被展开。
-
-### 6. 按优先级进行 convention detection
-
-Commit messages 和 PR titles：context 中的 repo conventions 最优先；recent commit history 是下一个 signal；conventional commits 是 fallback default。使用 conventional commits 时，如果 `fix:` 和 `feat:` 都看起来合适，skill 默认 `fix:`（修复 broken 或 missing behavior 的 change 是 `fix:`，即使用新增代码实现；`feat:` 用于用户此前无法完成的 capability）。用户可以 override。
-
-### 7. Evidence integration（证据集成）
-
-当 change 有 observable behavior（UI rendering、CLI output、带 runnable example 的 API behavior、generated artifacts），skill 会询问是否 capture evidence；如果 yes，就用当前可用的截图、recording 或 terminal capture workflow 捕获 GIF、terminal recording 或 screenshot，然后 splice 到 body 的 `## Demo` section。Categorical no-evidence cases（docs-only、markdown-only、changelog-only、CI/config-only、test-only 或 pure internal refactors）会直接 skip prompt。Agent judgment 也可对自己 authored 且确认 non-observable 的 changes skip prompt（internal plumbing、type-only changes 等）。
-
-### 8. 重写 existing PR 前确认
-
-当 skill 在有 open PR 的 branch 上运行，且你想 rewrite description 时，它会 preview：new Summary 前两句加 total body line count，并在 apply 前询问 confirmation。前两句承载 reviewer 大部分注意力。如果 decline，可以传入 focus text regenerate，不 apply 任何东西。
-
-### 10. Concept-teaching section：PR 会讲解它引入的内容
-
-Agent-driven development 消除了亲手写 code 原本会带来的学习过程。当 composition pass 判断 change 向 codebase 引入了新 concept 时，description 会增加专门的 `## New concepts` section。新鲜度对照 base ref 检查，而不是 working tree，避免 PR 自身的 code 掩盖其 novelty。Section 会解释 concept 是什么、为何在这里选择它而不是 obvious alternative，并给出一个来自本 PR behavior 的 example。按设计，没有该 section 才是常态：established repo patterns、refactors、renames 和 dependency bumps 都不会触发它。PR ship 后，一行 offer 会指向 `/ce-explain` 进行 interactive learning；opt-in config key `pr_teaching_archive` 会把 explainer 归档到 `docs/explainers/`，并从 PR 链接过去。要在当前 repo 完全关闭该 feature，请在 `.compound-engineering/config.local.yaml` 中设置 `pr_teaching_section: false`。
-
-### 11. Session-settled provenance line（会话已定决策来源行）
-
-当存在带 label 的 plan 时，PR body 会增加一行 static provenance，列出哪些 decisions 已在 session 中确定、各自属于哪个 class，以及它们取代了什么选项，让 reviewer 一眼看出用户已作出的选择。没有 plan 的 run 会省略该行。三个 PR settings 的完整说明参见[配置参考](./configuration.md)。
-
-### 12. 选择加入的 stack mode：构建或提交 managed stack，再按 posture handoff
-
-Stack mode **只按 intent 选择加入**，绝不是默认路径，也不会对 trivial single-concern change 主动建议。Intent 明确时，skill 会探测 `gh stack`。它会保留已有 managed topology；若已完成的 work 都在一个 branch 上，则推导最小且有用、可独立 review 的 linear layers，自 bottom 到 top 构建，并验证 top 仍包含完整 change set。Review boundaries 有歧义时必须确认；pipeline mode 会把 proposed topology 作为 residual 返回，而不是猜测。随后通过 `gh stack submit --auto --open` 提交，并在 **bottom open non-draft** PR 上 handoff `/ce-babysit-pr`：默认 posture 为 `stack-ready`，只有明确表达 land/merge-when-green intent 时才使用 `stack-land`。
+On the full path it stages named files, splits distinct concerns at file level (2-3 max), and routes detached HEAD / default-branch / missing-upstream cases before it pushes. Every body is written to a temp file and passed with `--body-file <path>`. Descriptions read the full PR range. Related-work preflight classifies each tracker ID as closing, non-closing, or uncertain.
 
 ---
 
-## 快速示例
+## What Makes It Novel
 
-你在 feature branch 上完成 notification-mute feature，调用 `/ce-commit-push-pr`。
+### Three modes, not one forced ship
 
-Skill 检测到你在 meaningful-named feature branch 上、没有 upstream，并且有四个 uncommitted files，覆盖 database migration、model change、controller update 和 UI component。它从 recent commits 识别 repo convention（带 scope 的 conventional commits），并把工作拆成两个 commits（data layer；UI），按 file level grouping，不做 interactive hunk staging。然后用 `-u` push。
+- **Full workflow** for "ship this" / "create a PR" / "commit push PR"
+- **Description update** for "refresh" / "rewrite" / "update the PR description"
+- **Description-only** for "draft a PR description", "describe this PR", or a PR URL/number alone
 
-它 resolve PR commit range，读取所有 commits 的 diff（不只是 working-tree diff），并检测到 change 有 observable UI behavior。它询问是否 capture evidence；你说 yes；它用可用 capture workflow 获得 GIF。
+If the detected mode is wrong, say so in the next prompt (`just write the description, don't apply it`).
 
-Composition pass 产出 title（`feat(notifications): add per-type mute with TTL`）和 body，包含 summary、key decisions、test plan、demo GIF 和 operational validation section。它用 quoted heredoc sentinel 把 body 写入 temp file，并运行 `gh pr create --title ... --body-file ...`。
+### Descriptions sized to the change, over the full range
 
-它返回 PR URL。
+There is no fixed template. A typo can be one or two sentences. A large refactor gets motivation, decisions, a test plan, evidence, and risks. The composition pass reads every commit in the PR, not just the uncommitted diff.
 
----
+### Named-file commits, then a branch decision tree
 
-## 何时使用
+Same commit rules as `/ce-commit`: no `git add -A`, file-level splits only, convention from context then history then conventional commits (`fix:` when `fix:` and `feat:` both fit). A known plan unit ID is appended to the subject in parentheses (`(U3)` for unit 3) when it is already in hand for that commit.
 
-在以下情况使用 `ce-commit-push-pr`：
+Branch routing is explicit:
 
-- Code 已写好，想要 commits + PR
-- 想重写 existing PR description（例如 merge `main` 后 original description stale）
-- 需要 PR description draft，但还不想 commit 或 push
-- 想要 adaptive description sizing，而不是 cookie-cutter template
-- Changes 触及 distinct concerns，希望 smart commit splitting
-- 明确想要 multi-layer work 的 **PR stack**（且 `gh stack` 可用）
+- Detached HEAD -> create a feature branch from current `HEAD`
+- Default branch with work -> create a feature branch. If local default has unpushed commits, it asks whether to carry them forward
+- Default branch, everything pushed, no PR -> stop (`no feature branch work`)
+- Feature branch, no upstream -> push `-u` and continue
+- Feature branch, all pushed, no open PR -> skip commit/push, open the PR
+- Feature branch, all pushed, open PR -> report up to date, then ask about a rewrite
 
-以下情况跳过 `ce-commit-push-pr`：
+### Body-file, related refs, and an existing-PR preview
 
-- 只想 commit，不 push 或 PR：使用 `/ce-commit`
-- 在 default branch 上且确实想在那里 commit：手动处理（此 skill 不会在没有 explicit feature-branch creation 的情况下 push to default）
-- PR shape 特殊到需要 hand-crafted git work（interactive rebase、complex history rewrite）
+Bodies go through a quoted heredoc into a temp file. The skill does not use `--body-file -`, stdin pipes, or `--body "$(cat ...)"`.
 
----
+Before composing, it scans the prompt, branch name, full commit messages, existing body, PR template, plan notes, and visible IDs. GitHub Issues get `Fixes #123` only when the PR targets the default branch and truly resolves the issue. Linear uses `Fixes ENG-123` or `Related to ENG-123` in the description, not a comment. Unknown trackers get a neutral link.
 
-## 作为 Workflow 的一部分使用
+A rewrite previews the new title, the first two sentences of the Summary, and the body line count, then asks before `gh pr edit`. Decline and you can send focus text for another draft.
 
-`ce-commit-push-pr` 是多个 skills 的 standard shipping handoff：
+### Concept teaching, branding, and the babysit handoff
 
-- **`/lfg` step 8**：使用 `mode:pipeline branding:on` 调用（non-interactive：没有 blocking asks，existing-PR rewrite 默认为 no）；当打印 `New concepts:` trailer 时，lfg 会在 completion output 中复述该 concept 和 `/ce-explain` pointer
-- **`/ce-work` Phase 4**：使用 `branding:on`，并传递 plan summary、key decisions、testing notes、evidence context、operational validation 和任何 accepted Known Residuals
-- **`/ce-debug` Phase 4**（skill-owned branch）：使用 `branding:on`；successful fix 后默认 commit-and-PR，不再 prompt；只在 PR 解决 issue 时包含 closing syntax，对 partial、investigative 或 uncertain links 则使用 non-closing related syntax
-- **`/ce-compound`**：写入 learning doc 后，可 commit + push，并用新 commit 更新 open PR
+When the change introduces a concept that is new to this repo (checked against the **base** ref, not the working tree), the body can gain a `## New concepts` section. Most PRs should not have one. Turn it off with `pr_teaching_section: false`. `pr_teaching_archive: true` (or `archive:on`) writes the explainer under the CE artifact root and links it.
 
----
+New PRs get the Compound Engineering badge only with `branding:on` or an explicit ask. Existing rewrites keep whatever branding is already there.
 
-## 单独使用
+After a newly created PR, a successful stack submit, or new commits on an open PR, the run is not done until `/ce-babysit-pr` starts. Pass `babysit:off` to skip. `babysit:continuous` / `babysit:checkpoint` force that babysit mode. `auto_babysit: false` in CE config (`config.local.yaml` then `config.yaml`) is the standing opt-out. Description-only, description-update, `mode:pipeline` (except after a stack submit), non-GitHub remotes, a draft this run created, and a head you cannot push all skip the handoff. Fork PRs are fine when you can push the head.
 
-Skill 直接调用比作为 chain 一部分更常见：
+### Opt-in stacks
 
-- **Full ship**：在有 uncommitted 或 unpushed work 的 feature branch 上运行 `/ce-commit-push-pr`
-- **Refresh existing PR description**：`/ce-commit-push-pr "update the PR description"` 或 `/ce-commit-push-pr "include the benchmarking results"`（会尊重 focus）
-- **Draft description without applying**：`/ce-commit-push-pr "draft a PR description for this branch"` 打印 description 供你复制或手动 apply
-- **Describe a different PR**：`/ce-commit-push-pr <PR URL>` resolve 该 PR 的 commit range
-
-当 skill mode detection 选错 path，可用匹配 target mode 的明确 phrasing（例如 "just write the description, don't apply it"）。
+Stacks are never the default and are never suggested for a one-line fix. An explicit request is required intent: it is not rewritten as a single PR with a custom `--base`. The skill probes for `gh stack`. A named parent PR is classified by number. It reuses a confirmed topology, or (for completed work) builds the smallest useful linear layers, then submits with `gh stack submit --auto --open` and babysits the **bottom open non-draft** PR. Default posture is `stack-ready`. `stack-land` only when you asked to land or merge when green. Ambiguous review boundaries ask first. `mode:pipeline` returns the proposed topology as a residual instead of guessing.
 
 ---
 
-## 参考
+## Quick Example
 
-| Argument（参数） | Effect（效果） |
+You finish a notification-mute feature on a named feature branch with no upstream. Four uncommitted files span a migration, a model, a controller, and a UI component.
+
+`/ce-commit-push-pr` matches recent conventional-commits-with-scope history, splits into two file-level commits (data layer; UI), and pushes `-u`. It reads the full range, not just the leftover working tree. You pass a GIF URL from the harness capture flow; that becomes `## Demo`.
+
+It writes a title (`feat(notifications): add per-type mute with TTL`) and a body (summary, decisions, test plan, the GIF) to a temp file, then `gh pr create --title ... --body-file ...`. It returns the URL and starts `/ce-babysit-pr`.
+
+---
+
+## When to Reach For It
+
+Use `ce-commit-push-pr` when:
+
+- The code is written and you want commits plus a PR
+- An existing PR description is stale and you want it rewritten
+- You want a printed description without committing or pushing
+- You explicitly want a **PR stack** and `gh stack` is available
+
+Skip it when:
+
+- You want commits only -> `/ce-commit`
+- You want to commit on the default branch and stay there. This skill will not push the default; it creates a feature branch
+- You need an interactive rebase or a history rewrite. Do that by hand
+- A PR is already open and you want it watched -> `/ce-babysit-pr`
+- Review comments are already in and you want them fixed now -> `/ce-resolve-pr-feedback`
+
+---
+
+## Chain Position
+
+On-demand shipping. Not a required ideation-chain stage.
+
+```text
+/ce-work   ->  /ce-commit-push-pr  ->  /ce-babysit-pr
+/ce-debug  ->  /ce-commit-push-pr  ->  /ce-babysit-pr
+/ce-commit ->  /ce-commit-push-pr     (if you committed first, then decide to ship)
+```
+
+`/lfg` and `/ce-work` call this with `branding:on` when they own the ship — unless the project's instructions name their own shipping process, which then runs instead. You can also invoke it on a branch you already finished by hand.
+
+---
+
+## Use Standalone
+
+- **Full ship** from a feature branch: `/ce-commit-push-pr`
+- **Skip babysit**: `/ce-commit-push-pr babysit:off`
+- **Refresh a description**: `/ce-commit-push-pr update the PR description`
+- **Print only**: `/ce-commit-push-pr draft a PR description for this branch`
+- **Another PR's range**: `/ce-commit-push-pr <PR URL>`
+- **Stack**: `/ce-commit-push-pr stack this on top of PR #123`
+
+---
+
+## Reference
+
+| Argument | Effect |
 |----------|--------|
-| _(empty)_ | 在 current branch 上运行 full workflow |
-| `"draft a PR description"` / `"describe this PR"` | Description-only generation；打印回来，不 apply |
-| `"update the PR description"` / `"refresh the PR description"` | 更新 existing PR description |
-| `<PR URL or number>` | 对该 PR 操作（description-only 或 update，取决于 intent） |
-| `"...<focus text>"` | 引导 description composition（例如 "include the benchmarking results"） |
-| `mode:pipeline` | 供 orchestrated callers 使用的 non-interactive modifier；禁用所有 blocking ask（existing-PR rewrite 默认为 no） |
-| `archive:on\|off` | 单次运行覆盖 `pr_teaching_archive` config key（把 explainer doc 归档到 `docs/explainers/`） |
-| `branding:on\|off` | 显式添加或省略新建 PR 的 generic Compound Engineering branding；未传时默认 off，rewrite existing PR 时保留当前 branding |
+| _(empty)_ | Full workflow on the current branch, then babysit |
+| `"draft a PR description"` / `"describe this PR"` | Description-only. Printed, not applied. |
+| `"update the PR description"` / `"refresh the PR description"` | Description update on the existing PR |
+| `<PR URL or number>` alone | Description-only for that PR's full range |
+| `"...<focus text>"` | Steers composition (`include the benchmarking results`) |
+| stack language | Opt-in `gh stack` path. Parent PR/branch roots the layers. |
+| `babysit:off` | Skip the `/ce-babysit-pr` handoff |
+| `babysit:continuous` / `babysit:checkpoint` | Force that babysit mode (also watches a draft this run created) |
+| `mode:pipeline` | Non-interactive. Existing-PR rewrite defaults to no, except in description-update mode, which applies. |
+| `archive:on\|off` | Per-run override of `pr_teaching_archive` |
+| `branding:on\|off` | Add or omit generic Compound Engineering branding on a **new** PR. Omission defaults off. Rewrites keep current branding. |
+
+See the [configuration reference](./configuration.md) for `pr_teaching_section`, `pr_teaching_archive`, and `auto_babysit`.
 
 ---
 
-## 常见问题
+## FAQ
 
-**为什么用 adaptive description，而不是 fixed template？**
-Cookie-cutter templates 让 trivial PRs 显得 ceremonial，让 large PRs 显得 under-described。Adaptive composition 按 change 选择 structure 和 depth：one-line fix 得到 tight description；large refactor 得到应有结构。Description 匹配 change 时，reviewer 工作更轻松。
+**Why not a fixed PR template?**
+A one-line fix does not need a test-plan heading. A large refactor does. Adaptive composition matches the description to the change. A project PR template still sets the structural floor.
 
-**为什么用 body-file，而不是 inline `--body`？**
-Wrappers 和 stdin handling 可能静默产出 empty PR body，同时 `gh` 仍 exit 0 并返回 URL。Skill 把每个 body 写入 temp file，使用 quoted heredoc sentinel，并通过 `--body-file <path>` 传入。Quoted sentinel 防止 body 中的 `$VAR`、backticks 和 literal `EOF` markers 被展开。
+**Why `--body-file` instead of `--body`?**
+Stdin wrappers can produce an empty body while `gh` exits 0 and returns a URL. A quoted temp file keeps `$VAR`, backticks, and literal `EOF` from expanding.
 
-**Description-only 和 description update 有什么区别？**
-Description-only 生成 description 并打印回来，不触碰任何东西（不 `gh pr edit`、不 commit、不 push）。Description update 会找到 current branch 的 existing open PR，生成新 description，preview，询问 confirmation，然后通过 `gh pr edit` apply。
+**Description-only vs description update?**
+Description-only prints and stops (no `gh pr edit`, no commit, no push). Description update finds the open PR, previews, asks, then applies with `gh pr edit`. A URL or number **alone** is description-only.
 
-**支持不同 commit message conventions 吗？**
-支持。`AGENTS.md`/`CLAUDE.md` 中的 repo conventions 优先；recent commit history 是下一个 signal；conventional commits 是 fallback default。使用 conventional commits 时，`fix:` vs `feat:` ambiguous 时默认 `fix:`。
+**Does it follow a non-conventional commit style?**
+Yes. Project conventions in context, then recent history, then conventional commits. Ambiguous `fix:` vs `feat:` defaults to `fix:`.
 
-**Commit signing 或 hooks 怎么办？**
-Skill 尊重你的 git config 和 pre-commit hooks。它绝不会传 `--no-verify`、`--no-gpg-sign` 或类似 flags 来跳过它们。如果 hook fails，skill 会 investigate 并 surface underlying issue。
+**Does it skip hooks or signing?**
+The commit command does not pass `--no-verify` or `--no-gpg-sign`. Your git config and hooks run as usual.
 
-**能创建 draft PR 吗？**
-使用 description-only mode 生成 body，然后自己用 `gh pr create --draft --title "..." --body-file "..."` apply。Full workflow 目前没有暴露 draft flag。Stack mode 会有意通过 `--auto --open` 提交 ready（non-draft）PR，以便 babysit 接管后续。
+**Can I open a draft PR?**
+Not as a flag on the full workflow. Use description-only, then `gh pr create --draft --title "..." --body-file "..."`. Stack submit uses `--auto --open` so layers are ready for babysit, not drafts.
 
-**什么时候会 open PR stack？**
-只有你（或 standing preference）明确想要 stack 时才进行——绝不会为一行的 fix 主动建议。没有已有 topology 时，当 whole-file groups 或现有 commit boundaries 能给出清晰、安全的一个方案时，它可以把已完成的工作 retrospectively 拆成最小的有用线性 dependency layers。对 ambiguous split 或 published-history rewrite，它会先询问。提交后，它会在 bottom open non-draft PR 上以 `posture:stack-ready`（你要求 green 时 land 则为 `stack-land`）handoff babysit。
+**When does it open a stack?**
+Only when you (or a standing preference) clearly want one. "Stack this on top of PR #123" builds a managed stack rooted on that PR. With no topology, it can split completed work into linear layers when whole-file groups or existing commits make one plan clear. It asks before an ambiguous split or a published-history rewrite.
 
-**为什么我的 PR 没有 `## New concepts` section？**
-这是有意的设计：大多数 PR 都不应该有。只有当 change 引入的 concept 对当前 codebase 确实是新的（对照 base ref 检查），而且能够迁移到该 codebase 之外时，section 才会触发。常规使用 established repo patterns、refactors、renames 和 dependency bumps 都不符合条件。缺少 section 的代价很小；像说教一样的 section 却会训练 readers 直接跳过这个 feature。如果你永远不想生成该 section，请在 `.compound-engineering/config.local.yaml` 中设置 `pr_teaching_section: false`。
+**Why is there no `## New concepts` section?**
+Most PRs should not have one. It fires only when the change introduces a concept that is new to this codebase and transferable. Refactors, renames, and dependency bumps never qualify. Set `pr_teaching_section: false` to turn it off.
 
 ---
 
-## 另见
+## See Also
 
-- [`ce-work`](./ce-work.md) - Phase 4 handoff target（Phase 4 交接目标）；standard upstream caller
-- [`ce-debug`](./ce-debug.md) - skill-owned branch 上 successful fix（成功修复）后调用此 skill
-- [`ce-commit`](./ce-commit.md) - local-commit-only sibling；不想 push 或 open PR 时使用
-- [`ce-compound`](./ce-compound.md) - 捕获 reusable learning；可 chain 回此 skill push learning doc
+- [`/ce-commit`](./ce-commit.md): local commit only
+- [`/ce-babysit-pr`](./ce-babysit-pr.md): watch the open PR toward merge-ready
+- [`/ce-resolve-pr-feedback`](./ce-resolve-pr-feedback.md): fix review comments now, one pass
+- [`/ce-work`](./ce-work.md): common upstream caller after implementation
+- [`/ce-debug`](./ce-debug.md): can ship a fix through this skill

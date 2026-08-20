@@ -1,21 +1,21 @@
-# Nuxt dev-server recipe（dev-server 配方，auto-detect fallback）
+# Nuxt dev-server recipe (auto-detect fallback)
 
-当 `detect-project-type.sh` 返回 `nuxt`，且没有 `.claude/launch.json` 可查询时加载。
+Loaded when `detect-project-type.sh` returns `nuxt` and the startup tuple still lacks a command.
 
-## Signature（识别特征）
+## Signature
 
-- 存在 `nuxt.config.js`、`nuxt.config.mjs` 或 `nuxt.config.ts`
-- `package.json` 包含 `nuxt` dependency
+- `nuxt.config.js`, `nuxt.config.mjs`, or `nuxt.config.ts` exists
+- `package.json` contains a `nuxt` dependency
 
-## Start command（启动命令）
+## Start command
 
-Standard（标准）:
+Standard:
 
 ```bash
 npm run dev
 ```
 
-也有效（读取 `package.json` scripts，确认项目使用哪一个）：
+Also valid (read `package.json` scripts to confirm which the project uses):
 
 ```bash
 pnpm dev
@@ -23,17 +23,17 @@ yarn dev
 bun run dev
 ```
 
-优先使用 lockfile 指示的 package manager：
+Prefer the package manager indicated by the lockfile:
 - `pnpm-lock.yaml` -> `pnpm dev`
 - `yarn.lock` -> `yarn dev`
 - `bun.lock` / `bun.lockb` -> `bun run dev`
 - `package-lock.json` or none -> `npm run dev`
 
-## Port（端口）
+## Port
 
-Default（默认）：`3000`。Nuxt respects `--port <port>` 和 `PORT` env var。Overrides 遵循 `references/dev-server-detection.md` 中的 cascade。
+Default: `3000`. Nuxt respects `--port <port>` and the `PORT` env var. Overrides follow the cascade in `references/dev-server-detection.md`.
 
-## Stub generation（stub 生成）
+## Stub generation
 
 ```json
 {
@@ -49,10 +49,10 @@ Default（默认）：`3000`。Nuxt respects `--port <port>` 和 `PORT` env var�
 }
 ```
 
-替换为 resolved package manager（`npm` / `pnpm` / `yarn` / `bun`）和 port。
+Substitute the resolved package manager (`npm` / `pnpm` / `yarn` / `bun`) and port.
 
-## Common gotchas（常见坑）
+## Common gotchas
 
-- **Nitro server engine：** Nitro（Nuxt 的 server engine）会在 Nuxt 背后添加自己的 dev server；polish 只关心 Nuxt port。不要单独 probe Nitro internal port。
-- **Port auto-increment：** 如果 3000 已被占用，Nuxt 会 auto-increment port（不同于会报错的 Next.js）。Polish 的 kill-by-port step 会在启动前 reclaim port，因此 auto-increment behavior 在实践中不会造成问题。
-- **Nuxt 3 vs Nuxt 2：** Nuxt 3 使用 `nuxt.config.ts`，Nuxt 2 使用 `nuxt.config.js`；signature check 会检测二者。Dev-server command 和 port defaults 在两个版本中相同。
+- **Nitro server engine:** Nitro (Nuxt's server engine) adds its own dev server behind Nuxt's; polish only cares about the Nuxt port. Do not probe the Nitro internal port separately.
+- **Port auto-increment:** Nuxt may move to another port when 3000 is occupied. If the resolved URL does not answer, use the server log to let the user correct the start configuration.
+- **Nuxt 3 vs Nuxt 2:** Nuxt 3 uses `nuxt.config.ts`, Nuxt 2 uses `nuxt.config.js` -- both are detected by the signature check. The dev-server command and port defaults are the same across both versions.

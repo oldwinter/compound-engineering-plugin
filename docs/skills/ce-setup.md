@@ -1,209 +1,193 @@
 # `ce-setup`
 
-> 诊断你的环境、安装缺失 tools，并 bootstrap project-local config：一个 interactive flow 完成。
+> Check Compound Engineering health, optional tool capabilities, and repo-local config safety. It does not bulk-install the plugin's dependencies.
 
-`ce-setup` 是 **onboarding** skill。它诊断已安装内容、缺失内容、plugin version、repo-local config 状态，并为缺失部分提供 guided installation。首次安装、升级 plugin 后、排查为什么某个 skill 说 tool 不可用，或把新 repo onboarding 到 compound-engineering 前，都可以运行它。
+`ce-setup` is a **diagnosis and config** utility. It reports which optional tools are on PATH, creates repo `config.yaml` when missing (after you approve), refreshes the committed config example, and offers to gitignore a local override or CE scratch space. It also reports where artifacts will land and can repair an invalid `docs_root` or a broken CE Work engine block.
 
-完整 option reference，以及 local defaults 与 session/project instructions 的交互方式，参见 [Compound Engineering 配置](./configuration.md)。
+It is explicit-invocation only (`disable-model-invocation: true`). Talking about setup does not start it.
 
-它只允许 explicit invocation（`disable-model-invocation: true`），因此不会因普通 setup discussion 而作为 side effect 运行。
+Outside a git repository it reports capabilities and stops. It does not create repo files there.
+
+See [Compound Engineering configuration](./configuration.md) for every option and how local defaults interact with session and project instructions.
 
 ---
 
-## 摘要（TL;DR）
+## TL;DR
 
-| 问题 | 答案 |
+| Question | Answer |
 |----------|--------|
-| 它做什么？ | 运行 environment diagnostic，展示 missing tools/skills 和 install commands，bootstrap `.compound-engineering/config.local.yaml`，可选添加 `.gitignore` entry |
-| 何时使用？ | First-time install、post-upgrade health check、"why does this skill say X isn't installed?"、new repo onboarding |
-| 产出什么？ | Confirmed-installed report，或 missing tools 的 guided install flow，外加 bootstrapped local config |
-| 状态 | Explicit-invocation only |
+| What does it do? | Runs a health check, reports optional tools, refreshes the example config, and applies only the repo-local fixes you approve |
+| When to use it | First install, after an upgrade, when a skill says a tool is missing, or when onboarding a repo |
+| What it produces | A setup report, plus any config or gitignore edits you accepted |
+| What it does not do | Bulk-install every optional CE dependency, update the plugin itself, or create `config.local.yaml` |
 
 ---
 
-## 问题
+## Example invocations
 
-Compound-engineering 依赖多个 external CLIs 和 per-repo config，很容易漏掉：
+The skill takes no feature argument. The same command covers first install, a later re-check, and a repo that is not a git checkout.
 
-- **Tool dependencies**：`agent-browser`、`gh`、`jq`、`vhs`、`silicon`、`ffmpeg`、`ast-grep`；每个 install command 不同，且并非都显而易见
-- **Skill dependencies**：一些 skills 依赖其他 agent skills（例如 `ast-grep` skill）；哪些需要、装到哪里并不透明
-- **Plugin version drift**：旧 installed plugin 行为与 current docs 不同；不检查的话，用户会把已修复 bugs 报成 bug reports
-- **Per-repo config**：`.compound-engineering/config.local.yaml` 存放 machine-local settings；没有 bootstrap 时，`ce-product-pulse` 等 skills 每次都会问相同问题
-- **Stale legacy config**：`compound-engineering.local.md` 是旧格式；遗留文件会造成混淆
-- **Gitignore gotchas**：`.compound-engineering/config.local.yaml` 应该 gitignored（machine-local），但不总是；用户可能意外 commit secrets
-- **Manual setup is tedious**：逐个安装 7 个 tools 并记住正确命令很有 friction
+```text
+# First install, or a later re-check of tools and repo config
+/ce-setup
 
-## 解决方案
+# Same command after a plugin upgrade, to refresh
+# .compound-engineering/config.example.yaml and notice new keys
+/ce-setup
 
-`ce-setup` 用 diagnostic-then-fix flow 执行 setup：
+# Same command when a skill said gh, agent-browser, or another
+# optional tool is missing. The report prints the install command.
+/ce-setup
 
-- **Phase 1: Diagnose**：运行一次 `bash scripts/check-health`；一次性报告 tool/skill installation status、plugin version、repo-local CE config state
-- **Phase 2: Fix**（仅当存在 issues）：
-  - 处理 repo-local cleanup（存在 obsolete `compound-engineering.local.md` 时删除）
-  - Bootstrap `.compound-engineering/config.local.yaml`（询问是否从 template 创建，是否加入 `.gitignore`）
-  - 为 missing tools 和 skills 提供 guided install（multiSelect，全部预选）
-  - 逐个运行 install commands，每一步继续前验证
-- **Final summary**：报告 installed / skipped，并说明下一步如何更新或重载 plugin
+# Same command in a directory that is not a git repo.
+# It reports optional tools and stops without writing files.
+/ce-setup
+```
 
----
-
-## 新颖之处
-
-### 1. 单次 diagnostic pass
-
-Skill 运行 **一个** check script，覆盖所有 CLI tools、agent skills、repo-local CE files 和 `.gitignore` guidance。没有逐 tool 手工检查，没有重复提问。Output 是可直接展示给用户的 colored report。如果所有内容都已安装、不需要 repo-local cleanup、local config 存在且已 gitignored，skill 打印 success message 并停止。
-
-### 2. Repo-local config bootstrapping（repo-local config 初始化）
-
-`.compound-engineering/config.local.yaml` 是 machine-local settings 的位置（使用哪些 tools、workflows 如何表现、pulse settings）。Skill 会：
-
-- 始终从 template 刷新 `.compound-engineering/config.local.example.yaml`（committed；给 teammates 参考可用 settings）
-- 缺失时创建一次 `.compound-engineering/config.local.yaml`（gitignored；实际 local settings，全部注释掉，只 opt in 需要项）
-- 如果 `.compound-engineering/*.local.yaml` 尚未被覆盖，询问是否加入 `.gitignore`
-- 报告 resolved artifact root 及其来源 config layer，并标记不可用的 `docs_root`；详见 [Artifact root](./configuration.md#artifact-root)
-
-Example（committed）与 local（gitignored）的 split 是 repo 中 machine-local config 的 canonical pattern。Bootstrap 后，未来 skills 就不用重复处理。
-
-### 3. 全部预选的 multi-select install
-
-当 tools 或 skills 缺失时，skill 会以 multi-select 展示它们，并且 **全部预选**。用户可以取消不想安装的项。Items 分组在 `Tools:` 和 `Skills:` 下，清楚表明各自 target runtime。已安装 items 完全不展示。
-
-### 4. 每次 install 后验证再继续
-
-每个 install command 运行后，skill 验证 tool 是否真的安装：
-
-- CLI tools（CLI 工具）：`command -v <tool>`
-- Agent skills：如果 `npx` 可用，使用 `npx skills list --global --json | jq -r '.[].name' | grep -qx <skill-name>`；否则检查 `~/.claude/skills/<skill-name>` / `~/.agents/skills/<skill-name>` / `~/.codex/skills/<skill-name>` paths
-
-验证成功就报告 success。失败时展示 project URL 作为 fallback，然后继续下一个 dependency，而不是阻塞。
-
-### 5. Legacy `compound-engineering.local.md` cleanup（旧配置清理）
-
-Skill 检测 repo root 是否存在 obsolete `compound-engineering.local.md`。如果存在，它会解释该文件已 obsolete（review-agent selection 现在自动完成，machine-local state 移至 `.compound-engineering/config.local.yaml`），并询问是否 delete。Cleanup 由用户控制；skill 不会 silent delete repo files。
-
-### 6. 为 platform detection 预先解析 plugin root
-
-Skill 使用 pre-resolution（skill load 时的 `!` backtick）捕获 plugin root。若能 resolve 为 absolute path，就可给出更具体的 update guidance；如果没有 resolve（empty、literal token 或 unsupported harness），则只给通用 reload/update guidance。不猜平台。
-
-### 7. Explicit-invocation only（仅显式调用）
-
-`disable-model-invocation: true` 防止 skill 因 "setup" 或 installation discussion 的 prose mentions 而 auto-fire。Setup 应是 deliberate user choice：直接调用 `/ce-setup`。
+On oh-my-pi the invocation is `/skill:ce-setup`. On Codex it is `$ce-setup` when that host uses dollar-prefixed skills.
 
 ---
 
-## 快速示例
+## The Problem
 
-你刚安装 compound-engineering，想确认一切配置正确。调用 `/ce-setup`。
+Compound Engineering has two different setup surfaces:
 
-Skill 宣布 "Compound Engineering — checking your environment..."，并运行 `bash scripts/check-health --version 3.4.1`。
+- **Repo-local state** that should stay consistent and safe: the committed config example, the repo `config.yaml`, gitignore coverage if a `config.local.yaml` override exists, and (optionally) gitignore coverage for `.context/compound-engineering/` scratch.
+- **Optional external tools** used by specific workflows: `agent-browser` for browser testing and dogfood QA, `gh` for GitHub, `jq` for shell JSON, `ast-grep` for structural search, `ffmpeg` for Riffrec media analysis.
 
-Diagnostic report（诊断报告）:
+A missing optional tool is not a broken plugin. Treating those as one install step forces a dependency footprint most workflows never use.
+
+## The Solution
+
+`ce-setup` diagnoses first, then remediates only repo-local project issues. The example config is refreshed on its own. Other writes wait for approval:
+
+- Deletes obsolete `compound-engineering.local.md` if you say yes.
+- Refreshes `.compound-engineering/config.example.yaml` from the bundled template. Always, inside a git repo.
+- Offers to create `.compound-engineering/config.yaml` if it is missing. Does not create `config.local.yaml`. Does not overwrite either file if it already exists.
+- Offers to add `.compound-engineering/*.local.yaml` to `.gitignore` only when `config.local.yaml` already exists and is not ignored.
+- Offers to add `.context/compound-engineering/` to `.gitignore` whether or not that directory exists yet. An uncovered path is a note, not a project issue.
+- Reports the resolved artifact root and which config layer supplied it. An invalid `docs_root` is a project issue. CE artifacts will not be written until it is fixed. See [Artifact root](./configuration.md#artifact-root).
+- Explains and repairs an invalid CE Work implementation-engine block, or leftover retired routing keys, in the layer that supplied the bad value.
+- Prints install commands or URLs for missing optional tools. It does not bulk-install them.
+
+Each question uses the host's blocking question tool when one exists. It does not silently auto-configure.
+
+---
+
+## What Makes It Novel
+
+### Capabilities are informational
+
+Missing `ffmpeg` or `ast-grep` does not fail setup. The report says which workflows those tools serve and how to install them. You install only what you use.
+
+### Repo files are opt-in writes
+
+The example config is the one file it refreshes on its own (it is the committed template copy). Creating `config.yaml`, appending gitignore lines, deleting the obsolete local-md file, and editing a broken `docs_root` or work-engine block all wait for approval. Existing `config.yaml` and `config.local.yaml` are never overwritten wholesale.
+
+### It tells you where artifacts will land
+
+The health report includes the resolved artifact root (`docs/` by default, or a valid `docs_root` from `config.yaml`). `docs_root` in `config.local.yaml` is ignored. If local still has one, setup says so and offers to move it into `config.yaml`.
+
+---
+
+## Optional Capabilities
+
+| Tool | Capability |
+|------|------------|
+| `agent-browser` | browser testing and dogfood QA |
+| `gh` | GitHub PR, issue, and review workflows |
+| `jq` | JSON inspection in shell-based workflows |
+| `ast-grep` | Syntax-aware structural code search |
+| `ffmpeg` | Media chunking and screenshot extraction for Riffrec analysis |
+
+---
+
+## Quick Example
+
+You just installed compound-engineering and want to check a repo:
 
 ```text
 /ce-setup
 ```
 
-Skill 检测到 3 个 missing tools、1 个 missing skill、没有 local config。它依次处理：
-
-1. Bootstrap config："Set up a local config file for this project? (y/n)"；你说 yes。复制 template 到 `.compound-engineering/config.local.yaml`。询问是否把 `.compound-engineering/*.local.yaml` 加入 `.gitignore`，并添加。
-2. 安装 missing tools："Select which to install (all pre-selected): [x] gh, [x] vhs, [x] ast-grep, [x] ast-grep skill"；你保留全部选择。
-3. 每一项：展示 install command，询问 approval，运行并验证。`gh` 通过 Homebrew 成功安装。`vhs` 成功。`ast-grep` 成功。`ast-grep` skill 通过 `npx skills add ...` 安装。
-
-Final summary（最终摘要）:
+The health check reports something like:
 
 ```text
 Optional capabilities  3/5
-  🟢 agent-browser -- browser testing, dogfood QA, and visual polish inspection
-  🟢 gh -- GitHub PR, issue, and review workflows
-  🟡 ast-grep -- unavailable: syntax-aware structural code search
+  🟢  agent-browser -- browser testing and dogfood QA
+  🟢  gh -- GitHub PR, issue, and review workflows
+  🟡  ast-grep -- unavailable: syntax-aware structural code search
        brew install -q ast-grep
 
 Project config
-  🟢 No obsolete compound-engineering.local.md
-  ➖ No local config yet (.compound-engineering/config.local.yaml)
-  🟡 Example config missing (.compound-engineering/config.local.example.yaml)
+  🟢  No obsolete compound-engineering.local.md
+  ➖  No repo config yet (.compound-engineering/config.yaml)
+  🟡  Example config missing (.compound-engineering/config.example.yaml)
 ```
 
-It refreshes the example config. If you want local preferences, it asks before creating `.compound-engineering/config.local.yaml` and before adding the `.gitignore` entry.
+It refreshes the example config and asks whether to create `.compound-engineering/config.yaml`. It does not create `config.local.yaml`. Missing optional tools stay in the summary as install hints.
+
+When the bundled health script is not runnable, the skill runs the same checks inline and still offers the repo-local fixes.
 
 ---
 
-## 何时使用
+## When to Reach For It
 
-在以下情况使用 `ce-setup`：
+Use `ce-setup` when:
 
-- 第一次安装 compound-engineering
-- 升级 plugin 后想确认 dependencies 仍匹配
-- 某个 skill 报 "X is not installed"，你想修复
-- 正在 onboarding 新 repo，想 bootstrap `.compound-engineering/config.local.yaml`
-- 很久没检查，想要 health snapshot
+- You just installed or upgraded the plugin
+- You want to verify a repo's CE config, artifact root, and gitignore state
+- A workflow reported an optional tool missing and you want the install command
+- You are onboarding a repo to `.compound-engineering/config.yaml`
+- Health marked `docs_root` or the CE Work engine block invalid
 
-以下情况跳过 `ce-setup`：
+Skip it when:
 
-- 尚未对 package managers 完成 authentication（它帮不上）
-- 只想安装一个已知 command 的 specific tool：直接安装更快
-
----
-
-## 作为工作流的一部分使用
-
-`ce-setup` 基本是 standalone；它不在 chain 内。它是 setup utility：
-
-- 其他 skills 报 "X is not installed" 后，用户运行 `ce-setup` 来修复
-- 定期作为 health check 运行
-- Onboarding 新 repo 或新 machine 前运行
-
-运行后，用户通常按平台提示更新或重载 plugin，或回到原本想运行的 skill。
+- You already know the exact tool to install
+- You are trying to update the plugin itself (use the host plugin manager)
+- You want every possible CE binary installed in one shot. This skill will not do that.
 
 ---
 
-## 单独使用
+## Use Standalone
 
-直接调用：
-
-- `/ce-setup`
-
-Skill 会诊断、展示 missing pieces 和 install commands，并 bootstrap config。无 arguments、无 flags；diagnostic pass 驱动一切。
+`ce-setup` is not a pipeline stage. Run it when you need a diagnosis or a safe config write. Re-run anytime. The summary prints the same invocation so you can do that.
 
 ---
 
-## 参考
+## Reference
+
+| Argument | Effect |
+|----------|--------|
+| _(empty)_ | Diagnose, then remediate repo-local issues you approve. Outside a git repo: report optional tools and stop. |
 
 | Phase | Step |
 |-------|------|
-| 1. Diagnose | Determine plugin version，运行 health check script，evaluate results |
-| 2. Fix | Resolve repo-local issues（delete obsolete `compound-engineering.local.md`），bootstrap `.compound-engineering/config.local.yaml`，为 missing dependencies 提供 install |
-| Final | Summary report；按 detected platform 给出 update/reload guidance |
-
-Required tools list（默认值；按 repo 变化）：`agent-browser`、`gh`、`jq`、`vhs`、`silicon`、`ffmpeg`、`ast-grep`。Required skills：`ast-grep`（当 repo needs 中存在时）。
+| Diagnose | Plugin version when the host exposes it, optional capabilities, project config, artifact root, work-engine block |
+| Fix | Obsolete local-md, example refresh, create repo config if wanted, gitignore safety, scratch-space gitignore, repair invalid `docs_root` or work-engine prefs |
+| Summary | Fixes applied, skipped actions, missing optional tools |
 
 ---
 
-## 常见问题（FAQ）
+## FAQ
 
-**`compound-engineering.local.md` 是什么，为什么要删除？**
-旧 machine-local config 格式，已被 `.compound-engineering/config.local.yaml` 替代。Skill 会检测 obsolete file、解释原因，并在删除前询问。Review-agent selection 现在通过 `ce-code-review` 自动完成；`compound-engineering.local.md` 中的 manual selection 不再适用。
+**Why does setup not install everything?**
+Most CE workflows do not need every optional tool, and modern harnesses already provide some capture and browser affordances. Setup reports capabilities instead of forcing a broad install.
 
-**为什么 `.compound-engineering/config.local.yaml` 要 gitignored？**
-因为它携带 machine-local settings（tool preferences、pulse configuration 等），不应污染 teammates 的 setups。Committed `.compound-engineering/config.local.example.yaml` 展示可用配置；每个用户本地 opt in。
+**What is `compound-engineering.local.md` and why is it obsolete?**
+It was the old machine-local config file. Team defaults now live in `.compound-engineering/config.yaml`. `config.local.yaml` is the optional per-checkout override. Review-agent selection is automatic.
 
-**如果 tool 安装了但 verification 失败怎么办？**
-Skill 会展示 project URL 作为 fallback，并继续下一个 dependency。Verification failed 不会阻塞剩余 install pass。
+**Why might `.compound-engineering/config.local.yaml` be gitignored?**
+It is the optional override. The committed `config.example.yaml` shows available settings. Setup creates the repo file, not the override.
 
-**我可以选择性跳过不想要的 tools 吗？**
-可以。Multi-select 会预选所有 missing items，但确认前可取消任何项。Skill 只安装被选中的内容。
-
-**为什么 explicit-invocation only？**
-`disable-model-invocation: true` 防止因 prose 中提到 "setup" 或 "install" 自动触发。Setup 是用户 deliberate action；把它作为询问其他内容的 side-effect 会令人意外。
-
-**它能在 non-Claude-Code platforms 上运行吗？**
-能。Diagnostic 和 install flow 到处都能工作。平台特定 update guidance 只在对应信息可检测时出现；其他 platforms 获得通用 next steps。
+**Does it run on non-Claude-Code platforms?**
+Yes. When the bundled health script is not directly runnable, the skill falls back to equivalent inline checks and still performs repo-local config remediation.
 
 ---
 
-## 另见（See Also）
+## See Also
 
-- [`/ce-test-browser`](./ce-test-browser.md) - 没有 capable host-native browser 时使用 `agent-browser`
-- [`/ce-dogfood`](./ce-dogfood.md) - 使用 `agent-browser` 做 diff-scoped QA
-- [`/ce-product-pulse`](./ce-product-pulse.md) - 使用 `.compound-engineering/config.local.yaml` 中的 pulse settings
-- [Compound Engineering 配置](./configuration.md) - 所有受支持 local option、consumer 与 precedence guidance
+- [Compound Engineering configuration](./configuration.md): every supported option, its consumer, and precedence
+- [`/ce-test-browser`](./ce-test-browser.md): uses `agent-browser` when no capable host-native browser is available
+- [`/ce-dogfood`](./ce-dogfood.md): uses `agent-browser` for diff-scoped QA
+- [`/ce-product-pulse`](./ce-product-pulse.md): reads pulse settings from CE config (local then repo)

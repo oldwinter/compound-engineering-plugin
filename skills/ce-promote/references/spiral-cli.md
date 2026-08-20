@@ -1,5 +1,13 @@
 # Spiral CLI reference（Spiral CLI 参考）
 
+<!-- ce-config-layers:start -->
+**Resolve ordinary CE yaml keys from the two repo files.**
+
+- **Read** `<repo-root>/.compound-engineering/config.local.yaml`, then `config.yaml` (`<repo-root>` = `git rev-parse --show-toplevel`). Missing files are skipped. Gitignore does not change resolution.
+- **Win** with the first active (non-commented) value. For scalars, empty is unset; an invalid value continues to the next layer, then the skill default. For lists and maps, a present key — including an empty list or map — replaces the whole key.
+- **Do not** use this rule for `docs_root` — that key is `config.yaml` only.
+<!-- ce-config-layers:end -->
+
 Spiral（`@every-env/spiral-cli`）会用用户的 brand voice 起草文案。`ce-promote` 将其作为**可选增强**使用；每次调用都必须被包裹起来，确保 CLI 缺失、未认证或报错时绝不阻塞 skill。
 
 ## Detection — three states（检测：三种状态）

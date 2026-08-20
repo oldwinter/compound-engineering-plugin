@@ -1,146 +1,188 @@
 # `lfg`
 
-> 运行从 planning 到 green PR 的完整 hands-off engineering pipeline。
+> Run the full hands-off engineering pipeline from planning through an open PR. It pushes and opens the PR without stopping for approval. It does not merge.
 
-`lfg` 是 **autonomous pipeline** skill。它把 Compound Engineering 主 workflow 串成一次长运行：plan work、implement、simplify result、review、apply eligible review fixes、run browser tests、commit、push、open PR，然后 watch CI，并在 bounded loop 内修复 failures。
+`lfg` is the **autonomous pipeline**. It chains the main Compound Engineering workflow into one long-running run: plan, implement, simplify, review, apply eligible review fixes, run browser tests, commit, push, open a PR, then watch CI and repair failures inside a bounded loop.
 
-当你想要完整 agentic shipping path，并且愿意让 agent 从 feature description 一路推进到 open PR 时使用它。最好在 `/ce-brainstorm` 之后使用，因为 pipeline 可以基于真实 requirements plan，而不是一行 prompt。
+Use it when you want the agent to take a software task from a description (or a requirements-only plan) to an open PR, and you are comfortable not inspecting each stage. It is not for in-the-loop work. If you want to approve the plan, the diff, or the review findings yourself, run those skills one at a time.
+
+It is best after `/ce-brainstorm`, because the pipeline can then plan against real requirements instead of a one-line prompt. Software brainstorm wrap-up offers "Ship it autonomously with `lfg`" when a unified plan artifact exists and nothing is still blocked on `Resolve Before Planning`.
 
 ---
 
-## 摘要（TL;DR）
+## TL;DR
 
 | Question | Answer |
 |----------|--------|
-| 它做什么？ | 从 planning 到 PR 和 CI watch 运行完整 CE software pipeline |
-| 何时使用？ | 已 ready for autonomous implementation 的 software tasks |
-| 产出什么？ | Code changes、commits、通常还有 PR；无法完全解决时留下 durable residual notes |
-| 下一步 | Review PR，ready 后 merge；若有 reusable learning，运行 `/ce-compound` 捕获 |
-| Distinguishing | Hard ordering gates、implementation-only cross-model routing、return-to-caller execution、review-fix persistence、browser test pass、bounded CI autofix loop |
+| What does it do? | Plans, implements, simplifies, reviews, applies eligible fixes, runs browser tests, commits, pushes, opens a PR, and watches CI |
+| When to use it | A software task you want shipped hands-off, already shaped by `/ce-brainstorm` or clear enough for `/ce-plan` |
+| What it produces | Code changes, commits, usually a PR. Unresolved review or CI leftovers become durable notes. No remote: local commits only. |
+| What's next | Review the PR. Run `/ce-babysit-pr` to watch it through review toward merge. Optionally `/ce-explain` for a new concept, `/ce-compound` for a reusable learning. |
+| What it does not do | Merge the PR, skip planning, run non-software work, or continue into the next area unless you accept a closeout handoff offer |
 
 ---
 
-## 调用示例
+## Example invocations
+
+The usual path is brainstorm, then empty `/lfg`. A plan path enriches that artifact, then ships. Stage assignments change who authors planning or implementation. The rest of the pipeline stays on `lfg`.
 
 ```text
-# 最常见：先确定有挑战性功能的 requirements，再基于该 context 交付
+# Most common: settle requirements, then ship from that context
 /ce-brainstorm design account-level notification controls for enterprise teams
 /lfg
 
-# 同一 handoff，但用指定 model author plan（implementation 仍保持 native）
+# Same handoff, but author the plan on a named model (implementation stays native)
 /ce-brainstorm design account-level notification controls for enterprise teams
 /lfg plan with fable
 
-# 直接交付边界已经很清晰的软件任务
+# After brainstorm already settled the requirements. No feature text needed.
+/lfg plan with fable
+
+# Clear, already-bounded software task. Weaker product context than a brainstorm.
 /lfg add a CSV export button to the account reports page
 
-# 在 customer items 对齐后，交付现有 feedback-sweep plan
+# Enrich a requirements-only plan in place, then ship it
 /lfg docs/plans/feedback-sweep-plan.md
+
+# Preference: try Codex for implementation, fall back to native if that route is down
+/lfg add account-level notification mute settings, use Codex for implementation
+
+# Requirement: only Composer may implement. If that route is unavailable, lfg stops.
+/lfg implement the settled plan, but only use Composer for implementation
+
+# Both stages, each to its own model or harness
+/lfg add account-level notification mute settings, plan with fable and use Codex for implementation
 ```
 
-最常见的 handoff 是 `/ce-brainstorm` -> `/lfg`：brainstorm 确定 requirements 和 scenarios，`lfg` 再把这些 context 转成 plan，并一路推进 implementation、review、PR 和 CI。Task 已经同样清晰时可直接调用 `lfg`。希望自行检查或批准各 stage 时，请使用各个独立 skill。
+An unscoped "use fable" or "with Codex" binds to **implementation only**, and `lfg` says so in its opening line. "Plan with Codex" (a harness assigned to planning) is not supported and blocks. Use individual skills when you want to inspect or approve stages yourself.
 
 ---
 
-## 问题
+## The Problem
 
-正常 CE workflow 刻意 staged：plan、work、simplify、review、ship。当你想检查每一步时这很有用；但任务边界清晰、希望 agent 一路 carry 时，handoff 太多。
+The normal CE workflow is staged on purpose: plan, work, simplify, review, ship. That is useful when you want to inspect each step. It is too much handoff when the task is well bounded and you want the agent to carry the whole thing.
 
-没有 explicit pipeline 时，autonomous runs 往往会跳过 planning，把 review 当 optional，忘记持久化 residual findings，或在 “PR opened” 时停止，即使 CI 仍然 red。
+Without an explicit pipeline, autonomous runs tend to skip planning, treat review as optional, forget to persist leftover findings, or stop at "PR opened" while CI is still red.
 
-## 方案
+## The Solution
 
-`lfg` 将 sequence 做成 explicit and gated：
+`lfg` makes the sequence explicit and gated:
 
-- Step 1 从 conversation 组合 transient settled-decisions brief：每个 decision 都带 class、rejected alternative 和 reason，并按 feature topic 限定 scope；将 brief 交给 `/ce-plan`，确保用户已作出的 decisions 被携带而不是重问。没有 settled decision 时完全跳过 brief
-- `/ce-plan` 必须在 work 开始前产出 implementation-ready code plan
-- `/ce-work` 以 return-to-caller mode 运行，使 pipeline 在 implementation 后重新获得控制；requested implementation target 只跨这一 seam 携带
-- Behavior-changing implementation 必须从 `/ce-work` 返回 verification evidence；缺失时，`lfg` 会重试 `/ce-work` 一次补齐 evidence，然后 blocked stop，而不是盲目 ship
-- `/ce-simplify-code` 在 review 前运行，除非 change 是 docs-only 或 trivial
-- `/ce-code-review` 报告 findings，然后 `lfg` 应用 eligible fixes 并 commit
-- Residual review findings 在 PR body 或 fallback tracked file 中持久化
-- `/ce-test-browser` 以 pipeline mode 运行
-- 有 remote 时，`/ce-commit-push-pr mode:pipeline branding:on` ship remaining changes，并显式标记 CE provenance
-- Open PR 上最多 watch CI 并 repair 三轮
-- Planning/review 暴露 invalidating settlement conflict 时，pipeline 在 shipping 前停止，而不是静默覆盖已达成的约定；non-halting flagged conflicts 成为 durable residuals 并进入 PR body
-- Closeout 时，eligible multi-area plan 可以产出对下一个单独规划 area 的 justified recommendation；`lfg` 拥有该选择，并提供 opt-in `/ce-handoff`，而不是自动继续
+1. Compose a short settled-decisions brief from the conversation (each decision, its class, the rejected alternative, and a reason), scoped to this feature, and pass it to `/ce-plan` so those choices are not re-asked. Skip the brief when nothing is settled.
+2. `/ce-plan` must produce an implementation-ready **code** plan before work starts. A requirements-only plan, a knowledge-work plan, or a non-software result stops the pipeline.
+3. `/ce-work` runs in return-to-caller mode so `lfg` keeps the shipping tail. Behavior-changing work must return verification evidence. Missing evidence is retried once, then the run stops rather than shipping blind.
+4. `/ce-simplify-code` runs on the branch diff before review, unless the change is docs-only or roughly under 10 lines.
+5. `/ce-code-review` (`mode:agent`) reports findings. `lfg` applies eligible mechanical fixes and commits them. Review itself does not edit the tree.
+6. Leftover actionable findings, plus any flagged settlement conflicts, become durable as tracker tickets and one run-report comment on the PR. They are not written into the PR body.
+7. `/ce-test-browser` runs in pipeline mode.
+8. `/ce-commit-push-pr mode:pipeline branding:on` commits remaining changes, pushes, and opens a PR when a remote exists, and marks CE provenance. If the project's instructions name their own shipping process (e.g. a `/create-pr` skill), that process runs instead, so CE branding may not appear.
+9. `/ce-babysit-pr mode:pipeline` watches the open PR: CI repairs via `/ce-debug`, incoming review comments via `/ce-resolve-pr-feedback`, up to three fix rounds by default. Pipeline babysit stops at "CI decided," not "merged."
+10. Print `DONE`. If the plan named a larger body of separately planned work and an area is still unplanned, `lfg` may offer an opt-in `/ce-handoff` for a fresh session. It does not continue that area itself.
 
-Pipeline 也有 local-only path：如果 repo 没有 git remote，就只在本地 commit，并跳过 push、PR creation 和 CI watch，而不是重试不可能的 network steps。
+An invalidating settlement conflict from planning or review stops the pipeline before shipping. Non-halting flagged conflicts become residuals that reach the PR's settled-decisions line.
 
-Next-work offer 受 gate 控制：completed plan 必须明确描述一组更大的 separately planned work，且至少一个受支持 future area 尚未规划。Gate 通过后，`lfg` 根据 current evidence 选择并解释最佳 next area。只有你明确接受 offer 后才调用 `/ce-handoff`；该 handoff 用于 fresh session 将一个 coherent area brainstorm 成单独 requirements-only plan，不扩展或编辑刚 ship 的 plan。没有 eligible area 时，`lfg` 结束且不 offer。
+No git remote: commit locally and skip push, PR creation, and CI watch. That is a terminal local-only path, not an error to retry.
+
+`lfg` never launches `/goal` itself. If goal-mode is the right engine, `ce-work` chooses it and must still return control.
 
 ---
 
-## 何时使用
+## What Makes It Novel
 
-Reach for `lfg` when:
+### Hard gates, then one shipping tail
 
-- 你有一个可以走完 plan、implementation、review 和 PR 的 software task
-- 你希望 hands-off progress，同时保留 CE quality gates
-- Task 已由 `/ce-brainstorm` shaped，或已经足够清楚，可由 `/ce-plan` 转为 implementation-ready plan
-- 你希望 CI failures 在 bounded loop 内自动处理
+Planning has to land an implementation-ready code plan. Implementation has to return evidence for behavior changes. Review is report-only by design. `lfg` applies the eligible fixes, persists what it will not apply, then owns the one push/PR/CI tail. Stages do not get to skip ahead to coding.
+
+### You can route two stages, not the whole run
+
+Planning can be authored on a named model (`plan with fable`) via `ce-plan`'s model elevation. Implementation can be sent to a harness (`use Codex for implementation`, `only use Composer for implementation`). Unscoped assignments bind to implementation only. Standing defaults live in CE config (`plan_model`, `work_engine_mode`, `work_engine_preferences`). See [Implementation routing](./configuration.md#implementation-routing).
+
+A preference falls back to native and says so. A requirement that cannot run blocks. `lfg` does not ask whether to weaken it.
+
+On string-only hosts the implementation seam is `mode:return-to-caller implementation_engine:<compact-json> <plan-path>`. The `plan_model:<alias>` carrier rides beside, never inside, `ce-plan`'s request. Neither carrier becomes plan content, a settled product decision, or review input.
+
+### Residuals and CI leftovers outlive the session
+
+Unapplied review findings are filed and committed. Unfixable CI is reported on the PR. `needs-human` leftovers (a product or design call) are deferred, not guessed. The run can reach `DONE` with those records in place.
+
+### Next work is an offer, not a second pipeline
+
+If the completed plan explicitly describes separately planned future areas, `lfg` picks one from current evidence and offers a handoff. Accepting creates a `ce-handoff` for a fresh session to brainstorm that area into a **separate** requirements-only plan. It does not edit the plan that just shipped.
+
+---
+
+## Quick Example
+
+You finish `/ce-brainstorm` on account-level notification mute. The wrap-up offers `lfg`. You invoke `/lfg` (or `/lfg plan with fable`).
+
+`lfg` builds a settled-decisions brief from the brainstorm, invokes `/ce-plan` on the requirements-only artifact, and waits until that file is `implementation-ready` with `execution: code`. Then `/ce-work` implements in return-to-caller mode. Simplify runs. Review reports findings. `lfg` applies the eligible mechanical ones, commits them, and surfaces the rest as tracker tickets plus one run-report comment on the PR. Browser tests run. `ce-commit-push-pr` opens a PR. `ce-babysit-pr` watches CI for up to three repair rounds.
+
+The run prints `DONE` and a line to run `/ce-babysit-pr <pr-url>` if you want it watched through review toward merge. It does not merge. If the plan named a later area, you may get a handoff offer. Decline it and the session is over.
+
+---
+
+## When to Reach For It
+
+Use `lfg` when:
+
+- You have a software task that can go through plan, implementation, review, and PR without you in the loop
+- The task is already shaped by `/ce-brainstorm`, or is clear enough for `/ce-plan`
+- You want CI failures handled automatically inside a bounded loop
+- You are fine with a branch being pushed and a PR being opened
 
 Skip `lfg` when:
 
-- Work 是 non-software 或 answer-seeking
-- Implementation 前需要 interactive product shaping：用 `/ce-brainstorm`
-- 你想手动检查并 approve 每个 stage：自己运行 `/ce-plan`、`/ce-work`、`/ce-code-review` 和 `/ce-commit-push-pr`
-- Repo 有 unusual shipping requirements，需要人工驱动 git 或 release work
+- The work is non-software or answer-seeking
+- You still need interactive product shaping → `/ce-brainstorm`
+- You want to inspect and approve each stage → `/ce-plan`, `/ce-work`, `/ce-code-review`, `/ce-commit-push-pr`
+- You only want a commit and PR for work that already exists → `/ce-commit-push-pr`
+- You only want a known bug fixed → `/ce-debug`
+- The repo has unusual shipping rules that need hand-driven git or release work
 
 ---
 
-## 放在 workflow 中使用
+## Use as Part of the Workflow
 
 ```text
 /ce-brainstorm describe the feature
 /lfg
 ```
 
-从 `/ce-brainstorm` 开始会给 pipeline 更好的 requirements。`lfg` 随后自行 invoke `/ce-plan`，如果 plan 不是 implementation-ready code plan 就停止。
+Starting with `/ce-brainstorm` gives the planner a Product Contract. `lfg` invokes `/ce-plan` itself and stops if the result is not an implementation-ready code plan.
 
-也可以直接调用：
+A sweep-reconciled plan is the same seam:
+
+```text
+/ce-sweep
+/lfg docs/plans/feedback-sweep-plan.md
+```
+
+After `DONE`:
+
+```text
+/ce-babysit-pr <pr-url>          # watch through review toward merge
+/ce-explain <new-concept>        # only if lfg printed a New concepts: trailer
+/ce-compound                     # optional, if there is reusable learning
+```
+
+## Use Standalone
 
 ```text
 /lfg add account-level notification mute settings
 ```
 
-Direct invocation 适合清晰 software tasks，但给 planner 的 product context 更少。
+Direct invocation is fine for a clear software task. The planner has less product context than it would after a brainstorm.
 
-## 路由 Planning 与 Implementation Stage
+## Route planning and implementation
 
-你可以让 `lfg` 使用特定 model 或 harness author 某个 pipeline stage，同时 `lfg` 保留 run 其余部分的 ownership。两个 stage 可独立路由：
+You can ask `lfg` to have a specific model or harness author one stage while `lfg` keeps the rest of the run.
 
-```text
-# implementation only
-/lfg add account-level notification mute settings, use Codex for implementation
-/lfg implement the settled plan, but only use Composer for implementation
+- **Scoped to planning:** `plan with fable`, `plan with opus`. This is model elevation inside `ce-plan`. Planning has no cross-harness engine. Assigning a harness to planning (`plan with Codex`, `plan on Cursor`) blocks.
+- **Scoped to implementation:** `use Codex for implementation` (preference), `only use Composer for implementation` (requirement). `cursor` means the Cursor harness with its default model. `composer` means a Composer-family model through Cursor.
+- **Unscoped:** `use fable`, `with Codex`. Binds to implementation only. In an interactive run that is genuinely ambiguous, `lfg` asks one question, then runs hands-off. In a headless run (scheduler, loop, nested orchestrator) it applies the implementation default and discloses it.
+- **No stage instruction:** `ce-plan` uses its `plan_model` config (or none). `ce-work` uses session/project instructions already in context, then checkout-local `work_engine_mode` and `work_engine_preferences`.
 
-# planning only
-/lfg plan with fable add account-level notification mute settings
-
-# both at once
-/lfg plan with fable, codex for implementation; add account-level notification mute settings
-```
-
-`lfg` 从整条 instruction 识别 intent，而不是匹配单一 keyword，并按 **scope** 解析每条 directive：
-
-- **Scoped** — instruction 点名 stage（"plan with fable"、"codex for implementation"）。路由到该 stage：向 `ce-plan` 传 `plan_model:<alias>` carrier（model elevation），向 `ce-work` 传 `implementation_engine` object。两者可同时解析。
-- **Unscoped** — 未点名 stage 的 bare assignment（"use fable"、"with codex"）。只绑定到 **implementation**，并在 `lfg` 的 opening line 中披露；绝不会静默扩散到 planning 或每个 stage。
-- **Unscoped 但确实 ambiguous，且你在场** — `lfg` 在 pipeline 开始前只问一个 upfront question，然后 hands-off 运行。Headless run（scheduler、loop、nested orchestrator）从不提问——应用 implementation default 并披露，因为无人可答。
-
-Implementation carrier 是 transient object，恰好包含 `mode`、`target`、`model` 与 `source`，只在 `lfg` 调用 `ce-work` 时与 `mode:return-to-caller` 一并传递。在 string-only host 上，该 seam 为 `mode:return-to-caller implementation_engine:<compact-json> <plan-path>`；例如 `implementation_engine:{"mode":"prefer","target":"codex","model":null,"source":"lfg-current-turn"}`。`plan_model:<alias>` carrier 与 `ce-plan` 的 request 并排传递——从不放进 request 内。两种 carrier 都不会成为 plan content、settled product decision 或 review input（Neither carrier becomes plan content）。Feature text、quoted material、comparison 或 filename 中普通 model mention 不激活 routing。
-
-Four-field carrier 刻意保持 scalar。若当前 LFG instruction 指定 ordered fallback list，LFG 将完整 list 保留为 stage-scoped current-task context，不传 truncated carrier；CE Work 按顺序解析并 preflight retained list。Host 无法跨 skill invocation 保留 current-task context 时，LFG 会 block，而不是静默丢失 later candidates。Standing ordered config 不需要 carrier，仍是建立 reusable matrix 最 portable 的方式。
-
-第一个示例是 preference-strength。若 work 开始前 Codex route unavailable，`ce-work` native implement，并返回 requested route、actual route/model、fallback reason；`lfg` 披露 fallback，继续唯一 shipping tail。第二个是 requirement-strength。由于 `lfg` 是 headless，required route unavailable 时直接 block，不询问或静默切到 native work。
-
-Target `cursor` 表示使用 configured default model 的 Cursor harness。Target `composer` 表示经 Cursor 请求 Composer-family model。Model pin 可选。Route substitution 保持在 requested target/model family 内并披露；fixed-recipient、unattended write adapter qualified 且 locally available 前不使用 route。Cross-model engine 的 launch floor 是至少一个真实 non-native route 通过 qualification matrix；failing candidates 保持 unavailable，不会变成 guessed production commands。
-
-Prompt 没有 stage instruction 时，`lfg` 不为该 stage 传 empty binding。Planning 方面，`ce-plan` 随后从其 `plan_model` config key 解析 elevation（或无 elevation）。Implementation 方面，`ce-work` 先考虑 context 中 applicable session/project instructions，再考虑 gitignored per-checkout `work_engine_mode` 与 ordered `work_engine_preferences` list。每个 config candidate 指定 `harness` 与可选 `model`；省略则使用 harness configured default。Config `prefer` 在 automatic flow 中生效，只在 ordered candidates 用尽后 native fallback；config `require` 在没有 qualified candidate 时 block。Current-task implementation instruction 优先于这些 defaults。
-
-共享 config shape 及其与 harness-loaded instructions 的关系，参见 [Compound Engineering 配置](./configuration.md#implementation-routing)。
-
-Long external run 通过 `ce-work` return contract 保持 observable：run id、requested/actual identity、unit/job state、activity/elapsed time、checkpoint、verification/commit state、blockers、recovery path。若 `lfg` 为 reconcile missing verification evidence 重试一次，会使用同一 binding/run id；不会 dispatch implementation 或运行 shipping tail 两次。Egress disclosure、private run state、detached-worktree containment、transactional fold-in、timeouts、resume/reap/cleanup、fallback 与 parallel-wave behavior 参见 [`ce-work`](./ce-work.md#choose-the-implementation-author)。
+A plain mention of a model in feature text, a quote, a comparison, or a filename does not activate routing. See [`ce-work`](./ce-work.md#choose-the-implementation-author) for fallback, timeouts, and detached-worktree behavior.
 
 ---
 
@@ -148,20 +190,46 @@ Long external run 通过 `ce-work` return contract 保持 observable：run id、
 
 | Argument | Effect |
 |----------|--------|
-| _(empty)_ | 从当前 context plan，然后在 plan eligible 时运行 pipeline |
-| `<feature description>` | 将 description 传给 `/ce-plan`，然后运行 pipeline |
-| `<feature description + stage assignment>` | 从 product request 移除 routing directives；将 scoped planning directive 路由到 `ce-plan`（`plan_model`），和/或将 scoped implementation directive 路由到 `ce-work`（`implementation_engine`）；unscoped assignment 只绑定到 implementation |
+| _(empty)_ | Plans from current context (including a just-finished brainstorm), then runs the pipeline if the plan is an implementation-ready code plan |
+| `<feature description>` | Passed to `/ce-plan`, then the pipeline |
+| `<requirements-only plan path>` | `/ce-plan` enriches that file in place, then the pipeline |
+| `<description or path> + stage assignment` | Routing words are stripped from the product request. A scoped planning directive goes to `ce-plan`. A scoped implementation directive goes to `ce-work`. An unscoped assignment binds to implementation only. |
 
-Output：code changes、commits，通常还有 PR。没有 configured git remote 时，output 只有 local commits。如果 CI 在 bounded repair loop 后仍 red，unresolved failures 会在 run 结束前持久化记录。
+Output: code changes, commits, and usually a PR. No configured git remote: local commits only. If CI is still red after the bounded repair loop, unresolved failures are recorded before the run ends.
+
+---
+
+## FAQ
+
+**Does `lfg` merge the PR?**
+No. Pipeline babysit stops when CI is decided (or the fix budget is hit). Merge stays yours. The closeout line points at `/ce-babysit-pr` for an interactive watch toward merge.
+
+**Will it stop and ask me to approve the plan or the diff?**
+No. That is the point of the skill, and why it is the wrong tool for in-the-loop work.
+
+**What if planning cannot produce an implementation-ready code plan?**
+The pipeline stops. Non-software tasks, requirements-only leftovers, knowledge-work plans, and invalidating settlement conflicts all halt before implementation.
+
+**Where do leftover review findings go?**
+Not into the PR description. They are filed in the project tracker when possible, and carried in one run-report comment on the PR.
+
+**What happens if there is no `origin`?**
+Local commits only. No push, no PR, no CI watch.
+
+**Can I send planning to Codex?**
+No. Planning accepts a model alias (`fable`, `opus`), not a harness. Implementation is the stage that can change harness.
 
 ---
 
 ## See Also
 
-- [`ce-brainstorm`](./ce-brainstorm.md) — 最强 upstream requirements source
-- [`ce-plan`](./ce-plan.md) — 第一个 required pipeline step
-- [`ce-work`](./ce-work.md) — 以 return-to-caller mode 调用的 implementation engine
-- [`ce-simplify-code`](./ce-simplify-code.md) — pre-review simplification step
-- [`ce-code-review`](./ce-code-review.md) — review gate
-- [`ce-test-browser`](./ce-test-browser.md) — browser validation step
-- [`ce-commit-push-pr`](./ce-commit-push-pr.md) — 有 remote 时的 shipping handoff
+- [`ce-brainstorm`](./ce-brainstorm.md): strongest upstream source of requirements; wrap-up can invoke `lfg`
+- [`ce-plan`](./ce-plan.md): first required pipeline step
+- [`ce-work`](./ce-work.md): implementation, called in return-to-caller mode
+- [`ce-simplify-code`](./ce-simplify-code.md): pre-review simplification
+- [`ce-code-review`](./ce-code-review.md): report-only review gate
+- [`ce-test-browser`](./ce-test-browser.md): browser validation
+- [`ce-commit-push-pr`](./ce-commit-push-pr.md): shipping handoff when a remote exists
+- [`ce-babysit-pr`](./ce-babysit-pr.md): CI and review watch after the PR is open
+- [`ce-handoff`](./ce-handoff.md): opt-in next-area snapshot at closeout
+- [`ce-sweep`](./ce-sweep.md): rolling plan that `/lfg <plan path>` can ship

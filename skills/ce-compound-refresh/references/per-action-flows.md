@@ -87,7 +87,7 @@ Split 是 Consolidate 的反向操作：把一篇覆盖多个问题的 doc 拆�
 1. Spawn 单个 subagent 编写 replacement learning。传入：
    - old learning 的完整内容
    - investigation evidence summary（什么变了、当前 code 做什么、为什么旧 guidance 会误导）
-   - target path 和 category（除非 category 本身变化，否则与 old learning 相同）
+   - target path 和 category（除非 category 本身变化，否则与 old learning 相同）。Replacement follows the corpus-first rule in `references/yaml-schema.md`, counting the old learning as one of the corpus's docs when choosing `component` and `root_cause`。
    - 上面列出的三个 support files 的 relevant contents
 2. Subagent 以 support files 作为 source of truth 编写 new learning：`references/schema.yaml` 用于 frontmatter fields 和 enum values，`references/yaml-schema.md` 用于 category mapping 和 array items 的 YAML-safety rules，`assets/resolution-template.md` 用于 section order。如果需要传入内容之外的额外 context，应使用 dedicated file search 和 read tools。
 3. **Validate parser-safety of the new learning's frontmatter**，捕获 prose rules 漏掉的 silent-corruption issues：malformed `---` delimiter lines、scalar values 中未 quote 的 ` #`（silent comment truncation），以及 scalar values 中未 quote 的 `: `（silent mapping confusion）。Bundled validator 位于 **skill bundle 内部**；把 `SKILL_DIR` 设置为包含本 skill `SKILL.md` 的目录绝对路径，并通过 existence guard 运行。无法 locate script 的平台应 fallback 到 manual check，而不是静默跳过 protection：

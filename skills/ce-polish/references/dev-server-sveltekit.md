@@ -1,21 +1,21 @@
-# SvelteKit dev-server recipe（dev-server 配方，auto-detect fallback）
+# SvelteKit dev-server recipe (auto-detect fallback)
 
-当 `detect-project-type.sh` 返回 `sveltekit`，且没有 `.claude/launch.json` 可查询时加载。
+Loaded when `detect-project-type.sh` returns `sveltekit` and the startup tuple still lacks a command.
 
-## Signature（识别特征）
+## Signature
 
-- 存在 `svelte.config.js`、`svelte.config.mjs` 或 `svelte.config.ts`
-- `package.json` 包含 `@sveltejs/kit` dependency
+- `svelte.config.js`, `svelte.config.mjs`, or `svelte.config.ts` exists
+- `package.json` contains a `@sveltejs/kit` dependency
 
-## Start command（启动命令）
+## Start command
 
-Standard（标准）:
+Standard:
 
 ```bash
 npm run dev
 ```
 
-`package.json` 中的 `dev` script 通常通过 SvelteKit 包装 `vite dev`。也有效（读取 `package.json` scripts，确认项目使用哪一个）：
+The `dev` script in `package.json` typically wraps `vite dev` via SvelteKit. Also valid (read `package.json` scripts to confirm which the project uses):
 
 ```bash
 pnpm dev
@@ -23,17 +23,17 @@ yarn dev
 bun run dev
 ```
 
-优先使用 lockfile 指示的 package manager：
+Prefer the package manager indicated by the lockfile:
 - `pnpm-lock.yaml` -> `pnpm dev`
 - `yarn.lock` -> `yarn dev`
 - `bun.lock` / `bun.lockb` -> `bun run dev`
 - `package-lock.json` or none -> `npm run dev`
 
-## Port（端口）
+## Port
 
-Default（默认）：`5173`（继承自 Vite）。SvelteKit respects `--port <port>` flag 和 `vite.config.ts` 中的 Vite `server.port` config。Overrides 遵循 `references/dev-server-detection.md` 中的 cascade。
+Default: `5173` (inherited from Vite). SvelteKit respects `--port <port>` flag and Vite's `server.port` config in `vite.config.ts`. Overrides follow the cascade in `references/dev-server-detection.md`.
 
-## Stub generation（stub 生成）
+## Stub generation
 
 ```json
 {
@@ -49,10 +49,10 @@ Default（默认）：`5173`（继承自 Vite）。SvelteKit respects `--port <p
 }
 ```
 
-替换为 resolved package manager（`npm` / `pnpm` / `yarn` / `bun`）和 port。
+Substitute the resolved package manager (`npm` / `pnpm` / `yarn` / `bun`) and port.
 
-## Common gotchas（常见坑）
+## Common gotchas
 
-- **Vite under the hood：** SvelteKit 内部使用 Vite；相同 port default（5173），相同 HMR behavior。`sveltekit` type 存在，是因为 `svelte.config.js` 比通用 `vite.config.ts` 是更精确的 signal，可让 polish 生成 SvelteKit-specific stub name 和 label。
-- **Adapter does not matter for dev：** `adapter-auto`、`adapter-node`、`adapter-static` 和其他 adapters 都生成相同 dev server。Adapter 只影响 production build output。
-- **`svelte.config.js` 是 primary signature：** `svelte.config.js` 在 SvelteKit projects 中总是存在，即使 `vite.config.ts` 也存在。这是区分 SvelteKit project 与 plain Vite project 的文件。
+- **Vite under the hood:** SvelteKit uses Vite internally -- same port default (5173), same HMR behavior. The `sveltekit` type exists because `svelte.config.js` is a more precise signal than a generic `vite.config.ts`, allowing polish to generate a SvelteKit-specific stub name and label.
+- **Adapter does not matter for dev:** `adapter-auto`, `adapter-node`, `adapter-static`, and other adapters all produce the same dev server. The adapter only affects the production build output.
+- **`svelte.config.js` is the primary signature:** `svelte.config.js` always exists in SvelteKit projects, even when `vite.config.ts` also exists. This is the file that distinguishes a SvelteKit project from a plain Vite project.
