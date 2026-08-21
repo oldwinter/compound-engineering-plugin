@@ -1,5 +1,7 @@
 # `lfg`
 
+> **中文更新摘要：** implementation route 的 `prefer` 与 `require` 都会在不可用时披露一次并回退到当前 harness/session model；`require` 只在 route 可用期间固定请求的 external identity，不会授权其他 external recipient。LFG 不会停下来询问是否弱化 route。
+
 > Run the full hands-off engineering pipeline from planning through an open PR. It pushes and opens the PR without stopping for approval. It does not merge.
 
 `lfg` is the **autonomous pipeline**. It chains the main Compound Engineering workflow into one long-running run: plan, implement, simplify, review, apply eligible review fixes, run browser tests, commit, push, open a PR, then watch CI and repair failures inside a bounded loop.
@@ -97,7 +99,7 @@ Planning has to land an implementation-ready code plan. Implementation has to re
 
 Planning can be authored on a named model (`plan with fable`) via `ce-plan`'s model elevation. Implementation can be sent to a harness (`use Codex for implementation`, `only use Composer for implementation`). Unscoped assignments bind to implementation only. Standing defaults live in CE config (`plan_model`, `work_engine_mode`, `work_engine_preferences`). See [Implementation routing](./configuration.md#implementation-routing).
 
-A preference falls back to native and says so. A requirement that cannot run blocks. `lfg` does not ask whether to weaken it.
+Both a preference and a requirement fall back to the current harness/session model with one disclosure when the external route cannot run. A requirement keeps the requested external identity fixed while viable; it never authorizes another external recipient. `lfg` does not ask whether to weaken the route.
 
 On string-only hosts the implementation seam is `mode:return-to-caller implementation_engine:<compact-json> <plan-path>`. The `plan_model:<alias>` carrier rides beside, never inside, `ce-plan`'s request. Neither carrier becomes plan content, a settled product decision, or review input.
 

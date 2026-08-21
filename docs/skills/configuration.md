@@ -39,7 +39,7 @@ Config 是 local default，不是另一份 agent-instructions 文件：
 | [`ce-plan`](./ce-plan.md) | `plan_skip_scoping_confirm` | `true` 跳过正常的 pre-plan scope confirmation，默认 `false`；不会抑制真实 blocker 或 post-plan menu。 |
 | [`ce-plan`](./ce-plan.md)、[`ce-brainstorm`](./ce-brainstorm.md) | `plan_model`、`brainstorm_model` | Model elevation：将 reasoning-heavy step 交给命名 model（例如 `fable`、`opus`），而非 session model。值为 model alias；prompt request 或 orchestrator 的 `plan_model:<alias>` carrier（例如来自 `lfg`，pipeline mode 也生效）可覆盖。会在所有 harness 生效：host 原生提供时走原生，否则走 Claude CLI，再否则 inline。无默认值（关闭 elevation）。 |
 | [`ce-work`](./ce-work.md)、[`lfg`](./lfg.md) | `work_engine_mode`、`work_engine_preferences` | 有序 implementation-author preferences。Mode 为 `off`、`prefer` 或 `require`；每项包含 `harness` 和可选 `model`。参见[实现路由](#implementation-routing)。 |
-| [`ce-code-review`](./ce-code-review.md)、[`ce-doc-review`](./ce-doc-review.md) | `cross_model_peer` | 首选 cross-model review target：`codex`、`claude`、`grok`、`cursor` 或 `composer`。Review skills 仍会应用 host-independence 和 route-availability gates。 |
+| [`ce-code-review`](./ce-code-review.md)、[`ce-doc-review`](./ce-doc-review.md) | `cross_model_review_mode`、`cross_model_peer`、`cross_model_model`、`cross_model_effort` | `cross_model_review_mode` 为 `auto`（默认）或 `off`，用于允许或关闭自动跨模型审查；`cross_model_peer` 指定首选目标：`codex`、`claude`、`grok`、`cursor` 或 `composer`；`cross_model_model` 与 `cross_model_effort` 可固定具体模型及推理强度。Review skills 仍会应用 host-independence 和 route-availability gates，无法遵循的设置会明确跳过，不会静默替换。 |
 | [`ce-commit-push-pr`](./ce-commit-push-pr.md) | `pr_teaching_section`、`pr_teaching_archive`、`auto_babysit` | 切换 PR concept teaching、选择 explainer archival，或退出默认 babysit handoff。默认分别为 `true`、`false`、`true`。 |
 | [`ce-product-pulse`](./ce-product-pulse.md) | `pulse_product_name`、`pulse_lookback_default`、`pulse_primary_event`、`pulse_value_event`、`pulse_completion_events` | Product identity、reporting window，以及代表 engagement、value 和 completion 的 events。Setup interview 会写入这些值。 |
 | [`ce-product-pulse`](./ce-product-pulse.md) | `pulse_quality_scoring`、`pulse_quality_dimension`、`pulse_analytics_source`、`pulse_tracing_source`、`pulse_payments_source`、`pulse_db_enabled` | 可选 quality scoring 和 read-only data-source routing。 |
@@ -63,13 +63,13 @@ work_engine_preferences:
 
 支持的 harness 为 `codex`、`claude`、`grok` 和 `cursor`。省略 `model` 时使用该 harness 的 configured default。Composer 是通过 Cursor 访问的 model family，因此应使用 `harness: cursor` 和 `model: composer` 请求。
 
-`ce-work` 按顺序遍历该列表，并跳过与当前 host/default model 等价的项。同一 harness 中另一个显式 model 仍然 eligible。使用 `prefer` 时，不可用的列表会回退到 native implementation 并披露；使用 `require` 时，interactive CE Work run 会在弱化 route 前询问，而 LFG 和其他 headless caller 会阻塞。
+`ce-work` 按顺序遍历该列表，并跳过与当前 host/default model 等价的项。同一 harness 中另一个显式 model 仍然 eligible。无论使用 `prefer` 还是 `require`，不可用的列表都会回退到当前 harness 和 session model 的 native implementation，并披露一次。只要 route 仍可用，`require` 就会固定请求的 external identity；它绝不会授权未请求的 external recipient，也不会让 route 不可用变成 blocker。
 
 当前任务的措辞可以为单次 run 选择其他 route 而不修改 config，例如“use Codex for implementation”或“only use Composer for implementation”。Assignment 仅作用于 implementation；host 仍负责 validation、integration、commit 和调用 workflow 的其余部分。
 
 ## 安全维护
 
-- 保持该文件被 gitignore。它可能包含 local integration choices，不应作为 team policy 提交。
-- 持久化的 team-wide instructions 应写入项目正常的 agent-instructions 机制，而不是此文件。
-- 一次性选择优先使用 per-run instruction；同一 checkout 跨 session 使用的默认值再写入 config。
+- 如需 team defaults，请提交 `config.yaml`。如果 `config.local.yaml` 包含个人或仅限当前 checkout 的选项，请勿提交（`/ce-setup` 可以添加 `.compound-engineering/*.local.yaml`）。
+- 持久化的 team-wide instructions 应写入项目正常的 agent-instructions 机制。CE key 的 team defaults 可以写入 `config.yaml`。
+- 一次性选择优先使用 per-run instruction。
 - Plugin 升级后重新运行 `/ce-setup`，刷新已提交的示例并诊断 retired 或 malformed settings。

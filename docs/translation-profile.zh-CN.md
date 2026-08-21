@@ -44,7 +44,9 @@
 
 README 顶部提供“安装中文版”区块，必须说明这是社区中文 fork，并使用 `oldwinter/compound-engineering-plugin` 作为 marketplace source。上游 `EveryInc/compound-engineering-plugin` 命令可保留作英文版说明，但不能标注为中文版安装入口。
 
-当前同步基线：上游 commit `15ab6f76`（compound-engineering-v3.22.4）。
+当前同步基线：上游 commit `66ccf579f8c1ef2ccfc642c317ba53151eeb1ebb`。
+
+本批同步移除已满足退出条件的共享 `context.mjs` workaround，并把仍有效的 dispatch failure direction 留在各自 consumer boundary；同时更新 work-engine `require` fallback、PR typed decision handoff 与 cross-model authentication attribution。中文 runtime 导读和面向读者的配置说明已同步这些行为，canonical executable prompt contract 保留上游英文原文。
 
 ## 同步后检查
 

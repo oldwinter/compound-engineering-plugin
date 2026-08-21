@@ -7,7 +7,7 @@ allowed-tools: Bash(gh *), Bash(git *), Read
 
 ## 中文执行导读
 
-这是中文 fork 的 runtime 入口。先按本文件的阶段顺序和 references 执行；命令、参数、文件路径、schema、精确字符串和安全边界保持原样，英文契约仍是权威。
+这是中文 fork 的 runtime 入口。先按本文件的阶段顺序和 references 执行；命令、参数、文件路径、schema、精确字符串和安全边界保持原样，英文契约仍是权威。凡是无法安全自动决定的 feedback，都必须保留完整 typed residual（稳定 sources、quoted feedback、investigation、decision reason、options/tradeoffs、recommendation 与 thread URLs），并让 caller 原样传播，不能只返回计数或泛化摘要。
 
 # Resolve PR Review Feedback
 

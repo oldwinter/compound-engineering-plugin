@@ -6,7 +6,7 @@ argument-hint: "[PR number|URL|blank=current branch] [watch|checkpoint] [duratio
 
 ## 中文执行导读
 
-这是中文 fork 的 runtime 入口。先按本文件的阶段顺序和 references 执行；命令、参数、文件路径、schema、精确字符串和安全边界保持原样，英文契约仍是权威。
+这是中文 fork 的 runtime 入口。先按本文件的阶段顺序和 references 执行；命令、参数、文件路径、schema、精确字符串和安全边界保持原样，英文契约仍是权威。`needs-human` 必须通过 shared atomic mark 持久化为完整 typed decision，并在 pipeline 无更多 autonomous work 时原样返回 canonical decision set；interactive watch 则继续推进所有独立工作。
 
 # Babysit a PR
 
@@ -48,7 +48,7 @@ Snapshot first, then in this order:
 
 1. **Terminal check.** `MERGED`/`CLOSED` → stop (a `stack-land` merge this run landed is a transition).
 2. **Capture the head SHA**; in a confirmed managed stack also record the pre-push baseline (`references/stack.md`).
-3. **Feedback before CI.** Threads or non-thread candidates present → invoke `ce-resolve-pr-feedback mode:pipeline` once with the PR ref; mark its `needs-human` threads and every passed comment; pass `trajectory` when a trigger is crossed; never declare non-convergence yourself.
+3. **Feedback before CI.** Threads or non-thread candidates present → invoke `ce-resolve-pr-feedback mode:pipeline` once with the PR ref; persist typed decisions through the shared atomic mark and dispatch every other passed comment; pass `trajectory` when a trigger is crossed; never declare non-convergence yourself.
 4. **Stale-SHA cancellation.** Head moved since step 2 → this snapshot's CI is dead; skip.
 5. **CI on the current head**, one pass for all failures: flaky/infra → `gh run rerun <run-id> --failed -R <host>/<owner>/<repo>`; real failure → `ce-debug mode:pipeline` once; mark each check acted on; unfixed checks stay red residuals.
 6. **Branch currency** — consume the exact emitted item (`references/branch-currency.md`); no item → nothing. `unrequested_base_merge` is a defect to report, never undo.
@@ -56,7 +56,7 @@ Snapshot first, then in this order:
 
 ## Step 3: Stop conditions
 
-**True stops** (`references/settle.md`): **Terminal**; **Looks ready** — `mergeability_certain`, `MERGEABLE`, `CLEAN`, no `base_ref_blocker`, checks terminal, zero backlog, `open_needs_human == 0`, `branch_currency_blocker == null`, settle elapsed, review-still-expected guard clear or its bounded stale protocol says stop; **blocked-external-drained**; **Budget** (active budget or 3-day backstop). Refresh a drifted PR description via `ce-commit-push-pr mode:pipeline` before reporting ready. **Standing residuals** (`needs-human`, `blocked-failing`, `stack-blocked`) block declaring ready but never end the loop — ending it because one item needs a human is the primary failure mode. `mode:pipeline` uses its bounded stop; `stack-land` lands the settled prefix before advancing. After a tick with no true stop, re-arm and wait on the one watcher; silence carries no PR-state information.
+**True stops** (`references/settle.md`): **Terminal**; **Looks ready** — `mergeability_certain`, `MERGEABLE`, `CLEAN`, no `base_ref_blocker`, checks terminal, zero backlog, `open_needs_human == 0`, `branch_currency_blocker == null`, settle elapsed, review-still-expected guard clear or its bounded stale protocol says stop; **blocked-external-drained**; **Budget** (active budget or 3-day backstop). Refresh a drifted PR description via `ce-commit-push-pr mode:pipeline` before reporting ready. Interactive **standing residuals** (`needs-human`, `blocked-failing`, `stack-blocked`) block ready while independent work continues; stopping there is the primary failure mode. `mode:pipeline` returns the canonical decision set when autonomous work ends. `stack-land` lands the settled prefix before advancing. After an interactive tick with no true stop, re-arm and wait on the one watcher; silence carries no PR-state information.
 
 ## Step 4: Report
 

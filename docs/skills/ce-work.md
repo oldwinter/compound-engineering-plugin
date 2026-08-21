@@ -2,6 +2,8 @@
 
 > Execute against the plan's guardrails, figure out the HOW with code in front of you, ship complete features, and hand off to a clean PR.
 
+> **中文更新摘要：** `prefer` 与 `require` 都会按顺序尝试 external implementation route；route 不可用时，披露一次后回退到当前 harness/session model。只要 route 仍可用，`require` 就固定用户请求的 external identity，并且绝不会改用未请求的 external recipient。
+
 `ce-work` is the **execution** skill. It takes a plan (or, for smaller scope, a bare prompt), implements against the plan's guardrails, runs tests continuously, selects an implementation engine and a safe scheduling strategy, runs quality gates, and hands off to a commit + PR flow. Implementation can stay on the current host or route bounded units to another qualified model or harness. The host still owns verification, canonical commits, and shipping.
 
 It treats the plan as a **decision artifact**: authoritative for scope, decisions, units, and tests. It figures out the actual implementation itself. **This is the HOW phase that `ce-plan` deliberately does not pre-write.**
@@ -225,7 +227,7 @@ Native execution is the default. You can assign implementation to a target in th
 /ce-work use Codex to add retry limits to the existing webhook sender
 ```
 
-The first three are preferences: `ce-work` attempts the route and continues natively, with a prominent requested-versus-actual disclosure, if it is unavailable. The fourth is a requirement: an interactive standalone run asks before weakening it, while a headless or automatic caller returns a blocker without prompting. Intent matters, not a particular keyword.
+The first three are preferences: `ce-work` attempts the route and continues natively, with a prominent requested-versus-actual disclosure, if it is unavailable. The fourth is a requirement: `ce-work` keeps that external identity fixed while the route is viable and never substitutes another external recipient, but an unavailable route still continues on the current harness and session model after one disclosure. Intent matters, not a particular keyword.
 
 An explicit current task wins. A still-active session preference remains applicable. An implementation-only caller binding keeps its recorded provenance. Active project or user instructions already in context can supply a default. Per-checkout config is the final preference before native execution. An incidental model mention in feature prose, quoted text, examples, or filenames does nothing.
 
@@ -247,7 +249,7 @@ The [central configuration reference](./configuration.md#implementation-routing)
 
 Each candidate has a `harness` (`codex`, `claude`, `grok`, or `cursor`) and an optional `model`. Omitting `model` means that harness's configured default. Composer is a model family reached through Cursor, so it is written as `harness: cursor` plus `model: composer`. Keep CLI flags and commands out of config.
 
-`off`, a commented or missing mode, and an invalid mode preserve the native default. `off` affects only standing config; it does not cancel applicable live intent or a caller binding. `prefer` tries ordered candidates, then falls back natively with disclosure. `require` asks only in an interactive standalone run; under `lfg` or another headless caller it blocks.
+`off`, a commented or missing mode, and an invalid mode preserve the native default. `off` affects only standing config; it does not cancel applicable live intent or a caller binding. Both `prefer` and `require` try ordered candidates, then fall back natively on the current harness and session model with one disclosure. `require` keeps the requested external identity fixed while viable and never substitutes an unrequested external recipient.
 
 A candidate is usable only after its unattended, write-capable, isolated-workspace route has qualified and the necessary CLI or authentication is available.
 

@@ -20,19 +20,8 @@ Document review is mandatory. The default is non-interactive (`mode:non-interact
 
 **Research, decide, and write the plan — never implement.** This workflow does not write production code, run tests, or learn from execution-time results; if the answer depends on changing code and seeing what happens, that belongs in `ce-work`. Directional pseudo-code and DSL grammar sketches that communicate design remain welcome where the references allow them — the boundary is implementing, not sketching.
 
-## Setup
+At every native subagent boundary, classify a rejected dispatch by whether an agent launched: correct a pre-launch argument rejection once, leave capacity-limited work queued, and otherwise follow that boundary's stated fallback or failed-pass handling.
 
-Run this once at the start of this invocation, before any subagent dispatch, and follow the directives it prints — except where one conflicts with this skill's own rules on asking the user questions, whether those rules are scoped to a non-interactive mode or apply in every mode, in which case this skill's rules win and no blocking question is asked. Run the fence exactly as written, as its own command: do not pipe or filter it (no `head`, `tail`, or `grep`), do not truncate its output, and do not bundle it into a batch with other commands. Its output opens with a `=== skill context` header and ends with `CE_CONTEXT_END`; if you received one of those lines without the other, the output was truncated — rerun the fence verbatim once. That recovery is the only rerun: otherwise do not rerun it within the same invocation; a later invocation of this or any other skill runs its own. If no Node runtime is available the skill proceeds unchanged.
-
-```bash
-SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
-NODE="$(for c in node nodejs; do command -v "$c" >/dev/null 2>&1 && "$c" -e '' >/dev/null 2>&1 && { echo "$c"; break; }; done)";
-if [ -n "$NODE" ]; then
-"$NODE" "$SKILL_DIR/scripts/context.mjs" || echo "context script failed; continue with the skill's normal behavior";
-else
-echo "no Node runtime; continue with the skill's normal behavior";
-fi
-```
 
 ## Mandatory Completion Contract
 
@@ -84,7 +73,7 @@ Determine `OUTPUT_FORMAT` before any other phase fires. Output mode is **exclusi
 2. **User-stated preference.** If this prompt holds no format request, honor an output-format preference the user established earlier that is already in your context, matching `md`/`html` case-insensitively. A remembered preference is more current than the rarely-edited config, so it **overrides** the config in step 3. Do not open or search instruction files to find it.
 3. **Config.** Apply the ordinary-key rule below: the first **active (non-commented)** `plan_output:` matching `md` or `html` (case-insensitively) wins. Missing, invalid, or commented values continue to the next layer, then step 4. The shipped template's commented examples are not settings.
 4. **Default.** Otherwise `OUTPUT_FORMAT=md`. If `<repo-root>` cannot be resolved so the config cannot be read, fall through to this default rather than failing.
-5. **Pipeline override.** When invoked from LFG or any `disable-model-invocation` context, force `OUTPUT_FORMAT=md` regardless of steps 1-4.
+5. **Pipeline override.** When invoked from LFG or any `disable-model-invocation` context, force `OUTPUT_FORMAT=md` regardless of steps 1-4. Pipeline mode forces markdown and skips interactive questions but does **not** disable model elevation — `plan_model` config (and a `plan_model:<alias>` caller carrier) is still honored (see the model-elevation sub-step below and `references/reasoning-elevation.md`).
 
 **Token-parsing convention:** only literal-prefix flag tokens (`output:`, `mode:`, the exact `confirm:auto`/`confirm:ask` forms, `plan_model:<alias>`, `delegate:` where applicable) are consumed and stripped. Other `<word>:<word>` tokens — including commit prefixes like `feat:` and any unrecognized `confirm:<value>` — pass through verbatim into the feature description. A stripped `plan_model:<alias>` carrier is retained for the Phase 5.2 model-elevation step.
 
@@ -99,6 +88,8 @@ Determine `OUTPUT_FORMAT` before any other phase fires. Output mode is **exclusi
 <!-- ce-config-layers:end -->
 
 Also resolve `SKIP_SCOPING_CONFIRM` here by the same precedence. `confirm:auto` skips the scoping-synthesis confirmation for this run and `confirm:ask` forces it on; honor an equivalent plain-language instruction the same way ("just write it, don't ask me to confirm" skips; "ask me before writing the plan" asks). Only those two literal values are consumed as a flag — any other `confirm:<value>` stays verbatim in the feature description. Then a preference already in your context, then the first **active (non-commented)** `plan_skip_scoping_confirm:` matching `true` or `false`, then the default of asking. `references/intake.md` owns what the skip does and does not cover, at the gate it applies to.
+
+**Model-elevation visibility.** Treat a stripped `plan_model:<alias>` carrier or a surfaced `plan_model` config value as a pending Phase 5.2 input, not a resolved choice. Phase 5.2 resolves the choice from the current conversation, carrier, and config immediately before authoring, so later user intent cannot be lost.
 
 #### 0.1 Resume Existing Plan Work When Appropriate
 
@@ -148,7 +139,7 @@ Read `references/final-review.md` now and follow it. It carries Phase 5.1 (the p
 
 #### 5.2 Write Plan File
 
-**Model elevation.** Before authoring the plan, load `references/reasoning-elevation.md` and follow it. It resolves whether a model was chosen for the interpret-findings-then-author step and dispatches that one step to it, with transparent fallback to your session model. When no model is chosen it is a no-op. It runs the same on every harness — do not gate it on the host.
+**Model elevation.** Before authoring the plan, load `references/reasoning-elevation.md`, resolve the choice at this boundary, and follow it. Do not author until activation resolution has completed and any selected dispatch or transparent fallback has settled. When no model is selected it is a no-op. It runs the same on every harness — do not gate it on the host.
 
 **REQUIRED: Write the plan file to disk before presenting any options.** Write it to `<root>/plans/` with the extension `OUTPUT_FORMAT` resolved to, following the naming and atomic-reservation rules in `references/final-review.md`. Both formats continue through `ce-doc-review`; fixes apply in the artifact's native format while preserving its existing structure.
 

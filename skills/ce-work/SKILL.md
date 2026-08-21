@@ -4,23 +4,10 @@ description: Execute a plan or concrete work prompt end-to-end. Use when impleme
 argument-hint: "[Plan path, work description, or recovery request with run id; blank uses latest] | [mode:return-to-caller [implementation_engine:<compact-json>] [implementation_run:<safe-id>] <plan path> for outer orchestrators]"
 ---
 
-> **中文导读（下方英文为 canonical contract）：** CE Work 会先解析 `<root>`，按 plan/prompt authority 执行 bounded units。每个 native subagent implementation unit 必须使用 fresh、single-use worker context；同一 handle 只可继续或恢复该 unit，集成、验证并 commit 后立即 retire，不能 retask 或保留 idle pool。`ce-simplify-code` 的自动 gate 只统计 substantive human-authored code，不用总 diff 行数。带 `session-settled:` 的 KTD 或 Product Contract Key Decision 都是 structure pins；Product decision 通过精确 `Governs R...` links 绑定 unit，发现 load-bearing 冲突时必须上报 blocker。
+> **中文导读（下方英文为 canonical contract）：** CE Work 会先解析 `<root>`，按 plan/prompt authority 执行 bounded units。每个 native subagent implementation unit 必须使用 fresh、single-use worker context；同一 handle 只可继续或恢复该 unit，集成、验证并 commit 后立即 retire，不能 retask 或保留 idle pool。`ce-simplify-code` 的自动 gate 只统计 substantive human-authored code，不用总 diff 行数。带 `session-settled:` 的 KTD 或 Product Contract Key Decision 都是 structure pins；Product decision 通过精确 `Governs R...` links 绑定 unit，发现 load-bearing 冲突时必须上报 blocker。`prefer` 与 `require` 的 external route 都会在不可用时披露一次并回退到当前 harness/session model；`require` 只在 route 可用期间固定请求的 external identity，绝不替换成未请求的 external recipient。
 
 # Work Execution Command
 
-## Setup
-
-Run this once at the start of this invocation, before any subagent dispatch, and follow the directives it prints — except where one conflicts with this skill's own rules on asking the user questions, whether those rules are scoped to a non-interactive mode or apply in every mode, in which case this skill's rules win and no blocking question is asked. Run the fence exactly as written, as its own command: do not pipe or filter it (no `head`, `tail`, or `grep`), do not truncate its output, and do not bundle it into a batch with other commands. Its output opens with a `=== skill context` header and ends with `CE_CONTEXT_END`; if you received one of those lines without the other, the output was truncated — rerun the fence verbatim once. That recovery is the only rerun: otherwise do not rerun it within the same invocation; a later invocation of this or any other skill runs its own. If no Node runtime is available the skill proceeds unchanged.
-
-```bash
-SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
-NODE="$(for c in node nodejs; do command -v "$c" >/dev/null 2>&1 && "$c" -e '' >/dev/null 2>&1 && { echo "$c"; break; }; done)";
-if [ -n "$NODE" ]; then
-"$NODE" "$SKILL_DIR/scripts/context.mjs" || echo "context script failed; continue with the skill's normal behavior";
-else
-echo "no Node runtime; continue with the skill's normal behavior";
-fi
-```
 
 ## Outcome
 
