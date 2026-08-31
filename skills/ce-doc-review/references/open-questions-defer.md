@@ -2,7 +2,7 @@
 
 > **中文导读：** Defer 会把 finding 追加到被 review 文档末尾的 `## Deferred / Open Questions`。持久化条目必须符合 shared rendering floor：先写建议与不处理的后果，再写定位信息；无法脱离原文理解的 opaque tokens 要解释或移出 decision block。
 
-This reference defines the Defer action's in-doc append mechanic. When the user chooses Defer on a finding (from the walk-through or from the bulk-preview Append-to-Open-Questions path), an entry for that finding appends to a `## Deferred / Open Questions` section at the end of the document under review.
+This reference defines the Defer action's in-doc append mechanic. When the user chooses Defer on a finding (from the walk-through or from the bulk-preview Append-to-Open-Questions path), append it to a visible `Deferred / Open Questions` section in the document's native format.
 
 The locator accepts the section regardless of heading syntax around the rest of the document, while matching the exact `## Deferred / Open Questions` heading for the target section.
 
@@ -14,7 +14,7 @@ Interactive mode only. Invoked by `references/walkthrough.md` (per-finding Defer
 
 ### Step 1: Locate or create the Open Questions section
 
-Scan the document for an existing `## Deferred / Open Questions` heading (case-sensitive match on the full heading text). Behavior by location:
+Scan the document for an existing `Deferred / Open Questions` section, matching its visible heading text exactly. Preserve the document's native format and existing structure; never insert markdown syntax into HTML.
 
 - **Heading present at the end of the document (last `##`-level section):** append new content inside this section at the end.
 - **Heading present mid-document (not the last `##`-level section):** still append inside the existing heading at that location. Do not create a duplicate at the end — the user positioned the section deliberately.
@@ -22,7 +22,7 @@ Scan the document for an existing `## Deferred / Open Questions` heading (case-s
 
 ### Step 2: Locate or create the timestamped subsection
 
-Within the Open Questions section, scan for a subsection heading matching the current review date: `### From YYYY-MM-DD review`. Behavior:
+Within the Open Questions section, scan for a visible subsection heading matching the current review date: `From YYYY-MM-DD review`. Use `###` in markdown and the document's existing subsection pattern in HTML. Behavior:
 
 - **Subsection present:** append new entries to it. Multiple Defer actions within a single review session accumulate under the same subsection.
 - **Subsection absent:** create `### From YYYY-MM-DD review` as the last subsection within the Open Questions section. Insert one blank line before the heading for readability.
@@ -31,7 +31,9 @@ Date format: ISO 8601 calendar date (`YYYY-MM-DD`). If multiple reviews occur on
 
 ### Step 3: Format and append the entry
 
-Per deferred finding, append a reader-facing bullet-point entry. The entry carries no HTML comment — the markdown rendering contract forbids mixed-in HTML, and every field Step 4's dedup needs is reconstructable from the visible entry text:
+Per deferred finding, append a reader-facing list entry in the document's native format. The entry carries no hidden comment; every field Step 4's dedup needs is reconstructable from visible text.
+
+The example below is markdown. In HTML, mirror the nearest sibling entry's element structure. If no sibling entry exists, use a semantic HTML list with one deferred finding per list item.
 
 ```
 - **{title}** — {section} ({severity}, {reviewer}, confidence {confidence})
@@ -54,7 +56,7 @@ Do not include `suggested_fix` or the full `evidence` array in the appended entr
 
 ### Step 4: Idempotence on compound-key collisions
 
-If an entry with the same compound key already exists under the same `### From YYYY-MM-DD review` subsection, do not append a duplicate. This can happen when:
+If an entry with the same compound key already exists under the same visible `From YYYY-MM-DD review` subsection, regardless of heading syntax, do not append a duplicate. This can happen when:
 
 - The same review session re-routes the same finding to Defer a second time (rare but possible via best-judgment-the-rest after a walk-through Defer)
 - The orchestrator retries after a partial failure

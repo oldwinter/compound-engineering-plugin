@@ -11,8 +11,12 @@
 # Write discipline（写入纪律）：
 # - 每个 experiment entry 会在其 measurement
 #   完成后立即 APPEND（SKILL.md step 3.3），早于 batch evaluation
+# - 同一 experiment 后续 ladder samples 会原地更新同一个 entry
 # - Outcome fields 可在 batch evaluation 后 in-place 更新（step 3.5）
 # - 如果发现 new best，`best` section 会在每个 batch 后更新
+# - `hypothesis_backlog` 会在每个 batch 后更新
+# - agent 会在每个 phase boundary 从磁盘重新读取此文件
+# - `best` section 会在每个 batch 后更新（如果发现 new best）
 # - `hypothesis_backlog` 会在每个 batch 后更新
 # - agent 会在每个 phase boundary 从磁盘重新读取此文件
 #
@@ -53,6 +57,9 @@ structure:
       gates:
         type: object
         description: "gate metric names 到 baseline values 的 key-value pairs"
+      metrics:
+        type: object
+        description: "Required hard-objective snapshots（aggregate 加 samples），供 decide.mjs 加载并用于后续 comparisons"
       diagnostics:
         type: object
         description: "diagnostic metric names 到 baseline values 的 key-value pairs"
@@ -141,8 +148,12 @@ experiment_entry:
       type: enum
       values:
         - measured                # measurement 已完成且 metrics 已 persisted，等待 batch evaluation
+        - promising              # 当前 samples 上 eligible，但 ladder 仍需 confirmation 才能 keep
         - kept                    # primary metric improved，gates passed -> merge 到 optimization branch
-        - reverted                # primary metric 未 improve 或更差 -> changes discarded
+        - not_selected            # comparison 后 eligible 但未 integrated（非 winner、重叠或超过 runner-up cap）
+        - reverted                # comparison 后 not eligible（required objective 回归，或没有 objective improved）
+        - inconclusive            # delta 在 comparison threshold 内；既不是 keep，也未证明 regression
+        - censored                # 根据预先声明的 futility bound 终止，因为不具竞争力
         - degenerate              # degenerate gate failed -> 立即 reverted，无 judge evaluation
         - error                   # measurement command crashed、timed out 或 produced malformed output
         - deferred_needs_approval # experiment 需要 unapproved dependency -> 暂存以进行 batch approval
@@ -151,9 +162,12 @@ experiment_entry:
         - runner_up_reverted      # file-disjoint runner-up，已 cherry-picked 但 combined measurement not better
       description: >
         Load-bearing state：loop 会根据此 value branch。
-        'measured' 是唯一 non-terminal state，存在目的是让 CP-3 能 persist
-        raw metrics，然后由 batch-level comparison 决定最终 outcome。
+        'measured' 和 'promising' 是 non-terminal states：CP-3 会先 persist raw
+        metrics，再进行 batch-level comparison；'promising' 表示 ladder 仍需要
+        confirmation samples。eligible 的 decide `keep` 在 diff 进入 optimization
+        branch 前保持为 'measured'。
         'kept' 和 'runner_up_kept' 会 advance optimization branch。
+        'not_selected' 是 eligible 但未 integrated 的 candidate 的 terminal state。
         'deferred_needs_approval' items 会在 wrap-up 时重新呈现。
         所有其他 states 对该 experiment 都是 terminal。
 
@@ -182,6 +196,10 @@ experiment_entry:
       type: object
       description: "来自 measurement command 的 diagnostic metric values"
 
+    metrics:
+      type: object
+      description: "Required hard-objective snapshots (aggregate plus samples) that decide.mjs loads"
+
     judge:
       type: object
       description: "Judge evaluation scores（仅当 primary type 为 'judge' 且 gates passed）"
@@ -195,6 +213,19 @@ experiment_entry:
     primary_delta:
       type: string
       description: "相对 current best 的 primary metric change（例如 '+0.7'、'-0.3'）"
+
+    objective_results:
+      type: object
+      description: "Per-required-objective comparison from decide.mjs (verdict, delta, relative)"
+
+    sample_count:
+      type: integer
+      description: "How many harness samples were spent on this experiment"
+
+    next_measurement:
+      type: string
+      enum: [none, smoke, exploratory, add_sample, confirm]
+      description: "Ladder next step from decide.mjs; none when the decision is terminal"
 
     learnings:
       type: string
@@ -227,16 +258,22 @@ experiment_entry:
 #         -> gates failed           -> outcome: degenerate
 #         -> measurement error      -> outcome: error
 #         -> measurement timeout    -> outcome: timeout
+#         -> smoke failed           -> outcome: degenerate
+#         -> futile / censored      -> outcome: censored
 #         -> gates passed
-#           -> persist raw metrics   -> outcome: measured
+#           -> persist raw metrics   -> outcome: measured or promising
 #           -> judge evaluated (if type: judge)
 #             -> batch 中最佳且 improved -> outcome: kept
+#             -> decide.mjs eligible, next_measurement none -> stay measured until integration
+#               -> diff on optimization branch -> outcome: kept
+#               -> eligible leftover             -> outcome: not_selected
 #             -> runner-up, file-disjoint -> cherry-pick + re-measure
-#               -> combined better        -> outcome: runner_up_kept
+#               -> combined eligible and integrated -> outcome: runner_up_kept
 #                  （组合后更好）
-#               -> combined not better    -> outcome: runner_up_reverted
+#               -> combined not kept       -> outcome: runner_up_reverted
 #                  （组合后没有更好）
-#             -> not improved             -> outcome: reverted
+#             -> inconclusive             -> outcome: inconclusive
+#             -> not eligible             -> outcome: reverted
 #       -> needs unapproved dep    -> outcome: deferred_needs_approval
 #          （需要未批准 dependency）
 #

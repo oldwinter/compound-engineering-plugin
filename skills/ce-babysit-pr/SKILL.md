@@ -4,9 +4,7 @@ description: "Babysits an open GitHub PR until merge-ready. Use when asked to wa
 argument-hint: "[PR number|URL|blank=current branch] [watch|checkpoint] [duration] [posture:target|stack-ready|stack-land]"
 ---
 
-## 中文执行导读
-
-这是中文 fork 的 runtime 入口。先按本文件的阶段顺序和 references 执行；命令、参数、文件路径、schema、精确字符串和安全边界保持原样，英文契约仍是权威。`needs-human` 必须通过 shared atomic mark 持久化为完整 typed decision，并在 pipeline 无更多 autonomous work 时原样返回 canonical decision set；interactive watch 则继续推进所有独立工作。
+<!-- 中文 fork；英文契约权威。 -->
 
 # Babysit a PR
 

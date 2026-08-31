@@ -176,6 +176,109 @@ describe("skill-eval-cell host grade", () => {
     expect(g.ok).toBe(true)
   })
 
+  test("classification passes when the field value is exactly Keep", () => {
+    const dir = hostDir({
+      "stdout.txt": "## Classification: **Keep**\nPotential product regression affecting request_id.\n",
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "post",
+      grade: {
+        classification: "Keep",
+        must_include: ["potential product regression", "request_id"],
+      },
+    })
+    expect(g.ok).toBe(true)
+  })
+
+  test("classification fails when a Replace value merely mentions Keep", () => {
+    const dir = hostDir({
+      "stdout.txt": "Classification: Replace — do not Keep\nPotential product regression affecting request_id.\n",
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "post",
+      grade: {
+        classification: "Keep",
+        must_include: ["potential product regression", "request_id"],
+      },
+    })
+    expect(g.ok).toBe(false)
+    expect(g.reasons).toContain(
+      "expected Classification: Keep, got Replace — do not Keep",
+    )
+  })
+
+  test("a roster probe fails when the run declared no TEAM trailer", () => {
+    const dir = hostDir({
+      "stdout.txt": "Reviewing with: coherence-reviewer, feasibility-reviewer\nFILES_READ: SKILL.md\nACTIONS: none\n",
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "post",
+      grade: { must_include: ["coherence-reviewer"], must_not_include: ["product-lens-reviewer"] },
+    })
+    expect(g.ok).toBe(false)
+    expect(g.reasons).toContain("missing TEAM trailer")
+  })
+
+  test("must_not_include fails when the TEAM trailer names the forbidden roster member", () => {
+    const dir = hostDir({
+      "stdout.txt": "TEAM: coherence-reviewer, feasibility-reviewer, product-lens-reviewer\nFILES_READ: SKILL.md\nACTIONS: none\n",
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "post",
+      grade: { must_include: ["coherence-reviewer"], must_not_include: ["product-lens-reviewer"] },
+    })
+    expect(g.ok).toBe(false)
+    expect(g.reasons.some((r) => r.includes("product-lens-reviewer"))).toBe(true)
+  })
+
+  test("a TEAM line scopes roster terms, so narration naming the forbidden persona does not fail", () => {
+    const dir = hostDir({
+      "stdout.txt":
+        "product-lens-reviewer was not activated: the plan chooses mechanisms for an agreed outcome.\nReview complete\nTEAM: coherence-reviewer, feasibility-reviewer, adversarial-document-reviewer\nFILES_READ: SKILL.md\nACTIONS: none\n",
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "post",
+      grade: { must_include: ["coherence", "feasibility"], must_not_include: ["product-lens"] },
+    })
+    expect(g.ok).toBe(true)
+  })
+
+  test("a TEAM line that names the forbidden persona fails even when narration is clean", () => {
+    const dir = hostDir({
+      "stdout.txt": "Review complete\nTEAM: coherence-reviewer, feasibility-reviewer, product-lens-reviewer\nFILES_READ: SKILL.md\nACTIONS: none\n",
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "post",
+      grade: { must_include: ["coherence", "feasibility"], must_not_include: ["product-lens"] },
+    })
+    expect(g.ok).toBe(false)
+  })
+
+  test("must_not_include passes when the TEAM trailer omits the forbidden member", () => {
+    const dir = hostDir({
+      "stdout.txt": "TEAM: coherence-reviewer, feasibility-reviewer\nFILES_READ: SKILL.md\nACTIONS: none\n",
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "post",
+      grade: { must_include: ["coherence-reviewer"], must_not_include: ["product-lens-reviewer"] },
+    })
+    expect(g.ok).toBe(true)
+  })
+
   test("a listed required read is a fail on post when FILES_READ omits it", () => {
     const dir = hostDir({
       "stdout.txt": "needs-human\nFILES_READ: SKILL.md\nACTIONS: none\n",
@@ -227,6 +330,70 @@ describe("skill-eval-cell host grade", () => {
       grade: { must_include: ["needs-human"] },
     })
     expect(g.ok).toBe(false)
+  })
+
+  test("must_include_field ignores a needle that only the trailers carry", () => {
+    const dir = hostDir({
+      "stdout.txt": [
+        "OPENING: Sessions issued before an operator revokes them are still accepted.",
+        "FILES_READ: src/session-stamp.js",
+        "ACTIONS: git commit",
+        "",
+      ].join("\n"),
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "pre",
+      grade: { must_include: ["revo", "stamp"], must_include_field: "OPENING" },
+    })
+    expect(g.ok).toBe(false)
+    expect(g.reasons).toEqual(["missing required text: stamp"])
+  })
+
+  test("must_include_field passes when the needle is in the field itself", () => {
+    const dir = hostDir({
+      "stdout.txt": [
+        "OPENING: Adds the per-user stamp that later revocation checks compare against.",
+        "FILES_READ: src/session-stamp.js",
+        "ACTIONS: git commit",
+        "",
+      ].join("\n"),
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "pre",
+      grade: { must_include: ["revo", "stamp"], must_include_field: "OPENING" },
+    })
+    expect(g.ok).toBe(true)
+  })
+
+  test("must_include_field fails when the run never emitted the field", () => {
+    const dir = hostDir({
+      "stdout.txt": "FILES_READ: src/session-stamp.js\nACTIONS: created branch session-revocation-stamp\n",
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "pre",
+      grade: { must_include: ["revo", "stamp"], must_include_field: "OPENING" },
+    })
+    expect(g.ok).toBe(false)
+    expect(g.reasons).toEqual(["missing OPENING field"])
+  })
+
+  test("must_include without a field still reads the whole answer", () => {
+    const dir = hostDir({
+      "stdout.txt": "The stamp lands first.\nFILES_READ: SKILL.md\nACTIONS: none\n",
+    })
+    const g = gradeHost({
+      host: "claude",
+      hostDir: dir,
+      arm: "pre",
+      grade: { must_include: ["stamp"] },
+    })
+    expect(g.ok).toBe(true)
   })
 
   test("a timed-out host fails even with a clean ACTIONS trailer", () => {

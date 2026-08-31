@@ -1,12 +1,24 @@
+<div align="center">
+
+<img src="assets/logo.png" alt="Compound Engineering" width="120">
+
 # Compound Engineering
 
-[![Build Status](https://github.com/EveryInc/compound-engineering-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/EveryInc/compound-engineering-plugin/actions/workflows/ci.yml)
+**AI skills that make each unit of engineering work easier than the last.**
 
-让每一个工程工作单元都比上一个更容易的 AI skills。
+[![Build Status](https://github.com/EveryInc/compound-engineering-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/EveryInc/compound-engineering-plugin/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
+[![Skills](https://img.shields.io/badge/skills-33-black.svg)](docs/guides/README.md)
+
+</div>
+
+Compound Engineering is a plugin of 33 skills for AI coding agents. It structures the work around a loop — brainstorm, plan, build, review, then **capture what you learned** — so the knowledge from each change is written down where the next change can read it.
+
+It runs on 14 agent hosts, including Claude Code, Cursor, and Codex.
 
 ## 安装中文版
 
-> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。当前已同步至上游 commit `66ccf579`。
+> 这是由社区维护的中文 fork，不是上游 EveryInc 的官方发行版。安装后，runtime 会从该 fork 加载 `skills/*/SKILL.md` 及各 skill 的 `references/`；这些是中文本地化的实际执行入口。
 
 在 Claude Code 中安装这个中文 fork：
 
@@ -15,164 +27,9 @@
 /plugin install compound-engineering
 ```
 
-安装后，runtime 会加载这个 fork 中的 `skills/*/SKILL.md` 及各 skill 自带的 `references/`；这些是中文本地化的实际执行入口。下方保留的 `EveryInc/compound-engineering-plugin` 命令指向上游英文版，不应当作中文版安装命令。
+上游英文安装命令仍保留在下方的 `Install` 章节，但不应当作中文版安装入口。
 
-**使用其他编辑器或 CLI？** Claude Code、Cursor、Codex、Kimi Code CLI、Cline、Grok Build CLI、Devin CLI、GitHub Copilot、Factory Droid、Qwen Code、OpenCode、Pi 和 Antigravity CLI 均受支持，详见[更多安装方式](#更多安装方式)。
-
-## Philosophy（理念）
-
-Codex 本地开发模式直接链接当前 checkout；`remote` 模式则恢复为 this checkout 的 cached copy（cached copy of this checkout）。
-
-**每一个工程工作单元都应该让后续工作更容易，而不是更困难。**
-
-调用语法：本 README uses `/skill-name` examples for slash-skill hosts。在 Codex 中，invoke installed skills with `$skill-name`（for example, `$ce-plan` and `$lfg`）；`/goal` remains a Codex built-in command。
-
-传统开发会积累技术债。每个 feature 都增加 complexity。每个 bug fix 都留下一点 local knowledge，后来的人还得重新发现。Codebase 越来越大，context 越来越难 hold，下一次 change 也越来越慢。
-
-Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execution：
-
-- 写 code 前用 `/ce-brainstorm` 和 `/ce-plan` 基于 readiness 的统一 plan artifact 充分 plan
-- 用 `/ce-code-review` 和 `/ce-doc-review` review，捕获问题并校准判断
-- 用 `/ce-compound` 把 knowledge codify 成可复用资产
-- 保持质量，让未来 changes 更容易
-
-重点不是 ceremony，而是 leverage。好的 brainstorm 让 plan 更锋利。好的 plan 让 execution 更小。好的 review 捕获 pattern，而不只是 bug。好的 compound note 让下一个 agent 不必从零学同一课。
-
-**了解更多**
-
-- [Skill documentation catalog](docs/skills/README.md)
-- [Compound engineering: how Every codes with agents](https://every.to/chain-of-thought/compound-engineering-how-every-codes-with-agents)
-- [The story behind compounding engineering](https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it)
-
-## Workflow（工作流）
-
-核心 loop 有六步：**brainstorm** requirements，**plan** implementation，按 plan **work**，**simplify** 刚写的 code，**review** 结果，然后 **compound** learning，并带着更好的 context 重复。
-
-| Skill | Purpose（用途） |
-|-------|---------|
-| [`/ce-brainstorm`](docs/skills/ce-brainstorm.md) | 通过 interactive Q&A 思考 feature 或 problem，并在 planning 前写出 requirements-only unified plan |
-| [`/ce-plan`](docs/skills/ce-plan.md) | 将 feature ideas 或 requirements-only plans enrich 为 implementation-ready plans |
-| [`/ce-work`](docs/skills/ce-work.md) | 原生执行 implementation-ready plans，或通过合格的跨模型 author（qualified cross-model author）实施，同时由 host 保留 verification、commits 和 shipping |
-| [`/ce-simplify-code`](docs/skills/ce-simplify-code.md) | 在 review 前 refinement 新写的 code，提升 clarity 和 reuse |
-| [`/ce-code-review`](docs/skills/ce-code-review.md) | 合并前按 plan 进行 report-only multi-agent review；本地应用修复必须显式授权 |
-| [`/ce-compound`](docs/skills/ce-compound.md) | 把 learning 捕获到 `docs/solutions/`，让下一轮 loop 更聪明 |
-
-每个 cycle 都会 compound：`/ce-compound` 写下 learnings，下一次 `/ce-brainstorm` 和 `/ce-plan` 会读取它们作为 grounding。Brainstorms sharpen plans，plans inform future plans，reviews catch more issues，patterns get documented。这个 return arrow 就是重点。
-
-> `docs/solutions/`、`docs/plans/` 等 artifact folders 只是默认位置。如果项目本身把 `docs/` 用作受版本控制的内容，可通过 `docs_root` 把所有 CE artifact folders 统一迁移到一个 repo-relative root；详见[配置](docs/skills/configuration.md#artifact-root)。
-
-### Additional skills（额外 skills）
-
-这些 skills 位于 loop 周边，或按需使用；并不是每个 cycle 都需要它们。
-
-| Skill | 何时使用 |
-|-------|---------|
-| [`/ce-ideate`](docs/skills/ce-ideate.md) | *Loop 之前*，当你还不知道要 build 什么时使用：生成并严格排序 grounded ideas，然后把最强的一个送入 `/ce-brainstorm` |
-| [`/ce-strategy`](docs/skills/ce-strategy.md) | *Upstream anchor*：创建并维护 `STRATEGY.md`，由 ideate、brainstorm 和 plan 读取作为 grounding，让 strategy choices 流入每个 feature |
-| [`/ce-product-pulse`](docs/skills/ce-product-pulse.md) | *Outer loop*：给定时间窗口内用户实际经历了什么（usage、performance、errors）的 report，保存到 `docs/pulse-reports/`；follow-ups 反馈到 ideation 和 brainstorming |
-| [`/ce-debug`](docs/skills/ce-debug.md) | 当输入是 bug 而不是 feature 时，替代 brainstorm -> plan -> work：reproduce，trace root cause，fix，然后在必要时 polish/review 并 handoff 给 PR |
-| [`/ce-pov`](docs/skills/ce-pov.md) | *On demand, before you commit*：给出 decisive、project-grounded adoption verdict、holistic document take 或针对既有 approaches 的立场；可由 named peers 或 `oracle` 通过 blind initial round 和 bounded reconciliation 做 cross-check |
-| [`/ce-explain`](docs/skills/ce-explain.md) | *按需记录或理解工作*：把 concept、diff、idea 或 “what did I do this week?” 变成值得长期保留、self-contained 的 visual document；材料值得记住时，可选 check-in（diff 的 predict-then-reveal、corrected exercises） |
-
-完整 catalog 和 skill chaining 见 [docs/skills](docs/skills/README.md)。完整 inventory 见[下方](#full-skill-inventory)。
-
-## Quick Example（快速示例）
-
-**寻找方向**：当你还没有具体 idea 时，先 ideate，再把最强 survivor 带入 loop：
-
-```text
-/ce-ideate new drawing tools
-/ce-ideate surprise me
-/ce-ideate open issues     # ground ideas in your tracker's open issues (GitHub, Linear, Jira)
-```
-
-`/ce-ideate` 会先做 homework（codebase、past learnings、web 上的 prior art，以及可选的 issue tracker），然后给出一组 ranked grounded candidates，供你带入 `/ce-brainstorm`。
-
-**标准 feature loop**：把 rough idea 变成 shipped、reviewed code：
-
-```text
-/ce-brainstorm make background job retries safer
-/ce-plan
-/ce-work
-/ce-simplify-code
-/ce-code-review
-/ce-compound
-```
-
-**Simplifying code**：在 fresh implementation work 后使用，或指向持续拖慢 changes 的 code：
-
-```text
-/ce-simplify-code
-/ce-simplify-code simplify the code in my most-churned file
-```
-
-第一种用法会在 review 前收紧 recent branch changes。Targeted pass 适用于某个 file 持续吸收 unrelated fixes、follow-ups 或 merge conflicts 的情况。
-
-**Debugging a bug**：当你从 broken behavior 而不是 feature 开始：
-
-```text
-/ce-debug the checkout webhook sometimes creates duplicate invoices
-/ce-code-review
-/ce-compound
-```
-
-**Autonomous**：交出一个 feature，让 agent 跑完整 pipeline：
-
-```text
-/ce-brainstorm describe the feature
-/lfg
-```
-
-`/lfg` 会 hands-off 跑完整 loop：plan，按 plan work，simplify，运行 code review 并应用 fixes，运行 browser tests，commit，push，open PR，然后 watch CI 并修复 failures 直到 green。建议在 `/ce-brainstorm` 之后启动，让它基于真实 requirements plan，而不是基于一行 prompt。它是 standard loop 的 autopilot 版本，适合你想离开一会儿、回来看到一个打开且 green 的 PR。当 eligible multi-area plan 仍有 unplanned work 时，`lfg` 还会推荐并说明 next separately planned area；只有你接受后，才会为 fresh session 和 separate plan 创建 `/ce-handoff`。
-
-## Getting Started（开始使用）
-
-安装后，在任意 project 中运行 `/ce-setup`。它会检查 repo-local config、报告 optional tool capabilities，并帮助把 machine-local CE settings 安全地放进 gitignore。
-
-`compound-engineering` plugin 当前包含 32 个 skills。其核心 workflows 会按需为 research、review、planning 和 implementation 启动 specialist subagents；每个 skill 用自己的 prompts 初始化 generic subagents，而不是依赖 standalone plugin agents，从而让 workflows 在不同 harness（它们对 formal agent definitions 的处理方式不同）之间保持可移植。
-
-### Full Skill Inventory（完整 Skill 清单）
-
-| Skill | Purpose（用途） |
-|-------|---------|
-| [`/ce-strategy`](docs/skills/ce-strategy.md) | 创建或维护 `STRATEGY.md` |
-| [`/ce-ideate`](docs/skills/ce-ideate.md) | 生成并严格评估 grounded ideas |
-| [`/ce-pov`](docs/skills/ce-pov.md) | 对 adoption、document 或 approach set 形成 decisive、project-grounded POV |
-| [`/ce-explain`](docs/skills/ce-explain.md) | 将 concept、diff、idea 或你自己的一段 work 记录成可长期保留的 visual artifact |
-| [`/ce-brainstorm`](docs/skills/ce-brainstorm.md) | 探索 requirements 并写出尺寸合适的 requirements doc |
-| [`/ce-plan`](docs/skills/ce-plan.md) | 创建 structured implementation plans |
-| [`/ce-work`](docs/skills/ce-work.md) | 以 native 或 cross-model implementation 执行 plans，并保持 durable progress 与 transactional host-owned integration |
-| [`/ce-code-review`](docs/skills/ce-code-review.md) | 使用 skill-local reviewer personas review code |
-| [`/ce-doc-review`](docs/skills/ce-doc-review.md) | Review requirements 和 plan documents |
-| [`/ce-debug`](docs/skills/ce-debug.md) | Reproduce failures，trace root cause，fix bugs，并为 non-trivial fixes 准备 PR |
-| [`/ce-compound`](docs/skills/ce-compound.md) | 记录已解决问题，compound team knowledge |
-| [`/ce-compound-refresh`](docs/skills/ce-compound-refresh.md) | Refresh stale 或 drifting learnings |
-| [`/ce-optimize`](docs/skills/ce-optimize.md) | 运行 iterative optimization loops |
-| [`/ce-retune`](docs/skills/ce-retune.md) | 以 measurement-first 方式为新 model retune skill corpus |
-| [`/ce-product-pulse`](docs/skills/ce-product-pulse.md) | 生成 time-windowed product pulse reports |
-| [`/ce-riffrec-feedback-analysis`](docs/skills/ce-riffrec-feedback-analysis.md) | 把 Riffrec recordings 或 notes 转成 structured feedback |
-| [`/ce-sweep`](docs/skills/ce-sweep.md) | Sweep feedback sources，track item lifecycles，并产出 `/lfg`-ready plan |
-| [`/ce-resolve-pr-feedback`](docs/skills/ce-resolve-pr-feedback.md) | Resolve PR review feedback |
-| [`/ce-commit`](docs/skills/ce-commit.md) | 创建带清晰 message 的 git commit |
-| [`/ce-commit-push-pr`](docs/skills/ce-commit-push-pr.md) | Commit、push 并 open PR（或 construct/submit 一个选择加入的 managed stack），同时讲解本次 change 新引入的任何 concept |
-| [`/ce-babysit-pr`](docs/skills/ce-babysit-pr.md) | 持续 watch open PR（或 posture 下已确认的 managed stack），根据新到达的 review comments 和 CI 状态推动它走向 merge-ready |
-| [`/ce-worktree`](docs/skills/ce-worktree.md) | 确保 work 在 isolated git worktree 中进行 |
-| [`/ce-promote`](docs/skills/ce-promote.md) | Draft user-facing announcement copy |
-| [`/ce-test-browser`](docs/skills/ce-test-browser.md) | 对 PR-affected pages 运行 browser tests |
-| [`/ce-test-xcode`](docs/skills/ce-test-xcode.md) | 在 simulator 上 build 和 test iOS apps |
-| [`/ce-setup`](docs/skills/ce-setup.md) | Diagnose optional tool capabilities 和 project config |
-| [`/ce-handoff`](docs/skills/ce-handoff.md) | 在默认临时存储或指定位置创建 session handoff，并从选定来源恢复上下文 |
-| [`/ce-simplify-code`](docs/skills/ce-simplify-code.md) | Simplify recent code changes |
-| [`/ce-polish`](docs/skills/ce-polish.md) | 启动 dev server 并迭代 UX polish |
-| [`/ce-proof`](docs/skills/ce-proof.md) | 创建、编辑和分享 Proof documents |
-| [`/ce-dogfood`](docs/skills/ce-dogfood.md) | 对 active branch 做 hands-off diff-scoped browser QA，并可自主修复小 breakages |
-| [`/lfg`](docs/skills/lfg.md) | 完整 autonomous engineering workflow |
-
----
-
-## 更多安装方式
-
-中文 fork 的 Claude Code 安装方式位于[文档顶部](#安装中文版)。以下命令均指向上游英文版，上游对这些平台提供同等支持。
+## Install
 
 ### Claude Code
 
@@ -181,7 +38,8 @@ Compound engineering 反过来做：80% 在 planning 和 review，20% 在 execut
 /plugin install compound-engineering
 ```
 
-> **Already have Compound Engineering installed?** Compound Engineering moved to a root-native layout. You must refresh the marketplace *before* updating — see [Existing Installs](#existing-installs). Running `/plugin update` alone keeps you on the old version.
+> [!IMPORTANT]
+> **Already have Compound Engineering installed?** Refresh the marketplace *before* updating — see [Upgrading](docs/install/upgrading.md). Running `/plugin update` alone keeps you on the old version.
 
 ### Cursor
 
@@ -210,7 +68,7 @@ Or search for "compound engineering" in the Cursor plugin marketplace. Do not ru
 Compound Engineering is not listed in Codex's built-in plugin marketplace yet. Add it as a custom marketplace:
 
 1. In the Codex app, open **Plugins** from the sidebar.
-2. 点击 **Create** 旁的箭头，然后选择 **Add marketplace**。
+2. Click the arrow next to **Create**, then select **Add marketplace**.
 3. Enter:
 
    | Field | Value |
@@ -220,7 +78,7 @@ Compound Engineering is not listed in Codex's built-in plugin marketplace yet. A
    | Sparse paths | leave blank |
 
 4. Click **Add marketplace**.
-5. 搜索 **Compound Engineering**，安装 **compound-engineering-plugin**，然后重启 Codex。
+5. Search for **Compound Engineering**, install **compound-engineering-plugin**, then restart Codex.
 
 The Codex app install is self-contained for Compound Engineering. Specialist reviewer and research behavior lives inside the skills as local prompt assets; no separate custom-agent install step is required.
 
@@ -253,35 +111,102 @@ CODEX_HOME="$HOME/.codex/profiles/work" codex plugin add compound-engineering@co
 
 The marketplace step only makes the plugin available; the plugin install is what activates the native CE skills for that profile.
 
-#### 移除旧版 Codex tool map（native plugin 推出前的安装）
-
-如果你曾在 native Codex plugin 支持推出前，通过 Bun `convert` / `install --to codex` CLI 安装 Compound Engineering，该路径可能在你的**全局** Codex instructions file 中插入过一个 managed block：
-
-`<!-- BEGIN COMPOUND CODEX TOOL MAP -->` … `<!-- END COMPOUND CODEX TOOL MAP -->`
-
-它位于 `$CODEX_HOME/AGENTS.md`（默认 `~/.codex/AGENTS.md`）。这个 Claude-compat tool map 已经过时，因为 CE skills 会直接在内部指明 Codex tools；其中一行还错误地要求 Codex 把 subagent dispatch 收缩到 main thread。Native plugin 安装**不会**添加该 block。
-
-把以下 prompt 粘贴给 Codex（或任何可访问 home directory 的 agent）即可移除：
-
-```text
-从我的 Codex home AGENTS.md 中移除过时的 Compound Engineering Codex tool-map block。
-
-1. 如果设置了 CODEX_HOME，检查 `$CODEX_HOME/AGENTS.md`；否则检查 `~/.codex/AGENTS.md`。如果我使用 Codex profiles，还要检查 `~/.codex/profiles/*/AGENTS.md`。
-2. 查找精确 sentinels：`<!-- BEGIN COMPOUND CODEX TOOL MAP -->` 和 `<!-- END COMPOUND CODEX TOOL MAP -->`。
-3. 如果两者都存在，只删除从 BEGIN 行到 END 行（含首尾两行）的内容，其他 user content 保持不变。除非 project/repo AGENTS.md 中也出现了这两个精确 sentinels，否则不要编辑它。
-4. 如果移除后文件为空，则删除该文件。
-5. 简短展示修改前后的摘要；如果 block 原本就不存在，也请说明。不要添加 replacement tool map。
-```
-
-重新运行面向 Codex 的 Bun convert/install CLI，也会移除仍然存在的 block；新版 CLI 不再插入它。
-
-**使用其他 editor 或 CLI？** Kimi Code CLI、Cline、Grok Build CLI、Devin CLI、GitHub Copilot、Factory Droid、Qwen Code、OpenCode、Pi 和 Antigravity CLI 均受支持，参见[更多安装方式](#more-install-options)。
+**Another editor or CLI?** Kimi Code CLI, Cline, Grok Build CLI, Devin CLI, GitHub Copilot, Factory Droid, Qwen Code, OpenCode, Pi, oh-my-pi (omp), and Antigravity CLI are all supported — see [More install options](#more-install-options).
 
 ---
 
-### 其他 editor 和 CLI
+## Philosophy
 
-[Claude Code、Cursor 和 Codex](#claude-code) 的说明在上方；这里列出的平台同样受到支持。
+**Each unit of engineering work should make subsequent units easier -- not harder.**
+
+Invocation syntax: this README uses `/skill-name` examples for slash-skill hosts. In Codex, invoke installed skills with `$skill-name` (for example, `$ce-plan` and `$lfg`). In oh-my-pi (omp), these prompts can model-route to visible skills; use the native deterministic `/skill:<name>` form for manual-only or hidden skills (for example, `/skill:ce-polish`). `/goal` remains a Codex built-in command.
+
+Traditional development accumulates technical debt. Every feature adds complexity. Every bug fix leaves behind a little more local knowledge that someone has to rediscover later. The codebase gets larger, the context gets harder to hold, and the next change becomes slower.
+
+Compound engineering inverts this. 80% is in planning and review, 20% is in execution:
+
+- Plan thoroughly before writing code with `/ce-brainstorm` and `/ce-plan` using one readiness-based plan artifact
+- Review to catch issues and calibrate judgment with `/ce-code-review` and `/ce-doc-review`
+- Codify knowledge so it is reusable with `/ce-compound`
+- Keep quality high so future changes are easy
+
+The point is not ceremony. The point is leverage. A good brainstorm makes the plan sharper. A good plan makes execution smaller. A good review catches the pattern, not just the bug. A good compound note means the next agent does not have to learn the same lesson from scratch.
+
+## The loop
+
+The core loop is six steps: **brainstorm** the requirements, **plan** the implementation, **work** through the plan, **simplify** what you wrote, **review** the result, then **compound** the learning -- and repeat with better context.
+
+| Skill | Purpose |
+|-------|---------|
+| [`/ce-brainstorm`](docs/guides/ce-brainstorm.md) | Interactive Q&A to think through a feature or problem and write a requirements-only unified plan before planning |
+| [`/ce-plan`](docs/guides/ce-plan.md) | Enrich feature ideas or requirements-only plans into implementation-ready plans |
+| [`/ce-work`](docs/guides/ce-work.md) | Execute implementation-ready plans natively or through a qualified cross-model author while retaining host verification, commits, and shipping |
+| [`/ce-simplify-code`](docs/guides/ce-simplify-code.md) | Refine the freshly written code for clarity and reuse before review |
+| [`/ce-code-review`](docs/guides/ce-code-review.md) | Report-only multi-agent review against the plan before merging; local apply is explicit |
+| [`/ce-compound`](docs/guides/ce-compound.md) | Capture the learning into `docs/solutions/` so the next loop starts smarter |
+
+Each cycle compounds: `/ce-compound` writes learnings that the next `/ce-brainstorm` and `/ce-plan` read as grounding -- brainstorms sharpen plans, plans inform future plans, reviews catch more issues, patterns get documented. That return arrow is the whole point.
+
+<img src="assets/demo/compound-loop.gif" alt="A ce-compound run writes a learning about an env-var trap; 18 days later, on unrelated work, a ce-plan run finds that learning and carries its constraints into the new plan" width="100%">
+
+**Run one teaches it. Run two remembers.**
+
+<sub>Replayed from a real pair of sessions 18 days apart, with names and paths anonymized and the six-minute run compressed to about 30 seconds. Nothing shown is behavior the skills don't have — see <a href="assets/demo/README.md">assets/demo</a> for the source and the substitutions.</sub>
+
+> Artifact folders like `docs/solutions/` and `docs/plans/` are the **defaults**. A project whose `docs/` is tracked content can relocate every CE artifact folder under one repo-relative root via the `docs_root` setting -- see [configuration](docs/guides/configuration.md#artifact-root).
+
+## Try it
+
+After installing, run `/ce-setup` in any project. It reports optional tool capabilities, creates repo `.compound-engineering/config.yaml` when missing, refreshes the committed example, and gitignores an existing local override.
+
+**The standard loop** -- turn a rough idea into shipped, reviewed code:
+
+```text
+/ce-brainstorm make background job retries safer
+/ce-plan
+/ce-work
+/ce-simplify-code
+/ce-code-review
+/ce-compound
+```
+
+**Autonomous** -- hand off a feature and let the agent run the whole pipeline:
+
+```text
+/ce-brainstorm describe the feature
+/lfg
+```
+
+`/lfg` runs the loop hands-off: it plans, works through the plan, simplifies, runs code review and applies the fixes, runs browser tests, then commits. When a git remote exists it pushes, opens a PR, and watches CI with a bounded repair loop (it does not merge, and it can finish with leftovers if the repair budget is hit). With no remote it stops at local commits. Start it after `/ce-brainstorm` so it plans against real requirements rather than a one-line prompt.
+
+Starting from a bug instead of a feature? Use [`/ce-debug`](docs/guides/ce-debug.md). Not sure what to build yet? Start with [`/ce-ideate`](docs/guides/ce-ideate.md).
+
+## Skills at a glance
+
+33 skills, grouped by what they are for. The full catalog, with a page per skill and how each one chains into the others, is in **[docs/guides](docs/guides/README.md)**.
+
+| Group | Skills | What it covers |
+|-------|--------|----------------|
+| [Core loop](docs/guides/README.md#the-core-loop) | `ce-brainstorm` `ce-plan` `ce-work` `ce-simplify-code` `ce-code-review` `ce-compound` | The six steps of every iteration |
+| [Around the loop](docs/guides/README.md#around-the-loop) | `ce-strategy` `ce-product-pulse` `ce-sweep` `ce-compound-refresh` | Anchors and feeds that keep the loop grounded |
+| [On demand](docs/guides/README.md#on-demand) | `ce-ideate` `ce-pov` `ce-debug` `ce-explain` `ce-doc-review` `ce-optimize` `ce-prototype` | Reached for when a specific need arises |
+| [Git workflow](docs/guides/README.md#git-workflow) | `ce-commit` `ce-commit-push-pr` `ce-babysit-pr` `ce-resolve-pr-feedback` `ce-worktree` | Committing, shipping, and shepherding PRs |
+| [Autonomous](docs/guides/README.md#autonomous-pipeline) | `lfg` | The whole pipeline, hands-off |
+| [Testing & design](docs/guides/README.md#frontend-design) | `ce-test-browser` `ce-test-xcode` `ce-polish` `ce-dogfood` | Verifying and polishing what you built |
+| [Collaboration](docs/guides/README.md#collaboration) | `ce-proof` `ce-handoff` `ce-promote` | Sharing work and handing it off |
+| [Utilities](docs/guides/README.md#workflow-utilities) | `ce-setup` `ce-retune` `ce-riffrec-feedback-analysis` | Setup and maintenance |
+
+**Learn more**
+
+- [Skill documentation catalog](docs/guides/README.md)
+- [Compound engineering: how Every codes with agents](https://every.to/chain-of-thought/compound-engineering-how-every-codes-with-agents)
+- [The story behind compounding engineering](https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it)
+
+---
+
+## More Install Options
+
+[Claude Code, Cursor, and Codex](#install) are at the top. Everything here is equally supported.
 
 ### Kimi Code CLI
 
@@ -301,58 +226,58 @@ After installing or updating, run `/reload` or start a new Kimi session so the p
 
 ### Cline
 
-Cline 从包含 `SKILL.md` 的目录中按需加载 CE skills。先在 Cline 扩展中启用 **Settings -> Features -> Enable Skills**，再将本中文 fork 的 skills link 到全局或单个 project：
+Cline loads CE skills from on-demand `SKILL.md` directories. Enable **Settings -> Features -> Enable Skills** in the Cline extension, then link this repository's skills globally or per project:
 
 ```bash
-git clone https://github.com/oldwinter/compound-engineering-plugin
+git clone https://github.com/EveryInc/compound-engineering-plugin
 ./compound-engineering-plugin/.cline/scripts/install-skills.sh --global
 ```
 
-从 checkout 安装到单个 project：
+Per-project install from a checkout:
 
 ```bash
 ./compound-engineering-plugin/.cline/scripts/install-skills.sh --project
 ```
 
-安装或更新 skills 后，请启动新的 Cline task。固定版本、本地开发和卸载步骤见 [`.cline/INSTALL.md`](.cline/INSTALL.md)。
+Start a new Cline task after installing or updating skills. See [`.cline/INSTALL.md`](.cline/INSTALL.md) for pinning, local development, and uninstall steps.
 
 ### Grok Build CLI (`grok`)
 
-xAI 的 [Grok Build CLI](https://x.ai/cli)（`grok`）可以直接从本 repository 安装 Compound Engineering。Repo root 本身就是有效的 Grok plugin：`grok` 会读取现有的 Claude-compatible manifests，而且 repo 也提供 native `.grok-plugin/plugin.json`：
+xAI's [Grok Build CLI](https://x.ai/cli) (`grok`) installs Compound Engineering directly from this repository — the repo root is a valid Grok plugin (`grok` reads the existing Claude-compatible manifests, and the repo also ships a native `.grok-plugin/plugin.json`):
 
 ```bash
 grok plugin install EveryInc/compound-engineering-plugin
 ```
 
-这种安装会跟踪 repository；运行 `grok plugin update` 即可拉取最新版。如果想将其作为 marketplace source 浏览，repo 也提供 native `.grok-plugin/marketplace.json`：
+This tracks the repository; run `grok plugin update` to pull the latest. To browse it as a marketplace source instead, the repo ships a native `.grok-plugin/marketplace.json`:
 
 ```bash
 grok plugin marketplace add EveryInc/compound-engineering-plugin
 grok plugin install compound-engineering
 ```
 
-两种 path 都会直接跟踪 repository（没有 commit pin），因此不需要 Bun install step。添加 `--trust` 可跳过安装确认。`grok` 把 config 存在 `~/.grok` 下；安装后启动新 session，以便加载 skills。
+Both paths track the repository directly (no commit pin). Add `--trust` to skip the install confirmation. `grok` stores config under `~/.grok`; start a new session after installing so the skills load.
 
-Compound Engineering 也正在提交到官方 [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace)；maintainer runbook 见 [`docs/grok-marketplace-submission.md`](docs/grok-marketplace-submission.md)。
+Compound Engineering is also being submitted to the official [xAI plugin marketplace](https://github.com/xai-org/plugin-marketplace); see [`docs/grok-marketplace-submission.md`](docs/grok-marketplace-submission.md) for the maintainer runbook.
 
 ### Devin CLI
 
-Repo 提供 native `.devin-plugin/plugin.json` manifest，因此 Devin CLI 可以直接从 GitHub 安装 Compound Engineering：
+Devin CLI can install Compound Engineering directly from GitHub because the repo ships a native `.devin-plugin/plugin.json` manifest:
 
 ```bash
 devin plugins install EveryInc/compound-engineering-plugin
 ```
 
-验证安装并检查 skills：
+Verify the install and inspect the skills:
 
 ```bash
 devin plugins list
 devin plugins info compound-engineering
 ```
 
-使用 `devin plugins update compound-engineering` 更新到最新版。Plugins 会在 session 开始时加载，因此安装或更新后需要启动新 Devin session，skills 才会以 `/compound-engineering:<skill>` slash commands 出现。
+Update to the latest version with `devin plugins update compound-engineering`. Plugins load at session start, so start a new Devin session after installing or updating for the skills to appear (as `/compound-engineering:<skill>` slash commands).
 
-少数 skills 声明了 Devin 尚未映射的 Claude-style `allowed-tools` names（例如 `Bash`）。这些 skills 仍可工作，但某些 actions 会请求 permission，而不是 auto-approved 运行。详见 [`docs/specs/devin.md`](docs/specs/devin.md)。
+A few skills declare Claude-style `allowed-tools` names that Devin does not map (for example `Bash`); those skills still work, but some of their actions ask for permission instead of running auto-approved. See [`docs/specs/devin.md`](docs/specs/devin.md) for details.
 
 ### GitHub Copilot
 
@@ -378,7 +303,7 @@ copilot plugin marketplace add EveryInc/compound-engineering-plugin
 copilot plugin install compound-engineering@compound-engineering-plugin
 ```
 
-Copilot CLI reads the existing Claude-compatible plugin manifests, so no separate Bun install step is needed.
+Copilot CLI reads the existing Claude-compatible plugin manifests directly.
 
 ### Factory Droid
 
@@ -389,7 +314,7 @@ droid plugin marketplace add https://github.com/EveryInc/compound-engineering-pl
 droid plugin install compound-engineering@compound-engineering-plugin
 ```
 
-Droid uses `plugin@marketplace` plugin IDs; here `compound-engineering` is the plugin and `compound-engineering-plugin` is the marketplace name. Droid installs the existing Claude Code-compatible plugin and translates the format automatically, so no Bun install step is needed.
+Droid uses `plugin@marketplace` plugin IDs; here `compound-engineering` is the plugin and `compound-engineering-plugin` is the marketplace name. Droid installs the existing Claude Code-compatible plugin and translates the format automatically.
 
 ### Qwen Code
 
@@ -397,7 +322,7 @@ Droid uses `plugin@marketplace` plugin IDs; here `compound-engineering` is the p
 qwen extensions install EveryInc/compound-engineering-plugin:compound-engineering
 ```
 
-Qwen Code installs Claude Code-compatible plugins directly from GitHub and converts the plugin format during install, so no Bun install step is needed.
+Qwen Code installs Claude Code-compatible plugins directly from GitHub and converts the plugin format during install.
 
 ### OpenCode
 
@@ -431,198 +356,70 @@ Recommended companion for richer blocking questions:
 pi install npm:pi-ask-user
 ```
 
+### oh-my-pi (omp)
+
+oh-my-pi (omp) installs Compound Engineering through its marketplace flow. The repo ships a native `.omp-plugin/marketplace.json` catalog whose plugin entry carries a release-managed `version`, so omp's update checker can see each new CE release:
+
+```text
+omp plugin marketplace add EveryInc/compound-engineering-plugin
+omp plugin install compound-engineering@compound-engineering-plugin
+```
+
+To stay current automatically, enable auto-update:
+
+```bash
+omp config set marketplace.autoUpdate auto
+```
+
+The default `notify` mode only writes update availability to the debug log — it does not prompt — so without `auto` you will not hear about new releases. To upgrade by hand instead, run `omp plugin upgrade compound-engineering@compound-engineering-plugin`.
+
+<details>
+<summary>Other install paths (pin-style and contributor development)</summary>
+
+`omp install https://github.com/EveryInc/compound-engineering-plugin` installs the repository as an npm-style plugin. That path has **no update mechanism** — treat it as pinning a snapshot, not as the recommended install.
+
+For local development from a checkout, use a live symlink instead:
+
+```bash
+omp plugin link "$PWD"
+```
+
+</details>
+
+Run `/reload-plugins` or start a new omp session after installing so the skills load. omp's native deterministic command is `/skill:<name>` (for example, `/skill:ce-plan`); ordinary `/skill-name` prompts can also model-route to visible skills, but manual-only or hidden skills require the native form. See [`docs/specs/omp.md`](docs/specs/omp.md) for details.
+
 ### Antigravity CLI (`agy`)
 
-Google 已用 [Antigravity CLI](https://antigravity.google)（`agy`）替代 consumer Gemini CLI，后者仍运行在 Gemini models 上。直接从 GitHub 安装 Compound Engineering，无需 clone：
+Google has replaced the consumer Gemini CLI with [Antigravity CLI](https://antigravity.google) (`agy`), which still runs on Gemini models. Install Compound Engineering directly from GitHub — no clone step required:
 
 ```bash
 agy plugin install https://github.com/EveryInc/compound-engineering-plugin
 ```
 
-用下面命令验证：
+Verify with `agy plugin list`. The repository root is the plugin package (`plugin.json` plus `skills/`).
 
-```bash
-agy plugin list
-```
-
-repository root 就是 plugin package（`plugin.json` 加 `skills/`）。
-
-本地 checkout 或 pinned release 可用：
+For a local checkout or pinned release:
 
 ```bash
 git clone https://github.com/EveryInc/compound-engineering-plugin
 agy plugin install ./compound-engineering-plugin
 ```
 
-bundled `.agy/` directory 仍可作为 compatibility entry point：
+The bundled `.agy/` directory remains a compatibility entry point (`agy plugin install ./compound-engineering-plugin/.agy`). `agy` also loads `GEMINI.md` workspace context from the checkout.
 
-```bash
-agy plugin install ./compound-engineering-plugin/.agy
-```
-
-`agy` 也会从 checkout 加载 `GEMINI.md` workspace context。
-
-pinning、本地开发、uninstall 和 legacy Gemini import 见 [`.agy/INSTALL.md`](.agy/INSTALL.md)。
-
-### Existing Installs
-
-Compound Engineering moved to a root-native, skills-only layout. An existing marketplace install keeps a **cached** marketplace snapshot that still points at the old `plugins/compound-engineering` path, so updating the plugin on its own reads that stale snapshot and leaves you on the previous version. Refresh the cached marketplace **first**, then update the plugin — order matters.
-
-**Claude Code**
-
-```text
-/plugin marketplace update compound-engineering-plugin
-/plugin update compound-engineering
-```
-
-**Codex CLI**
-
-```bash
-codex plugin marketplace upgrade compound-engineering-plugin
-codex plugin add compound-engineering@compound-engineering-plugin
-```
-
-There is no `codex plugin update`; re-running `add` reinstalls from the refreshed snapshot. For a non-default profile, run both commands against the same `CODEX_HOME`.
-
-**Codex App**
-
-Refresh the marketplace from the **Plugins** panel (remove and re-add the `EveryInc/compound-engineering-plugin` marketplace if there is no refresh control), then reinstall **compound-engineering** and restart Codex.
-
-**Grok Bot**
-
-Reinstall or refresh Compound Engineering on that Cursor account (`/add-plugin compound-engineering` in Cursor Agent chat, or marketplace search). Grok Bot then loads the new snapshot from the shared plugin library. Do not clone this repository onto the Grok Bot computer for a normal update.
-
-If you configured a host with a direct path or sparse path under `plugins/compound-engineering`, edit or reinstall that source so it points at the repository root with no sparse path.
-
-If a previous Bun-installed copy is still shadowing native plugin skills, run the current cleanup command from a checkout of this repository:
-
-```bash
-git clone https://github.com/EveryInc/compound-engineering-plugin.git /tmp/compound-engineering-plugin-cleanup
-cd /tmp/compound-engineering-plugin-cleanup
-bun install
-bun run cleanup --target all
-```
+See [`.agy/INSTALL.md`](.agy/INSTALL.md) for pinning, local development, uninstall, and legacy Gemini import.
 
 ---
 
-## Local Development
+## Upgrading an existing install
 
-```bash
-bun install
-bun test
-bun run release:validate
-```
+Compound Engineering moved to a root-native, skills-only layout. If you installed before that move, refresh the cached marketplace **before** updating the plugin — order matters, and `/plugin update` alone keeps you on the old version.
 
-### From your local checkout
-
-For active development, load this checkout directly in the harness you want to test.
-
-**Claude Code**
-
-```bash
-claude --plugin-dir "$PWD"
-```
-
-**Cursor Agent CLI**
-
-```bash
-cursor-agent --plugin-dir "$PWD"
-```
-
-**Codex**
-
-常规、接近生产环境的 plugin 安装请使用上方 [Codex App](#codex-app) 或 [Codex CLI](#codex-cli) 说明。下面的流程仅供贡献者测试某个精确 checkout 或 linked worktree 中尚未发布的文件。
-
-<details>
-<summary><strong>高级：在 Codex 中测试当前 checkout</strong></summary>
-
-把当前 worktree 选为 Codex 的 active development source：
-
-```bash
-bun run codex:dev -- local
-```
-
-该命令会在 `$CODEX_HOME/skills/compound-engineering-local`（默认 `~/.codex/skills/compound-engineering-local`）创建一个指向当前 worktree `skills/` 目录的 collection symlink。它还会通过 Codex CLI 移除已安装的 Compound Engineering plugin variants，避免 marketplace cache 遮蔽或重复加载本地 skills。它不会复制 skills、修改 checkout、执行 `git pull`，也不会触碰 `$CODEX_HOME/skills` 下无关条目。
-
-这个 link 会暴露所选 worktree 中的精确内容，包括 modified 和 untracked skills。普通编辑无需重装；当前 Codex 版本会自动检测直接的 skill 变更。切换 local/remote 安装模式后请启动新 session；普通 skill 修改未出现时，重启 Codex。
-
-检查和切换模式：
-
-```bash
-bun run codex:dev -- status
-bun run codex:dev -- refresh
-bun run codex:dev -- remote
-bun run codex:dev -- remove
-```
-
-- `status` 报告 local、remote、mixed、drifted 或 absent 状态，以及 linked checkout、worktree 类型、branch、commit SHA 和 dirty counts。
-- `refresh` 是幂等的 `local` alias，用于修复误装的 plugin；live link 已会直接反映文件变化。
-- `remote` 刷新官方 Git marketplace，安装并验证 `compound-engineering@compound-engineering-plugin`，然后移除 local link，用于模拟已发布版本的用户体验。
-- `remove` 移除 Compound Engineering plugin variants 和 managed link，保留 checkout 与其他用户 skills。
-
-脚本会自动推导 repository path，因此可用于任意位置的 checkout，包括带空格的路径。它继承当前 `CODEX_HOME`；测试隔离 profile 时，在命令上设置 `CODEX_HOME`。所有模式必须针对启动 Codex 时使用的同一 `CODEX_HOME` 运行。
-
-不要用 `codex plugin marketplace add "$PWD"` 做 live local development。它会安装当前 checkout 的缓存副本，之后的编辑在重新安装 plugin 前不会生效；manifest version 相同也不能证明 cache 与 worktree 一致。`codex:dev` workflow 会让 Codex 始终链接当前 skill files。
-
-</details>
-
-**Kimi Code CLI**
-
-Inside Kimi Code CLI:
-
-```text
-/plugins install /path/to/compound-engineering-plugin
-```
-
-To test the local marketplace catalog instead, pass the catalog path:
-
-```text
-/plugins marketplace /path/to/compound-engineering-plugin/.kimi-plugin/marketplace.json
-```
-
-**Cline**
-
-```bash
-/path/to/compound-engineering-plugin/.cline/scripts/install-skills.sh --global
-```
-
-在 Cline 扩展中启用 **Settings -> Features -> Enable Skills**，然后启动新的 task。
-
-**Devin CLI**
-
-```bash
-devin plugins install /path/to/compound-engineering-plugin
-```
-
-Local install 会 link 到 checkout，而不是复制内容，因此无需重新安装，skill edits 就会在下一个 Devin session 生效。
-
-**OpenCode**
-
-```json
-{
-  "plugin": ["/path/to/compound-engineering-plugin"]
-}
-```
-
-Restart OpenCode after changing `opencode.json`.
-
-**Pi**
-
-```bash
-pi -e "$PWD"
-```
-
-**Antigravity CLI (`agy`)**
-
-```bash
-agy plugin install "$PWD/.agy"
-```
-
-`agy` installs the bundled `.agy` plugin directory from your checkout and loads `GEMINI.md` workspace context.
+See **[docs/install/upgrading.md](docs/install/upgrading.md)** for the per-host refresh commands, and for removing the obsolete Codex tool-map block left behind by pre-native Bun installs.
 
 ## Limitations
 
-OpenCode and Pi use native package/plugin loading from this repository. The Bun CLI remains for repository development and converter maintenance, not normal installation.
+OpenCode, Pi, and oh-my-pi (omp) use native package/plugin loading from this repository. The Bun CLI remains for repository development and converter maintenance, not normal installation.
 
 Release versions are owned by release automation. Routine feature PRs should not hand-bump plugin or marketplace manifest versions.
 
@@ -634,15 +431,29 @@ No. Bun is only needed for repo development tasks and converter maintenance.
 
 ### Where do I see all available skills?
 
-The skill inventory is in this README. Each skill's authoritative runtime spec lives in `skills/<skill>/SKILL.md`.
+The grouped overview is [above](#skills-at-a-glance); the full catalog with a page per skill is [`docs/guides/README.md`](docs/guides/README.md). Each skill's authoritative runtime spec lives in `skills/<skill>/SKILL.md`.
 
 ### Where is release history?
 
 GitHub Releases are the canonical release-notes surface. The root [`CHANGELOG.md`](CHANGELOG.md) points to that history.
 
+### How do I work on the plugin itself?
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, and [`docs/development.md`](docs/development.md) for loading a local checkout into each harness.
+
+## Documentation
+
+| | |
+|---|---|
+| [Skill catalog](docs/guides/README.md) | A page per skill, and how they chain together |
+| [Configuration](docs/guides/configuration.md) | `.compound-engineering/config.yaml` options |
+| [Installing](#install) · [Upgrading](docs/install/upgrading.md) | Per-host install and refresh |
+| [Contributing](CONTRIBUTING.md) · [Development](docs/development.md) | Working on the plugin itself |
+| [Security](SECURITY.md) · [Privacy](PRIVACY.md) | Reporting and data handling |
+
 ## Contributing
 
-Contributions are welcome. Issues, bug reports, and pull requests all help make this better, and we genuinely appreciate them — bug reports especially.
+Contributions are welcome. Issues, bug reports, and pull requests all help make this better, and we genuinely appreciate them — bug reports especially. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md), which covers setup and what to do before opening a PR.
 
 A note on what to expect: Compound Engineering is opinionated by design. It's maintained by [@kieranklaassen](https://github.com/kieranklaassen) and [@tmchow](https://github.com/tmchow), and its direction reflects a specific point of view about how AI-assisted engineering should work. So while we welcome help, we can't promise to accept every change — some proposals won't fit that vision even when they're good ideas on their own.
 

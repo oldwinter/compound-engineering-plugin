@@ -23,7 +23,7 @@ import { gradeArm, type EvalArm } from "./grade"
 type Arm = EvalArm | "ab"
 
 function resolveArmRef(scenario: Scenario, arm: EvalArm): string | null {
-  if (arm === "pre") return PRE_SWEEP_REF
+  if (arm === "pre") return scenario.baseline_ref ?? PRE_SWEEP_REF
   if (arm === "post") return POST_SWEEP_REF
   if (arm === "preview") return scenario.preview_ref ?? null
   return null
@@ -38,8 +38,12 @@ function armsFor(scenario: Scenario, requested: Arm): EvalArm[] {
   if (requested === "pre") return ["pre"]
   if (requested === "post") return ["post"]
   if (requested === "preview") return scenario.preview_ref ? ["preview"] : []
-  if (scenario.cohort !== "resized") return ["post"]
-  return ["pre", "post"]
+  return hasBaseline(scenario) ? ["pre", "post"] : ["post"]
+}
+
+/** A row has an A/B pair when it was resized in the sweep or carries its own baseline. */
+function hasBaseline(scenario: Scenario): boolean {
+  return scenario.cohort === "resized" || Boolean(scenario.baseline_ref)
 }
 
 function runCell(scenario: Scenario, arm: EvalArm, out: string, hosts?: string) {
@@ -65,6 +69,8 @@ function runCell(scenario: Scenario, arm: EvalArm, out: string, hosts?: string) 
   if (scenario.read_only) argv.push("--read-only")
   if (scenario.git_init) argv.push("--git-init")
   if (scenario.git_untracked?.length) argv.push("--git-untracked", scenario.git_untracked.join(","))
+  if (scenario.git_staged?.length) argv.push("--git-staged", scenario.git_staged.join(","))
+  if (scenario.git_remote) argv.push("--git-remote")
   if (scenario.shim_git_push) argv.push("--shim-git-push")
   if (scenario.shim_gh_pr) argv.push("--shim-gh-pr")
   if (scenario.fixture) argv.push("--fixture", path.join(REPO_ROOT, scenario.fixture))
@@ -101,7 +107,7 @@ function main() {
   }
   if (flag("--list")) {
     for (const s of selectedScenarios()) {
-      const ab = s.post_only ? "post-only" : s.cohort === "resized" ? "A/B" : "post-only"
+      const ab = s.post_only ? "post-only" : hasBaseline(s) ? "A/B" : "post-only"
       console.log(`${s.id}\t${s.cohort}\t${ab}\t${s.key_behavior}\t${s.read_only ? "ro" : "live"}`)
     }
     return

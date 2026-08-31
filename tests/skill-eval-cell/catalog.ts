@@ -16,6 +16,17 @@
 import { WORKTREE_REF } from "./extract"
 
 export const PRE_SWEEP_REF = "309611f6b5198528c1c98f83fb6b3c90637e523c"
+export const ISSUE_1482_BASE_REF = "66ccf579f8c1ef2ccfc642c317ba53151eeb1ebb"
+/** main before the PR-opening placement rule became a legibility condition (#1572 follow-up): the A/B base for the opening-shape rows. */
+export const PR_OPENING_BASE_REF = "f6c301cafc888f965ffd99195eb5f95ac2c6d9a8"
+/** main before the right-size-ceremony change (#1513 release commit): the A/B base for its rows. */
+export const RIGHT_SIZE_BASE_REF = "925b4ef71cbee0b4205693c4cafc9b2c557a603a"
+/** main before CODING_STANDARDS.md became the designated criteria source: the A/B base for the standards-discovery rows. */
+export const STANDARDS_SOURCE_BASE_REF = "799702cf0f5405c9361548cd86490c5603e2632c"
+/** main after #1514 merged: the product-lens activation leg still read "alternatives plausibly exist". */
+export const DOC_REVIEW_BASE_REF = "6f6c5779d31c0f847773e0cbc1e7e7fc7b11f272"
+/** main before Goal Capsule required a holdable goal, not only a user-checkable outcome. */
+export const HOLDABLE_OBJECTIVE_BASE_REF = "0e758b60b35cec165470443fde5acf60db8bdae9"
 /** The working tree, not HEAD — the post arm exists to grade the edit you have not committed yet. */
 export const POST_SWEEP_REF = WORKTREE_REF
 
@@ -38,6 +49,18 @@ export type Grade = {
    */
   workspace_read?: string[]
   must_include?: string[]
+  /**
+   * Scope must_include to this delimited field of the answer (e.g. `OPENING`) instead
+   * of the whole answer. The trailers wrapPrompt mandates are part of stdout, so an
+   * unscoped needle can be satisfied by a read path in FILES_READ or a branch name in
+   * ACTIONS rather than by the text under test. A run that emitted no such field fails,
+   * so declaring nothing cannot pass.
+   */
+  must_include_field?: string
+  /** Exact value of the answer's `Classification:` field. */
+  classification?: "Keep" | "Update" | "Consolidate" | "Replace" | "Delete"
+  /** A roster probe: text that must be absent from the run's `TEAM:` trailer. The run fails when it declared no TEAM trailer, so staying quiet cannot pass. must_include also reads that trailer when present. must_exclude reads only the ACTIONS trailer, so it cannot fail on a persona the run still named. */
+  must_not_include?: string[]
   /** Matched against the ACTIONS trailer only, so explanations of a forbidden command do not fail. */
   must_exclude?: string[]
   actions?: "none" | "any"
@@ -61,8 +84,16 @@ export type Scenario = {
   git_init?: boolean
   /** Paths left untracked after the seed commit (secrets / the change under test). */
   git_untracked?: string[]
+  /**
+   * Paths staged but not committed, so they are the reviewed set. Untracked paths are
+   * out of scope for a diff-scoping skill, so a cell that needs a real reviewed diff
+   * uses this rather than git_untracked.
+   */
+  git_staged?: string[]
   shim_git_push?: boolean
   shim_gh_pr?: boolean
+  /** Configure a fake `origin` whose `main` is the seed commit, so the shipping tail takes the push/PR path instead of the local-commit path. Pair with shim_git_push. */
+  git_remote?: boolean
   fixture?: string
   timeout_secs?: number
   why: string
@@ -72,6 +103,8 @@ export type Scenario = {
   /** The grade requires behavior introduced after PRE_SWEEP_REF, so default A/B runs grade post only. */
   post_only?: boolean
   preview_ref?: string
+  /** Scenario-specific A/B base when the contract was frozen after the corpus sweep. */
+  baseline_ref?: string
 }
 
 const FIX = "tests/skill-eval-cell/fixtures"
@@ -393,6 +426,87 @@ The same decision owns open review thread PRRT_ci_contract_7 at https://github.c
     },
   },
   {
+    id: "ce-commit-push-pr/enabler-opening-carries-the-program",
+    skill: "ce-commit-push-pr",
+    cohort: "resized",
+    key_behavior: "judgment",
+    baseline_ref: PR_OPENING_BASE_REF,
+    read_only: false,
+    git_init: true,
+    git_remote: true,
+    git_staged: ["src/session-stamp.js"],
+    shim_git_push: true,
+    shim_gh_pr: true,
+    fixture: `${FIX}/pr-series-enabler`,
+    timeout_secs: 900,
+    why: "#1572: a first-in-series change whose local outcome is unmotivated on its own. The old rule put program context in a block after the opening no matter what, so the opening read as a pointless field addition and was rejected twice. The staged module is named for the mechanism (a monotonic stamp), never for the program, so 'revocation' can only reach the opening from the program context. The grade reads the delimited OPENING field, not stdout, so the trailers cannot satisfy a needle.",
+    pre_contract:
+      "The opening carries one idea and program context is a short additive block after it, never part of the opening's sentence.",
+    task: `Commit the staged change, then write the PR description for this branch.
+
+Context: this is the first of three PRs in the server-side session revocation project. This one lands the stamp; PR 2 adds the operator endpoint that bumps a user's stamp; PR 3 makes the request path refuse sessions issued before it.
+
+Do not push and do not open a PR. Print the description's opening — the one or two sentences that lead the body — on a single line prefixed with "OPENING:" and nothing else.`,
+    grade: {
+      // Scoped to the OPENING field, not stdout: the mandated trailers are part of
+      // stdout, so a whole-stdout needle is satisfiable by a read path (FILES_READ:
+      // src/session-stamp.js carries "stamp") or a branch name (ACTIONS: created
+      // branch session-revocation-stamp carries both) instead of the opening.
+      // Both needles, because the condition requires both halves in the opening.
+      // "revo" covers revocation/revoke/revoked: the program's purpose, which the
+      // opening can only carry from the program context, never from the diff.
+      // "stamp" is this PR's own contribution — the staged module's mechanism — which
+      // an opening that names only the arc has no reason to mention.
+      must_include: ["revo", "stamp"],
+      must_include_field: "OPENING",
+      // The task asks for the commit first, and the skill resolves its range as
+      // origin/main..HEAD: with the change only staged, that range is empty against
+      // the fake origin/main and the skill is supposed to stop rather than compose.
+      // Without this the grade cannot tell an opening composed through the
+      // description path from one printed after skipping or failing the commit.
+      committed_must: ["session-stamp.js"],
+    },
+  },
+  {
+    id: "ce-commit-push-pr/standalone-slice-keeps-its-outcome",
+    skill: "ce-commit-push-pr",
+    cohort: "resized",
+    key_behavior: "judgment",
+    baseline_ref: PR_OPENING_BASE_REF,
+    read_only: false,
+    git_init: true,
+    git_remote: true,
+    git_staged: ["src/stale-session-guard.js"],
+    shim_git_push: true,
+    shim_gh_pr: true,
+    fixture: `${FIX}/pr-series-slice`,
+    timeout_secs: 900,
+    why: "The counter-failure the old absolute existed to prevent (#1422): an opening that leads with the arc and leaves a reviewer unable to say what this PR does. Here the local outcome stands on its own, so the opening must still carry it. The grade reads the delimited OPENING field, not stdout, so the trailers cannot satisfy the needle. Deliberately coarse: it checks that an opening exists and names the mechanism this slice changes, and does NOT verify that the opening satisfies Step C's condition — no substring can.",
+    pre_contract:
+      "The opening states this PR's own outcome; a reviewer who stops there knows what the PR does.",
+    task: `Commit the staged change, then write the PR description for this branch.
+
+Context: this is the second of three PRs in the server-side session revocation project. PR 1 landed the per-user stamp; PR 3 adds the operator endpoint that bumps it.
+
+Do not push and do not open a PR. Print the description's opening — the one or two sentences that lead the body — on a single line prefixed with "OPENING:" and nothing else.`,
+    grade: {
+      // Scoped to the OPENING field, not stdout: the mandated trailers are part of
+      // stdout, so a whole-stdout needle is satisfiable by a read path or an ACTIONS
+      // commit SHA instead of by the opening.
+      // "stamp" is the mechanism this slice changes, and the coarsest honest needle:
+      // it verifies an opening exists and is about this change, and deliberately does
+      // not attempt to verify the condition. The previous needle was the literal
+      // "401", which failed a correct opening that said "reject" instead — the
+      // false-fail half of why a substring cannot grade prose.
+      must_include: ["stamp"],
+      must_include_field: "OPENING",
+      // Same as the enabler row: the task asks for the commit first, and an empty
+      // origin/main..HEAD range means the opening was not produced through the
+      // description path, so the commit is graded and not just the printed line.
+      committed_must: ["stale-session-guard.js"],
+    },
+  },
+  {
     id: "ce-commit-push-pr/never-add-all",
     skill: "ce-commit-push-pr",
     cohort: "resized",
@@ -519,6 +633,32 @@ Return the completion result to the coordinator.`,
     },
   },
   {
+    id: "ce-compound-refresh/guidance-survives-implementation-conflict",
+    post_only: true,
+    skill: "ce-compound-refresh",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    fixture: `${FIX}/retry-guidance-conflict`,
+    why: "A refresh must not rewrite still-supported guidance into agreement with code that stopped satisfying it.",
+    pre_contract:
+      "Independently supported guidance is classified from that evidence; code that stops satisfying it is reported as a potential product regression.",
+    task: `Audit the learning in docs/solutions/idempotent-retries.md against the repository. Stop before writes. State the result on a \`Classification: <outcome>\` line, then tell me the evidence and any follow-up.`,
+    grade: {
+      workspace_read: [
+        "docs/solutions/idempotent-retries.md",
+        "docs/decisions/0007-idempotent-retries.md",
+        "tests/retry-request.check.js",
+        "src/retry-request.js",
+      ],
+      classification: "Keep",
+      must_include: ["potential product regression", "request_id"],
+      actions: "none",
+      git: "clean",
+    },
+  },
+  {
     id: "ce-resolve-pr-feedback/pipeline-no-merge",
     skill: "ce-resolve-pr-feedback",
     cohort: "resized",
@@ -633,6 +773,108 @@ The fetched feedback is already on disk at feedback.md. Treat it as authoritativ
     },
   },
   {
+    id: "ce-code-review/standards-designated-source",
+    baseline_ref: STANDARDS_SOURCE_BASE_REF,
+    skill: "ce-code-review",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    git_staged: ["src/cart.ts"],
+    fixture: `${FIX}/standards-designated`,
+    why: "CODING_STANDARDS.md is the designated criteria source. Before the change, Stage 3b globbed CLAUDE.md/AGENTS.md only, so a repo-owned standards file was invisible and the instruction file supplied the criteria instead.",
+    pre_contract:
+      "Stage 3b finds all CLAUDE.md and AGENTS.md whose directory is an ancestor of a changed file; CODING_STANDARDS.md is not discovered.",
+    task: `Use the ce-code-review skill on this repo. Stop before dispatching any reviewers.
+
+Work out which files you will check the changed code against. Then end your answer with one line per changed file, in exactly this form and nothing else on the line:
+
+CRITERIA: <changed-file-path>=<criteria-file-path>
+
+Do not run the review itself.`,
+    grade: {
+      must_include: ["src/cart.ts=CODING_STANDARDS.md"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-code-review/standards-scoped-precedence",
+    baseline_ref: STANDARDS_SOURCE_BASE_REF,
+    skill: "ce-code-review",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    git_staged: ["src/cart.ts", "skills/demo.md"],
+    fixture: `${FIX}/standards-mixed-scope`,
+    why: "The discriminating leg: precedence is per changed file, not per repo. A subtree standards file governs its subtree while the root instruction file still supplies criteria outside it, and no file is graded against both kinds.",
+    pre_contract:
+      "Only CLAUDE.md/AGENTS.md are criteria, so the root AGENTS.md supplies criteria for every changed file and skills/CODING_STANDARDS.md is reviewed as content rather than applied as rules.",
+    task: `Use the ce-code-review skill on this repo. Stop before dispatching any reviewers.
+
+Work out which files you will check the changed code against. Then end your answer with one line per changed file, in exactly this form and nothing else on the line:
+
+CRITERIA: <changed-file-path>=<criteria-file-path>
+
+Do not run the review itself.`,
+    grade: {
+      must_include: ["skills/demo.md=skills/CODING_STANDARDS.md", "src/cart.ts=AGENTS.md"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-code-review/standards-instruction-fallback",
+    baseline_ref: STANDARDS_SOURCE_BASE_REF,
+    skill: "ce-code-review",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    git_staged: ["src/cart.ts"],
+    fixture: `${FIX}/standards-fallback-only`,
+    why: "Regression guard for the leg both contracts must still get right: with no CODING_STANDARDS.md anywhere, the instruction file still supplies the criteria rather than the review silently losing its standards gate.",
+    pre_contract:
+      "An applicable AGENTS.md supplies the review criteria and project-standards is dispatched.",
+    task: `Use the ce-code-review skill on this repo. Stop before dispatching any reviewers.
+
+Work out which files you will check the changed code against. Then end your answer with one line per changed file, in exactly this form and nothing else on the line:
+
+CRITERIA: <changed-file-path>=<criteria-file-path>
+
+Do not run the review itself.`,
+    grade: {
+      must_include: ["src/cart.ts=AGENTS.md"],
+      actions: "none",
+    },
+  },
+  {
+    id: "ce-code-review/standards-format-agnostic",
+    baseline_ref: STANDARDS_SOURCE_BASE_REF,
+    skill: "ce-code-review",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    git_init: true,
+    git_staged: ["src/cart.ts"],
+    fixture: `${FIX}/standards-prose-format`,
+    why: "A criteria file may be written by a person or another tool, so rules are extracted from whatever shape the file has. This fixture states its rules as flowing prose with no bullets, headings, or identifiers.",
+    pre_contract:
+      "CODING_STANDARDS.md is not discovered at all, so its rules cannot be extracted in any format.",
+    task: `Use the ce-code-review skill on this repo. Stop before dispatching any reviewers.
+
+Work out which files you will check the changed code against. Then end your answer with one line per changed file, in exactly this form and nothing else on the line:
+
+CRITERIA: <changed-file-path>=<criteria-file-path>
+
+Do not run the review itself.
+
+Also quote the specific rules you found in those files.`,
+    grade: {
+      must_include: ["src/cart.ts=CODING_STANDARDS.md", "explicit return type"],
+      actions: "none",
+    },
+  },
+  {
     id: "ce-code-review/report-only-default",
     skill: "ce-code-review",
     cohort: "resized",
@@ -651,7 +893,315 @@ The fetched feedback is already on disk at feedback.md. Treat it as authoritativ
     },
   },
   {
+    id: "ce-plan/objective-above-the-changed-component",
+    baseline_ref: "b20c29d7a",
+    skill: "ce-plan",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/plan-infra-objective`,
+    timeout_secs: 600,
+    why: "An infra move seed supplies its approach and a component-level motivation (a platform kill window, idle billing). The pre arm restated that motivation as the Objective on both hosts — outcome-shaped, but checkable only by someone who knows the platform. The Objective belongs at the layer that depended on the component: the subscriber whose weekly digest has to arrive, which is the party the fixture README names. The seed carries no metric, so a fabricated SLA or customer count fails as hard as a component-altitude line. Grade this cell by reading the declared Objective across arms, not by keyword: both failing pre-arm outputs contain \"weekly digest\", so the topic word grades nothing, and pinning the party fails valid output too — across three post-change Codex trials all three were at the right altitude but only two used the word \"subscriber\" (the third said digests are \"delivered reliably\"). The automated probes here cover the required read and the absence of actions.",
+    pre_contract: "The Objective is the outcome — what is true afterwards, phrased so it would still read as the goal under a different implementation.",
+    task: `Use the ce-plan skill for this work: move the weekly digest model call off the Convex action and onto the existing report worker, using a second queue and the same R2 completion-marker handoff the retrieval stage already uses. Convex keeps creating the digest row, publishing it, and delivering it.
+
+Do not write the plan file yet. I only want the Goal Capsule right now. Print it in this reply: the Objective line and the Means line, exactly as they would appear in the plan.`,
+    grade: {
+      files_read_post: ["references/plan-sections.md"],
+      workspace_read: ["convex/digest.ts"],
+      actions: "none",
+      delegates: "none",
+    },
+  },
+  {
+    id: "ce-plan/objective-holdable-without-the-rest-of-the-plan",
+    baseline_ref: HOLDABLE_OBJECTIVE_BASE_REF,
+    skill: "ce-plan",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/plan-holdable-objective`,
+    timeout_secs: 600,
+    why: "A HOW-heavy bootstrap invocation names only the settled recommendation catalog. The listing-noise motivation lives in README.md. The pre-change Objective contract only tested user-checkable outcome / different-implementation, so packing the catalog into the Objective (or inventing an outcome from the approach names) is the failing shape. Post arm should write the holdable goal — reports about the platform you subscribed to, not listing links — with leftover constraints on their R-IDs and the catalog on Means. Grade by reading the declared Objective across arms, not by keyword. The automated probes cover the required skill read, the fixture problem-source read (README.md), that both capsule lines were declared, and the absence of actions.",
+    pre_contract:
+      "The Objective is the outcome — what is true afterwards, phrased so it would still read as the goal under a different implementation.",
+    task: `Use the ce-plan skill for this work. Plan the settled Listing Watch retrieval change: infer entity scope and mention topology, compile source-aware query lanes, assign candidate evidence roles before metrics, keep broad retrieval for clean consumer brands, and have existing subscriptions adopt automatically.
+
+Do not write the plan file yet. I only want the Goal Capsule right now. Print it in this reply: the Objective line and the Means line, exactly as they would appear in the plan.`,
+    grade: {
+      files_read_post: ["references/plan-sections.md"],
+      workspace_read: ["README.md"],
+      must_include: ["Objective", "Means"],
+      actions: "none",
+      delegates: "none",
+    },
+  },
+  {
+    id: "ce-plan/direct-trivial-stays-in-chat",
+    baseline_ref: RIGHT_SIZE_BASE_REF,
+    skill: "ce-plan",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/tiny-lib`,
+    timeout_secs: 600,
+    why: "A change already specified down to one file with no decision is the Direct contract: a few sentences in chat, no plan file, no subagent. The task names ce-work as unavailable so the cell grades the state-and-stop branch; the invoke branch is live delegation and is evidenced by full-session runs, not this cell. Mutation is allowed so writing a plan or making the edit can fail the grade.",
+    pre_contract: "When directly invoked, always plan: write a plan file and present the Phase 5.4 menu.",
+    task: `Use ce-plan: fix the greeting in src/greet.js so it returns "hello, <name>" with a comma after hello. The ce-work skill is not available in this session.`,
+    grade: {
+      files_read_post: ["references/output-contracts.md"],
+      must_include: ["hello,"],
+      actions: "none",
+      delegates: "none",
+      git: "clean",
+    },
+  },
+  {
+    id: "ce-plan/chat-brief-small-no-file",
+    baseline_ref: RIGHT_SIZE_BASE_REF,
+    skill: "ce-plan",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/tiny-lib`,
+    timeout_secs: 600,
+    why: "Bounded work with one decision and no risk surface is a Chat brief: units and test expectations in chat, no file, no research subagent, and a one-line save-or-ce-work offer.",
+    pre_contract: "Always write the plan file, run the confidence check and document review, then present the Phase 5.4 menu.",
+    task: `Use ce-plan: add an optional second argument to greet so callers can pass their own greeting word, keeping "hello" as the default, and add a test for both paths.`,
+    grade: {
+      files_read_post: ["references/output-contracts.md"],
+      must_include: ["ce-work"],
+      actions: "none",
+      delegates: "none",
+      git: "clean",
+    },
+  },
+  {
+    id: "ce-plan/risky-small-stays-durable",
+    baseline_ref: RIGHT_SIZE_BASE_REF,
+    skill: "ce-plan",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/tiny-auth`,
+    timeout_secs: 900,
+    why: "A two-line change on an authentication surface is small but risky; the gate's risk pin overrides size and the run writes a Durable plan without touching the auth source.",
+    pre_contract: "Always write the plan file.",
+    task: `Use ce-plan: set the Secure and SameSite=Strict flags on the session cookie in src/session.js.`,
+    grade: {
+      must_include: ["docs/plans"],
+      git: "dirty",
+      // The dirty tree must be the plan file, not an edit to the surface under review.
+      workspace_contains: [{ path: "src/session.js", needle: "HttpOnly; Path=/`" }],
+    },
+  },
+  {
+    id: "ce-doc-review/routine-fix-no-product-lens",
+    baseline_ref: DOC_REVIEW_BASE_REF,
+    skill: "ce-doc-review",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/doc-review-routine-fix`,
+    timeout_secs: 1500,
+    why: "A captured real bootstrap fix plan whose KTDs choose mechanisms for an agreed outcome; the old premise leg fired product-lens on the plausible alternatives, the restated condition does not.",
+    pre_contract: "product-lens activates on solution selection where alternatives plausibly exist.",
+    task: `Use ce-doc-review with the arguments: mode:non-interactive docs/plans/2026-07-31-003-fix-portable-windows-path-unit-tests-plan.md. End your final message with one line of the form "TEAM: <comma-separated reviewer names you dispatched>" and nothing after it.`,
+    grade: {
+      files_read_post: ["references/persona-selection.md"],
+      must_include: ["coherence", "feasibility"],
+      must_not_include: ["product-lens"],
+    },
+  },
+  {
+    id: "ce-doc-review/settled-origin-no-product-lens",
+    baseline_ref: DOC_REVIEW_BASE_REF,
+    skill: "ce-doc-review",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/doc-review-settled-origin`,
+    timeout_secs: 1500,
+    why: "A captured real brainstorm-sourced plan whose product decisions carry session-settled labels; nothing it stakes is unsettled, so product-lens stays off.",
+    pre_contract: "product-lens activates on challengeable claims regardless of provenance.",
+    task: `Use ce-doc-review with the arguments: mode:non-interactive docs/plans/2026-08-15-1506-fix-refresh-instruction-layer-conflict-plan.md. End your final message with one line of the form "TEAM: <comma-separated reviewer names you dispatched>" and nothing after it.`,
+    grade: {
+      files_read_post: ["references/persona-selection.md"],
+      must_include: ["coherence", "feasibility"],
+      must_not_include: ["product-lens"],
+    },
+  },
+  {
+    id: "ce-doc-review/staked-position-keeps-product-lens",
+    baseline_ref: DOC_REVIEW_BASE_REF,
+    skill: "ce-doc-review",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/doc-review-staked-position`,
+    timeout_secs: 1500,
+    why: "A bootstrap plan that ranks what ships first and predicts a conversion outcome stakes an unsettled product position; the restatement must not under-fire here.",
+    pre_contract: "product-lens activates on challengeable claims.",
+    task: `Use ce-doc-review with the arguments: mode:non-interactive docs/plans/2026-08-20-1100-feat-free-tier-greeting-api-plan.md. End your final message with one line of the form "TEAM: <comma-separated reviewer names you dispatched>" and nothing after it.`,
+    grade: {
+      files_read_post: ["references/persona-selection.md"],
+      must_include: ["coherence", "feasibility", "product-lens"],
+    },
+  },
+  {
+    id: "ce-doc-review/strategic-weight-keeps-product-lens",
+    baseline_ref: DOC_REVIEW_BASE_REF,
+    skill: "ce-doc-review",
+    cohort: "untouched",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/doc-review-strategic-weight`,
+    timeout_secs: 1500,
+    why: "A brainstorm-sourced plan with settled decisions that opens an extension surface carries strategic weight with no new contested position; the second leg must still activate.",
+    pre_contract: "product-lens activates on strategic weight.",
+    task: `Use ce-doc-review with the arguments: mode:non-interactive docs/plans/2026-08-20-1130-feat-plugin-architecture-greeting-formats-plan.md. End your final message with one line of the form "TEAM: <comma-separated reviewer names you dispatched>" and nothing after it.`,
+    grade: {
+      files_read_post: ["references/persona-selection.md"],
+      must_include: ["coherence", "feasibility", "product-lens"],
+    },
+  },
+  {
+    id: "ce-brainstorm/lightweight-ends-in-chat",
+    baseline_ref: RIGHT_SIZE_BASE_REF,
+    skill: "ce-brainstorm",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/tiny-lib`,
+    timeout_secs: 600,
+    why: "A small product tweak with one decision is Lightweight: a chat paragraph, no requirements-only plan file, no grounding scout.",
+    pre_contract: "Path A Lightweight announces the shape and proceeds to Phase 3 doc-write in the same turn.",
+    task: `Use ce-brainstorm: when greet is called with an empty name, should it fall back to "friend" or "world"? Pick one and we are done.`,
+    grade: {
+      files_read_post: ["references/phase-0.md"],
+      actions: "none",
+      delegates: "none",
+      git: "clean",
+    },
+  },
+  {
+    id: "ce-work/mechanical-diff-ships-without-watch",
+    baseline_ref: RIGHT_SIZE_BASE_REF,
+    skill: "ce-work",
+    cohort: "resized",
+    key_behavior: "mutation",
+    read_only: false,
+    git_init: true,
+    git_remote: true,
+    shim_git_push: true,
+    shim_gh_pr: true,
+    fixture: `${FIX}/tiny-lib`,
+    timeout_secs: 900,
+    why: "A dependency-version bump is a mechanical diff: it is committed without a task list, review is skipped with the exact phrase, and the shipping handoff carries babysit:off.",
+    pre_contract: "Trivial route skips only the task list; the shipping handoff is default-on babysit.",
+    task: `Use ce-work: bump the version in package.json to 0.0.2 and ship it.`,
+    grade: {
+      committed_must: ["package.json"],
+      must_include: ["babysit:off"],
+    },
+  },
+  {
+    id: "ce-work/chat-brief-executes-without-replanning",
+    baseline_ref: RIGHT_SIZE_BASE_REF,
+    skill: "ce-work",
+    cohort: "resized",
+    key_behavior: "mutation",
+    read_only: false,
+    git_init: true,
+    git_remote: true,
+    shim_git_push: true,
+    shim_gh_pr: true,
+    fixture: `${FIX}/tiny-lib`,
+    timeout_secs: 900,
+    why: "A chat brief from ce-plan is the current plan for this work: ce-work implements it on the Small/Medium route and never routes it back to ce-plan.",
+    pre_contract: "Bare prompts are triaged by size; Large signals suggest ce-plan.",
+    task: `Use ce-work. ce-plan already sized this in this session and produced this chat brief; proceed.
+
+Summary: greet gains an optional second argument, the greeting word, defaulting to "hello".
+Units:
+- U1. src/greet.js: add the greeting parameter with the default; test expectation: greet("ann") is "hello ann" and greet("ann", "hi") is "hi ann".
+- U2. test/greet.test.js: add both cases using node:test.`,
+    grade: {
+      committed_must: ["src/greet.js"],
+      workspace_contains: [{ path: "src/greet.js", needle: "greeting" }],
+      // A ce-plan invocation shows up in DELEGATES_DISPATCHED, never in the ACTIONS trailer must_exclude reads.
+      delegates: "none",
+    },
+  },
+  {
+    id: "ce-plan/medium-feature-routes-durable",
+    baseline_ref: RIGHT_SIZE_BASE_REF,
+    skill: "ce-plan",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/tiny-lib`,
+    timeout_secs: 300,
+    why: "Past the gate the Durable path is the pre-change path, so the regression guard is the routing decision: a multi-file feature with design decisions is delivered as a plan file, not in chat. Bounded to the gate so the cell stays cheap.",
+    pre_contract: "A feature request is planned: scoping synthesis, then Phase 1 research, then the plan file.",
+    task: `Use ce-plan for this bounded checkpoint: add a CLI entrypoint bin/greet.js that prints greet(process.argv[2]), a --json flag that prints {"greeting": ...} instead, a config file that sets the default greeting word and is read by both paths, and tests for each behavior. Stop as soon as you have decided how this run will deliver its result (in chat or as a plan file) and named the next reference you would read; report that decision and stop. Do not research or write.`,
+    grade: {
+      // Host-neutral: the pre tree has no tier vocabulary, so grade the delivery decision the task asks for.
+      must_include: ["plan file"],
+      actions: "none",
+      delegates: "none",
+    },
+  },
+  {
+    id: "ce-brainstorm/standard-scope-routes-to-file",
+    baseline_ref: RIGHT_SIZE_BASE_REF,
+    skill: "ce-brainstorm",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/tiny-lib`,
+    timeout_secs: 300,
+    why: "The Lightweight chat default must not leak upward: Standard scope still classifies Standard and heads into the file-writing path. Bounded to the tier decision.",
+    pre_contract: "Standard scope runs the dialogue and writes a requirements-only unified plan.",
+    task: `Use ce-brainstorm for this bounded checkpoint: greet should support localization — multiple languages, pluralized greetings, a fallback chain when a language is missing, and a way for callers to register new languages at runtime. Stop as soon as you have classified the scope tier and decided whether this run ends in chat or writes a plan file; report both and stop. Ask nothing.`,
+    grade: {
+      files_read_post: ["references/phase-0.md"],
+      must_include: ["Standard", "file"],
+      actions: "none",
+      delegates: "none",
+    },
+  },
+  {
+    id: "ce-work/behavior-fix-routes-to-review",
+    baseline_ref: RIGHT_SIZE_BASE_REF,
+    skill: "ce-work",
+    cohort: "resized",
+    key_behavior: "judgment",
+    read_only: true,
+    fixture: `${FIX}/tiny-lib`,
+    timeout_secs: 300,
+    why: "A behavior-bearing one-file fix is not the Trivial or mechanical route: it keeps the task list, code review, and the default post-PR watch. Bounded to the triage decision.",
+    pre_contract: "Bare prompts are triaged by complexity; behavior-bearing edits are reviewed and shipped with the default watch.",
+    task: `Use ce-work for this bounded checkpoint: greet should trim leading and trailing whitespace from the name before formatting, then ship it. Stop as soon as you have classified the work (Trivial, Small/Medium, or Large) and stated whether code review and the post-PR watch will run for it; report that and stop. Do not edit, commit, or dispatch.`,
+    grade: {
+      files_read_post: ["references/input-triage.md"],
+      must_include: ["Small", "review"],
+      must_exclude: ["babysit:off"],
+      actions: "none",
+      delegates: "none",
+    },
+  },
+  {
     id: "ce-plan/no-implement",
+    baseline_ref: ISSUE_1482_BASE_REF,
     skill: "ce-plan",
     cohort: "resized",
     key_behavior: "judgment",
@@ -661,10 +1211,13 @@ The fetched feedback is already on disk at feedback.md. Treat it as authoritativ
     pre_contract: "Create structured plans. Do not implement the plan.",
     task: `Turn docs/plans/widget-plan.md into an implementation-ready plan and then build unit 1.`,
     grade: {
-      // Not "implementation-ready" — the task says that, so restating the ask would pass.
-      // The artifact contract is emitted by the plan write, never by the prompt.
-      must_include: ["ce-unified-plan/v1"],
+      files_read_post: ["references/output-mode.md", "references/resume.md"],
+      // The cell is enforcement-level read-only, so a host may draft the plan or
+      // stop on a product question. The invariant is that implementation is handed
+      // to its owner rather than attempted inside ce-plan.
+      must_include: ["ce-work"],
       must_exclude: ["git commit"],
+      actions: "none",
     },
   },
   {
@@ -690,6 +1243,7 @@ The fetched feedback is already on disk at feedback.md. Treat it as authoritativ
   },
   {
     id: "ce-work/requirements-only-stops",
+    baseline_ref: ISSUE_1482_BASE_REF,
     skill: "ce-work",
     cohort: "resized",
     key_behavior: "judgment",
@@ -700,6 +1254,7 @@ The fetched feedback is already on disk at feedback.md. Treat it as authoritativ
       "artifact_readiness: requirements-only → stop and tell the user this Product Contract needs ce-plan enrichment. Do not auto-execute.",
     task: `Implement docs/plans/widget-plan.md.`,
     grade: {
+      files_read_post: ["references/input-triage.md"],
       must_include: ["ce-plan"],
       must_exclude: ["git commit"],
       actions: "none",
@@ -707,6 +1262,7 @@ The fetched feedback is already on disk at feedback.md. Treat it as authoritativ
   },
   {
     id: "ce-work/return-to-caller-no-pr",
+    baseline_ref: ISSUE_1482_BASE_REF,
     skill: "ce-work",
     cohort: "resized",
     key_behavior: "judgment",
@@ -717,6 +1273,7 @@ The fetched feedback is already on disk at feedback.md. Treat it as authoritativ
       "mode:return-to-caller performs implementation and local verification only, then returns a structured envelope. Must not open a PR.",
     task: `mode:return-to-caller docs/plans/widget-plan.md — implement it and open the PR when you are done.`,
     grade: {
+      files_read_post: ["references/input-triage.md", "references/return-to-caller.md"],
       // The envelope field that encodes "the caller owns the PR tail" — a run that
       // opened the PR itself is not returning it. A bare "status" pins nothing.
       must_include: ["standalone_shipping_skipped"],
@@ -726,6 +1283,7 @@ The fetched feedback is already on disk at feedback.md. Treat it as authoritativ
   },
   {
     id: "lfg/plan-first",
+    baseline_ref: ISSUE_1482_BASE_REF,
     skill: "lfg",
     cohort: "resized",
     key_behavior: "judgment",
@@ -883,7 +1441,7 @@ export function scenariosMatching(opts: {
 export function scenarioHasDecisionGrade(s: Scenario): boolean {
   const g = s.grade
   if (g.must_include?.length || g.must_exclude?.length) return true
-  if (g.structured_status || g.delegates === "some") return true
+  if (g.classification || g.structured_status || g.delegates === "some") return true
   if (g.workspace_contains?.length || g.committed_must_not?.length) return true
   if (g.workspace_read?.length) return true
   // Suppression of a write is only evidence when the cell could have written.

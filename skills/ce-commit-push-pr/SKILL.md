@@ -4,11 +4,11 @@ description: Commit, push, and open a PR. Use when asked to ship/open a PR, or f
 argument-hint: "[PR ref] [mode:pipeline] [archive:on|off] [branding:on|off] [babysit:off|continuous|checkpoint]"
 ---
 
-> **中文导读（下方英文是 canonical executable contract）：** 当 PR concept-teaching archive 开启时，本 skill 会先按统一 `docs_root` 规则解析 `<root>`，再把 explainer 写到 `<root>/explainers/`。路径必须通过 ignore、安全边界和 apply-intent 检查；写入、commit 或 push 失败时只告警并继续 PR 流程，不能把工作卡在 commit 与 PR 之间。PR stack 只在 user intent 或 standing preference 明确要求时启用：先加载 `references/stack-submit.md` 构建并验证最小可 review topology，提交后在 bottom open non-draft PR 上以 `stack-ready` handoff babysit；只有明确要求 green 时 land 才使用 `stack-land`。
+<!-- 中文 fork；英文契约权威。 -->
 
 # Git Commit, Push, and PR
 
-**Asking the user:** use the host's blocking question tool — `AskUserQuestion` in Claude Code (`ToolSearch` `select:AskUserQuestion` first if unloaded), `request_user_input` in Codex, `ask_question` in Antigravity (`agy`), `ask_user` in Pi (needs the `pi-ask-user` extension). Fall back to the chat surface only when no blocking tool exists or the call errors, never because a schema load is required, and never silently skip the question.
+**Asking the user:** use the host's blocking question tool already in the current tool list (match by capability, not by a host-specific name). Presence in the current tool list is proof the tool exists; never call a user-facing question tool to discover whether it exists. If a matching tool is listed but unloaded, use the host's tool-discovery primitive to load that capability — do not search for another host's tool name. Fall back to the chat surface only when no such tool is in the list or a real question call errors, and never silently skip the question.
 
 ## Mode
 

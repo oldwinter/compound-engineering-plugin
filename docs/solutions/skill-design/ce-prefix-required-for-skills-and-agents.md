@@ -1,5 +1,5 @@
 ---
-title: 新 skills 和 agents 必须使用 ce- 前缀；用测试强制执行，而不只写在 prose 中
+title: Public skills must use the ce- prefix; enforce it in tests, not just prose
 date: 2026-05-01
 last_refreshed: 2026-06-20
 category: skill-design
@@ -8,9 +8,9 @@ problem_type: convention
 component: root plugin
 severity: low
 applies_when:
-  - 在 skills/ 下新增 skill directory
-  - 在 plugins/compound-engineering/agents/ 下新增 agent file
-  - 编写或 review 引入 plugin 新组件的 PR
+  - Adding a new skill directory under `skills/`
+  - Authoring or reviewing a PR that introduces a new public plugin component
+  - Deciding whether a new specialist prompt should be a public skill or a skill-local reference asset
 tags:
   - naming-convention
   - ce-prefix
@@ -22,26 +22,28 @@ related:
 related_pr: https://github.com/EveryInc/compound-engineering-plugin/pull/747
 ---
 
-## 问题
+## Problem
 
-`plugins/compound-engineering/AGENTS.md` 已经说明“所有 skills 和 agents 都使用 `ce-` 前缀，以便明确标识它们是 compound-engineering 组件。”但这条规则只存在于 prose 中，而且 legacy skills 与带 `ce-` 前缀的 sibling skills 一起放在同一目录中却没有前缀。软规则加上可见例外，使得一个新 skill（`riffrec-feedback-analysis`）在 PR #747 中未带前缀就被发布。用户在第一个 commit merge 后发现了这个问题，因此同一个 PR 需要追加 rename commit。（该 skill 现在是 `ce-riffrec-feedback-analysis`；曾经无前缀的 `every-style-editor` 和 `file-todos` skills 已被移除，只剩 `lfg` 是唯一豁免。）
+`AGENTS.md` stated that public Compound Engineering components use the `ce-` prefix to make ownership clear. But the rule was prose-only, and legacy skills sat unprefixed in the same directory as their `ce-`-prefixed siblings. The combination — a soft rule plus visible exceptions — let a new skill (`riffrec-feedback-analysis`) ship in PR #747 without the prefix. The user caught it post-merge of the first commit, requiring a rename commit on the same PR.
 
-一个有可见反例且没有机器检查的 prose convention，在实践中就是*建议性*约定。任何粗略浏览目录列表的作者看到无前缀 skill 与 `ce-brainstorm` 并列，都可能合理地认为前缀是可选的。
+That skill is now `ce-riffrec-feedback-analysis`; `lfg` remains the sole intentional public-skill exemption.
 
-## 根因
+The repo no longer ships standalone CE agents. Specialist reviewer, researcher, and helper behavior lives as skill-local prompt assets under `skills/*/references/agents/` or `skills/*/references/personas/`. Those internal filenames should be descriptive for the owning skill, not treated as public plugin component names.
 
-有两层问题：
+## Root cause
 
-1. **规则未被强制执行。** 添加非 `ce-` skill 时，CI 或 test suite 中没有任何东西会失败。frontmatter test 会断言 skill 的 `name:` 与目录匹配，并且目录使用 `[a-z0-9-]+`，但不会检查 `ce-` 前缀。
-2. **例外列表是隐式的。** Legacy skills 早于该规则存在。没有显式 allowlist 时，从文件系统上看，“早于规则”与“规则不适用”没有区别。
+Two layered problems:
 
-## 解决方案
+1. **The rule was unenforced.** Nothing in CI or the test suite failed when a non-`ce-` public skill was added.
+2. **The exception list was implicit.** Legacy skills predated the rule. Without an explicit allowlist, "predates the rule" looked identical to "the rule does not apply" when reading the filesystem.
 
-让规则通过机器强制执行，并显式固定例外。
+## Solution
 
-### 1. Test enforcement（测试强制）
+Make the public-skill rule mechanically enforced and pin exceptions explicitly.
 
-强制逻辑位于专用测试文件 `tests/skill-agent-ce-prefix.test.ts`，它遍历 skill directories 和 agent files，并同时断言 directory/file name 与 frontmatter `name` 都带有前缀。豁免项是显式命名的 `Set`，且每个 entry 都需要书面理由：
+### 1. Test enforcement
+
+Enforcement lives in `tests/frontmatter.test.ts`, which walks root `skills/` directories and asserts the prefix on the directory name and frontmatter `name`. Exemptions are explicit:
 
 ```ts
 const SKILL_PREFIX_ALLOWLIST = new Set([
@@ -50,44 +52,29 @@ const SKILL_PREFIX_ALLOWLIST = new Set([
 ])
 ```
 
-Agents 是 `skills/*/references/agents/` 下的扁平 `.md` files，按扩展名过滤，并用与 skills 相同的方式检查：
+`tests/frontmatter.test.ts` still lists two additional historical names (`every-style-editor`, `file-todos`) that are not present under `skills/` (legacy-cleanup only). Live `skills/` matches the sole-`lfg` exemption; do not treat those extra allowlist entries as permission to add new unprefixed public skills.
 
-```ts
-const agentFiles = readdirSync(AGENTS_DIR, { withFileTypes: true })
-  .filter((entry) =>
-    entry.isFile() &&
-    entry.name.endsWith(".md") &&
-    !AGENT_EXEMPTIONS.has(entry.name),
-  )
-  .map((entry) => entry.name)
-```
+The test also verifies each skill frontmatter `name` matches its parent directory and uses only lowercase letters, numbers, and hyphens. That protects Pi and other native plugin loaders that reject punctuation-heavy names.
 
-每条 failure message 都指向 `AGENTS.md` 的 "Naming Convention" section，让作者知道规则记录在哪里，以及如何添加有理由的豁免。（skill/agent checks 的 parallel copy 也存在于 `tests/frontmatter.test.ts`；专用文件是 canonical home。）
+### 2. Strengthened prose
 
-### 2. 强化 prose
+The public `ce-` rule is enforced by tests, not by an `AGENTS.md` "Naming Convention" heading (that section is gone). `AGENTS.md` still documents the complementary internal-asset rule under "Specialist Prompt Assets in Skills": skill-local personas stay unprefixed. Prose alone would not have prevented the original mistake; the CI allowlist is the load-bearing story.
 
-更新 `plugins/compound-engineering/AGENTS.md`，明确前缀是 mandatory，列出 legacy exceptions，指向测试，并禁止扩展 allowlist。prose 现在写明 "no exceptions"，并告诉作者测试会失败。单靠 prose 不能防止原始错误，但与测试配对后，就形成了一个内部一致的规则体系。
+### 3. Internal prompt assets stay internal
 
-### 3. Persistent author memory（持久作者记忆）
+Do not use this rule as a reason to prefix every internal persona file. After the agentless restructure, names like `learnings-researcher.md` and `coherence-reviewer.md` are intentionally scoped by their owning skill directory. The public namespace is the skill name; the internal filename is just a prompt asset.
 
-在 agent 的 per-project memory store 中保存了一条 feedback memory，让未来在该 repo 上的 sessions 自动加载规则，并在测试触发前应用它。（确切 memory path 与机器和用户有关；持久要点是这条规则同时存在于 author memory、prose 和 tests 中。）
+## Prevention
 
-## 预防
+For any plugin convention that is prose-only, ask:
 
-对于任何目前只存在于 prose 中的 plugin convention，先问：
+- Is there at least one visible counterexample in the codebase that an author could mistake for permission?
+- Is there a mechanical check that would fail on violation?
 
-- codebase 中是否至少有一个可见反例，可能被作者误认为是许可？
-- 是否存在违反时会失败的 mechanical check？
+If the answer to the first is yes and the second is no, the convention will eventually be violated. Add a test with a hard-coded allowlist, or migrate the legacy exceptions so the rule is universal.
 
-如果第一个答案是 yes，而第二个答案是 no，该 convention 迟早会被违反。修复方式二选一：
+## Related
 
-- 添加测试来断言该 convention，并为 legacy exceptions 使用 hard-coded allowlist。
-- 迁移 legacy exceptions，使规则成为 universal，不再需要 allowlist。
-
-当迁移有风险（重命名已安装 skill 会破坏用户调用），但规则可干净地向前适用时，优先使用 allowlist pattern。
-
-## 相关
-
-- `plugins/compound-engineering/AGENTS.md` — Naming Convention section 现在记录规则和 allowlist。
-- `tests/skill-agent-ce-prefix.test.ts` — 实现强制执行的专用测试（parallel copy 也存在于 `tests/frontmatter.test.ts`）。
-- PR #747 — 原始错误，以及随之而来的 rename + enforcement。
+- `AGENTS.md` — Specialist Prompt Assets documents unprefixed internal prompt files; public `ce-` prefix is the test allowlist, not a named AGENTS heading.
+- `tests/frontmatter.test.ts` and `tests/skill-agent-ce-prefix.test.ts` — public-skill prefix enforcement.
+- PR #747 — the original mistake and the rename + enforcement that came with it.

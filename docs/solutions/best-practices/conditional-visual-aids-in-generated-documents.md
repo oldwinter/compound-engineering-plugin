@@ -1,222 +1,191 @@
 ---
-title: Generated documents 与 PR descriptions 中的 conditional visual aids
+title: Conditional visual aids in generated documents and PR descriptions
 date: 2026-03-29
 category: best-practices
 module: compound-engineering plugin skills
 problem_type: design_pattern
 component: documentation
 symptoms:
-  - "Generated documents 和 PR descriptions 缺少 visual aids，而这些 visual aids 本可提升 complex workflows 和 relationships 的理解效率"
-  - "缺少一致 criteria 来判断何时包含 mermaid diagrams、ASCII art 或 markdown tables"
-  - "Dense prose 掩盖了 diagram 可立即澄清的 architectural relationships"
-  - "因为 upstream documents 没有包含 visuals，downstream consumers 必须从零 recreate visuals"
+  - "Generated documents and PR descriptions lack visual aids that would improve comprehension of complex workflows and relationships"
+  - "No consistent criteria for when to include mermaid diagrams vs markdown tables vs prose"
+  - "Dense prose obscures architectural relationships that a diagram would clarify instantly"
+  - "Downstream consumers recreate visuals from scratch because upstream documents did not include them"
 root_cause: inadequate_documentation
 resolution_type: documentation_update
 severity: low
 tags:
   - visual-aids
   - mermaid
-  - ascii-diagrams
   - markdown-tables
   - pr-descriptions
   - skill-design
   - document-generation
 ---
 
-# Generated documents 与 PR descriptions 中的 conditional visual aids
+# Conditional visual aids in generated documents and PR descriptions
 
-## 问题
+## Problem
 
-AI-generated documents 与 PR descriptions 默认输出 prose-only，即使内容 -- multi-step workflows、behavioral mode comparisons、multi-participant interactions、dependency structures -- 通过 visual aid 可以显著更快理解。gap 不是 "没有 diagrams"。真正的 gap 是没有 principled framework 来判断 visual aid 何时值得占位、该用哪种 format，以及如何为不同 output surfaces calibration。
-
----
-
-## 症状
-
-- Readers 必须从 dense prose paragraphs 中 mentally reconstruct workflows、dependency graphs 或 mode differences
-- Downstream consumers（ce:plan reading a brainstorm、reviewers reading a PR）因为 upstream document 没有 visuals，而从零创建自己的 visual aids
-- 包含 5+ implementation units 且有 non-linear dependencies 的 plans，迫使 readers 扫描每个 unit 的 Dependencies field 来重建 execution graph
-- System-Wide Impact sections 命名多个 interacting surfaces 时像一堵 prose wall，而 component diagram 几秒即可 scan
-- architecturally significant changes 的 PR descriptions 是 text-only，尽管它们来自包含 visual aids 的 plans
-- 简单、线性的 documents 包含 diagrams，但它们只是在视觉上重复 prose，没有 comprehension value
+AI-generated documents and PR descriptions default to prose-only output, even when the content -- multi-step workflows, behavioral mode comparisons, multi-participant interactions, dependency structures -- would be understood significantly faster with a visual aid. The gap is not "no diagrams." The gap is that there is no principled framework for deciding when a visual aid earns its place, which format to use, and how to calibrate for different output surfaces.
 
 ---
 
-## 不奏效的做法
+## Symptoms
 
-- **Always adding diagrams** -- 按 depth classification、document length 或 PR size 把 visual aids 当作 mandatory，会制造 noise。反射式加入 diagrams 会训练 readers 跳过它们。
-- **Never adding diagrams** -- prose-only output 在 branching flows、mode comparisons 或 multi-participant interactions 上失败。Downstream consumers 最终自己构建 visuals。
-- **Wrong diagram type for the content** -- 当价值在每个 step 的 rich annotations（CLI commands、decision logic）中时，使用 mermaid flow diagram 会剥离有用细节。
-- **Wrong abstraction level for the surface** -- brainstorm diagram 中的 code-level detail 太早。plan 的 Technical Design section 中的 product-level user flows 抓错重点。PR description 中过大的 diagrams 会拖慢 reviewers。
-- **Size/depth as the trigger** -- 按 "Standard" 或 "Deep" depth classification，或按 PR line count gate visual aids，会产生 false positives（长但简单的 docs 出现 unwanted diagrams）和 false negatives（短但复杂的 docs 没有 diagrams）。
+- Readers mentally reconstruct workflows, dependency graphs, or mode differences from dense prose paragraphs
+- Downstream consumers (`ce-plan` reading a brainstorm, reviewers reading a PR) create their own visual aids from scratch because the upstream document didn't include them
+- Plans with 5+ implementation units and non-linear dependencies force readers to scan every unit's Dependencies field to reconstruct the execution graph
+- System-Wide Impact sections naming multiple interacting surfaces read as a wall of prose when a component diagram would take seconds to scan
+- PR descriptions for architecturally significant changes are text-only even though they were built from plans that contained visual aids
+- Simple, linear documents include diagrams that add no comprehension value beyond restating the prose
 
 ---
 
-## 解决方案：Conditional Visual Aid Pattern
+## What Didn't Work
 
-Visual aids 取决于 **content patterns** -- 内容描述了什么 -- 而不是 document size、depth classification 或 surface type 本身。内容显著更容易用 visual aid 理解时就加入；prose 已清楚表达概念时就跳过。
+- **Always adding diagrams** -- treating visual aids as mandatory by depth classification, document length, or PR size produces noise. Reflexive diagram inclusion trains readers to skip them.
+- **Never adding diagrams** -- prose-only output fails when content has branching flows, mode comparisons, or multi-participant interactions. Downstream consumers end up building the visuals themselves.
+- **Gating on whether the author's prose already "reads clearly"** -- calling your own wording "clear enough" is the trap that quietly under-produces the visuals a reader actually uses. Decide on whether the *structure* exists, not on how polished the surrounding sentences feel.
+- **Hand-drawn box-drawing / ASCII diagrams** -- they violate the repo's no-box-drawing-characters rule, clip in diffs and terminals, and read worse than mermaid or a table. Annotation density is not a reason to draw boxes.
+- **Wrong diagram type for the content** -- using a flowchart when the value is a comparison (use a table) or a UI layout in markdown (use mermaid layout or prose; there is no inline-SVG wireframe in markdown).
+- **Wrong abstraction level for the surface** -- code-level detail in a brainstorm diagram is premature. Product-level user flows in a plan's High-Level Technical Design miss the point. Oversized diagrams in a PR description slow down reviewers.
+- **Size/depth as the trigger** -- gating visual aids on "Standard" or "Deep" depth classification, or on PR line count, produces false positives (long but simple docs get unwanted diagrams) and false negatives (short but complex docs get none).
 
-### 1. Content-Pattern Triggers（不是 Size/Depth Triggers）
+---
 
-是否加入 visual aid 取决于内容描述了 WHAT，而不是有 HOW MUCH 内容。关于 complex workflow 的 Lightweight brainstorm 可能值得 diagram；关于 straightforward feature 的 Deep brainstorm 可能不需要。
+## Solution: The Conditional Visual Aid Pattern
 
-| Content describes...（内容描述） | Visual aid type（visual aid 类型） | Notes（说明） |
+Visual aids are conditional on **content patterns** -- whether the content has a structure worth showing -- not on document size, depth classification, surface type, or how clear the surrounding prose feels.
+
+A structure worth showing is **necessary, not sufficient**. Skip when there is nothing structural to show. When there is, the **surface's own threshold** still decides whether to draw it: a plan skips a one-paragraph approach that prose already carries; a PR includes a visual only when it is faster than prose for a reviewer who cannot get the shape from the diff. Prose stays complete either way: a diagram is an on-ramp, never a substitute. When diagram and prose disagree, **prose governs**.
+
+### 1. Content-Pattern Triggers (Not Size/Depth Triggers)
+
+Whether to include a visual aid depends on WHAT the content describes, not HOW MUCH content there is. A Lightweight brainstorm about a complex workflow may warrant a diagram; a Deep brainstorm about a straightforward feature may not.
+
+| Content describes... | Visual aid type | Notes |
 |---|---|---|
-| 带 branching 的 multi-step workflow 或 process | Flow diagram (mermaid or ASCII) | 展示 sequence、branches、decision points |
-| 3+ behavioral modes、variants 或 states | Comparison table (markdown) | 展示 modes 在不同 dimensions 上的差异 |
-| 3+ interacting participants（roles、components、services） | Relationship/interaction diagram (mermaid or ASCII) | 展示谁和谁通信，以及顺序 |
-| 多个 competing approaches 或 alternatives | Comparison table (markdown) | Structured side-by-side evaluation |
-| 4+ units/stages 且有 non-linear dependencies | Dependency graph (mermaid) | 展示 parallelism、fan-in/fan-out、blocking order |
-| Data pipeline 或 transformation chain | Data flow sketch (mermaid or ASCII) | 展示 input/output transformations |
-| State-heavy lifecycle | State diagram (mermaid) | 展示 transitions 和 guards |
-| Before/after performance 或 behavioral changes | Comparison table (markdown) | Structured quantitative comparison |
+| Multi-step workflow or process with branching | Mermaid flowchart (`flowchart TB`) | Sequence, branches, decision points |
+| 3+ behavioral modes, variants, or states | Markdown table | How modes differ across dimensions |
+| 3+ interacting participants (roles, components, services) | Mermaid sequence or flowchart | Who talks to whom and in what order |
+| Multiple competing approaches or alternatives | Markdown table | Side-by-side evaluation |
+| 4+ units/stages with non-linear dependencies | Mermaid graph | Parallelism, fan-in/fan-out, blocking order |
+| Data pipeline or transformation chain | Mermaid flowchart | Input/output transformations |
+| State-heavy lifecycle | Mermaid state diagram | Transitions and guards |
+| Before/after performance or behavioral changes | Markdown table | Structured quantitative comparison |
+| UI / layout / screen flow | HTML wireframe, or mermaid layout / prose in markdown | Markdown has no inline-SVG wireframe |
 
-**为什么 content patterns 优于 size thresholds：** Size 与 structural complexity 只弱相关。一个 200-line brainstorm 讲简单 CRUD feature，结构上很简单。一个 50-line brainstorm 讲 multi-actor authorization workflow，结构上很复杂。Pattern-based triggers 能正确区分这些；size-based triggers 不能。
+**Why content patterns beat size thresholds:** Size correlates weakly with structural complexity. A 200-line brainstorm about a simple CRUD feature is structurally simple. A 50-line brainstorm about a multi-actor authorization workflow is structurally complex. Pattern-based triggers correctly distinguish these; size-based triggers don't.
 
-**通用 skip criteria:**
-- Prose 已清楚传达概念
-- Diagram 只会以视觉形式复述内容，没有增加 comprehension value
-- 内容简单且线性，没有 multi-step flows、mode comparisons 或 multi-participant interactions
-- Visual 在该 surface 上描述了错误 abstraction level 的 detail
-- 三个或更少 items 的 straight chain -- text 足够
-- Diagram 只有 3 nodes 或更少 -- 它增加 ceremony，而不增加理解
+**Skip when there is no structure to show:**
+- A single-field add, a rename, or a one-line change -- a before/after of one changed line is decoration
+- Content is simple and linear with no multi-step flows, mode comparisons, or multi-participant interactions
+- Three or fewer items in a straight chain -- text is sufficient
+- Diagram would be 3 nodes or fewer -- ceremony without comprehension benefit
+- Visual describes detail at the wrong abstraction level for the surface
+- Simple / rename / dep-bump PRs -- skip visual aids entirely
 
-### 2. 如何选择 Visual Aid
+Do **not** skip because the author's surrounding sentences already "read clearly" — that judgment under-produces. Do skip when the surface threshold says the structure is already available (plan HTD: one-paragraph pattern application; PR: the diff already shows it). The shared trigger is structure; the surface table in §3 is authoritative for whether that structure still needs a visual.
 
-```
-                    +---------------------------+
-                    | Does the content warrant   |
-                    | a visual aid at all?        |
-                    +-------------+-------------+
-                                  |
-                         +--------+--------+
-                         |                 |
-                        No                Yes
-                         |                 |
-                    Skip entirely    What kind of content?
-                                         |
-                    +--------------------+--------------------+
-                    |                    |                    |
-              Flows/sequences     Comparisons/data     Relationships
-                    |                    |                    |
-              +-----+-----+       Markdown table       +-----+-----+
-              |           |                            |           |
-         Annotation    Simple flow               Simple graph   Complex
-         density high? (5-15 nodes)              (5-15 nodes)   spatial
-              |           |                            |        layout
-              |        Mermaid                      Mermaid        |
-           ASCII                                                ASCII
+### 2. Which Visual Aid to Choose
+
+```mermaid
+flowchart TB
+  warrant{Does the content have a structure worth showing?}
+  warrant -->|No| skip[Skip the visual]
+  warrant -->|Yes| kind{What kind of structure?}
+  kind --> flows[Flows / sequences / relationships]
+  kind --> compare[Comparisons / quantitative data]
+  kind --> ui[UI / layout]
+  flows --> mermaid[Fenced mermaid, flowchart TB]
+  compare --> table[Markdown table]
+  ui --> htmlwf[HTML: wireframe]
+  ui --> mdlayout[Markdown: mermaid layout or prose]
 ```
 
-**Mermaid diagrams（大多数 flow 与 relationship content 的默认选择）**
+**Mermaid (default for flow, relationship, state, and architecture)**
 
-- Best for（适合）：simple flows（5-15 nodes）、dependency graphs、sequence diagrams、state diagrams、component diagrams
-- Strengths（优势）：在 GitHub 中渲染为 SVG；source text 在 email、Slack、terminal、diff views 中作为 fallback 仍可读；syntax 标准化；易维护
-- Limitations（限制）：不擅长 rich in-box annotations；node labels 必须 concise；node 内 multi-line content awkward
-- 使用 `TB`（top-to-bottom）direction，以便 SVG 与 source fallback 都窄屏友好
+- Best for: flows, dependency graphs, sequence diagrams, state diagrams, component diagrams
+- Strengths: renders as SVG on GitHub; source text readable as fallback in email, Slack, terminal, diff views
+- Use `TB` (top-to-bottom) so the diagram stays narrow in both SVG and source fallback
+- HTML plans may use inline SVG for the same shapes (halo, contrast, label placement in the HTML rendering reference)
 
-**ASCII/box-drawing diagrams（annotation density 高时）**
+**Markdown tables (structured comparison data)**
 
-- Best for（适合）：带 CLI commands、decision logic、file paths 的 annotated flows；multi-column spatial arrangements；价值在 *step 内 annotations* 而不只是 step 间 flow 的 layouts
-- Strengths（优势）：everywhere 渲染一致（无 renderer dependency）；更适合 in-box content
-- Constraints（约束）：terminal 和 diff view compatibility 要求 max 80-column；用 vertical stacking 适配
-- Choose over mermaid when（何时优先于 Mermaid）：diagram 的价值来自每个 box 内写了什么，而不是 graph shape
+- Best for: mode/variant comparisons (3+ modes), before/after data, decision matrices, approach evaluations, trade-offs
+- Also the markdown stand-in for quantitative charts (bar/scatter) that HTML can draw natively
 
-**Markdown tables（Markdown 表格，structured comparison data）**
+**Never hand-draw box-drawing or ASCII diagrams.** Annotation density does not justify them. Put the annotations in mermaid node labels, a table, a fenced code block, or the surrounding prose.
 
-- Best for（适合）：mode/variant comparisons（3+ modes）、before/after data、decision matrices、approach evaluations、trade-off summaries
-- Strengths（优势）：在 renderers 中自然 wrap；universally supported；scannable form 中承载 dense information
-- 任何把 inputs 映射到 outputs，或跨 dimensions 比较 items 的 structured data 都选它
+### 3. Surface-Specific Calibration
 
-### 3. Surface-Specific Calibration（按输出 surface 校准）
+Each output surface has different reading patterns. The trigger bar and diagram density must adjust. There is no separate "Plan -- Readability (4.4)" phase; plan structure visuals live in High-Level Technical Design (3.4) or next to the units they illustrate.
 
-每个 output surface 有不同 reading patterns。trigger bar 和 diagram density 必须调整。
-
-| Surface（输出 surface） | Reading pattern（阅读模式） | Trigger bar（触发门槛） | Abstraction level（抽象层级） | Typical diagram size（典型 diagram 大小） |
+| Surface | Reading pattern | Trigger bar | Abstraction level | Typical diagram size |
 |---|---|---|---|---|
-| Requirements (ce-brainstorm) | Studied deeply | Standard | Conceptual/product-level: user flows, information flows, mode comparisons | 5-20 nodes |
-| Plan -- Technical Design (ce-plan 3.4) | Studied deeply | Work-characteristic-driven | Solution architecture: component interactions, data flow, state machines | 5-15 nodes |
-| Plan -- Readability (ce-plan 4.4) | Studied deeply | Standard | Document structure: unit dependencies, impact surfaces, mode overviews | 5-15 nodes |
-| PR description (git-commit-push-pr) | Scanned quickly | High | Change impact: what changed architecturally, what flows differently | 5-10 nodes |
+| Requirements (`ce-brainstorm` Visualizations) | Studied deeply | Structure worth showing | Conceptual/product-level: user flows, information flows, data-shape, wireframes for UI requirements | 5-20 nodes |
+| Plan -- High-Level Technical Design (`ce-plan` 3.4) | Studied deeply | Architecture, sequencing, state, branching that prose doesn't carry well | Solution architecture: component interactions, data flow, state machines | 5-15 nodes |
+| Plan -- unit technical design | Studied with the unit | Non-obvious unit approach | Directional, unit-local -- not a second HTD | Small |
+| PR description (`ce-commit-push-pr`) | Scanned quickly | High -- only when faster than prose for a reviewer who still cannot get it from the diff | Change impact: what changed architecturally, what flows differently | 5-10 nodes |
+| Explainer (`ce-explain`) | Studied in one sitting | Material shape | Architecture / lifecycle as mermaid; comparisons as tables | Proportionate |
 
-关键区别：
-- **Brainstorm**: 仅 conceptual level。没有 implementation architecture、data schemas 或 code structure。
-- **Plan Technical Design vs. Plan Readability**: Section 3.4 diagrams 描述 *正在构建什么*。Section 4.4 diagrams 帮助 readers *理解 plan document 本身*。两者 complementary，不重叠。
-- **PR description**: highest bar。只有当 change 涉及 reviewer 难以仅从 prose 重建的 structural complexity 时才包含。来自 branch diff，而不是 upstream plan/brainstorm artifacts。
+Key distinctions:
+- **Brainstorm**: conceptual level only. No implementation architecture, data schemas, or code structure unless the brainstorm itself is about those. A visual sits next to the Key Decision, Requirements group, or Flow it illustrates -- not in a "Diagrams" section.
+- **Plan HTD**: describes *what's being built*. Skip when the approach is a one-paragraph pattern application that prose conveys. Plan diagrams are authoritative content alongside the prose, not "directional sketches" with hedging captions. Per-unit technical design, if present, stays concise and directional.
+- **PR description**: highest bar. Content pattern decides, never size or file count. Derived from the branch diff, not copied from upstream plan/brainstorm artifacts. Prefer mermaid for architecture, a short code block for mechanics, a table for trade-offs. Navigation hints (which file to start in) only when the reviewer would start in the wrong place -- never a list of changed files.
 
-### 4. Layout 与 Cross-Device Optimization
+### 4. Layout and Placement
 
-**Mermaid 使用 TB direction。** Top-to-bottom diagrams 在 rendered SVG 和 source text fallback 中都保持窄。这对以下场景重要：
-- GitHub 的 PR description view（horizontal space 有限）
-- Side-by-side diff views（source text 显示为 code block）
-- Email/Slack notifications（只有 source text 会 render）
+**TB direction for mermaid.** Top-to-bottom diagrams stay narrow in both rendered SVG and source text fallback. This matters for GitHub PR views, side-by-side diffs, and email/Slack notifications where source text is all that renders.
 
-**ASCII max 80-column。** Terminal windows、diff views 和 email clients 在超过 80 columns 后会 clip 或 wrap。用 vertical stacking 让 complex content 适配 column limits。
+**Mermaid source as text fallback.** Node labels stay concise so the fenced block is readable as text.
 
-**Proportionality: 典型为 5-15 nodes。** 每个 node 都应 earn its place：
-- Simple 5-step workflow（简单 5 步 workflow） -> 5-10 nodes
-- 带 decision branches 的 complex workflow -> 如果每个 node 都值得，可到 15-20 nodes
-- PR descriptions 倾向更小（5-10 nodes）；brainstorms 和 plans 可更大
-- 超过 15 应仅因为内容确实有那么多 meaningful steps
+**Proportionality: 5-15 nodes typical.** Every node earns its place. Exceed 15 only when the content genuinely has that many meaningful steps. PR descriptions trend smaller (5-10).
 
-**Mermaid source as text fallback。** 许多 consumers 第一次接触 generated documents 时所处 contexts 不 render mermaid：
-- PR descriptions 的 Email notifications（邮件通知）
-- Slack link previews（Slack 链接预览）
-- Terminal diff views 与 `git log` output
-- RSS readers（RSS 阅读器）
-Source text 必须作为 text 可读。TB direction 和 concise node labels 有帮助。
+**Inline at the point of relevance.** Workflow diagram after the concept it illustrates, not in a "Diagrams" appendix. A separate "Diagrams" section invites diagrams for diagrams' sake. Exception: substantial flows (>10 nodes) may warrant their own heading near the point of relevance.
 
-**Inline placement at point of relevance。** 始终把 visual aids 放在有助 comprehension 的地方：
-- Workflow diagram 放在 Problem Frame 后，而不是 "Diagrams" appendix
-- Dependency graph 放在 Implementation Units heading 前或后
-- Comparison table 放在讨论 modes 或 alternatives 的 section 内
-- 单独 "Diagrams" section 会邀请为了 diagram 而 diagram
-- Exception: substantial flows（>10 nodes）可在 relevant point 附近有自己的 heading
+**Post-generation accuracy check.** After generating any visual aid, verify it matches surrounding content -- correct sequence, no missing branches, no merged steps, no omitted participants.
 
 ---
 
-## 为什么有效
+## Why This Works
 
-conditional、content-pattern-based approach 把 inclusion decision 绑定到内容本身的 observable property，而不是 proxy metric。这在两端都产生正确 decisions：关于 complex multi-actor workflow 的短 brainstorm 会得到 diagram（trigger 匹配）；关于 straightforward feature 的长 brainstorm 不会得到 diagram（没有 trigger 匹配）。
+The conditional, content-pattern-based approach ties the inclusion decision to an observable property of the content itself, not to a proxy metric and not to the author's confidence in their prose. A short brainstorm about a complex multi-actor workflow gets a diagram (structure exists); a long brainstorm about a straightforward feature does not (no structure).
 
-Surface-specific calibration 确保同一个 core principle -- "include when content patterns warrant it" -- 可适配 consumption context。随着 reading pattern 从 deep study 转向 quick scanning，trigger bar 升高，diagram sizes 缩小。
+Surface-specific calibration keeps the same core principle -- "include when content patterns warrant it" -- while raising the bar and shrinking diagrams as reading shifts from deep study to quick scanning.
 
-每个 skill 自包含 format selection（而不是 cross-references）让 skills 独立可用，同时 shared structural patterns（When to include / When to skip / Format selection / Prose-is-authoritative）保持一致性。
+Format selection is mermaid, table, or prose (plus HTML wireframes). That matches the repo's no-box-drawing rule and the rendering references `ce-brainstorm`, `ce-plan`, `ce-commit-push-pr`, and `ce-explain` actually load.
 
-prose-is-authoritative invariant 解决 trust problem：diagram 与 prose 不一致时，以 prose 为准。reviewers 或 implementers 不会有 ambiguity。
-
----
-
-## 预防措施
-
-任何生成带 visual aids 文档的 skill，都应遵循这些 concrete guidance：
-
-1. **使用 content-pattern triggers，不用 size/depth gates。** 定义明确 "When to include" table，将 content patterns 映射到 visual aid types。绝不要按 depth classification 或 line count gate。
-
-2. **定义 explicit skip criteria。** 每个 "When to include" 都需要 "When to skip"。至少包含：prose 已清楚、diagram 会无价值复述、content 简单/线性、visual abstraction level 错误。
-
-3. **每个 skill 自包含 format selection。** 每个 skill 包含自己的 format guidance（mermaid、ASCII、markdown tables），并按 surface calibration。不要 cross-reference 其他 skills 的 guidance。
-
-4. **按 surface reading pattern calibration。** 相对于 consumption context 定义 trigger bar。Studied surfaces 用 standard bar；scanned surfaces 用更高 bar 和更小 diagrams。
-
-5. **指定 abstraction level。** 说明该 surface 的 visual aids 应包含什么 detail level。"Conceptual level only -- not implementation architecture" 是 brainstorm 示例。
-
-6. **Enforce prose-is-authoritative。** 说明 visual aid 与 prose 不一致时，以 prose 为准。Cross-skill invariant。
-
-7. **要求 post-generation accuracy check。** 生成任何 visual aid 后，验证它匹配 surrounding content -- sequence 正确、没有 missing branches、没有 merged steps、没有 omitted participants。
-
-8. **Mermaid 使用 TB direction，ASCII max 80-column。** cross-device compatibility 的 layout constraints。
-
-9. **Inline 放在 relevant point。** 永远不要创建单独 "Diagrams" section。
-
-10. **保持 diagrams proportionate。** 每个 node 都 earn its place。典型 5-15 nodes。只有真正复杂的 content 才超过 15。
+The prose-is-authoritative invariant resolves the trust problem: when diagram and prose disagree, prose governs. IDed requirements, decisions, and acceptance examples stay complete without the diagram.
 
 ---
 
-## 相关 Issues（相关 issue 与 PR）
+## Prevention
 
-- `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md` -- 相关但不同：覆盖 git-commit-push-pr state machine correctness，不是 output content quality
-- GitHub issue #44 -- mermaid dark mode rendering，与 diagram styling 相关
-- PR #437 -- ce:brainstorm visual aids implementation（visual aids 实现）
-- PR #440 -- ce:plan visual aids implementation（visual aids 实现）
-- `docs/plans/2026-03-29-003-feat-pr-description-visual-aids-plan.md` -- git-commit-push-pr visual aids plan（visual aids plan）
+Concrete guidance for any skill that generates documents with visual aids:
+
+1. **Use content-pattern triggers, not size/depth gates.** Map content patterns to visual aid types. Never gate on depth classification or line count.
+2. **Trigger on structure, then apply the surface threshold.** Skip when there is nothing structural to show, or when that surface already carries the structure (plan prose, PR diff). Do not skip because the surrounding sentences already "read clearly."
+3. **Pair every include rule with a skip rule.** Minimum skips: no structure, simple/linear content, wrong abstraction level, 3-node ceremony.
+4. **Mermaid or table (or HTML wireframe); never box-drawing ASCII.** Put dense annotations in labels, tables, code blocks, or prose.
+5. **Calibrate to the surface's reading pattern.** Studied surfaces get the standard bar; scanned surfaces (PR descriptions) get a higher bar and smaller diagrams.
+6. **Specify the abstraction level.** "Conceptual level only -- not implementation architecture" is the brainstorm example. Plan HTD is solution architecture. PRs are change impact from the diff.
+7. **Enforce prose-is-authoritative.** When visual aid and prose disagree, prose governs. Cross-skill invariant.
+8. **Require a post-generation accuracy check.** Sequence, branches, participants match the surrounding content.
+9. **Use TB direction for mermaid.** Layout constraint for cross-device compatibility.
+10. **Place inline at point of relevance.** Never create a separate "Diagrams" section.
+11. **Keep diagrams proportionate.** Every node earns its place. 5-15 nodes typical.
+
+---
+
+## Related Issues
+
+- `docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md` -- related but distinct: covers `ce-commit-push-pr` state machine correctness, not output content quality
+- GitHub issue #44 -- mermaid dark mode rendering, relevant when considering diagram styling
+- PR #437 -- ce-brainstorm visual aids implementation
+- PR #440 -- ce-plan visual aids implementation
+- `docs/plans/2026-03-29-003-feat-pr-description-visual-aids-plan.md` -- PR-description visual aids plan
+- `skills/ce-brainstorm/references/brainstorm-sections.md` -- "structure worth showing" / prose-clarity trap
+- `skills/ce-plan/references/structure.md` -- HTD at 3.4; mermaid encouraged for relationships prose cannot carry
+- `skills/ce-commit-push-pr/references/pr-description-writing.md` -- content pattern, mermaid, never box-drawing
+- `skills/ce-explain/references/explainer-markdown.md` -- mermaid or prose; never ASCII diagrams

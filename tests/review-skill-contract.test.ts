@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import { readFile } from "fs/promises"
 import path from "path"
 import { describe, expect, test } from "bun:test"
@@ -524,6 +525,40 @@ describe("ce-code-review contract", () => {
     expect(content).toMatch(/still waiting/i)
   })
 
+  test("Stage 4 collects by observed return shape and fails closed without a collector", async () => {
+    const skill = await readRepoFile("skills/ce-code-review/SKILL.md")
+    const content = await readRepoFile(
+      "skills/ce-code-review/references/dispatch-reviewers.md",
+    )
+    const crossModel = await readRepoFile(
+      "skills/ce-code-review/references/cross-model-review.md",
+    )
+    const solution = await readRepoFile(
+      "docs/solutions/skill-design/anti-poll-scope-and-async-subagent-dispatch.md",
+    )
+
+    expect(skill).toMatch(/every.*successful launch.*terminal outcome/i)
+    expect(skill).toMatch(/terminal.*malformed.*failed reviewer/i)
+    expect(content).toMatch(/compact JSON.*in[- ]band/i)
+    expect(content).toMatch(/launch receipt.*not.*reviewer return/i)
+    expect(content).toMatch(/launch receipt.*uncollected/i)
+    expect(content).toMatch(/blocking collection/i)
+    expect(content).toMatch(/until every.*successful.*launch.*terminal outcome/i)
+    expect(content).toMatch(/terminal.*tool error.*malformed.*failed reviewer/i)
+    expect(content).toMatch(/no reliable blocking collection/i)
+    expect(content).toMatch(/["`]status["`]\s*:\s*["`]failed["`]/i)
+    expect(skill).toMatch(/persisted peer.*cleanup.*before.*failure result/i)
+    expect(content).toMatch(/persisted peer.*owning cleanup.*before.*failure/i)
+    expect(crossModel).toMatch(/every persisted job id.*terminal.*job directory.*deleted.*before.*returns/i)
+    expect(crossModel).toMatch(/cannot continue.*reap.*final.*wait.*delete.*without.*fold/i)
+    expect(content).not.toMatch(/single blocking wait return all their compact JSON together/i)
+    expect(content).not.toMatch(/collecting multiple returns from one batch is the harness's job/i)
+    expect(solution).toMatch(/every successful launch reaches a terminal outcome/i)
+    expect(solution).toMatch(/terminal tool error or malformed output.*failed\/degraded rules/i)
+    expect(solution).toMatch(/launch receipt.*uncollected/i)
+    expect(solution).toMatch(/fail closed.*lifecycle obligations.*detached work.*already started/i)
+  })
+
   test("Stage 5 synthesis uses anchor gate and one-anchor promotion", async () => {
     const content = await readRepoFile(
       "skills/ce-code-review/references/finish-review.md",
@@ -571,6 +606,16 @@ describe("ce-code-review contract", () => {
     expect(content).toMatch(/never split the work into another batch/i)
     expect(content).toMatch(/Run the validator batch foreground/i)
     expect(content).toMatch(/Cost, elapsed time, confidence.*never licenses an additional skip/i)
+
+    // Foreground is a request, not proof that the host returned a verdict in-band.
+    expect(content).toMatch(/compact.*verdict.*in[- ]band/i)
+    expect(content).toMatch(/launch receipt.*not.*validator return/i)
+    expect(content).toMatch(/launch receipt.*uncollected/i)
+    expect(content).toMatch(/blocking collection/i)
+    expect(content).toMatch(/terminal outcome/i)
+    expect(content).toMatch(/malformed output.*validator infrastructure failure/i)
+    expect(content).toMatch(/validator infrastructure failure/i)
+    expect(content).not.toMatch(/A foreground Agent call is the wait/i)
 
     // Validator template exists and is read-only
     expect(validatorTemplate).toMatch(/validator is independent|independent validation gate/i)
@@ -620,7 +665,7 @@ describe("ce-code-review contract", () => {
     const catalog = await readRepoFile(
       "skills/ce-code-review/references/persona-catalog.md",
     )
-    const docs = await readRepoFile("docs/skills/ce-code-review.md")
+    const docs = await readRepoFile("docs/guides/ce-code-review.md")
 
     expect(content).toContain("**Core (always-on):** `correctness-reviewer`.")
     expect(content).toMatch(/project-standards-reviewer.*only when Stage 3b finds/i)
@@ -954,6 +999,7 @@ describe("ce-code-review contract", () => {
       "skills/ce-work/references/review-findings-followup.md",
     )
     const skill = await readRepoFile("skills/ce-work/SKILL.md")
+    const shipping = await readRepoFile("skills/ce-work/references/shipping-workflow.md")
     expect(followup).toContain("review-only")
     expect(followup).toContain("suggested_fix")
     // The apply followup consumes the review the caller already ran; re-invocation is a
@@ -964,9 +1010,11 @@ describe("ce-code-review contract", () => {
     expect(followup).toMatch(/Group by `file`/i)
     expect(followup).toMatch(/batch/i)
     expect(followup).toContain("mode:agent")
-    expect(skill).toMatch(/ce-code-review.*review-only|review-only.*ce-code-review/i)
-    expect(skill).toContain("review-findings-followup.md")
-    expect(skill).toMatch(/batch.*file|batch applicable findings by file/i)
+    expect(skill).toContain("references/shipping-workflow.md")
+    expect(shipping).toContain("**Review is not fix — two steps:**")
+    expect(shipping).toContain("Review-only via `mode:agent`")
+    expect(shipping).toContain("review-findings-followup.md")
+    expect(shipping).toMatch(/batch.*file|batch applicable findings by file/i)
   })
 
   test("ce-work shipping-workflow enforces a residual-work gate after Tier 2 review", async () => {
@@ -991,8 +1039,9 @@ describe("ce-code-review contract", () => {
       expect(workflow).toContain("Accept and proceed")
       expect(workflow).toContain("Stop — do not ship")
 
-      // Accept-and-proceed path threads findings into the PR description.
-      expect(workflow).toContain("Known Residuals")
+      // Accept-and-proceed path threads findings into the PR description under the
+      // heading ce-resolve-pr-feedback ticks; see the cross-skill heading test below.
+      expect(workflow).toContain("## Unapplied review findings")
       expect(workflow).toContain("If the user later chooses the no-PR `ce-commit` path")
       // With no PR and no reachable tracker there is no durable sink, so the run says so
       // outright. The committed record file that used to fill this slot was removed: it
@@ -1002,7 +1051,7 @@ describe("ce-code-review contract", () => {
     }
   })
 
-  test("lfg autonomously handles residuals via non-interactive tracker-defer and a committed record file (never the PR body)", async () => {
+  test("lfg records residuals in the PR body checklist and files tickets only with no PR", async () => {
     const lfg = await readRepoFile("skills/lfg/SKILL.md")
     // Steps 3-6 are owned by the reference lfg's step 3 names as a required read;
     // the body keeps each step's gate and the DONE-durability rule. Assertions on
@@ -1024,29 +1073,26 @@ describe("ce-code-review contract", () => {
     expect(lfg).toContain("Autonomous residual handoff")
     expect(lfg).toMatch(/Do not prompt the user/)
 
-    // tracker-defer is invoked in non-interactive mode, from the step-6 procedure
-    // in the reference lfg's step 3 requires.
+    // tracker-defer is invoked in non-interactive mode only on the no-PR path.
     expect(followupRef).toContain("references/tracker-defer.md")
     expect(followupRef).toContain("**non-interactive mode**")
+    expect(followupRef).toMatch(/When no PR will exist[^\n]*tracker-defer/)
     expect(lfg).not.toContain("skills/ce-code-review/references/tracker-defer.md")
-
-    // Structured return buckets drive the residual record.
-    expect(followupRef).toMatch(/filed/)
-    expect(followupRef).toMatch(/failed/)
     expect(followupRef).toMatch(/no_sink/)
 
-    // Residuals are recorded via tracker tickets + a committed record file,
-    // NEVER the PR body (which would duplicate GitHub's own tracking and go
-    // stale as items resolve). The old `gh pr edit`-into-body path is retired.
-    expect(lfg).toContain("never the PR body")
+    // With a PR, residuals are a checklist in the PR body — the reviewer decides each
+    // (lfg never merges). Not a ticket per finding (tracker flood) and not a PR
+    // comment (buried). The body is written by step 8, never edited here.
+    expect(lfg).toContain("the PR body")
+    expect(lfg).not.toContain("never the PR body")
+    expect(lfg).not.toContain("run-report comment")
     expect(lfg).not.toContain("gh pr edit PR_NUMBER --body-file BODY_FILE")
-    expect(followupRef).toContain("## Residual Review Findings")
-    // ...and not a committed record file either. Residuals ride the same run-report
-    // comment `ce-babysit-pr` already uses for unfixable CI, so nothing is committed to
-    // carry them and the DONE gate no longer waits on a file write plus a push.
-    expect(lfg).toContain("run-report comment")
+    expect(followupRef).toContain("## Unapplied review findings")
+    expect(followupRef).toContain("- [ ] <severity> — <file:line> — <title>")
+    expect(followupRef).not.toContain("gh pr comment")
+    expect(followupRef).not.toContain("## Residual Review Findings")
+    expect(shippingTail).toContain("## Unapplied review findings")
     expect(lfg).not.toContain("residual-review-findings")
-    expect(followupRef).toContain("run-report comment")
     expect(followupRef).not.toContain("residual-review-findings")
     expect(lfg).toContain("Do not output DONE until the residuals are durable")
 
@@ -1067,6 +1113,27 @@ describe("ce-code-review contract", () => {
     // Autopilot contract: never prompt, but require a durable sink before DONE.
     expect(lfg).toContain("Do not prompt the user")
     expect(lfg).toMatch(/Never block DONE on tracker filing failures/i)
+  })
+
+  test("every writer of the PR-body residual checklist uses the heading ce-resolve-pr-feedback ticks", async () => {
+    // The heading is a cross-skill contract: lfg, ce-work, and ce-debug write it into
+    // the PR body; ce-resolve-pr-feedback finds it by name to tick bullets its fixes close.
+    const heading = "## Unapplied review findings"
+    for (const path of [
+      "skills/lfg/references/review-followup.md",
+      "skills/ce-work/references/shipping-workflow.md",
+      "skills/ce-debug/references/post-fix-handoff.md",
+      "skills/ce-resolve-pr-feedback/SKILL.md",
+      "skills/ce-resolve-pr-feedback/references/pipeline-mode.md",
+    ]) {
+      expect(await readRepoFile(path)).toContain(heading)
+    }
+    const resolver = await readRepoFile("skills/ce-resolve-pr-feedback/SKILL.md")
+    expect(resolver).toMatch(/tick it to `- \[x\]`/)
+    expect(resolver).toMatch(/never add to, reorder, or create that section/)
+    for (const path of ["skills/ce-work/references/shipping-workflow.md", "skills/ce-debug/references/post-fix-handoff.md"]) {
+      expect(await readRepoFile(path)).not.toContain("Known Residuals")
+    }
   })
 
   test("ce-code-review emits actionable findings summary for callers", async () => {
@@ -1320,11 +1387,17 @@ describe("cross-model peer skip legibility", () => {
       // for the findings brace-match and receipt jq-parse, so stderr is separate.
       expect(workerSrc).toContain('2>"$PEERERR"')
       expect(workerSrc).toContain("peer skip evidence (stderr):")
+      expect(workerSrc).toContain("provider_overloaded")
+      expect(workerSrc).toMatch(/provider overload 529; retrying same route once/i)
 
       // Consumer: the reference points the agent at the same token and asks it
       // to classify a quota/usage-limit exhaustion (harness-agnostic reasoning).
       expect(referenceSrc).toContain("peer skip evidence:")
       expect(referenceSrc).toMatch(/quota|usage-limit/i)
+      expect(referenceSrc).toMatch(/529[^.]{0,160}once|once[^.]{0,160}529/i)
+      expect(referenceSrc).toMatch(/worker exclusively owns the one same-route retry/i)
+      expect(referenceSrc).toMatch(/host never restarts that peer/i)
+      expect(referenceSrc).not.toMatch(/host may retry|host-owned retry/i)
       if (worker.includes("ce-code-review")) {
         expect(workerSrc).not.toContain("peer skip class:")
         expect(referenceSrc).not.toContain("peer skip class:")
@@ -1333,6 +1406,7 @@ describe("cross-model peer skip legibility", () => {
         expect(referenceSrc).toMatch(/never silently continue to another recipient/i)
         expect(referenceSrc).toMatch(/explicit user-stated preference/i)
         expect(referenceSrc).toContain("in-process `adversarial-reviewer`")
+        expect(referenceSrc).toMatch(/max-turn exhaustion:[^\n]*in-process `adversarial-reviewer`/i)
       } else {
         expect(referenceSrc).toMatch(/more than once in this session/i)
       }
@@ -1466,6 +1540,68 @@ describe("cross-model peer skip legibility", () => {
     })
   }
 
+  for (const reference of routeTokenPairs.map((p) => p.reference)) {
+    // The snippet resolves the harnesses whose markers it names; self-knowledge covers
+    // the rest. Without this, every new harness needs a bash arm AND a prose mapping —
+    // which is how the Grok change had to edit the same fact in two places.
+    test(`${reference} does not require a new attestation branch per harness`, async () => {
+      // ce-pov's panel reference is hard-wrapped, so match on collapsed whitespace.
+      const src = (await readRepoFile(reference)).replace(/\s+/g, " ")
+      expect(src).toContain("The snippet is evidence, not the verdict")
+      expect(src).toContain("attest what you know instead")
+      expect(src).toContain("A harness the snippet does not name needs no new branch here")
+    })
+  }
+
+  for (const reference of routeTokenPairs.map((p) => p.reference)) {
+    test(`${reference} binds grok-cli unless the user asked for Grok through Cursor`, async () => {
+      const src = await readRepoFile(reference)
+      expect(src).toContain("The host harness does not choose the Grok route")
+      expect(src).toContain("Target `grok` binds `grok-cli` when that CLI is installed")
+      expect(src).toContain("Bind `grok-cursor` only when the user asked for Grok through Cursor")
+    })
+  }
+
+  function extractHostAttestation(src: string): string {
+    const m = src.match(
+      /if \[ "\$\{CLAUDECODE:-\}" = "1" \]; then XHOST_HARNESS=claude; XHOST_FAMILY=claude;\n(?:elif .+\n)*else XHOST_HARNESS=unknown; XHOST_FAMILY=unknown; fi/,
+    )
+    expect(m).toBeTruthy()
+    return m![0]
+  }
+
+  function attestHost(snippet: string, env: Record<string, string>): string {
+    const r = spawnSync(
+      "bash",
+      ["-c", `${snippet}\nprintf '%s %s\\n' "$XHOST_HARNESS" "$XHOST_FAMILY"`],
+      {
+        encoding: "utf8",
+        env: { PATH: process.env.PATH ?? "/usr/bin:/bin", ...env },
+      },
+    )
+    expect(r.status).toBe(0)
+    return (r.stdout ?? "").trim()
+  }
+
+  test("cross-model host attestation snippets are identical and map Grok Build to grok", async () => {
+    const snippets = await Promise.all(
+      routeTokenPairs.map(async (p) => extractHostAttestation(await readRepoFile(p.reference))),
+    )
+    for (const snippet of snippets) {
+      expect(snippet).toBe(snippets[0])
+      expect(snippet).toContain('XHOST_HARNESS=grok; XHOST_FAMILY=grok')
+      expect(snippet).toContain("GROK_AGENT")
+      expect(snippet).toContain("GROK_SESSION_ID")
+    }
+    const snippet = snippets[0]
+    expect(attestHost(snippet, {})).toBe("unknown unknown")
+    expect(attestHost(snippet, { GROK_AGENT: "1" })).toBe("grok grok")
+    expect(attestHost(snippet, { GROK_SESSION_ID: "sess" })).toBe("grok grok")
+    expect(attestHost(snippet, { CLAUDECODE: "1", GROK_AGENT: "1" })).toBe("claude claude")
+    expect(attestHost(snippet, { CODEX_SESSION_ID: "sess", GROK_AGENT: "1" })).toBe("codex codex")
+    expect(attestHost(snippet, { CURSOR_AGENT: "1" })).toBe("cursor unknown")
+  })
+
   // The provider runs under `set -m` in its OWN process group so the worker can
   // group-reap it without killing itself. On a clean worker exit the runner's
   // final sweep only kills the worker's pgid, and a survivor the provider left
@@ -1526,5 +1662,26 @@ describe("testing-reviewer contract", () => {
 
     // Non-behavioral changes are excluded
     expect(content).toContain("Non-behavioral changes")
+  })
+})
+
+describe("ce-code-review dispatch templates", () => {
+  // #1509: a placeholder named in the template's prose gets filled like a slot, so
+  // `{diff}` in the closing note re-emitted the whole diff into every reviewer prompt.
+  // Each placeholder may appear only once inside the fenced template, as its slot.
+  test("the reviewer template names each placeholder once, as a slot", async () => {
+    const content = await readRepoFile(
+      "skills/ce-code-review/references/subagent-template.md",
+    )
+    // The template fence nests a ```json example, so bound it by the heading that follows it.
+    const fenced = content.match(/^```\n[\s\S]*?^```\n\n## Variable Reference/m)?.[0]
+    expect(fenced).toBeDefined()
+    const counts = new Map<string, number>()
+    for (const m of fenced!.matchAll(/\{([a-z_]+)\}/g)) {
+      counts.set(m[1], (counts.get(m[1]) ?? 0) + 1)
+    }
+    for (const name of ["file_list", "diff"]) {
+      expect(counts.get(name)).toBe(1)
+    }
   })
 })

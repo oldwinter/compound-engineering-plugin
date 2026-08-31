@@ -1,41 +1,43 @@
 ---
-title: 添加新的 Converter Target Providers
+title: Adding New Converter Target Providers
 category: architecture
 tags: [converter, target-provider, plugin-conversion, multi-platform, pattern]
 created: 2026-02-23
-last_refreshed: 2026-06-23
+date: 2026-02-23
+last_refreshed: 2026-08-23
+module: converter-cli
 severity: medium
 component: converter-cli
 problem_type: architecture_pattern
 root_cause: architectural_pattern
 ---
 
-# 添加新的 Converter Target Providers
+# Adding New Converter Target Providers
 
-## 问题
+## Problem
 
-当为新的 AI platform 添加支持时，converter CLI architecture 要求 types、converters、writers、CLI integration 和 tests 之间保持一致实现。如果没有文档化的 patterns 和 learnings，新 targets 的实现会更慢，也更容易出现 architecture inconsistency。
+When adding support for a new AI platform, the converter CLI architecture requires consistent implementation across types, converters, writers, CLI integration, and tests. Without documented patterns and learnings, new targets take longer to implement and risk architectural inconsistency.
 
-## 方案
+## Solution
 
-compound-engineering-plugin 使用一个已验证的 **6-phase target provider pattern**，并已应用到本 repo 维护的 converter targets。一些较旧的 converter modules 仍留在 tests 或 cleanup paths 中用于 compatibility，但当 harness 支持 native package/plugin mechanism 时，新的 user-facing installs 应优先使用 native mechanism。
+The compound-engineering-plugin uses a proven **6-phase target provider pattern** that has been applied across converter targets this repo maintains. Some older converter modules remain in tests or cleanup paths for compatibility, but new user-facing installs should prefer native package/plugin mechanisms when the harness supports them.
 
-1. **OpenCode**（primary target，reference implementation，主要参考实现）
-2. **Codex**（second target，established pattern，已验证 pattern）
-3. **Pi**（MCPorter ecosystem，MCPorter 生态）
-4. **Antigravity CLI**（content transformation patterns，内容转换 patterns）
-5. **Compatibility converter modules**，例如 Copilot、Droid 和 Kiro（在 regression coverage 或 cleanup support 仍然重要时保留）
-6. **Historical removed targets**，例如 Windsurf、OpenClaw 和 Qwen（仅作为 archived lessons 使用）
+1. **OpenCode** (primary target, reference implementation)
+2. **Codex** (second target, established pattern)
+3. **Pi** (MCPorter ecosystem)
+4. **Antigravity CLI** (content transformation patterns)
+5. **Compatibility converter modules** such as Copilot, Droid, and Kiro (kept where regression coverage or cleanup support still matters)
+6. **Historical removed targets** such as Windsurf, OpenClaw, Qwen, and Gemini CLI (use as archived lessons only)
 
-每个 implementation 都精确遵循该 architecture，以确保 consistency 和 maintainability。
+Each implementation follows this architecture precisely, ensuring consistency and maintainability.
 
-## 架构：6 阶段 Pattern
+## Architecture: The 6-Phase Pattern
 
-### Phase 1：Type Definitions（类型定义，`src/types/{target}.ts`）
+### Phase 1: Type Definitions (`src/types/{target}.ts`)
 
-**目的：** 为 intermediate bundle format 定义 TypeScript types
+**Purpose:** Define TypeScript types for the intermediate bundle format
 
-**关键模式：**
+**Key Pattern:**
 
 ```typescript
 // Exported bundle type used by converter and writer
@@ -58,26 +60,26 @@ export type {TargetName}Agent = {
 }
 ```
 
-**关键经验：**
+**Key Learnings:**
 
-- 始终包含 `content` field（完整 file text），而不是拆解后的 fields；这更简单，也匹配文件写入方式
-- 对 complex sections 使用 intermediate types，让 section building 可以独立测试
-- 除非必要，避免在 base bundle 中放 target-specific fields；目标是跨 targets 共享 structure
-- 如果 target 有 file-type variants（agents vs. commands vs. rules），包含 `category` field
+- Always include a `content` field (full file text) rather than decomposed fields — it's simpler and matches how files are written
+- Use intermediate types for complex sections to make section building independently testable
+- Avoid target-specific fields in the base bundle unless essential — aim for shared structure across targets
+- Include a `category` field if the target has file-type variants (agents vs. commands vs. rules)
 
-**参考实现：**
-- OpenCode：`src/types/opencode.ts`（command + agent split，command 与 agent 拆分）
-- Codex：`src/types/codex.ts`（agents plus optional copied skills，agents 与 optional copied skills）
-- Pi：`src/types/pi.ts`（plugin/extension output，plugin/extension 输出）
-- Antigravity：`src/types/antigravity.ts`（extension-style output，extension 风格输出）
+**Reference Implementations:**
+- OpenCode: `src/types/opencode.ts` (command + agent split)
+- Codex: `src/types/codex.ts` (agents plus optional copied skills)
+- Pi: `src/types/pi.ts` (plugin/extension output)
+- Antigravity: `src/types/antigravity.ts` (extension-style output)
 
 ---
 
-### Phase 2：Converter（转换器，`src/converters/claude-to-{target}.ts`）
+### Phase 2: Converter (`src/converters/claude-to-{target}.ts`)
 
-**目的：** 将 Claude Code plugin format 转换为 target-specific bundle format
+**Purpose:** Transform Claude Code plugin format → target-specific bundle format
 
-**关键模式：**
+**Key Pattern:**
 
 ```typescript
 export type ClaudeTo{Target}Options = ClaudeToOpenCodeOptions  // Reuse common options
@@ -114,9 +116,9 @@ export function convertClaudeTo{Target}(
 }
 ```
 
-**Content Transformation（内容转换，`transformContentFor{Target}`）：**
+**Content Transformation (`transformContentFor{Target}`):**
 
-应用于 agent bodies 和 command bodies，用于重写 paths、command references 和 agent mentions：
+Applied to both agent bodies and command bodies to rewrite paths, command references, and agent mentions:
 
 ```typescript
 export function transformContentFor{Target}(body: string): string {
@@ -155,9 +157,9 @@ export function transformContentFor{Target}(body: string): string {
 }
 ```
 
-**Deduplication Pattern（去重 pattern，`uniqueName`）：**
+**Deduplication Pattern (`uniqueName`):**
 
-当 target 使用 flat namespaces（Copilot、Windsurf）或出现 name collisions 时使用：
+Used when target has flat namespaces or when name collisions occur:
 
 ```typescript
 function uniqueName(base: string, used: Set<string>): string {
@@ -194,37 +196,36 @@ function flattenCommandName(name: string): string {
 }
 ```
 
-**关键经验：**
+**Key Learnings:**
 
-1. **预扫描 cross-references**：如果 target 需要 reference names（macros、URIs、IDs），在 conversion 前先构建 map，以避免 name collisions 并支持 deduplication。
+1. **Pre-scan for cross-references** — If target requires reference names (macros, URIs, IDs), build a map before conversion to avoid name collisions and enable deduplication.
 
-2. **Content transformation 很脆弱**：需要充分测试。适用于 slash commands 的 patterns 可能误匹配 file paths。使用 negative lookahead 跳过 `/etc`、`/usr`、`/var` 等。
+2. **Content transformation is fragile** — Test extensively. Patterns that work for slash commands might false-match on file paths. Use negative lookahead to skip `/etc`, `/usr`, `/var`, etc.
 
-3. **简化 heuristics，信任 structural mapping**：不要尝试解析 agent body 中的 “You are...” 或 “NEVER do...” patterns。改为映射 agent.description → Overview、agent.body → Procedure、agent.capabilities → Specifications。Heuristics 在 edge cases 上容易失败，也难测试。
+3. **Simplify heuristics, trust structural mapping** — Don't try to parse agent body for "You are..." or "NEVER do..." patterns. Instead, map agent.description → Overview, agent.body → Procedure, agent.capabilities → Specifications. Heuristics fail on edge cases and are hard to test.
 
-4. **尽早且一致地 normalize**：全程使用同一个 `normalizeName()` function。不一致的 normalization 会导致 deduplication bugs。
+4. **Normalize early and consistently** — Use the same `normalizeName()` function throughout. Inconsistent normalization causes deduplication bugs.
 
-5. **MCP servers 需要 target-specific handling：**
-   - **OpenCode:** Merge into `opencode.json`（合并到 `opencode.json`，preserve user keys）
-   - **Pi:** Emit extension/package metadata without requiring CE-owned subagent extensions（输出 extension/package metadata，不要求 CE-owned subagent extensions）
-   - **Antigravity:** Prefer native extension manifests and skip unsupported Claude-only surfaces（优先 native extension manifests，跳过 unsupported Claude-only surfaces）
+5. **MCP servers need target-specific handling:**
+   - **OpenCode:** Merge into `opencode.json` (preserve user keys)
+   - **Pi:** Emit extension/package metadata without requiring CE-owned subagent extensions
+   - **Antigravity:** Use `serverUrl` (not `url`) for remote MCP servers; emit `mcp_config.json` at plugin root
 
-6. **对 unsupported features 发出 warning**：Hooks 和 target-incompatible MCP types 应输出到 stderr 并继续 conversion。
+6. **Warn on unsupported features** — Hooks and target-incompatible MCP types should emit to stderr and continue conversion.
 
-**参考实现：**
-- OpenCode：`src/converters/claude-to-opencode.ts`（most comprehensive，最完整）
-- Codex：`src/converters/claude-to-codex.ts`（native-plugin-compatible default with legacy include-skills path，默认兼容 native plugin，并保留 legacy include-skills path）
-- Pi：`src/converters/claude-to-pi.ts`（Pi plugin metadata，Pi plugin metadata）
-- Antigravity：`src/converters/claude-to-antigravity.ts`（Antigravity extension output，Antigravity extension 输出）
-- Windsurf：`src/converters/claude-to-windsurf.ts`（rules-based conversion，基于 rules 的转换）
+**Reference Implementations:**
+- OpenCode: `src/converters/claude-to-opencode.ts` (most comprehensive)
+- Codex: `src/converters/claude-to-codex.ts` (native-plugin-compatible default with legacy include-skills path)
+- Pi: `src/converters/claude-to-pi.ts` (Pi plugin metadata)
+- Antigravity: `src/converters/claude-to-antigravity.ts` (Antigravity plugin output)
 
 ---
 
-### Phase 3：Writer（写入器，`src/targets/{target}.ts`）
+### Phase 3: Writer (`src/targets/{target}.ts`)
 
-**目的：** 按 target-specific directory structure 将 converted bundle 写入磁盘
+**Purpose:** Write converted bundle to disk in target-specific directory structure
 
-**关键模式：**
+**Key Pattern:**
 
 ```typescript
 export async function write{Target}Bundle(outputRoot: string, bundle: {Target}Bundle): Promise<void> {
@@ -291,9 +292,9 @@ function resolve{Target}Paths(outputRoot: string) {
 }
 ```
 
-**备份模式（仅 MCP configs）：**
+**Backup Pattern (MCP configs only):**
 
-MCP configs 通常已经存在且由用户手工编辑。覆盖前先备份：
+MCP configs are often pre-existing and user-edited. Backup before overwrite:
 
 ```typescript
 // From src/utils/files.ts
@@ -310,9 +311,9 @@ export async function backupFile(filePath: string): Promise<string | null> {
 }
 ```
 
-**关键经验：**
+**Key Learnings:**
 
-1. **始终检查 double-nesting**：如果 output root 已经是 `.target`，不要再次嵌套。Pattern：
+1. **Always check for double-nesting** — If output root is already `.target`, don't nest again. Pattern:
    ```typescript
    if (path.basename(outputRoot) === ".target") {
      return { root: outputRoot }  // Write directly
@@ -320,34 +321,34 @@ export async function backupFile(filePath: string): Promise<string | null> {
    return { root: path.join(outputRoot, ".target") }  // Nest
    ```
 
-2. **使用 `writeText` 和 `writeJson` helpers**：它们会一致处理 directory creation 和 line endings
+2. **Use `writeText` and `writeJson` helpers** — These handle directory creation and line endings consistently
 
-3. **覆盖前备份 MCP configs**：MCP JSON files 经常被手工编辑。始终使用 timestamp 备份。
+3. **Backup MCP configs before overwriting** — MCP JSON files are often hand-edited. Always backup with timestamp.
 
-4. **Empty bundles 应优雅成功**：component array 为空时不要失败。许多 plugins 可能没有 commands 或 skills。
+4. **Empty bundles should succeed gracefully** — Don't fail if a component array is empty. Many plugins may have no commands or no skills.
 
-5. **File extensions 很重要**：精确匹配 target conventions：
-   - Copilot: agents 使用 `.md`（VS Code 会把 `.agent.md` 解析为 Copilot format，并静默 drop Claude-style tool names；`.md` 会触发 Claude format detection，并将 tools 映射到 VS Code equivalents）
-   - Windsurf: rules 使用 `.md`
-   - OpenCode: commands 使用 `.md`
+5. **File extensions matter** — Match target conventions exactly:
+   - OpenCode: `.md` for commands
+   - Codex/Antigravity/Pi: preserve the target's native skill or extension filenames exactly
 
-6. **Sensitive files 的 permissions**：带 API keys 的 MCP config 应使用 `0o600`：
+6. **Permissions for sensitive files** — MCP config with API keys should use `0o600` via `writeJsonSecure` (`writeJson` has no mode option):
    ```typescript
-   await writeJson(mcpPath, config, { mode: 0o600 })
+   await writeJsonSecure(mcpPath, config)
    ```
 
-**参考实现：**
-- Droid: `src/targets/droid.ts`（simpler pattern, good for learning，较简单、适合学习）
-- Copilot: `src/targets/copilot.ts`（double-nesting pattern，双层嵌套防护 pattern）
-- Windsurf: `src/targets/windsurf.ts`（rules-based output，基于 rules 的输出）
+**Reference Implementations:**
+- OpenCode: `src/targets/opencode.ts` (merge-preserving workspace/global writer)
+- Codex: `src/targets/codex.ts` (Codex home writer with optional legacy skill output)
+- Pi: `src/targets/pi.ts` (Pi plugin output)
+- Antigravity: `src/targets/antigravity.ts` (Antigravity plugin output)
 
 ---
 
-### Phase 4：CLI 接线
+### Phase 4: CLI Wiring
 
-**文件：`src/targets/index.ts`**
+**File: `src/targets/index.ts`**
 
-在 global target registry 中注册新 target：
+Register the new target in the global target registry:
 
 ```typescript
 import { convertClaudeTo{Target} } from "../converters/claude-to-{target}"
@@ -365,9 +366,9 @@ export const targets: Record<string, TargetHandler<any>> = {
 }
 ```
 
-**文件：`src/commands/convert.ts` 和 `src/commands/install.ts`**
+**File: `src/commands/convert.ts` and `src/commands/install.ts`**
 
-添加 output root resolution：
+Add output root resolution:
 
 ```typescript
 // In resolveTargetOutputRoot()
@@ -381,11 +382,11 @@ const toDescription = "Target format (opencode | codex | pi | antigravity | all)
 
 ---
 
-### Phase 5：同步支持（可选）
+### Phase 5: Personal Sync Support (Historical/Optional)
 
-**文件：`src/sync/{target}.ts`**
+The current target registry does not have a separate `src/sync/` layer. Earlier versions used sync modules for personal skills and MCP servers; if a future target reintroduces that behavior, keep it separate from conversion and treat it as optional platform glue.
 
-如果 target 支持同步 personal skills 和 MCP servers：
+If the target supports syncing personal skills and MCP servers, the shape looks like:
 
 ```typescript
 export async function syncTo{Target}(outputRoot: string): Promise<void> {
@@ -417,16 +418,16 @@ export async function syncTo{Target}(outputRoot: string): Promise<void> {
         ...personalSettings.mcpServers,
       },
     }
-    await writeJson(mcpPath, merged, { mode: 0o600 })
+    await writeJsonSecure(mcpPath, merged)
   }
 }
 ```
 
-**文件：`src/commands/sync.ts`**
+Then wire the optional command path in the same explicit-target style as `src/commands/convert.ts`:
 
 ```typescript
 // Add to validTargets array
-const validTargets = ["opencode", "codex", "pi", "gemini", "{target}"] as const
+const validTargets = ["opencode", "codex", "pi", "antigravity", "{target}"] as const
 
 // In resolveOutputRoot()
 case "{target}":
@@ -440,11 +441,11 @@ case "{target}":
 
 ---
 
-### Phase 6：测试
+### Phase 6: Tests
 
-**文件：`tests/{target}-converter.test.ts`**
+**File: `tests/{target}-converter.test.ts`**
 
-使用 inline `ClaudePlugin` fixtures 测试 converter：
+Test converter using inline `ClaudePlugin` fixtures:
 
 ```typescript
 describe("convertClaudeTo{Target}", () => {
@@ -520,9 +521,9 @@ describe("convertClaudeTo{Target}", () => {
 })
 ```
 
-**文件：`tests/{target}-writer.test.ts`**
+**File: `tests/{target}-writer.test.ts`**
 
-使用 temp directories（来自 `tmp` package）测试 writer：
+Test writer using temp directories (from `tmp` package):
 
 ```typescript
 describe("write{Target}Bundle", () => {
@@ -580,111 +581,115 @@ describe("write{Target}Bundle", () => {
 })
 ```
 
-**关键测试模式：**
+**Key Testing Patterns:**
 
-- 分别测试 normalization、deduplication、content transformation
-- 使用 inline plugin fixtures（不要使用 file-based fixtures）
-- writer tests 使用 temp directories，并验证文件存在
-- 测试 edge cases：empty names、empty bodies、special characters
-- 测试 error handling：missing files、permission issues
-
----
-
-## 文档要求
-
-**文件：`docs/specs/{target}.md`**
-
-记录 target format specification：
-
-- 最后验证日期（链接到官方 docs）
-- Config file locations（config file 位置：project-level vs. user-level）
-- Agent/command/skill format 及 field descriptions
-- MCP configuration structure（MCP config 结构）
-- Character limits（如有）
-- Example file（示例文件）
-
-**文件：`README.md`**
-
-添加到 supported targets list，并包含 usage examples。
+- Test normalization, deduplication, content transformation separately
+- Use inline plugin fixtures (not file-based)
+- For writer tests, use temp directories and verify file existence
+- Test edge cases: empty names, empty bodies, special characters
+- Test error handling: missing files, permission issues
 
 ---
 
-## 常见陷阱与解决方案
+## Documentation Requirements
 
-| 陷阱 | 解决方案 |
+**File: `docs/specs/{target}.md`**
+
+Document the target format specification:
+
+- Last verified date (link to official docs)
+- Config file locations (project-level vs. user-level)
+- Agent/command/skill format with field descriptions
+- MCP configuration structure
+- Character limits (if any)
+- Example file
+
+**File: `README.md`**
+
+Add to supported targets list and include usage examples.
+
+---
+
+## Common Pitfalls and Solutions
+
+| Pitfall | Solution |
 |---------|----------|
-| **Double-nesting** (`.copilot/.copilot/`) | 嵌套前检查 `path.basename(outputRoot)` |
-| **Name normalization 不一致** | 全程使用单一 `normalizeName()` function |
-| **Content transformation 脆弱** | 用 edge cases（file paths、URLs）测试 regex patterns |
-| **Heuristic section extraction 失败** | 改用 structural mapping（description → Overview、body → Procedure） |
-| **MCP config 覆盖用户 edits** | 覆盖前始终使用 timestamp 备份 |
-| **Skill body 未加载** | 确认 `ClaudeSkill` 有用于读取文件的 `skillPath` field |
-| **缺少 deduplication** | conversion 前构建 `usedNames` set，并传给每个 converter |
-| **Unsupported features 导致静默丢失** | 始终 warn to stderr（hooks、incompatible MCP types 等） |
-| **Test isolation failure** | 每个 test 使用唯一 temp directory，结束后清理 |
-| **Flattening 后 command namespace collision** | 使用带 deduplication 的 `uniqueName()`，并测试多重 collisions |
+| **Double-nesting** (`.target/.target/`) | Check `path.basename(outputRoot)` before nesting |
+| **Inconsistent name normalization** | Use single `normalizeName()` function everywhere |
+| **Fragile content transformation** | Test regex patterns against edge cases (file paths, URLs) |
+| **Heuristic section extraction fails** | Use structural mapping (description → Overview, body → Procedure) instead |
+| **MCP config overwrites user edits** | Always backup with timestamp before overwriting |
+| **Skill body not loaded** | Verify `ClaudeSkill` has `skillPath` field for file reading |
+| **Missing deduplication** | Build `usedNames` set before conversion, pass to each converter |
+| **Unsupported features cause silent loss** | Always warn to stderr (hooks, incompatible MCP types, etc.) |
+| **Test isolation failures** | Use unique temp directories per test, clean up afterward |
+| **Command namespace collisions after flattening** | Use `uniqueName()` with deduplication, test multiple collisions |
 
 ---
 
-## 添加新 Target 的 Checklist
+## Checklist for Adding a New Target
 
-添加新的 target provider 时使用此 checklist：
+Use this checklist when adding a new target provider:
 
-### 实现
-- [ ] 创建包含 bundle 和 component types 的 `src/types/{target}.ts`
-- [ ] 实现包含 converter 和 content transformer 的 `src/converters/claude-to-{target}.ts`
-- [ ] 实现包含 writer 的 `src/targets/{target}.ts`
-- [ ] 在 `src/targets/index.ts` 注册 target
-- [ ] 更新 `src/commands/convert.ts`（添加 output root resolution，更新 help text）
-- [ ] 更新 `src/commands/install.ts`（与 convert.ts 相同）
-- [ ] （可选）实现 `src/sync/{target}.ts` 并更新 `src/commands/sync.ts`
+### Implementation
+- [ ] Create `src/types/{target}.ts` with bundle and component types
+- [ ] Implement `src/converters/claude-to-{target}.ts` with converter and content transformer
+- [ ] Implement `src/targets/{target}.ts` with writer
+- [ ] Register target in `src/targets/index.ts`
+- [ ] Update `src/commands/convert.ts` (add output root resolution, update help text)
+- [ ] Update `src/commands/install.ts` (same as convert.ts)
+- [ ] (Optional/historical) Add a separate sync command only if the target truly needs personal-skill synchronization outside conversion
 
-### 测试
-- [ ] 创建带 converter tests 的 `tests/{target}-converter.test.ts`
-- [ ] 创建带 writer tests 的 `tests/{target}-writer.test.ts`
-- [ ] （可选）创建带 sync tests 的 `tests/sync-{target}.test.ts`
-- [ ] 运行完整 test suite：`bun test`
-- [ ] 手工测试：`bun run src/index.ts convert --to {target} ./plugins/compound-engineering`
+### Testing
+- [ ] Create `tests/{target}-converter.test.ts` with converter tests
+- [ ] Create `tests/{target}-writer.test.ts` with writer tests
+- [ ] (Optional) Create `tests/sync-{target}.test.ts` with sync tests
+- [ ] Run full test suite: `bun test`
+- [ ] Manual test: `bun run src/index.ts convert --to {target} .`
 
-### 文档
-- [ ] 创建带 format specification 的 `docs/specs/{target}.md`
-- [ ] 更新 `README.md`，在列表和 usage examples 中加入 target
-- [ ] 不要手工添加 release notes；release automation 拥有 GitHub release notes 和 release-owned versions
+### Documentation
+- [ ] Create `docs/specs/{target}.md` with format specification
+- [ ] Update `README.md` with target in list and usage examples
+- [ ] Do not hand-add release notes; release automation owns GitHub release notes and release-owned versions
 
-### Version bumping（版本 bump）
-- [ ] 使用 conventional `feat:` 或 `fix:` title，让 release automation 能推断正确 bump
-- [ ] 不要手动启动或手动 bump `package.json` 或 plugin manifests 中 release-owned version lines
-- [ ] 如果 component counts 或 descriptions 变化，运行 `bun run release:validate`
-
----
-
-## 参考资料
-
-### 实现示例
-
-**按优先级排列的 reference implementations（从易到难）：**
-
-1. **Droid** (`src/targets/droid.ts`, `src/converters/claude-to-droid.ts`)：最简单的 pattern，适合作为学习 baseline
-2. **Copilot** (`src/targets/copilot.ts`, `src/converters/claude-to-copilot.ts`)：MCP prefixing（MCP 前缀处理）、double-nesting guard（双层嵌套防护）
-3. **Windsurf** (`src/targets/windsurf.ts`, `src/converters/claude-to-windsurf.ts`)：Rules-based conversion（基于 rules 的转换）
-4. **OpenCode** (`src/converters/claude-to-opencode.ts`)：最全面，处理 command structure 和 config merging
-
-### 关键工具
-
-- `src/utils/frontmatter.ts` — `formatFrontmatter()` 和 `parseFrontmatter()`
-- `src/utils/files.ts` — `writeText()`, `writeJson()`, `copyDir()`, `backupFile()`, `ensureDir()`
-- `src/utils/resolve-home.ts` — 用于 `~/.{target}` path resolution 的 `expandHome()`
-
-### 现有测试
-
-- `tests/copilot-writer.test.ts` — 使用 temp directories 的 writer tests
-- `tests/sync-copilot.test.ts` — 带 symlinks 和 config merge 的 sync pattern
+### Version Bumping
+- [ ] Use a conventional `feat:` or `fix:` title so release automation can infer the right bump
+- [ ] Do not hand-start or hand-bump release-owned version lines in `package.json` or plugin manifests
+- [ ] Run `bun run release:validate` if component counts or descriptions changed
 
 ---
 
-## 相关文件
+## References
 
-- `.claude-plugin/plugin.json` — version 和 component counts
-- `CHANGELOG.md` — 指向 canonical GitHub release history
-- `README.md` — 所有 targets 的 usage examples
-- `docs/solutions/plugin-versioning-requirements.md` — release checklist
+### Implementation Examples
+
+**Reference implementations by priority (easiest to hardest):**
+
+1. **OpenCode** (`src/targets/opencode.ts`, `src/converters/claude-to-opencode.ts`) — Most comprehensive, handles command structure and config merging
+2. **Codex** (`src/targets/codex.ts`, `src/converters/claude-to-codex.ts`) — Native-plugin-compatible default plus legacy include-skills path
+3. **Pi** (`src/targets/pi.ts`, `src/converters/claude-to-pi.ts`) — Plugin metadata and Pi extension output
+4. **Antigravity** (`src/targets/antigravity.ts`, `src/converters/claude-to-antigravity.ts`) — Antigravity plugin output
+
+### Key Utilities
+
+- `src/utils/frontmatter.ts` — `formatFrontmatter()` and `parseFrontmatter()`
+- `src/utils/files.ts` — `writeText()`, `writeJson()`, `writeJsonSecure()`, `copyDir()`, `backupFile()`, `ensureDir()`
+- `src/utils/model.ts` — shared Claude family alias map and `normalizeModelWithProvider()`; see `docs/solutions/integrations/cross-platform-model-field-normalization.md`
+- `src/utils/resolve-home.ts` — `expandHome()` for `~/.{target}` path resolution
+
+### Existing Tests
+
+- `tests/opencode-writer.test.ts` — Writer tests with temp directories and merge behavior
+- `tests/codex-writer.test.ts` — Codex writer layout and cleanup behavior
+- `tests/antigravity-writer.test.ts` — Antigravity writer output
+- `tests/antigravity-converter.test.ts` — Antigravity converter tests
+- `tests/kiro-writer.test.ts` — Compatibility writer coverage for a historical target
+
+---
+
+## Related Files
+
+- `.claude-plugin/plugin.json` — Version and component counts
+- `CHANGELOG.md` — Pointer to canonical GitHub release history
+- `README.md` — Usage examples for all targets
+- `docs/solutions/plugin-versioning-requirements.md` — Checklist for releases

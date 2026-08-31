@@ -54,6 +54,8 @@ Pruning JUDGMENT prescription is only safe if the skill realistically runs on fr
 
 The compression rule: replace the enumeration with the underlying principle and a single minimal contrast pair that makes the boundary unmistakable. Example from ce-ideate: a list of vague-phrase examples became "`browser sniff` is identifiable, `quick wins` is not — vagueness is about referent, not length." One pair carries the distinction; seven rows of table did not carry more. Also deduplicate: triplicated boilerplate becomes one full copy + pointers. This matches the broader principle: prefer principles + a named test over enumerated specifics — specifics drift. (auto memory [claude])
 
+The retained pair is not decoration, and the floor in step 2 is not only about model size. A frontier model can read literally enough to stop instantiating a principle once its concrete instance is gone, so where the enumeration existed because a real failure was observed, keep one instance subordinated under the principle and prove the compression by running the most literal host in the skill's shipping matrix — not by asserting the floor in review notes (`subordinate-the-failing-shape-to-the-condition.md`).
+
 ### 4. Tier: define cost tiers semantically, once, and reference by name
 
 Define three tiers in one place in SKILL.md; everywhere else refers to the tier name, never a model name:
@@ -73,7 +75,7 @@ Rules that travel with the tiers:
 Two independent levers:
 
 - **Reference extraction pays only for CONDITIONAL or LATE-SEQUENCE content.** Early unconditional content gains nothing — it would be read at start and carried anyway, plus a read round-trip. The test: *how many turns of other work happen before this content executes, and might it never execute?* ce-ideate's Phase 2 (~100 lines, ~22% of the file, runs after 5-8 turns of grounding) qualified; Phase 0 gating did not.
-- **Data flows usually dominate prose.** Measure both: 5 scouts × 150-line dossiers ≈ 10k tokens carried every subsequent turn if returned inline — more than the entire SKILL.md (~6k). Fix: subagents write outputs to scratch files (`/tmp/compound-engineering/<skill>/<run-id>/...`), return a 3-5-line gist; downstream agents receive paths and read the files themselves. This extends the established path-passing pattern (`skill-design/pass-paths-not-content-to-subagents.md`) with the gist refinement: the orchestrator keeps just enough orientation to route, never the bulk.
+- **Data flows usually dominate prose.** Measure both: 5 scouts × 150-line dossiers ≈ 10k tokens carried every subsequent turn if returned inline — more than the entire SKILL.md (~6k). Fix: subagents write outputs to scratch files (`/tmp/compound-engineering-<effective-uid>/<skill>/<run-id>/...`, `$TMPDIR` fallback per AGENTS.md Scratch Space), return a 3-5-line gist; downstream agents receive paths and read the files themselves. This extends the established path-passing pattern (`skill-design/pass-paths-not-content-to-subagents.md`) with the gist refinement: the orchestrator keeps just enough orientation to route, never the bulk.
 
 ### 6. Load-stub design: make extracted references information-asymmetric
 
@@ -165,7 +167,7 @@ in your final message.
 After:
 
 ```
-Write your dossier to /tmp/compound-engineering/<skill>/<run-id>/evidence-<axis-slug>.md.
+Write your dossier to /tmp/compound-engineering-<effective-uid>/<skill>/<run-id>/evidence-<axis-slug>.md.
 Return only a 3-5 line gist plus the file path. Downstream agents read
 the file themselves; the orchestrator never does.
 ```

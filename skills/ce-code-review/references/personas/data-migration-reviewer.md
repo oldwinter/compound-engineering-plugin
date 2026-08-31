@@ -51,7 +51,7 @@ bin/rails db:migrate
 - **Swapped or inverted ID/enum mappings** — code 中 `1 => TypeA, 2 => TypeB`，但 production 实际相反。逐个验证每个 CASE/IF branch 和 constant hash entry。
 - **Irreversible migrations without rollback plan** — column drops、precision-losing type changes、data deletes。Destructive `down` 缺失或不可恢复时，需要 explicit acknowledgment。
 - **Missing backfill for new non-nullable columns** — `NOT NULL` 没有 default 或 backfill，会在 existing rows 上失败。
-- **Deploy-window breaks** — 在所有 code paths 停止读取前 rename/drop；constraints 违反 existing rows。
+- **Deploy-window breaks** — 在所有 code paths 停止读取前 rename/drop；constraints 违反 existing rows。修复时使用 expand/contract（parallel change）模式：先 additive expand，再迁移 readers 和 writers，只有在没有任何代码继续读取旧 shape 后才 contract。
 - **Orphaned references** — drop/rename 后，搜索 serializers、jobs、admin、rake tasks、`includes`/`joins` 中的 stale columns 或 associations。
 - **Broken dual-write** — transition period 要求 old 和 new columns 都 populated；否则 rollback 会看到 NULLs。
 - **Missing transaction boundaries** — multi-table backfills 缺少 appropriate transaction scope。

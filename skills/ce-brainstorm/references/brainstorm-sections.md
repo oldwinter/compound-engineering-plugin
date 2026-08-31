@@ -40,11 +40,18 @@ A requirements-only unified plan is kept **light and standalone-readable**. It
 includes:
 
 - `## Goal Capsule` with objective, product authority, and open blockers. The
-  objective is always the outcome — what is true for users or operators
+  objective is the goal a reader who has not read the rest of the plan can
+  hold. Remaining-true constraints live on their owning R-IDs, not as extra
+  objective clauses — user-checkable is not a license to pack them onto the
+  objective. The objective is always the outcome — what is true for users or operators
   afterwards, phrased so it would still read as the goal under a different
-  implementation. When the seed supplies an approach ("move X to Y"), that is
+  implementation. It sits outside the component being changed: if a reader
+  who does not know that component's internals could not tell whether the
+  objective was met, it is stated at the component's altitude and the real
+  objective is whatever depended on it. When the seed supplies an approach ("move X to Y"), that is
   the **Means** (its own line) and the objective is the outcome it serves,
-  surfaced in the dialogue rather than assumed. When the coherent-work gate split a broader request, the objective
+  surfaced from the dialogue or the project's stated problem rather than
+  assumed. When the coherent-work gate split a broader request, the objective
   names the current area and product authority says the surrounding areas are
   not active scope.
 - `## Product Contract` containing the brainstorm sections below.
@@ -63,19 +70,13 @@ inputs. Do not migrate or rewrite them when creating new artifacts.
 
 ## Decide whether a doc is warranted at all
 
-Brainstorm dialogue does not always need to produce a durable document.
-Skip document creation when **both** hold:
-
-- The user only needs brief alignment — no exploration produced novel scope,
-  framing, or decisions worth preserving in IDed shape.
-- Any durable decisions made during the dialogue can flow naturally to
-  downstream artifacts (`ce-plan`, the commit message, `<root>/solutions/`)
-  without a brainstorm doc as an intermediary.
-
-The trigger for creating a doc is when the dialogue surfaced enough
-structural decisions, scope boundaries, or acceptance criteria that
-downstream consumers (planner, reviewer, future reader) need them in a
-durable, IDed form — not just as conversational artifacts.
+A brainstorm ends in chat unless a file is earned. A file is earned when the
+dialogue surfaced structural decisions, scope boundaries, or acceptance
+criteria that downstream consumers (planner, reviewer, future reader) need in
+IDed form, or when the user asks for one. Decisions that flow naturally to
+downstream artifacts (`ce-plan`'s prompt, the commit message,
+`<root>/solutions/`) do not earn a file; `phase-0.md` 0.3 states the
+Lightweight case.
 
 **Stress test:** a brainstorm about a tiny bug fix where the user asks "fix
 this with a null check or with upstream validation?" and the agent confirms
@@ -163,10 +164,12 @@ the Phase 4 handoff:
    or `data-ce-section="work-relationships"` on its wrapping `<section>` in HTML.
 2. **Consistent** — Goal Capsule, Requirements, Key Flows, Acceptance Examples,
    Scope Boundaries, and the `work-relationships` section do not contradict one
-   another. Could a reader find a contradiction in each section in one pass? A
-   sentence with more than one parenthetical or a requirement that specifies two
-   outcomes, or a rule stated in full in more than one section, fails this check
-   — split it, defer the fork, or replace the duplicate with its owning ID.
+   another. Could a reader find a contradiction in each section in one pass?
+   Could a colleague who was not in the session say what this work is after the
+   Objective alone? A sentence with more than one parenthetical or a requirement
+   that specifies two outcomes, or a rule stated in full in more than one section,
+   fails this check — split it, defer the fork, or replace the duplicate with
+   its owning ID.
 3. **Focused** — the Product Contract owns one coherent work unit. Surrounding
    work appears only as context, deferred work, or an explicit non-goal; it does
    not leak into active Requirements, Flows, or Acceptance Examples.

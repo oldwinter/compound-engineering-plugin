@@ -3,7 +3,9 @@ title: Codex Conversion Skills、Prompts 与 Canonical Entry Points
 category: architecture
 tags: [codex, converter, skills, prompts, workflows, deprecation]
 created: 2026-03-15
-last_refreshed: 2026-06-20
+date: 2026-03-15
+last_refreshed: 2026-08-23
+module: converter-cli
 severity: medium
 component: codex-target
 problem_type: convention

@@ -2,6 +2,12 @@
 
 `CONCEPTS.md` 定义在此 codebase 中具有特定含义的词汇，是 `<root>/solutions/` 和 AGENTS.md 无需重新定义即可引用的 substrate。文件位于 repo root。Terms 通过两种方式进入：accretion 和 seeding（见下文）；任一路径首次产生 qualifying entry 时创建该文件。
 
+## Supported mutations（支持的变更）
+
+一次 run 可以 **add** 一个 entry、**refine** 一个 entry、将一个 entry **fold** 到已承载其含义的 entry 中、将一个 entry **retire** 到 `## Retired`、**delete** 一个 entry，或清理它触及的 entry 中的 violations。某次 run 可以执行哪些子集，由该 run 的定义说明，不在其他位置重复列出。
+
+**Update-only** 描述的是某次 run 不提供什么，而不是授予什么：它不允许 creation 或 seeding，也不会扩大该 run 自身定义允许的子集。
+
 ## Terms 如何进入：accretion 和 seeding
 
 两条路径会填充此文件，并覆盖不同 gaps：
@@ -20,7 +26,7 @@
 
 ## Be opinionated（明确取舍）
 
-当团队用多个词表示同一概念时，选择最佳词并 retire 其余词。将 retired synonyms 作为 aliases 记录在 entry 上（见 "Per entry"）。Settled distinctions 放到末尾的 Flagged ambiguities。Glossary 不是团队曾经用过的所有词的记录，而是团队 agreed-upon vocabulary。
+当团队用多个词表示同一概念时，选择最佳词并 drop 其余词。drop 一个 synonym 不等于 retirement：surviving entry 仍承载该含义，因此将该词作为 aliases line 写在 surviving entry 上（见 “Per entry”），不要放入 `## Retired`；后者只用于项目已不再拥有的 concept。Settled distinctions 放到末尾的 Flagged ambiguities。Glossary 不是团队曾经用过的所有词的记录，而是团队 agreed-upon vocabulary。
 
 ## The file stands on its own（文件应能独立成立）
 
@@ -34,15 +40,25 @@
 
 `CONCEPTS.md` 内 entries 之间的 cross-references 可以使用，因为它们能 internally resolve。General programming vocabulary（caches、queues、jobs、sessions）和 everyday domain English 也不需要重新定义。但如果某个 entry 依赖另一个 *project-specific* term 才能讲通，那个 term 也必须在这里定义；未定义的 project-specific sibling 本身就是候选新增项。
 
-## What earns a slot（什么值得占一个条目）
+## What earns a slot — and what keeps one（什么值得保留条目）
 
-当某个 term 在这里的含义足够精确，以至于 new engineer 需要定义才能理解 conversations、tickets 或 code，它就 qualifies。General programming vocabulary 不属于这里，即使用得很多也一样。
+一个 term 同时满足两个条件才 qualifies：它在此处的含义足够精确，以至于 new engineer 需要定义才能理解 conversations、tickets 或 code；并且它本身是一个 concept，而不是已有条目的 property。General programming vocabulary 不属于这里，即使用得很多也一样。
+
+这两个条件同时适用于接纳工作暴露的 term，以及判断已有 entry 是否保留 heading。
+
+失去 heading 的 entry 仍必须为后来在旧 ticket、learning 或 commit 中遇到该 term 的读者提供解析。判断哪个 surviving entry 能承载它，通常是那个它一直作为 property 的邻近 concept，或取代它的 concept；将含义 **fold** 到那里，重定向 cross-references，并在该 entry 上标明旧 term，让读者能看出它是指向该 entry 还是已被其取代。如果没有 entry 能承载它，而读者仍会在项目自己的材料中遇到该 term，就将它 **retire** 到末尾的 `## Retired`；否则删除它，因为 version history 才是 archive。
+
+只有正面的 contrary evidence 才能支持移除 entry，不确定时保留它。说明该 concept 去了哪里：由什么取代、吸收或移除。找不到它不等于它已经消失：被删除的 class、path 或 symbol 从来不是这种证据（entry 的设计目的就是长于实现它的 code），缺少 corroboration 也不是。
+
+## The coherence neighborhood（连贯性邻域）
+
+entry 的 neighborhood 是它所在 cluster 的 siblings，加上它 cross-reference 或引用它的 terms。它限定 capture-time pass：只处理已经掌握的 evidence，从不 audit 整个文件；任何需要本次 run 未进行的调查才能判断的内容，标记给 `ce-compound-refresh`。
 
 ## Per entry（单个条目）
 
 Definition 是一句话：该 term 在此 domain 中是什么意思，是什么让它不同于相邻概念。带有 non-obvious behavioral rules（lifecycle、cancellation semantics、ownership invariants）的 term 可以有第二段说明这些 rules，但绝不用于展开 definition 本身。
 
-当存在 retired synonyms 时，在 definition 正下方用 aliases line 列出：*Avoid: Booking, appointment*。Entities 通常比 value types 需要更多深度；status concepts 可能需要 transition notes。
+当存在 dropped synonyms 时，在 definition 正下方用 aliases line 列出：*Avoid: Booking, appointment*。Entities 通常比 value types 需要更多深度；status concepts 可能需要 transition notes。
 
 ## Relationships（可选）
 
@@ -55,6 +71,10 @@ Definition 是一句话：该 term 在此 domain 中是什么意思，是什么�
 ## Flagged ambiguities（文件末尾的歧义记录）
 
 当两个 terms 曾被 interchangeable 使用，而团队已确定 distinction 时，用 one-line note 记录 resolution：*"'account' had been used for both Customer and User — these are distinct."* 此 section 是团队已形成 opinions 的 audit trail。
+
+## Retired（文件末尾；仅在有条目时存在）
+
+每个项目已不再拥有且没有替代者的 concept 占一行：说明该 term 的含义，以及移除它的原因。让在旧 ticket 中遇到它的人能理解当时读到的内容，以及它为什么不再是当前 concept；不要直接搬运原始 entry。
 
 ## 一个 illustrative entry：展示 shape，不是 template
 

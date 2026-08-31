@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync, type Dirent } from "fs"
+import { existsSync, readdirSync, readFileSync, statSync, type Dirent } from "fs"
 import path from "path"
 import { describe, expect, test } from "bun:test"
 import { parseFrontmatter } from "../src/utils/frontmatter"
@@ -102,12 +102,16 @@ const ROOT_README = readFileSync(path.join(process.cwd(), "README.md"), "utf8")
  *    several skills in this plugin are large by design, and gating guidance
  *    would tax every deliberately-large skill with exemption-list ceremony.
  *    The "8KB Codex body cap" that circulates in ecosystem lint tooling is
- *    not a universal body cap: on the legacy (schema-less) path Codex reads
- *    full SKILL.md bodies from disk on demand and only budgets the injected
- *    skills metadata LIST (see tests/real-plugin-conversion.test.ts). It IS a
- *    real 8000-byte body truncation on the Agent Plugins path (Codex >= 0.147),
- *    which is why tests/codex-skill-prompt-budget.test.ts ratchets every skill
- *    under it as a standing goal — that test owns the size gate, not this one.
+ *    not a universal body cap, and it is not from the Agent Plugins spec,
+ *    which imposes no size limit of any kind. On the legacy (schema-less)
+ *    path Codex reads full SKILL.md bodies from disk on demand and only
+ *    budgets the injected skills metadata LIST (see
+ *    tests/real-plugin-conversion.test.ts). It IS a real 8000-byte body
+ *    truncation on the Agent Plugins path (Codex >= 0.147), which is why
+ *    tests/codex-skill-prompt-budget.test.ts ratchets every skill under it as
+ *    a standing goal -- that test owns the size gate, not this one, and its
+ *    header carries the full provenance including Claude Code's separate
+ *    5,000-token auto-compaction bound.
  *
  * 4. PLATFORM-VARIABLE FALLBACK (AGENTS.md "Platform-Specific Variables in
  *    Skills"): skill markdown using harness variables (${CLAUDE_*},
@@ -238,6 +242,7 @@ function listSkillDirs(): SkillDir[] {
   for (const entry of skillEntries) {
     if (!entry.isDirectory()) continue
     const absPath = path.join(SKILLS_ROOT, entry.name)
+    if (!existsSync(path.join(absPath, "SKILL.md"))) continue
     out.push({ relPath: path.relative(REPO_ROOT, absPath), absPath })
   }
   return out
@@ -693,6 +698,71 @@ describe("portable skill capability wording", () => {
     expect(
       offenders,
       "Skills should describe blocking-question and subagent capabilities without adding oh-my-pi-specific tool names.",
+    ).toEqual([])
+  })
+
+  // Issue #1522: Grok's native ask_user_question is already in the tool list,
+  // but a closed Claude/Codex/Antigravity/Pi catalog plus
+  // `ToolSearch select:AskUserQuestion` made agents test-fire user-facing
+  // question cards to "prove" the tool exists. Pin the defect signatures,
+  // not a fifth host name.
+  test("blocking-question instructions do not discover the tool by a closed host catalog or by executing a user-facing call", () => {
+    const closedCatalog =
+      /AskUserQuestion[\s\S]{0,280}request_user_input[\s\S]{0,200}ask_question[\s\S]{0,160}`ask_user`/
+    const claudeSelect = /select:AskUserQuestion/
+    // Bulk catalog→capability replacements that drop a parenthesized name
+    // leave `()` as a mid-sentence call fragment (`() with two options`,
+    // `(), fall back`). Pin the leftover, not a host name.
+    const leftoverEmptyCall = /tool name\.\s*\(\)|\(\)\s*(?:with two options|, fall back)/
+    const offenders: string[] = []
+    for (const skill of skillDirs) {
+      for (const filePath of listMarkdownFiles(skill.absPath)) {
+        const fileRel = path.relative(REPO_ROOT, filePath)
+        const content = readFileSync(filePath, "utf8")
+        if (claudeSelect.test(content)) {
+          offenders.push(
+            `${fileRel}: ToolSearch select:AskUserQuestion used as portable discovery`,
+          )
+        }
+        if (closedCatalog.test(content)) {
+          offenders.push(
+            `${fileRel}: closed AskUserQuestion/request_user_input/ask_question/ask_user catalog`,
+          )
+        }
+        if (leftoverEmptyCall.test(content)) {
+          offenders.push(
+            `${fileRel}: leftover empty () after catalog-name replacement`,
+          )
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      "Ask via the host's blocking question tool already in the current tool list. Do not name a closed per-host catalog, and do not use Claude's ToolSearch select:AskUserQuestion as the discovery path (issue #1522).",
+    ).toEqual([])
+  })
+
+  test("adapter copies that fall back from a blocking question tool treat the current list as proof and forbid user-facing probes", () => {
+    const useAndFallback =
+      /blocking[- ]question[\s\S]{0,1200}Fall back to (?:a )?numbered|Fall back to (?:a )?numbered[\s\S]{0,1200}blocking[- ]question/i
+    const proof =
+      /already in the (?:current )?tool list|presence in the (?:current )?tool list is proof|never call a user-facing question tool to discover/i
+    const offenders: string[] = []
+    for (const skill of skillDirs) {
+      for (const filePath of listMarkdownFiles(skill.absPath)) {
+        const fileRel = path.relative(REPO_ROOT, filePath)
+        const content = readFileSync(filePath, "utf8")
+        if (!useAndFallback.test(content)) continue
+        if (!proof.test(content)) {
+          offenders.push(fileRel)
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      "A blocking-question adapter must say the current tool list is proof and must forbid test-firing a user-facing question tool (issue #1522).",
     ).toEqual([])
   })
 })

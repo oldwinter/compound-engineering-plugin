@@ -2,7 +2,7 @@
 
 ### Phase 3: Capture the Requirements-Only Unified Plan
 
-Write or update a requirements-only unified plan only when the conversation produced durable decisions worth preserving — see `references/brainstorm-sections.md` "Decide whether a doc is warranted at all" for the criteria and the bug-fix stress test. Skip document creation when the user only needs brief alignment and the decisions can flow downstream (ce-plan, commit message, <root>/solutions/) without a brainstorm artifact in the middle.
+Write or update a requirements-only unified plan only when a file was earned — see `references/brainstorm-sections.md` "Decide whether a doc is warranted at all" for the condition and the bug-fix stress test. Otherwise the chat paragraph from Phase 2.5 is the result and the decisions flow downstream (ce-plan's prompt, commit message, <root>/solutions/) without a brainstorm artifact in the middle.
 
 When a doc is warranted, compose it using:
 
@@ -23,7 +23,7 @@ Session-settled decisions land in the Product Contract's Key Decisions section c
 
 Run this **after** the approaches, the scope synthesis, and the requirements-only unified plan — that is where the canonical term often gets chosen or corrected, so capturing during early dialogue (before this point) would miss the final resolved name. If it exists, scan the full dialogue and the Product Contract for **resolved** domain terms — terms where the conversation actively pinned down a precise local meaning, not terms merely mentioned in passing. **Resolved means the definition is settled, not still under discussion.** Provisional terms that may still revise stay in the conversation only.
 
-For each resolved term: if missing, add it; if present but new precision surfaced, refine it; if already consistent, no action.
+For each resolved term: if missing, add it; if present but new precision surfaced, refine it; if already consistent, no action. A term whose whole meaning an existing entry already carries is a refinement of that entry, not a new heading. Folding an existing entry is owned by ce-compound and ce-compound-refresh; retiring or deleting one is ce-compound-refresh's alone.
 
 **Domain entities, named processes, and status concepts with project-specific meaning only.** Not file paths, class names, function signatures, or implementation decisions — `CONCEPTS.md` is a glossary, not a spec or catch-all.
 

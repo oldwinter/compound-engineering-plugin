@@ -1,48 +1,50 @@
 ---
-title: Plugin 版本与文档要求
+title: Plugin Versioning and Documentation Requirements
 category: workflow
 tags: [versioning, changelog, readme, plugin, documentation]
 created: 2025-11-24
 date: 2026-03-17
-last_updated: 2026-06-23
-severity: process
+last_updated: 2026-08-23
+module: plugin-development
+problem_type: convention
+severity: medium
 component: plugin-development
 ---
 
-# Plugin 版本与文档要求
+# Plugin Versioning and Documentation Requirements
 
-## 问题
+## Problem
 
-修改 compound-engineering plugin 时，文档可能与实际组件（agents、commands、skills）不同步。这会让每个版本包含哪些内容变得不清楚，也让长期追踪变更更困难。
+When making changes to the compound-engineering plugin, documentation can get out of sync with the actual components (agents, commands, skills). This leads to confusion about what's included in each version and makes it difficult to track changes over time.
 
-本文适用于 `compound-engineering` plugin 中由 release 拥有的 plugin metadata 和 changelog 表面，不适用于普通 feature work。
+This document applies to release-owned plugin metadata and changelog surfaces for the `compound-engineering` plugin, not ordinary feature work.
 
-更大的 repo-level release model 现在记录在：
+The broader repo-level release model now lives in:
 
 - `docs/solutions/workflow/manual-release-please-github-releases.md`
 
-该文档覆盖常驻 release PR、`cli`、`compound-engineering`、`coding-tutor` 和 `marketplace` 之间的组件 ownership，以及用于发布 release notes 的 GitHub Releases 模型。本文范围更窄：它是给修改 `plugins/compound-engineering/**` 的贡献者看的 plugin-scoped 提醒。
+That doc covers the standing release PR, component ownership across the root `compound-engineering` package and the marketplace packages, and the GitHub Releases model for published release notes. This document stays narrower: it is the plugin-scoped reminder for contributors changing the root plugin surface.
 
-## 解决方案
+## Solution
 
-**常规 PR 不应切 plugin releases。**
+**Routine PRs should not cut plugin releases.**
 
-内嵌 plugin versions 是 release-owned metadata。release automation 会在决定哪些已合并变更一起发布后，准备下一批 versions 和 changelog entries。由于多个 PR 可能在 release 前合并，贡献者不应在单个 PR 内猜测 release versions。
+Embedded plugin versions are release-owned metadata. Release automation prepares the next versions and changelog entries after deciding which merged changes ship together. Because multiple PRs may merge before release, contributors should not guess release versions inside individual PRs.
 
-贡献者应：
+Contributors should:
 
-1. **避免在常规 PR 中做 release bookkeeping**
-   - 不要手动 bump `.claude-plugin/plugin.json`
-   - 不要手动 bump `.claude-plugin/marketplace.json` 中的 `compound-engineering` 条目
-   - 不要在根目录 `CHANGELOG.md` 中切 release sections
+1. **Avoid release bookkeeping in normal PRs**
+   - Do not manually bump `package.json`, `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `.kimi-plugin/plugin.json`, `.grok-plugin/plugin.json`, `.devin-plugin/plugin.json`, root `plugin.json`, `.agy/plugin.json`, or `.omp-plugin/marketplace.json`
+   - Do not manually bump the `compound-engineering` entry in `.claude-plugin/marketplace.json`
+   - Do not cut release sections in the root `CHANGELOG.md`
 
-2. **保持实质性文档准确**
-   - 验证 component counts 与实际文件匹配
-   - 验证 agent/command/skill 表格准确
-   - 如果功能发生变化，更新 descriptions
-   - 当 plugin inventories 或 release-owned descriptions 可能发生变化时，运行 `bun run release:validate`
+2. **Keep substantive docs accurate**
+   - Verify component counts match actual files
+   - Verify agent/command/skill tables are accurate
+   - Update descriptions if functionality changed
+   - Run `bun run release:validate` when plugin inventories or release-owned descriptions may have changed
 
-## Plugin 变更检查清单
+## Checklist for Plugin Changes
 
 ```markdown
 Before committing changes to compound-engineering plugin:
@@ -56,36 +58,41 @@ Before committing changes to compound-engineering plugin:
 - [ ] `bun run release:validate` passes
 ```
 
-## 文件位置
+## File Locations
 
-- Plugin version 由 release 拥有：`.claude-plugin/plugin.json`
-- Marketplace entry 由 release 拥有：`.claude-plugin/marketplace.json`
-- Release notes 由 release 拥有：GitHub release PRs 和 GitHub Releases
-- Readme（README）：`README.md`
+- Plugin version is release-owned: `package.json`, `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `.kimi-plugin/plugin.json`, `.grok-plugin/plugin.json`, `.devin-plugin/plugin.json`, root `plugin.json`, `.agy/plugin.json`, and `.omp-plugin/marketplace.json`
+- Marketplace entry is release-owned: `.claude-plugin/marketplace.json` (Cursor marketplace is a separate component)
+- Release notes are release-owned: GitHub release PRs and GitHub Releases
+- Readme: `README.md`
 
-## 示例 Workflow
+## Example Workflow
 
-添加新 agent 时：
+When adding, removing, or renaming a skill:
 
-1. 在 `plugins/compound-engineering/agents/[category]/` 中创建 agent 文件
-2. 更新 `README.md`
-3. 将 plugin version 选择和 canonical release-note 生成留给 release automation
-4. 运行 `bun run release:validate`
+1. Create or remove the directory under `skills/`
+2. Update `README.md`
+3. Leave plugin version selection and canonical release-note generation to release automation
+4. Run `bun run release:validate`
 
-## 预防
+## Prevention
 
-本文档作为提醒。maintainers 或 agents 处理该 plugin 时应：
+This documentation serves as a reminder. When maintainers or agents work on this plugin, they should:
 
-1. 在提交变更前检查本文档
-2. 遵循上面的检查清单
-3. 不要在 feature PRs 中猜测 release versions
-4. 当问题涉及 batching、release PR 行为或 multi-component ownership，而不是 plugin-only bookkeeping 时，参考 repo-level release learning
+1. Check this doc before committing changes
+2. Follow the checklist above
+3. Do not guess release versions in feature PRs
+4. Refer to the repo-level release learning when the question is about batching, release PR behavior, or multi-component ownership rather than plugin-only bookkeeping
 
-## 相关文件
+## Related Files
 
 - `.claude-plugin/plugin.json`
 - `.cursor-plugin/plugin.json`
 - `.codex-plugin/plugin.json`
+- `.kimi-plugin/plugin.json`
+- `.grok-plugin/plugin.json`
+- `.devin-plugin/plugin.json`
+- `plugin.json`
+- `.omp-plugin/marketplace.json`
 - `.agy/plugin.json`
 - `README.md`
 - `package.json`

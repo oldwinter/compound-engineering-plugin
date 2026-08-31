@@ -4470,7 +4470,7 @@ print(json.dumps({"ids": [t["thread_id"] for t in threads], "calls": calls}))
     expect(result.calls[1]).toContain("cursor=page-2")
   })
 
-  test("watch: managed target freshness blocks ordinary CLEAN merge-ready", () => {
+  test("watch: managed target freshness defers to GitHub — stale on trunk drift with CLEAN is merge-ready, stale without CLEAN blocks", () => {
     const GREEN = { key: "CI/test", name: "test", status: "COMPLETED", conclusion: "SUCCESS", details_url: "u" }
     const managedStale = {
       ...FAILING,
@@ -4486,10 +4486,17 @@ print(json.dumps({"ids": [t["thread_id"] for t in threads], "calls": calls}))
         upstack_needs_rebase: [],
       },
     }
-    expect(wakeReason(snapshot(path.join(dir, "stack-stale"), fetchFile(dir, "stack-stale.json", managedStale)))).toBe("stack-blocked")
+    const clean = snapshot(path.join(dir, "stack-stale"), fetchFile(dir, "stack-stale.json", managedStale))
+    expect(clean.stack_blocker).toBeNull()
+    expect(wakeReason(clean)).toBe("merge-ready")
+
+    const notClean = { ...managedStale, merge_state_status: "BLOCKED" }
+    const blocked = snapshot(path.join(dir, "stack-stale-blocked"), fetchFile(dir, "stack-stale-blocked.json", notClean))
+    expect(blocked.stack_blocker).toBe("target-needs-rebase")
+    expect(wakeReason(blocked)).toBe("stack-blocked")
   }, 15000)
 
-  test("watch: unknown managed freshness blocks ready, while stale upstack alone still permits ready-as-next", () => {
+  test("watch: unknown managed freshness blocks ready only when GitHub is not CLEAN, while stale upstack alone still permits ready-as-next", () => {
     const GREEN = { key: "CI/test", name: "test", status: "COMPLETED", conclusion: "SUCCESS", details_url: "u" }
     const base = {
       ...FAILING,
@@ -4508,7 +4515,9 @@ print(json.dumps({"ids": [t["thread_id"] for t in threads], "calls": calls}))
         upstack_needs_rebase: [],
       },
     }
-    expect(wakeReason(snapshot(path.join(dir, "stack-unknown"), fetchFile(dir, "stack-unknown.json", unknown)))).toBe("stack-blocked")
+    expect(wakeReason(snapshot(path.join(dir, "stack-unknown"), fetchFile(dir, "stack-unknown.json", unknown)))).toBe("merge-ready")
+    const unknownNotClean = { ...unknown, merge_state_status: "BLOCKED" }
+    expect(wakeReason(snapshot(path.join(dir, "stack-unknown-blocked"), fetchFile(dir, "stack-unknown-blocked.json", unknownNotClean)))).toBe("stack-blocked")
 
     const readyAsNext = {
       ...base,
@@ -4834,6 +4843,9 @@ print(json.dumps({"ids": [t["thread_id"] for t in threads], "calls": calls}))
     expect(later.base_ref_blocker).toBeNull()
     expect(later.mergeability_certain).toBe(true)
     expect(wakeReason(later)).toBe("merge-ready")
+    // Presentation-only degrade must not reset the quiet clock (#1562).
+    expect(JSON.parse(readFileSync(statePath, "utf8")).last_change_at).toBe("2026-07-17T12:00:00+00:00")
+    expect(wakeReason(later, 300)).toBe("merge-ready")
 
     // A pending (unclassified) head forces uncertainty even through the stale-computation degrade.
     const pendingStale = snapshot(state, fetchFile(dir, "stale-race-pending.json", { ...race,
@@ -4858,6 +4870,36 @@ print(json.dumps({"ids": [t["thread_id"] for t in threads], "calls": calls}))
       head_sha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       base: { ...race.base, merge_parent_oids: ["1111111111111111111111111111111111111111", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"] } }))
     expect(moved.base_ref_blocker).toBe("race")
+  })
+
+  test("genuine base identity transitions still change the settle signature", () => {
+    const frozen = "2026-07-17T12:00:00+00:00"
+    const baseCore = {
+      host: "github.com", repository: "o/r", ref: "main",
+      oid: "2222222222222222222222222222222222222222",
+      graphql_oid: "2222222222222222222222222222222222222222",
+      historical_oid: "1111111111111111111111111111111111111111",
+      merge_parent_oids: ["2222222222222222222222222222222222222222", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+    }
+    const green = {
+      ...FAILING, merge_state_status: "CLEAN", review_decision: "APPROVED",
+      checks: [{ key: "CI/test", name: "test", status: "COMPLETED", conclusion: "SUCCESS", details_url: "u" }],
+      threads: [], head_sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      base: { ...baseCore, identity: "probe-error" },
+    }
+    const file = fetchFile(dir, "identity-steps.json", green)
+    snapshot(state, file)
+    const statePath = path.join(state, "state.json")
+    const identities = ["race", "mergeability-pending", "current"]
+    for (const identity of identities) {
+      const persisted = JSON.parse(readFileSync(statePath, "utf8"))
+      persisted.last_change_at = frozen
+      writeFileSync(statePath, JSON.stringify(persisted))
+      snapshot(state, fetchFile(dir, `identity-${identity}.json`, {
+        ...green, base: { ...baseCore, identity },
+      }))
+      expect(JSON.parse(readFileSync(statePath, "utf8")).last_change_at).not.toBe(frozen)
+    }
   })
 
   // Pipelined stack traversal: the watcher polls the active (upper) layer and keeps probing the

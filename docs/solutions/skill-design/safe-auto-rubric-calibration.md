@@ -31,6 +31,8 @@ Issue #686 假设 personas 将 findings *过少* 分类为 `safe_auto`，并提�
 
 已 shipped 的 change 主要是 determinism patch，而不是 safe_auto-rate increase。两个 methodological lessons 可泛化到这次 calibration 之外：**measure variance, not just classification-rate-shift**，以及 **synthetic-fixture eval harness 是 "ship and watch" 与 "stare at the diff" 之间的正确 tier**。两者在下方专门章节中记录。
 
+**Current product outcome (historical for this doc):** `ce-code-review` no longer emits `safe_auto`. Live `action-class-rubric.md` forbids it; the schema enum is `gated_auto|manual|advisory`; peer `safe_auto` remaps to `gated_auto`. The #686/#685 product conclusion (tighten the `safe_auto` boundary) is superseded. Keep this doc for the eval methodology, not as the current autofix-class policy.
+
 ---
 
 ## 背景

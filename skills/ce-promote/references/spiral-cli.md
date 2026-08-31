@@ -12,10 +12,7 @@ Spiral（`@every-env/spiral-cli`）会用用户的 brand voice 起草文案。`c
 
 ## Detection — three states（检测：三种状态）
 
-```bash
-which spiral
-spiral auth status --json 2>/dev/null
-```
+使用当前 tool list 中已有的、按 capability 匹配的 host blocking question tool。当前 tool list 中存在该 tool 就证明它可用；不要调用 user-facing question tool 来探测其是否存在。如果匹配的 tool 已列出但尚未加载，使用 host 的 tool-discovery primitive 加载该 capability，不要搜索其他 host 的 tool name。如果 tool list 中没有该 tool，或真实 question call 报错，就在 chat 中以 numbered list 展示相同 options 并等待回复；绝不静默跳过。
 
 - **Absent** — `which spiral` 找不到任何结果。→ Path 0（提供 install + connect）。
 - 否则解析 `spiral auth status --json`：
@@ -41,7 +38,7 @@ cat "$(git rev-parse --show-toplevel 2>/dev/null)/.compound-engineering/config.l
 
 ### Ask（询问）
 
-使用平台 blocking-question tool：Claude Code 中的 `AskUserQuestion`（如果 schema 未加载，先用 `ToolSearch` 和 `select:AskUserQuestion` 调用）、Codex 中的 `request_user_input`、Antigravity / Pi 中的 `ask_user`。如果没有 blocking tool 或调用报错，在聊天中以编号列表呈现相同选项并等待回复；绝不要静默跳过。
+使用当前 tool list 中已存在、按 capability 匹配的 host blocking-question tool，不要通过 host-specific name 发现它。如果匹配的 tool 已列出但尚未加载，使用该 host 的 tool-discovery primitive 加载 capability；不要搜索其他 host 的 tool name。如果没有 blocking tool 或调用报错，在聊天中以编号列表呈现相同选项并等待回复；绝不要静默跳过。
 
 对于 **unauthed** 状态，**agent 自己**运行 `spiral login --json`（CLI >= 1.8.0）：它是 non-blocking，且 API key 永远不会经过 agent；agent 分享返回的 `auth_url`，用户在浏览器中 approve，credential 由 server->CLI 交付。blocking question 主要是 escape hatch。
 

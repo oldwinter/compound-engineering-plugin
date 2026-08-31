@@ -14,7 +14,7 @@ SKILL.md 中的 scope step 会处理 discovery，并传入 resolved diff。除�
 
 ## Remote scope（`pr-remote` 和 `branch-remote`）
 
-当 review context 包含 `<pr-scope-mode>pr-remote</pr-scope-mode>` 或 `<pr-scope-mode>branch-remote</pr-scope-mode>` 时，working tree **不是**被 review 的 head。不要对 changed-file list 中的文件使用 Read/Grep 读取 workspace paths；它们可能与正在 review 的 branch 或 PR 不匹配。
+当 review context 包含 `<pr-scope-mode>pr-remote</pr-scope-mode>` 或 `<pr-scope-mode>branch-remote</pr-scope-mode>` 时，working tree **不是**被 review 的 head。不要对属于被 review tree 的任何文件使用 Read/Grep 读取 workspace paths，包括 changed-file list 以及 review 指向的其他文件（例如 criteria file）；它们可能与正在 review 的 branch 或 PR 不匹配。即使文件未改动也不例外：checkout 可能包含 reviewed head 从未拥有的版本。
 
 改为：
 

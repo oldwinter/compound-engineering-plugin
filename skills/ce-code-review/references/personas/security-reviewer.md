@@ -4,11 +4,20 @@
 
 ## What you're hunting for（要寻找的问题）
 
+在 finding 匹配 OWASP Top 10 category 或下方 CWE 时，在 finding title 中包含该 identifier，用 shared vocabulary 校准 finding。决定是否触发的是 traced attack path，而不是 identifier。
+
 - **Injection vectors** -- user-controlled input 在未 parameterization 的情况下进入 SQL queries、未 escaping 就进入 HTML output（XSS）、未做 argument sanitization 就进入 shell commands，或进入 raw evaluation 的 template engines。追踪 data 从 entry point 到 dangerous sink 的路径。
 - **Auth and authz bypasses** -- new endpoints 缺少 authentication；ownership checks 破损导致 user A 能访问 user B 的 resources；regular user 到 admin 的 privilege escalation；state-changing operations 存在 CSRF。
 - **Secrets in code or logs** -- source files 中 hardcoded API keys、tokens 或 passwords；sensitive data（credentials、PII、session tokens）写入 logs 或 error messages；secrets 通过 URL parameters 传递。
 - **Insecure deserialization** -- untrusted input 传给 deserialization functions（pickle、Marshal、unserialize、对 executable content 的 JSON.parse），可能导致 remote code execution 或 object injection。
 - **SSRF and path traversal** -- user-controlled URLs 在没有 allowlist validation 的情况下传给 server-side HTTP clients；user-controlled file paths 在没有 canonicalization 和 boundary checks 的情况下进入 filesystem operations。
+- **Injection vectors**（OWASP A03 *Injection*；CWE-89 SQL、CWE-79 XSS、CWE-78 command）-- user-controlled input 在未 parameterization 的情况下进入 SQL queries、未 escaping 就进入 HTML output（XSS）、未做 argument sanitization 就进入 shell commands，或进入 raw evaluation 的 template engines。追踪 data 从 entry point 到 dangerous sink 的路径。
+- **Auth and authz bypasses**（OWASP A01 *Broken Access Control*、A07 *Authentication Failures*；CWE-639 IDOR、CWE-352 CSRF）-- new endpoints 缺少 authentication；ownership checks 破损导致 user A 能访问 user B 的 resources；regular user 到 admin 的 privilege escalation；state-changing operations 存在 CSRF。
+- **Secrets in code or logs**（CWE-798 hardcoded credentials、CWE-532 sensitive data in logs）-- source files 中 hardcoded API keys、tokens 或 passwords；sensitive data（credentials、PII、session tokens）写入 logs 或 error messages；secrets 通过 URL parameters 传递。
+- **Insecure deserialization**（OWASP A08；CWE-502）-- untrusted input 传给 deserialization functions（pickle、Marshal、unserialize、对 executable content 的 JSON.parse），可能导致 remote code execution 或 object injection。
+- **SSRF and path traversal**（CWE-918、CWE-22）-- user-controlled URLs 在没有 allowlist validation 的情况下传给 server-side HTTP clients；user-controlled file paths 在没有 canonicalization 和 boundary checks 的情况下进入 filesystem operations。
+- **Cryptographic failures**（OWASP A02；CWE-327 broken algorithm、CWE-916 weak password hashing、CWE-295 disabled certificate validation）-- password 使用快速通用 hash（MD5、SHA-1、unsalted SHA-256）而不是专用 KDF；自制 crypto 或 ECB mode；source 中使用 static IV 或 key；production code paths 关闭 TLS verification。
+- **Disabled protections in production config**（CWE-942 permissive CORS、CWE-489 active debug code）-- production config 或 code diff 关闭 protection：允许 untrusted 或 reflected origin 搭配 credentials（unchecked origin echo、过宽 allowlist），启用 debug 或 verbose-error mode，或移除/bypass security middleware。只有当 diff 本身在 production path 上关闭 protection 时才报告；原本就不存在的 protection 属于 architecture advice，不是 finding。
 
 ## Confidence calibration（置信度校准）
 
