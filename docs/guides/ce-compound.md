@@ -188,11 +188,11 @@ Auto-invoke trigger phrases（"that worked"、"it's fixed"）只有在你刚好�
 
 **先询问**：agent 在 capture 前提问，让你有机会说“这次不用”：
 
-> 当一个已经解决并验证的问题产生 non-trivial、reusable learning 时，在 final handoff 前只提议一次调用 `ce-compound` skill。仅在接受把 `docs/solutions/` 作为 tracked knowledge store 的 repository 中执行。
+> 当一个已经解决并验证的问题产生 non-trivial、reusable learning 时，在工作单元完成的 completion checkpoint 只提议一次调用 `ce-compound` skill，让 learning 能随产生它的 PR 一起交付。最迟必须在 learning 仍可提交到该 PR 时完成，无论 PR 尚未创建、仍是 draft，还是已经打开并处于 review 中；应在 checkpoint 主动提议，而不是拖到最后期限。仅在把 captured learnings 视为 tracked、committed knowledge 的 repository 中执行。
 
 **自动运行**：不提问，因为自动化的目的就是不被打断：
 
-> 当一个已经解决并验证的问题产生 non-trivial、reusable learning 时，自动调用 `ce-compound` skill，并传入 `mode:non-interactive` argument。仅在接受把 `docs/solutions/` 作为 tracked knowledge store 的 repository 中执行。
+> 当一个已经解决并验证的问题产生 non-trivial、reusable learning 时，自动调用 `ce-compound` skill，并传入 `mode:non-interactive` argument。在工作单元完成的 completion checkpoint 触发，让 learning 随产生它的 PR 一起交付，而不是后来成为孤立文档。最迟必须在 learning 仍可提交到该 PR 时完成，无论 PR 尚未创建、仍是 draft，还是已经打开并处于 review 中；应在 checkpoint capture，而不是拖到最后期限。仅在把 captured learnings 视为 tracked、committed knowledge 的 repository 中执行。
 
 如果 standing workflow 明确接受较少 research 和 validation，以换取 single-pass、no-subagent closure，可改用 `mode:non-interactive depth:lightweight`。
 
@@ -201,9 +201,9 @@ Auto-run 会不经询问写入 `docs/solutions/`（也可能触及 `CONCEPTS.md`
 这些措辞中的其余部分也有明确作用：
 
 - 使用 **"invoke the `ce-compound` skill"**，而不是 "run `/ce-compound`"：instruction files 会被 Codex、Gemini、Cursor、Claude Code 等不同 agents 读取，slash-command form 并非都能由 agent 稳定调用；应引用 capability，而不是 keystroke。
-- 使用 **"before the final handoff"**，而不是 "at the end of the session"：agent 无法可靠判断 session 何时真正结束，但知道自己何时要交付 verified result。
-- 使用 **"non-trivial, reusable learning"**：门槛是值得日后重读的 generalizable insight，而不只是一次昂贵 incident。
-- 使用 **"repositories that accept `docs/solutions/`"**：真正的问题是 repo 是否欢迎 generated learning docs，而不是“我是否拥有它”。你参与的 fork 或开源项目常常不接受；有些不由你拥有的 repo 反而接受。
+- 使用 **"at the completion checkpoint"**，并把 deadline 定义为 commit-reachability，而不是某个 PR event：PR 可能很早就创建，所以把期限绑定到 PR 创建会在工作完成前就过期；learning 是否仍能提交到产生它的 PR 才适用于所有情况。
+- 使用 **"non-trivial, reusable learning"**：门槛是 reuse，而不是投入；一次昂贵但无法 generalize 的 incident 不符合条件。
+- 使用 **"treats captured learnings as tracked, committed knowledge"**，而不是命名某个目录：真正的问题是 repo 是否欢迎 generated learning docs；你参与的 fork 或开源项目常常不接受。固定路径也会过时，因为 `docs_root` 可以移动 knowledge store。
 
 ---
 
@@ -213,7 +213,7 @@ Auto-run 会不经询问写入 `docs/solutions/`（也可能触及 `CONCEPTS.md`
 docs/solutions/[category]/[filename].md
 ```
 
-Categories 会 auto-detect。Bug-track examples：`build-errors/`、`test-failures/`、`runtime-errors/`、`performance-issues/`、`database-issues/`、`security-issues/`、`ui-bugs/`、`integration-issues/`、`logic-errors/`。Knowledge-track examples：`architecture-patterns/`、`design-patterns/`、`tooling-decisions/`、`conventions/`、`workflow-issues/`、`developer-experience/`、`documentation-gaps/`、`best-practices/`。
+这是 default root；如果 `config.yaml` 设置了 `docs_root`，store 会跟随它，因此在移动了 CE artifacts 的项目中，路径是 `<docs_root>/solutions/...`。Categories 会 auto-detect。Bug-track examples：`build-errors/`、`test-failures/`、`runtime-errors/`、`performance-issues/`、`database-issues/`、`security-issues/`、`ui-bugs/`、`integration-issues/`、`logic-errors/`。Knowledge-track examples：`architecture-patterns/`、`design-patterns/`、`tooling-decisions/`、`conventions/`、`workflow-issues/`、`developer-experience/`、`documentation-gaps/`、`best-practices/`。
 
 Doc 带 YAML frontmatter（`module`、`tags`、`problem_type` 等）以便 search。Validation 通过 `scripts/validate-frontmatter.py` 运行，用于捕获 silent corruption（malformed `---` delimiters、scalar values 中未 quote 的 `:`）；`scripts/validate-doc-claims.py` 则对照 tree 检查 body 中的 cited paths、SHAs、links 和 drafting scaffold。
 
