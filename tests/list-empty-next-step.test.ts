@@ -30,8 +30,14 @@ describe("list empty next step", () => {
     expect(stdout).toContain("bun run list")
   })
 
-  test("this clone root still lists compound-engineering", async () => {
-    const { exitCode, stdout, stderr } = await runList(repoRoot)
+  test("a plugin root still lists the manifest name", async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "ce-list-root-"))
+    await fs.mkdir(path.join(cwd, ".claude-plugin"), { recursive: true })
+    await fs.writeFile(
+      path.join(cwd, ".claude-plugin", "plugin.json"),
+      '{\n  "name": "compound-engineering",\n  "version": "1.0.0"\n}\n',
+    )
+    const { exitCode, stdout, stderr } = await runList(cwd)
     if (exitCode !== 0) {
       throw new Error(`list failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
     }
