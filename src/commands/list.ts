@@ -32,6 +32,7 @@ export default defineCommand({
 
     if (plugins.length === 0) {
       console.log("No Claude plugins found.")
+      console.log("try: run `bun run list` from a plugin root that has `.claude-plugin/plugin.json`")
       return
     }
 
