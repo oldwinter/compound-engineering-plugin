@@ -27,7 +27,14 @@ It runs on 14 agent hosts, including Claude Code, Cursor, and Codex.
 /plugin install compound-engineering
 ```
 
-上游英文安装命令仍保留在下方的 `Install` 章节，但不应当作中文版安装入口。
+在 Codex CLI 中安装这个中文 fork：
+
+```bash
+codex plugin marketplace add oldwinter/compound-engineering-plugin
+codex plugin add compound-engineering@compound-engineering-plugin
+```
+
+下方 `Install` 章节里的 EveryInc 示例是上游英文版，不应当作中文版入口。用 Codex 时复制上面的 `oldwinter/compound-engineering-plugin` 命令，不要复制 `EveryInc/compound-engineering-plugin`。
 
 ## Install
 
