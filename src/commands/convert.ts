@@ -77,7 +77,7 @@ export default defineCommand({
 
     const permissions = String(args.permissions)
     if (!permissionModes.includes(permissions as PermissionMode)) {
-      throw new Error(`Unknown permissions mode: ${permissions}`)
+      throw new Error(`Unknown permissions mode: ${permissions}. Use one of: ${permissionModes.join(", ")}`)
     }
 
     const plugin = await loadClaudePlugin(String(args.source))
