@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test"
 import path from "path"
 
 const repoRoot = path.join(import.meta.dir, "..")
+const cli = path.join(repoRoot, "src", "index.ts")
 
 async function runCli(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  const proc = Bun.spawn(["bun", "run", path.join(repoRoot, "src", "index.ts"), ...args], {
+  // Invoke the file directly. `bun run … --help` is bun's own help on some CI
+  // bun builds, so it never reaches citty.
+  const proc = Bun.spawn(["bun", cli, ...args], {
     cwd: repoRoot,
     stdout: "pipe",
     stderr: "pipe",
@@ -17,8 +20,9 @@ async function runCli(args: string[]): Promise<{ exitCode: number; stdout: strin
 
 describe("permissions mode next step", () => {
   test("install --help advertises from-commands, not the singular typo", async () => {
-    const { stdout, stderr } = await runCli(["install", "--help"])
+    const { exitCode, stdout, stderr } = await runCli(["install", "--help"])
     const help = `${stdout}\n${stderr}`
+    expect(exitCode).toBe(0)
     expect(help).toContain("from-commands")
     expect(help).not.toMatch(/from-command(?!s)/)
   })
