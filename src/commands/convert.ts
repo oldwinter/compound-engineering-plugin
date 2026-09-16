@@ -2,7 +2,7 @@ import { defineCommand } from "citty"
 import os from "os"
 import path from "path"
 import { loadClaudePlugin } from "../parsers/claude"
-import { targets, validateScope } from "../targets"
+import { convertToFlagDescription, requireImplementedConvertTarget, targets, validateScope } from "../targets"
 import type { ClaudeToOpenCodeOptions, PermissionMode } from "../converters/claude-to-opencode"
 import { stripCodexAgentsToolMap } from "../utils/codex-agents"
 import { expandHome, resolveCodexHome, resolveTargetHome } from "../utils/resolve-home"
@@ -25,7 +25,7 @@ export default defineCommand({
     to: {
       type: "string",
       default: "opencode",
-      description: "Target format (opencode | codex | pi | antigravity | all)",
+      description: convertToFlagDescription(),
     },
     output: {
       type: "string",
@@ -78,6 +78,10 @@ export default defineCommand({
     const permissions = String(args.permissions)
     if (!permissionModes.includes(permissions as PermissionMode)) {
       throw new Error(`Unknown permissions mode: ${permissions}`)
+    }
+
+    if (targetName !== "all") {
+      requireImplementedConvertTarget(targetName)
     }
 
     const plugin = await loadClaudePlugin(String(args.source))
@@ -142,14 +146,7 @@ export default defineCommand({
       return
     }
 
-    const target = targets[targetName]
-    if (!target) {
-      throw new Error(`Unknown target: ${targetName}`)
-    }
-
-    if (!target.implemented) {
-      throw new Error(`Target ${targetName} is registered but not implemented yet.`)
-    }
+    const target = requireImplementedConvertTarget(targetName)
 
     const resolvedScope = validateScope(targetName, target, args.scope ? String(args.scope) : undefined)
 
