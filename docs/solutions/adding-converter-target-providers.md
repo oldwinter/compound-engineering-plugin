@@ -368,16 +368,13 @@ export const targets: Record<string, TargetHandler<any>> = {
 
 **File: `src/commands/convert.ts` and `src/commands/install.ts`**
 
-Add output root resolution:
+Add output root resolution. Do **not** hand-edit the `--to` help string — `convertToFlagDescription()` reads implemented keys from `src/targets/index.ts`. If the new module is cleanup/regression only, add it to `COMPATIBILITY_CONVERTERS` instead of `targets`.
 
 ```typescript
 // In resolveTargetOutputRoot()
 if (targetName === "{target}") {
   return path.join(outputRoot, ".{target}")
 }
-
-// Update --to flag description
-const toDescription = "Target format (opencode | codex | pi | antigravity | all)"
 ```
 
 ---

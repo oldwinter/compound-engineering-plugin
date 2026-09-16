@@ -74,3 +74,41 @@ export const targets: Record<string, TargetHandler> = {
     write: writeAntigravityBundle as TargetHandler["write"],
   },
 }
+
+/**
+ * Converter modules that are cleanup / regression only.
+ * Not user-facing `--to` convert targets; native plugin install stays preferred.
+ * Every `src/converters/claude-to-*.ts` file must be listed here or in `targets`.
+ */
+export const COMPATIBILITY_CONVERTERS = ["copilot", "droid", "kiro"] as const
+
+export type CompatibilityConverter = (typeof COMPATIBILITY_CONVERTERS)[number]
+
+export function implementedConvertTargetNames(): string[] {
+  return Object.entries(targets)
+    .filter(([, handler]) => handler.implemented)
+    .map(([name]) => name)
+}
+
+export function convertToFlagDescription(): string {
+  return `Target format (${implementedConvertTargetNames().join(" | ")} | all)`
+}
+
+export function unknownConvertTargetMessage(targetName: string): string {
+  const options = `${implementedConvertTargetNames().join(", ")}, all`
+  if ((COMPATIBILITY_CONVERTERS as readonly string[]).includes(targetName)) {
+    return `Unknown target: ${targetName}. ${targetName} is cleanup / native plugin install only, not a --to convert target. Use one of: ${options}`
+  }
+  return `Unknown target: ${targetName}. Use one of: ${options}`
+}
+
+export function requireImplementedConvertTarget(targetName: string): TargetHandler {
+  const target = targets[targetName]
+  if (!target) {
+    throw new Error(unknownConvertTargetMessage(targetName))
+  }
+  if (!target.implemented) {
+    throw new Error(`Target ${targetName} is registered but not implemented yet.`)
+  }
+  return target
+}
