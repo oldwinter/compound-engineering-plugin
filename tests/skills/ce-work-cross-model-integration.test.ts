@@ -539,11 +539,11 @@ class FeatureTest(unittest.TestCase):
     const verified = control(
       runs, "verify-run", "--run-id", "transaction-run",
       "--verification-summary", "full suite passed",
-      "--", "python3", "-c", "open('verification-cache.tmp','w').write('temporary')",
+      "--", "python3", "-c", "open('verification-cache.txt','w').write('temporary')",
     )
     expect(verified.word).toBe("RUN_VERIFIED")
     expect(verified.body.verification_exit).toBe(0)
-    expect(verified.body.cleaned_paths).toEqual(["verification-cache.tmp"])
+    expect(verified.body.cleaned_paths).toEqual(["verification-cache.txt"])
     expect(git(repo, "status", "--porcelain")).toBe("")
     expect(control(runs, "status", "--run-id", "transaction-run").body).toMatchObject({
       integration_lock: null,
@@ -553,7 +553,7 @@ class FeatureTest(unittest.TestCase):
     const failedRunVerification = controlFailure(
       runs, "verify-run", "--run-id", "transaction-run",
       "--verification-summary", "full suite failed",
-      "--", "python3", "-c", "open('failure-cache.tmp','w').write('temporary'); raise SystemExit(7)",
+      "--", "python3", "-c", "open('failure-cache.txt','w').write('temporary'); raise SystemExit(7)",
     )
     expect(failedRunVerification.word).toBe("BLOCKED")
     expect(failedRunVerification.body.verification_exit).toBe(7)
