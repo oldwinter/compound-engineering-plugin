@@ -99,11 +99,14 @@ export function sanitizePathName(name: string): string {
  *   - empty strings
  *   - absolute paths (POSIX `/foo`, Windows `C:\foo`)
  *   - any `..` path segment (including `foo/../bar`)
+ *   - paths that resolve to `rootDir` itself (`.`, `./`)
  *   - paths that, when joined with `rootDir`, resolve outside `rootDir`
  *
  * The `rootDir` check is defense-in-depth against edge cases the first two
  * checks miss (e.g. platform-specific separators or encoded traversal the
- * split-based check didn't catch).
+ * split-based check didn't catch). Equality with the root is rejected
+ * because cleanup joins the candidate and `fs.rm`s it: `.` would wipe the
+ * managed tree, including the install manifest.
  */
 export function isSafeManagedPath(rootDir: string, candidate: unknown): candidate is string {
   if (typeof candidate !== "string" || candidate.length === 0) return false
@@ -112,11 +115,14 @@ export function isSafeManagedPath(rootDir: string, candidate: unknown): candidat
   // check is uniform across platforms.
   const segments = candidate.split(/[\\/]/)
   if (segments.some((segment) => segment === "..")) return false
-  // Final containment check: the fully-resolved candidate must stay inside
-  // the resolved root. This catches anything the above two checks missed.
+  // Final containment check: the fully-resolved candidate must be a strict
+  // descendant of the resolved root. Equality is unsafe (`.` / `./` would
+  // let cleanup delete the managed tree). This also catches anything the
+  // segment checks missed.
   const resolvedRoot = path.resolve(rootDir)
   const resolvedCandidate = path.resolve(resolvedRoot, candidate)
-  if (resolvedCandidate !== resolvedRoot && !resolvedCandidate.startsWith(resolvedRoot + path.sep)) {
+  if (resolvedCandidate === resolvedRoot) return false
+  if (!resolvedCandidate.startsWith(resolvedRoot + path.sep)) {
     return false
   }
   return true

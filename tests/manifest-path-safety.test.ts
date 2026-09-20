@@ -38,6 +38,12 @@ describe("isSafeManagedPath", () => {
     expect(isSafeManagedPath(root, "")).toBe(false)
   })
 
+  test("rejects the managed root itself", () => {
+    expect(isSafeManagedPath(root, ".")).toBe(false)
+    expect(isSafeManagedPath(root, "./")).toBe(false)
+    expect(isSafeManagedPath(root, "./.")).toBe(false)
+  })
+
   test("rejects absolute POSIX paths", () => {
     expect(isSafeManagedPath(root, "/etc/passwd")).toBe(false)
     expect(isSafeManagedPath(root, "/tmp/anything")).toBe(false)
@@ -86,6 +92,8 @@ describe("readManagedInstallManifest filters unsafe entries", () => {
       groups: {
         skills: [
           "safe-skill",
+          ".",
+          "./",
           "../../../etc/passwd",
           "/etc/passwd",
           "foo/../bar",
@@ -147,6 +155,24 @@ describe("cleanupRemovedManagedFiles does not escape root (defense in depth)", (
 
     await cleanupRemovedManagedFiles(rootDir, hostileManifest, "prompts", [])
     expect(await fs.readFile(outsideFile, "utf8")).toBe("keep me")
+  })
+
+  test("skips a `.` entry instead of deleting the managed root", async () => {
+    const rootDir = path.join(tempRoot, "root")
+    await fs.mkdir(rootDir, { recursive: true })
+    const marker = path.join(rootDir, "keep.txt")
+    await fs.writeFile(marker, "keep me")
+
+    const hostileManifest = {
+      version: 1 as const,
+      pluginName: "compound-engineering",
+      groups: {
+        skills: ["."],
+      },
+    }
+
+    await cleanupRemovedManagedDirectories(rootDir, hostileManifest, "skills", [])
+    expect(await fs.readFile(marker, "utf8")).toBe("keep me")
   })
 
   test("skips unsafe directory entries", async () => {
