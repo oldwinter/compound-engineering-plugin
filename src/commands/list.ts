@@ -14,8 +14,12 @@ export default defineCommand({
 
     const rootManifestPath = path.join(root, ".claude-plugin", "plugin.json")
     if (await pathExists(rootManifestPath)) {
-      const manifest = JSON.parse(await fs.readFile(rootManifestPath, "utf8")) as { name?: string }
-      plugins.push(manifest.name ?? path.basename(root))
+      try {
+        const manifest = JSON.parse(await fs.readFile(rootManifestPath, "utf8")) as { name?: string }
+        plugins.push(manifest.name ?? path.basename(root))
+      } catch {
+        // Malformed plugin.json is not a plugin; keep scanning the legacy layout.
+      }
     }
 
     const pluginsDir = path.join(root, "plugins")

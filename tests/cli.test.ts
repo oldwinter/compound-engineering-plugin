@@ -1029,6 +1029,35 @@ describe("CLI", () => {
     expect(stdout).toContain("demo-root-plugin")
   })
 
+  test("list ignores a malformed root plugin.json instead of crashing", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-list-badjson-"))
+    const pluginRoot = path.join(tempRoot, ".claude-plugin")
+    await fs.mkdir(pluginRoot, { recursive: true })
+    await fs.writeFile(path.join(pluginRoot, "plugin.json"), "{not-json")
+
+    const legacyRoot = path.join(tempRoot, "plugins", "demo-plugin", ".claude-plugin")
+    await fs.mkdir(legacyRoot, { recursive: true })
+    await fs.writeFile(path.join(legacyRoot, "plugin.json"), "{\n  \"name\": \"demo-plugin\",\n  \"version\": \"1.0.0\"\n}\n")
+
+    const repoRoot = path.join(import.meta.dir, "..")
+    const proc = Bun.spawn(["bun", "run", path.join(repoRoot, "src", "index.ts"), "list"], {
+      cwd: tempRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("demo-plugin")
+    expect(stdout).not.toContain("not-json")
+  })
+
   test("list keeps legacy plugins directory fallback", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-list-"))
     const pluginsRoot = path.join(tempRoot, "plugins", "demo-plugin", ".claude-plugin")
