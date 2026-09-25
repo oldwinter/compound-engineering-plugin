@@ -525,6 +525,22 @@ describe("ce-code-review contract", () => {
     expect(content).toMatch(/still waiting/i)
   })
 
+  test("Stage 4 isolates tree-mutating testing reviewers from the shared checkout (#1566)", async () => {
+    const dispatch = await readRepoFile(
+      "skills/ce-code-review/references/dispatch-reviewers.md",
+    )
+    expect(dispatch).toContain('isolation: "worktree"')
+    expect(dispatch).toContain("HEAD equals the reviewed commit")
+    expect(dispatch).toContain("Mutation testing on the shared tree is forbidden")
+    expect(dispatch).toContain("faithful snapshot of the reviewed tree")
+    expect(dispatch).toContain("local-aligned")
+    const testing = await readRepoFile(
+      "skills/ce-code-review/references/personas/testing-reviewer.md",
+    )
+    expect(testing).toContain("Never mutate the shared checkout")
+    expect(testing).toContain("faithful snapshot of the reviewed tree")
+  })
+
   test("Stage 4 collects by observed return shape and fails closed without a collector", async () => {
     const skill = await readRepoFile("skills/ce-code-review/SKILL.md")
     const content = await readRepoFile(

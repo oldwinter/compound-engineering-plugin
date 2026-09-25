@@ -1,6 +1,6 @@
 # Investigation Techniques（调查技巧）
 
-当 standard code tracing 不够时，用于 deeper investigation 的 techniques。当 bug 不能可靠 reproduce、涉及 timing 或 concurrency、或需要 framework-specific tracing 时加载本文件。
+当 standard code tracing 不够时，用于 deeper investigation 的 techniques。当 bug 不能可靠 reproduce、涉及 timing 或 concurrency、属于 performance regression，或需要 framework-specific tracing 时加载本文件。
 
 ---
 
@@ -205,6 +205,16 @@ Mixed use 很常见：先 instrument 以 localize，再在 localized point attac
 | Browser JS | `debugger;` in code, or DevTools Sources → set breakpoint | DevTools attaches to page automatically |
 
 对 test runs，多数 test runners 可与上述工具集成，例如 `node --inspect-brk $(which jest)`、`pytest --pdb`、带 `binding.pry` 的 `rspec`、`dlv test`。优先使用 runner integration，而不是事后 attach。
+
+---
+
+## Performance Regressions（性能回归）
+
+当 symptom 是“慢”而不是“错”时，logs 和 code reading 容易误导：直觉无法可靠判断时间花在哪里，一个看似合理的 hot spot 只是 hypothesis，不是 evidence。先测量，再修改：
+
+- 在改动前建立 numeric baseline，例如包住 slow operation 的 timing harness、一次 profiler run，或 query plan（`EXPLAIN ANALYZE`）。对 perf bug 来说，baseline 就是 Phase 1 的 reproduction check：数字是 red；fix 必须通过重新测量同一件事来验证，而不是推理改动“应该更快”。
+- 先 attribute 再 optimize：用 profile 或 per-stage timings 证明时间实际花在哪里。优化未经测量的 suspect，就是 performance 版本的 shotgun debugging。
+- 如果 slowness 是 regression，应针对 measurement 做 bisect（见上文 Git Bisect），而不是在 diffs 中寻找“看起来昂贵”的改动。
 
 ---
 
