@@ -56,7 +56,7 @@ export default defineCommand({
     permissions: {
       type: "string",
       default: "none", // Default is "none" -- writing global permissions to opencode.json pollutes user config. See ADR-003.
-      description: "Permission mapping written to opencode.json: none (default) | broad | from-command",
+      description: "Permission mapping written to opencode.json: none (default) | broad | from-commands",
     },
     agentMode: {
       type: "string",
@@ -84,7 +84,7 @@ export default defineCommand({
 
     const permissions = String(args.permissions)
     if (!permissionModes.includes(permissions as PermissionMode)) {
-      throw new Error(`Unknown permissions mode: ${permissions}`)
+      throw new Error(`Unknown permissions mode: ${permissions}. Use one of: ${permissionModes.join(", ")}`)
     }
 
     if (targetName !== "all") {
