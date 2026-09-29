@@ -12,7 +12,7 @@
  */
 export const CLAUDE_FAMILY_ALIASES: Record<string, string> = {
   haiku: "claude-haiku-4-5",
-  sonnet: "claude-sonnet-5",
+  sonnet: "claude-sonnet-5-5",
   opus: "claude-opus-4-8",
 }
 
@@ -25,6 +25,7 @@ export const CLAUDE_FAMILY_ALIASES: Record<string, string> = {
  */
 const SAMPLING_PARAM_REJECTING_MODELS: ReadonlySet<string> = new Set([
   "claude-sonnet-5",
+  "claude-sonnet-5-5",
   "claude-opus-4-7",
   "claude-opus-4-8",
 ])
@@ -33,7 +34,7 @@ const SAMPLING_PARAM_REJECTING_MODELS: ReadonlySet<string> = new Set([
  * Resolve a bare Claude family alias to its canonical model name.
  * Returns the input unchanged if not a recognized alias.
  *
- * "sonnet" -> "claude-sonnet-5"
+ * "sonnet" -> "claude-sonnet-5-5"
  * "claude-sonnet-4-20250514" -> "claude-sonnet-4-20250514" (unchanged)
  */
 export function resolveClaudeFamilyAlias(model: string): string {
@@ -44,7 +45,7 @@ export function resolveClaudeFamilyAlias(model: string): string {
  * Add a provider prefix based on model naming conventions.
  * Returns the input unchanged if already prefixed (contains "/").
  *
- * "claude-sonnet-5" -> "anthropic/claude-sonnet-5"
+ * "claude-sonnet-5-5" -> "anthropic/claude-sonnet-5-5"
  * "gpt-5.6-sol"       -> "openai/gpt-5.6-sol"
  * "gemini-2.0"        -> "google/gemini-2.0"
  * "minimax-m3"        -> "minimax/minimax-m3"
@@ -64,7 +65,7 @@ export function addProviderPrefix(model: string): string {
  * Normalize a model for targets that use provider-prefixed IDs.
  * Resolves bare aliases and adds provider prefix.
  *
- * "sonnet"                  -> "anthropic/claude-sonnet-5"
+ * "sonnet"                  -> "anthropic/claude-sonnet-5-5"
  * "claude-sonnet-4-20250514" -> "anthropic/claude-sonnet-4-20250514"
  * "anthropic/claude-opus"    -> "anthropic/claude-opus" (unchanged)
  */
@@ -83,9 +84,9 @@ export function normalizeModelWithProvider(model: string): string {
 /**
  * Whether a model rejects non-default sampling params. Accepts a bare alias,
  * a canonical ID, or a provider-prefixed ID; resolves aliases and strips the
- * provider prefix so `sonnet` and `anthropic/claude-sonnet-5` both match.
+ * provider prefix so `sonnet` and `anthropic/claude-sonnet-5-5` both match.
  *
- * "sonnet"                     -> true  (resolves to claude-sonnet-5)
+ * "sonnet"                     -> true  (resolves to claude-sonnet-5-5)
  * "claude-sonnet-4-20250514"   -> false (dated Sonnet 4 accepts sampling params)
  */
 export function rejectsSamplingParams(model: string): boolean {
