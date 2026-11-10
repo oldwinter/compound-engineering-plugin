@@ -142,7 +142,9 @@ missed    -> the specific defect is not identified anywhere
 detection% = (finding + flagged) / n     assertion% = finding / n
 ```
 
-Isolation: the arm differs only in the two swapped tokens on the real invocation —
+Isolation: the arm differs only in the two swapped tokens on the real invocation
+(the benchmark-era direct `codex exec` call; peers now run through the pinned acpx
+transport, where the same rule means swapping only the model and effort options) —
 
 ```
 codex exec ... -m gpt-5.6-sol   -c 'model_reasoning_effort="high"'    # baseline
@@ -173,17 +175,17 @@ write-up `docs/plans/2026-07-18-adversarial-peer-benchmark-report.md` and its ph
 log `docs/plans/2026-07-17-001-eval-cross-model-peer-model-config.md` — both predate
 the Luna/API-dollar update and do not contain it.
 Runnable harness (re-run when models change):
-`github.com/tmchow/cross-model-peer-eval` (private). Current config: `gpt-5.6-luna`
-at `xhigh` for both `ce-code-review` and `ce-doc-review` adversarial peers.
+`github.com/tmchow/cross-model-peer-eval` (private). The adopted Luna-at-`xhigh`
+choice carried forward to the GPT-6 generation (`gpt-6-luna`, #1762); the live pin
+is `M_CODEX` in the `ce-code-review` and `ce-doc-review` worker scripts.
 
 ## Related
 
-- `docs/solutions/skill-design/fake-cli-harness-for-skill-judgment-evals.md` —
-  faking peer CLIs to eval *orchestration* correctness; complementary to this
-  *quality/cost* benchmark of the real model behind the peer.
 - `docs/solutions/skill-design/paired-old-vs-new-injection-skill-evals.md` —
   non-inferiority framing for skill *prose* changes; same "tie vs improvement"
-  discipline applied to a model/tier change.
+  discipline applied to a model/tier change. Its technique 7 (fake peer CLIs on
+  PATH) evals *orchestration* correctness, complementary to this *quality/cost*
+  benchmark of the real model behind the peer.
 - `docs/solutions/skill-design/confidence-anchored-scoring.md` — judge-scoring
   rigor that pairs with the detection-vs-assertion split here.
 - `docs/solutions/skill-design/requested-vs-verified-model-identity.md` — verifying

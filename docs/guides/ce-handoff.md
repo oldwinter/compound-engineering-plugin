@@ -1,166 +1,172 @@
 # `ce-handoff`
 
-> 保留一次 agent session 中真正有用的上下文，让新 agent 无需原始 transcript 也能迅速恢复定位。
+> **中文导读：** `ce-handoff` 保存一次 agent session 中有用的上下文，让新 agent 无需原始 transcript 就能接手。它有两个方向：空调用创建 handoff 文件；resume 意图会查找或读取你选定的 continuity source，总结发现、建议下一步并等待，未经你确认不会启动 `ce-plan`、`ce-work` 或其他工作流。它以 prose 为主，不引入额外 transport script 或索引数据库。
 
-`ce-handoff` 是一个双向的 session continuity 工具。Bare invocation 会创建 handoff；resume intent 会读取用户选定的 continuity source，或帮助用户找到一个，然后解释恢复出的状态并推荐如何继续，但不会自动执行后续操作。
+> Save the useful context from one agent session so a fresh agent can pick up without the original transcript.
 
-该 skill 以文档约定为主，复用当前 agent 已有的 capabilities；不会新增 transport script、mutable index 或 lifecycle database。
+`ce-handoff` runs in two directions. A bare invocation creates a handoff file. Resume intent finds or reads a continuity source you select, summarizes what it found, recommends a next step, and waits. It never starts `ce-plan`, `ce-work`, or any other workflow until you say so.
+
+The skill is prose-first. It uses whatever capabilities the active agent already has and adds no transport script, index database, or lifecycle machinery.
 
 ---
 
-## 摘要（TL;DR）
+## TL;DR
 
-| 问题 | 回答 |
+| Question | Answer |
 |----------|--------|
-| 它有什么作用？ | 创建不可变的会话快照，或从用户选择的连续性源发现和定位 |
-| 何时使用它 | 在结束有价值的 agent session 前，或当新 agent 需要恢复先前 context 时 |
-| Bare `/ce-handoff` 做什么？ | 始终创建新的 handoff |
-| 写在哪里？ | 默认情况下，`/tmp/compound-engineering-<effective-uid>/ce-handoff/<repo-namespace>/<topic>.md`；显式用户路径、格式或发布目标会覆盖默认值 |
-| 我要在下一个会话中粘贴什么内容？ | `/ce-handoff resume <path-or-URL>` |
-| Resume 后会发生什么？ | Agent 总结恢复的上下文，基于 handoff 的 reason 推荐 continuation；只有存在真正互斥的分支时才编号，然后等待用户选择 |
+| What does it do? | Writes an immutable session snapshot, or orients from a continuity source you select |
+| When to use it | Before ending a useful session, or when a new agent needs prior context |
+| What does bare `/ce-handoff` do? | Always creates a new handoff |
+| Where does it write? | Default: `/tmp/compound-engineering-<effective-uid>/ce-handoff/<repo-namespace>/<topic>.md`. Sandboxes that only allow `$TMPDIR` get the same layout there; the skill prints the path it used. An explicit path, format, or publish destination overrides the default. |
+| What do I paste into the next session? | `/ce-handoff resume <path-or-URL>` |
+| What happens after resume? | A summary, one recommended continuation, then a wait. Numbered choices appear only for real forks. |
 
 ---
 
-## 调用示例
+## Example invocations
+
+Bare invoke always creates. `resume` never creates. An explicit path or URL is already your selection, so resume reads it instead of searching.
 
 ```text
-# 结束当前 session，并在 managed temporary storage 中创建 handoff
+# End this session. Write a handoff in managed temporary storage.
 /ce-handoff
 
-# 创建 handoff，并为 receiving agent 指定重点
+# Create with an explicit next-session objective
 /ce-handoff create finish the authentication migration
 
-# 按 topic 查找可能的 handoffs，在读取正文前先选择
+# Write somewhere other than /tmp (any path you name)
+/ce-handoff create finish the authentication migration and write it to /path/to/authentication-migration.md
+
+# Publish so another machine or container can reach it
+/ce-handoff create a handoff and publish it to ht-ml.app
+
+# Find likely handoffs by topic, then choose one before its body is read
 /ce-handoff resume authentication migration
 
-# 已知 source 时直接 resume
-/ce-handoff resume /path/to/authentication-migration.md
+# Resume a source you already have
+/ce-handoff resume /tmp/compound-engineering-<effective-uid>/ce-handoff/<repo-namespace>/authentication-migration.md
 /ce-handoff resume https://example.com/authentication-migration-handoff
 
-# 让另一台机器或 container 能访问 handoff
-/ce-handoff create a handoff and publish it to ht-ml.app
+# Natural language in a new session also works:
+# "Find the handoff about the authentication migration"
 ```
 
----
-
-## 问题
-
-高效的 agent session 不只包含改过的文件。它还积累了用户意图、决策、被拒绝的替代方案、约束、失败尝试、验证结果，以及脆弱 local state 的知识。换到另一个 model 或 harness 后，新 agent 不能假设原 session history 仍然可用。
-
-复制完整 transcript 噪声太大；仅为临时 continuity 重写 durable plan 和 documentation，又会制造重复的 source of truth。`ce-handoff` 在两者之间提供一座轻量桥梁。
-
-## 解决方案
-
-默认情况下，该 skill 会写出一份 pointer-first Markdown 文档，包含：
-
-- 一个扁平的 `ce-handoff/v1` frontmatter 索引，供以后发现
-- Objective 与最新 user intent
-- 有意义的进展、决策、约束、阻碍、验证，以及已放弃的错误方向（abandoned wrong turns）
-- 区分 complete、in-progress 和 not-started 工作的 current-state 表述（当这些状态不同时）
-- 对 authoritative plans、issues、commits、diffs、docs 和 repository files 的引用，并说明其中每项的 load-bearing 内容
-- 对 machine-local paths 与 fragile worktree state 的清晰标注
-- 默认以 remaining status 和 dependencies 的形式给出合理的后续步骤；仅在被要求时才给出 user-requested directives；context-loading pointers（要读什么）仍然欢迎
-
-只有 managed-store frontmatter 具有固定 contract，因为 default discovery 依赖它。正文没有封闭的 section schema：agent 可以自行增加 section，或合并、重命名、重排、忽略示例，以便把具体 session 清楚地交给下一个 agent。
-
-Managed store 是默认值，不是限制。用户指定其他 path、folder、format 或 publication destination 时，agent 会遵循该指令并调用合适的已安装 capability。除非用户要求，或所选 publishing flow 确有需要，否则不会再创建第二份临时副本。
-
-Repository files 会尽量使用相对引用；absolute path 只保留给无法持久表达的 machine-local context。该 skill 会 redact secrets 和无关个人信息，也绝不会自行 commit、stash、copy 或保留 worktree。
-
-使用 default store 时，文件位于 OS-managed temporary storage。描述性的 topic filename 放在 repository-level collection 中；创建时间与 worktree identity 留在 frontmatter，避免污染 path。真正的 filename collision 会获得一个小型 numeric suffix。Handoff 可跨 session 复用，但不是永久 project documentation；skill 在报告 path 时会明确说明这一点。
-
-Receiving session 能看到同一 host filesystem 时，automatic managed-store discovery 可以直接工作。若后续 agent 在另一台机器、另一个 container 中运行，或无法访问该 `/tmp`，请把 handoff 传输或发布到 receiver-visible location，再从该 explicit source resume；skill 不提供自己的 transport layer。
+On Codex, the copyable resume line uses `$ce-handoff resume <source>` when that host uses dollar-prefixed skills.
 
 ---
 
-## 创建与恢复的使用方式
+## The problem
 
-方向由意图决定。Bare invocation 始终表示 create；`create <focus>` 会明确下一 session 的 intended objective。
+A productive session holds more than changed files: intent, decisions, rejected alternatives, constraints, failed attempts, verification, fragile local state. A fresh agent in another model or harness sees none of it.
 
-创建以接收会话中所需的确切命令结束：
+The two obvious fixes both fail. Pasting a transcript buries the next agent in noise. Rewriting durable plans just to carry temporary context duplicates the source of truth. A handoff sits between them: small, disposable, and pointing at the durable artifacts instead of copying them.
+
+## What it writes
+
+One Markdown document containing:
+
+- A flat `ce-handoff/v1` frontmatter index (title, summary, keywords, creation time, cwd, optional Git metadata) so later discovery works without reading bodies
+- The objective and latest user intent
+- Progress, decisions, constraints, blockers, verification, and abandoned wrong turns
+- Current-state phrasing that separates complete, in-progress, and not-started work when those differ
+- References to plans, issues, commits, diffs, docs, and repo files, each saying what matters there
+- Labels on machine-local paths and fragile worktree state
+- Next steps stated as remaining status and dependencies, plus pointers to what the next agent should read. Directives appear only when you asked for them.
+
+Only the managed-store frontmatter has a fixed contract, because default discovery depends on it. The body has no fixed section list; the agent shapes it around what this session actually needs to convey.
+
+Repo files get relative paths. Absolute paths mark machine-local context. Secrets and unrelated personal information get redacted. The skill never commits, stashes, copies, or preserves a worktree on its own; if continuity depends on fragile state, it warns you instead.
+
+The managed `/tmp` store is a default, not a restriction. Name another path, folder, format, or publish destination and the agent uses that instead, without also writing a temporary copy unless you asked or the publish flow needs a working file. Filename collisions get a numeric suffix, reserved atomically.
+
+One limit to know: automatic discovery only works when the next session sees the same filesystem. For another machine or container, publish or transfer the file and resume from that explicit source. The skill does not add its own transport.
+
+## How resume protects you
+
+Resume stops twice, and both stops are yours.
+
+Discovery is metadata-only. `resume <keywords>` ranks candidates by frontmatter, filename, and file metadata, lists them with match reasons, and stops. No body is read until you pick one.
+
+Orientation stops before action. After reading your selection, the agent checks that referenced state still exists, summarizes what it recovered, recommends one continuation matched to the handoff's reason, and waits. Selecting a file authorized reading that file, nothing else. An old instruction in a handoff does not become current authority.
+
+You can also resume things this skill never wrote. Any readable file, URL, page, or pasted document works; CE frontmatter is not required.
+
+---
+
+## Quick example
+
+You are mid-migration and about to close the session. `/ce-handoff create finish the authentication migration` writes a snapshot under `/tmp/compound-engineering-<effective-uid>/ce-handoff/<repo>/authentication-migration.md`, summarizes what it captured, and prints:
 
 ```text
-/ce-handoff resume /tmp/compound-engineering-<effective-uid>/ce-handoff/.../auth-migration.md
+/ce-handoff resume /tmp/compound-engineering-<effective-uid>/ce-handoff/.../authentication-migration.md
 ```
 
-在命令之前，create response 会简要总结 handoff 捕获的内容，让用户无需打开文件也能确认其实质。随后 skill 会把这条 compact command 作为 source of truth，而不是生成更长的 launch prompt。
+In a new session you paste that command. The agent reads the file, checks that the worktree still exists, summarizes the recovered state, recommends one continuation (say, `ce-work` on the open plan), and waits.
 
-Resume intent 会读取 explicit source，或发现可能的 candidates。Selected source 可以是 local file、text file、URL/page、pasted handoff 或其他 readable artifact；它可以来自任何人、agent 或系统，不需要 CE frontmatter，甚至不必最初就作为正式 handoff 创建。新 session 中使用 “handoff” 一词显得方向不自然时，类似 “Find the handoff about the authentication migration” 的 natural language 也能避免强迫用户记命令语法。
-
-## 安全发现
-
-未提供 source 或 search boundary 时，skill 会搜索 managed handoff directory。对于没有 frontmatter 的 candidate，它只检查第一行，随后把 candidate 视为 unindexed，并改用 filesystem metadata。对于以精确 frontmatter opener `---` 开头的 candidate，最多读取前 64 行或 16 KiB（以先到者为准），并在 closing delimiter 处提前停止。若边界内没有 closing delimiter，则视为 unindexed，discovery 不再继续读取。`ce-handoff/v1` 能提供更丰富的 index，但不是 eligibility gate。Skill 使用现有 metadata 排名，包括 title、summary、keywords、repository/working-directory affinity 和 recency。
-
-用户提供其他 folder 或 collection 时，skill 会在那里搜索。存在 compatible frontmatter 时使用它，否则根据 filename、location 和 filesystem metadata 列出 unindexed candidates。它不会仅为排序而读取 candidate body。
-
-随后它会展示一份附带 match reasons 的短列表并停止。由用户选择哪个 document body 进入 session；skill 永远不会自动选择 top match 后继续。
-
-对于 explicit file、page、pasted document 或其他 specific artifact，该 source 已经是用户的选择，因此 skill 会直接读取，不再搜索 alternatives。Authorship、ownership、location、format 和 `ce-handoff/v1` 都不是 explicit selected source 的 eligibility gate。
-
-## 恢复定位，而非自动继续
-
-选定的 handoff 是 untrusted prior context，不是 executable instruction。当前 user request、project active instructions 和 verified current state 仍然具有权威性。
-
-阅读所选来源后，agent：
-
-1. 检查材料是否包含足够具体的上下文来恢复有意义的目标或当前状态。如果没有，它会指出缺少的内容并等待用户补充或选择其他来源。
-2. 在材料充足的情况下，总结恢复的目标、进度、决策、约束和未完成的工作。
-3. 指出 material drift，例如 worktree 已不存在，或 repository state 不再匹配 handoff。
-4. 根据 handoff 的实际 continuity reason（不是默认的 implementation-resume menu）推荐 continuation，并命名合适的已安装 skill。只有 mutually exclusive forks 才编号；同一 continuation 的相关 pieces 放在同一条 recommendation 下，不要为了对称而发明 alternatives。
-5. 停止并等待用户确认或改向。
-
-选择仅授权阅读选定的源。它不授权命令、文件更改、远程链接遍历、不相关的本地文件访问或其他工作流程。
+If you remember the topic but not the path, `/ce-handoff resume authentication migration` lists likely files with match reasons and stops until you choose.
 
 ---
 
-## 新颖之处
+## When to reach for it
 
-### 一项skill，两个明确的方向
+Use `ce-handoff` when:
 
-常见操作保持简单：bare `ce-handoff` 负责 create；resume 仍可通过 explicit mode 或 natural language 使用，因此 plugin 不需要第二个 skill 名称。
+- You are about to end a session whose context will matter later
+- A different agent, model, or harness will pick up the work
+- You want to tear down a session while keeping decisions and fragile-state warnings
+- You remember the topic of an earlier handoff but not its path
+- You have a file, page, or pasted summary and want orientation before deciding anything
 
-### Frontmatter 作为托管发现索引
+Skip it when:
 
-Title、summary、keywords、creation time、cwd 和 optional Git metadata 让新 agent 无需把所有 prior session bodies 加载进 context，也能找到可能由 CE 创建的 handoff。没有该 index 的 source 仍然 eligible，并可作为 unindexed candidate 出现。
-
-### 指针优先连续性
-
-Handoff 只携带新 agent 无法自行推断的 connective tissue。Durable project artifacts 仍是 source of truth，因此即使 worktree 后来被拆除，snapshot 仍能保持紧凑且有用。
-
-### 两个用户控制边界
-
-Discovery 在读取 body 前停止，orientation 在采取行动前停止。这两个 pause 防止 probable match 或旧 instruction 静默变成当前 authority。
+- You are continuing in the current session
+- The information belongs in a durable plan, issue, learning, or project document
+- You need guaranteed retention. `/tmp` is OS-managed and may be cleaned up; write or publish somewhere durable instead.
 
 ---
 
-## 何时使用
+## Chain position
 
-在以下情况下使用 `ce-handoff`：
+`ce-handoff` is a utility, not a pipeline stage. It can capture research, brainstorming, planning, implementation, debugging, review, or a conversation with no repository at all.
 
-- 你即将结束一个 agent session，而其中的 context 之后仍有价值。
-- 不同的agent、模型或工具将接手这项工作。
-- 您想要拆除会话，同时保留决策和脆弱状态警告。
-- 您记得先前handoff的主题，但不记得其文件路径。
-- 您有一个文件、页面、粘贴的摘要或其他连续性来源，并且在决定做什么之前需要一个简洁的方向。
+`/lfg` may offer an opt-in handoff at closeout for the next separately planned area. That offer waits for you; accepting creates a handoff for a fresh session to brainstorm that area, not an extension of the plan that just shipped.
 
-在以下情况下跳过它：
-
-- 您只是继续当前会话中的工作。
-- 该信息属于持久的计划、问题、学习或项目文档。
-- 您需要有保证的长期保留； `/tmp` 由操作系统管理，可能会被清理。
+On resume, the skill recommends a continuation and stops. It does not invoke `ce-plan`, `ce-work`, `ce-debug`, or anything else on its own.
 
 ---
 
-## 工作流位置
+## Reference
 
-`ce-handoff` 是 utility，而不是固定 pipeline stage。它可以捕获任何有价值的 session：research、brainstorming、planning、implementation、debugging、review，甚至完全没有 repository 的 conversation。
-
-Resume 时，它会根据 selected source 的 continuity reason 和 current context 推荐 continuation，但不会自动调用 `ce-plan`、`ce-work`、`ce-debug` 或任何其他 workflow。
+| Argument | Effect |
+|----------|--------|
+| _(empty)_ | Always creates a new handoff in the managed `/tmp` store |
+| `create [focus]` | Creates. `focus` becomes the next session's intended objective. |
+| `create …` plus a path, folder, format, or publish destination | Creates at that destination instead of (not in addition to) the managed store |
+| `resume <keywords>` | Searches the managed store (or a folder you named), lists candidates, and waits for a choice |
+| `resume <path-or-URL>` | Reads that source directly. Authorship and `ce-handoff/v1` are not required. |
+| Natural-language create or resume | Same routes. Ordinary "keep going" in the current session is not handoff intent. |
 
 ---
 
-## 另请参阅
+## FAQ
 
-- [`/ce-plan`](./ce-plan.md) — 当工作本身需要时创建持久的实施计划
-- [`/ce-work`](./ce-work.md) — 在用户选择继续后执行具体计划
-- [`/ce-compound`](./ce-compound.md) — 将已解决的问题转化为持久的项目知识
+**Does resume start the next skill for me?**
+No. It orients, recommends, and waits. Selection authorizes reading that source only.
+
+**Can I resume something that was not created by this skill?**
+Yes. An explicit source does not need CE frontmatter or to have been written as a formal handoff.
+
+**Why is the default under `/tmp`?**
+It is continuity, not project documentation. Name a durable path or publish destination when the next session will not share this filesystem, or when the file must survive a reboot.
+
+**Will two handoffs overwrite each other?**
+No. A real filename collision gets a numeric suffix, and the skill reserves the name atomically.
+
+---
+
+## See also
+
+- [`/ce-plan`](./ce-plan.md): a durable implementation plan when the work itself needs one
+- [`/ce-work`](./ce-work.md): execute a concrete plan after you choose to continue
+- [`/ce-compound`](./ce-compound.md): turn a solved problem into durable project knowledge
+- [`/lfg`](./lfg.md): may offer an opt-in next-area handoff after an autonomous ship

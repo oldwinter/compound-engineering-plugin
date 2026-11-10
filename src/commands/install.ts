@@ -231,7 +231,7 @@ type ResolvedPluginPath = {
 
 async function resolvePluginPath(input: string, branch?: string): Promise<ResolvedPluginPath> {
   // Only treat as a local path if it explicitly looks like one
-  if (input.startsWith(".") || input.startsWith("/") || input.startsWith("~")) {
+  if (input.startsWith(".") || path.isAbsolute(input) || input.startsWith("~")) {
     const expanded = expandHome(input)
     const directPath = path.resolve(expanded)
     if (await pathExists(directPath)) return { path: directPath }
@@ -328,7 +328,7 @@ function resolveGitHubSource(): string {
 async function cloneGitHubRepo(source: string, destination: string, branch?: string): Promise<void> {
   const args = ["git", "clone", "--depth", "1"]
   if (branch) args.push("--branch", branch)
-  args.push(source, destination)
+  args.push("--", source, destination)
   const proc = Bun.spawn(args, {
     stdout: "pipe",
     stderr: "pipe",

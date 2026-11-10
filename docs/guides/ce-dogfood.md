@@ -1,137 +1,144 @@
 # `ce-dogfood`
 
-> 对 active branch 做 hands-off、diff-scoped browser QA：map flows，驱动真实 browser，自主修复小 breakages（带 regression tests 和 commits），并写 durable report。仅手动调用。
+> **中文导读：** `ce-dogfood` 对当前 branch 相对 trunk 的改动做无人值守的浏览器 QA：把 diff 触及的路径映射成用户旅程，在真实浏览器中执行，修复小而明确的破损（附回归测试与提交），其余问题升级说明，并在 `docs/dogfood-reports/` 留下持久报告。它按 diff 限定范围，不爬全站；会改代码并提交，因此只能由用户手动触发。
 
-`ce-dogfood` 像 QA engineer 一样端到端 dogfood **active branch**：理解相对 trunk 的每个 change，map diff 触及的 user flows，通过 `agent-browser` 在真实 browser 中 exercise 每条 flow，同时判断 correctness 和 experience（包括 per-persona paper cuts），自主修复安全可修的小问题，给每个 fix 加 regression test 并 commit；无法安全修复的则 escalate，并在 `docs/dogfood-reports/` 下留下 durable report。
+> Hands-off, diff-scoped browser QA of the active branch. Maps the journeys the diff touches, drives them in a real browser, fixes small breakages (with a regression test and a commit), and writes a durable report.
 
-它是 **diff-scoped**，不是 whole-app exploration；也是 **hands-off**：调用后会自主跑完整 loop。因为它会编辑代码并创建 commits，所以 **只能手动调用**（`disable-model-invocation: true`）。
+`ce-dogfood` is autonomous QA of what this branch changed versus the trunk. It maps those changes as user journeys, exercises them in a real browser (the host's built-in one when it can cover the run, otherwise `agent-browser`), judges correctness and feel (including per-persona paper cuts), fixes what is small and unambiguous, escalates the rest, and leaves a report under `docs/dogfood-reports/`.
+
+It is diff-scoped, not a whole-app crawl. Once invoked it runs without check-ins. It stops only when it cannot continue without something only you have, and lists anything else waiting on you at the end. It edits code and creates commits, so it is manual invocation only.
+
+It is not `ce-test-browser` (test and report; fixes only if you pick "fix now"), not `ce-polish` (you drive live UX), and not `ce-simplify-code` (code cleanup, no browser).
 
 ---
 
-## 摘要（TL;DR）
+## TL;DR
 
 | Question | Answer |
 |----------|--------|
-| 它做什么？ | 将 diff -> flows -> test matrix，驱动 browser 测每条 flow，自主修复小 breakages（带 regression tests + commits），escalate 大问题，并写 report |
-| 何时使用？ | Branch ship 前，需要一次真实 browser pass，且希望它不仅 report，还能 *fix* 发现的问题 |
-| 产出什么？ | Durable report（`docs/dogfood-reports/<date>-<branch>-dogfood.md`）：flows、test matrix、fixes、paper cuts、escalations、learnings、verdict |
-| 与 `ce-test-browser` 的区别 | `ce-test-browser` test and report；`ce-dogfood` 增加 autonomous fixing、regression tests、fix commits、persona-level experiential judgment 和 durable report artifact |
-| Invocation | 仅手动，输入 `/ce-dogfood` |
+| What does it do? | Maps the branch diff to user flows, drives them in a browser, auto-fixes small issues, escalates the rest, writes a report |
+| When to use it | Before shipping a branch, when you want a real-browser pass that also fixes what it can |
+| What it produces | `docs/dogfood-reports/<YYYY-MM-DD>-<branch-slug>-dogfood.md`: flows, matrix, fixes, paper cuts, escalations, verdict. Plus any fix commits |
+| How it differs from `ce-test-browser` | That skill tests and reports. This one also fixes, adds regression tests, commits, judges feel per persona, and keeps a resumable report |
+| Invocation | Manual only. Type `/ce-dogfood` |
 
 ---
 
-## 调用示例
+## Example invocations
+
+Arguments pick which ref to dogfood and, optionally, which port. Empty runs in place on the current branch.
 
 ```text
-# Dogfood 当前 feature branch 的 diff
+# Current feature branch, in this checkout. Refuses main/master/the default branch
 /ce-dogfood
 
-# Dogfood 指定 pull request 或 branch
+# A PR. Always allowed, even if the head branch is named main. Runs in a worktree
 /ce-dogfood 847
+
+# A named branch you are not on. Dogfoods that ref in a worktree
 /ce-dogfood feature/new-dashboard
 
-# 复用已经在自定义端口运行的 dev server
+# Reuse or force a port (detection still applies if you omit this)
 /ce-dogfood --port 5000
+
+# Port plus a PR
+/ce-dogfood 847 --port 5000
 ```
 
-如果想要的是 bounded route test，而不是探索式、体验导向的 QA，请改用 `ce-test-browser`。
+If a matching unfinished report already exists, it resumes that report. Use `/ce-test-browser` when you want a bounded route test rather than this QA loop.
 
 ---
 
-## 问题
+## The Problem
 
-Branch 可以通过 static review 和 unit tests，却在 browser 中 broken 或 rough。发现这些通常需要人工 click-through，而且常有这些问题：
+A branch can pass review and unit tests and still be broken or rough in the browser. A manual click-through usually:
 
-- **Tests pages, not journeys**：email “sends”，但落到错误 thread；form save 了，但 redirect 到让人困惑的位置
-- **Stops at "does it work"**：只看它是否能用，不问对真正使用者是否 *feels right*
-- **Finds bugs but doesn't fix them**：QA pass 产出 list，修复变成之后的另一项任务
-- **Lets fixed bugs regress**：没有 test 锁住修复
-- **Leaves no durable trace**：下个人又从零推导同样 flows
+- Tests pages, not journeys (the email "sends" but opens the wrong thread)
+- Stops at "does it work" and never asks whether it feels right for the people who use the product
+- Produces a list of bugs and leaves the fixing for later
+- Does not lock a fix in with a test
+- Leaves no file the next person can resume
 
-## 方案
+## The Solution
 
-`ce-dogfood` 用一次 hands-off pass 跑完整 loop：
+One pass:
 
-- **Flow-first**：先把 diff 触及的 journeys 映射为 Mermaid flowcharts，再构建 test matrix，所以测试的是 journey，不是孤立 widgets
-- **Persona-grounded**：基于 product personas（来自 `STRATEGY.md` / `VISION.md` / persona docs，或 inferred persona）审视 flows，寻找 **paper cuts**
-- **Autonomous fix loop**：small、low-risk、unambiguous breakages 原地修复，每个 fix 都有 fails-before/passes-after regression test 和自己的 commit
-- **Knows when to stop**：large、ambiguous 或 product-altering changes 被记录为 “Decisions for a human”，不会强行修改
-- **Verifies before the verdict**：宣称 branch ready 前，先跑项目 existing test suite
-- **Durable artifact**：report doc 同时也是 resume checkpoint
+- Map each user-visible change as a Mermaid flowchart before building the test matrix
+- Ground flows in product personas (`STRATEGY.md`, `VISION.md`, persona docs, or one inferred persona)
+- Walk each flow for paper cuts as well as functional failures
+- Auto-fix only small, low-risk, unambiguous breakages, each with a regression test (or a documented replay/screenshot check when no automated test is meaningful) and its own commit
+- Escalate architecture, schema, product, or large changes as "Decisions for a human"
+- Run the project's existing test suite before calling the branch ready
+- Write the report as soon as the matrix exists and update it after every scenario, so the run can stop and resume
 
 ---
 
-## 新颖之处
+## What Makes It Novel
 
-### 1. Flows before the matrix
+### Flows before the matrix
 
-Skill 将每个 user-visible change 映射成 Mermaid `flowchart`：entry point、actions、branch points、side effects、true end state（包括 email click-through destinations），然后才从 diagrams 推导 test matrix。Flowcharts 是 understanding，本身会成为 matrix 的 spine，并进入 report。Mapping 随 diff 缩放：单 route change 得到一张小 flowchart，而不是跳过步骤。
+Each user-visible change becomes a flowchart: entry, actions, branches, side effects, true end state (including email click-through). The matrix comes from those diagrams, not from a flat page list. A one-route change gets one small chart. Mapping is never skipped.
 
-### 2. Functional and experiential judgment
+### Functional and experiential judgment
 
-每个 scenario 判断两次：“does it work?”（正确 data、正确 destination、没有 console errors）和 “does it feel right?”。Skill 会以每个 primary persona 走 flow，并记录 **paper cuts**：functional test 能通过、但会伤害该 persona experience 的小摩擦。Scenario 可以 functionally `Pass`，但仍带 paper cuts。
+Every scenario is scored twice: right data, right destination, no console errors; and whether it feels aligned with the product. Walking the flow as each primary persona produces paper cuts, small frictions that still `Pass` functionally. A sharp paper cut can enter the fix loop. The rest stay in the report.
 
-### 3. Autonomous fix loop with a size gate
+Declared [Compound Packs](./packs.md) feed both scores. A pack rule that describes a user is a persona the flows are walked as; one that prescribes how the product must look or behave is a criterion attached to every scenario it reaches, and a scenario that contradicts it fails with the `(pack: <id>, <path within the pack>)` citation. The report's Pack Compliance section lists each matched rule as honored, contradicted (fixed or escalated), or not exercised. When the branch contradicts a rule on purpose, the rule is what is in question: dogfood escalates a stale-rule decision instead of fighting the product. Judgments that generalize beyond the branch are handed to `ce-compound`, which owns whether they land in a writable pack; dogfood never writes a pack itself. Successive runs against the same packs therefore climb: each run fixes what contradicts the rules and refines the rules the product has outgrown.
 
-当 scenario 失败，或 passing scenario 带有值得现在修的 sharp paper cut 时，skill 先判断这个 fix 是否该由 **它** 来做。它只 auto-fix small、well-understood、low-risk changes；任何需要 architecture/schema decision、改变 product behavior、跨很多文件，或存在多个合理解法的内容都会 escalate，而不是强行修。每个 autonomous fix 都带 regression test；纯 copy/visual fix 则带 documented replay/screenshot check，并说明为什么 automated test 不 meaningful。
+### Size-gated autonomous fixes
 
-### 4. Escalation as a first-class outcome
+Auto-fix when the change is small, understood, and low-risk. Not when it needs an architecture or schema decision, changes product behavior, spans many files, or has competing answers. Each autonomous fix gets a regression test and a `ce-commit`. Too-big items go under "Decisions for a human" and the scenario becomes `Blocked (human decision)`.
 
-“太大，无法 autonomous fix” 是正常结果，不是失败。Skill 会把这类内容记录在 **Decisions for a human** 下：哪里 broken，为什么不适合 safe autonomous fix，选项与 trade-offs，以及 recommendation，并把 scenario 标记为 `Blocked (human decision)`。
+### Resumable report
 
-### 5. Resumable by design
+The report is created at the end of mapping (`docs/dogfood-reports/<date>-<branch-slug>-dogfood.md`) and updated as it goes. `<branch-slug>` is the branch name, lowercased, with non-alphanumeric runs collapsed to `-`. A later run resumes it without asking: `Pass` / `Fixed` / `Skipped` stay done; `Pending` is re-queued. `Blocked (needs human verify)` and `Blocked (human decision)` stay blocked and are listed for you at the end, not silently re-run.
 
-Report doc 在 matrix 出现后立即创建，并 incremental 更新，所以 run 可中断并 resume，或由 teammate 接手。Resume 时已完成 scenarios 保持完成，pending ones 重新 queue；但两个 `Blocked` states 会展示给用户，而不是静默 rerun，因为它们在等人。
+### A suite check before "ready"
 
-### 6. A suite check before "ready"
-
-Browser matrix green 但 test suite red，不是 “ready”。Verdict 前，skill 会根据项目 conventions 发现并运行 existing automated tests（加上新 regression tests），而不是假设某个 runner。
+A green browser matrix with a red test suite is not ready. Before the verdict it runs the project's automated tests, including new regression tests. The command comes from the project's conventions, not a hardcoded runner.
 
 ---
 
 ## `ce-dogfood` vs `ce-test-browser`
 
-二者都接受 PR / branch，并通过 browser 测试 diff-affected pages。`ce-test-browser` 优先使用 capable host-native browser，并 fallback 到 `agent-browser`；`ce-dogfood` 当前仍要求 `agent-browser`。按你想要的结尾选择：
+Both take a PR or branch and drive a browser over diff-affected surfaces. `ce-test-browser` prefers a host-native browser and falls back to `agent-browser`. `ce-dogfood` does the same, but picks `agent-browser` when the host browser cannot cover the run's scenarios (for example, a separate login per test user or simulated failed requests).
 
 | | `ce-test-browser` | `ce-dogfood` |
 |---|---|---|
-| Output | Test summary | Durable report + committed fixes |
-| Fixes breakages? | 不修，只 report | 修 small ones，并带 regression tests |
-| Experiential judgment | Functional focus | Functional + per-persona paper cuts |
-| Flow modeling | Route-oriented | Journey-first（Mermaid flowcharts） |
-| Autonomy | Failures 后询问怎么处理 | Hands-off：fix、escalate、continue |
-| Invocation | Model 或 user 都可触达 | 仅手动 |
+| Output | A test summary in chat | A durable report plus fix commits |
+| Fixes breakages? | Only if you pick "fix now" | Small ones on its own, with tests |
+| Feel | Functional | Functional plus per-persona paper cuts |
+| Model | Route-oriented | Journey-first (Mermaid flowcharts) |
+| Autonomy | Asks how to proceed on failures | Fixes, escalates, continues |
+| Invocation | Model or user | Manual only |
+| Checkout | Diff only; does not switch branches | Current branch in place; PR / other branch gets a worktree |
 
-需要较轻的 “affected pages still work?” pass 时用 `ce-test-browser`；希望 branch 被推向 genuinely-ready，并且 fixes 已应用时用 `ce-dogfood`。
+Use `ce-test-browser` for "do these pages still work." Use `ce-dogfood` when you want the branch driven, fixed where safe, and written up.
 
 ---
 
-## 何时使用
+## When to Reach For It
 
-Reach for `ce-dogfood` when:
+Use `ce-dogfood` when:
 
-- 你有一个 branch，希望它在真实 browser 中被推进到 genuinely-ready，而不只是 smoke-tested
-- 你希望 breakages 被 *fixed and locked in with tests*，而不只是列出来
-- 你关心 change 对真实用户是否 feels right，不只是是否能用
-- 你希望为 branch 留下一份 durable QA artifact
+- You want the branch exercised as a user would, not only smoke-tested
+- You want breakages fixed and locked with tests, not only listed
+- Feel for real users matters, not only pass/fail
+- You want a QA file that a later session can resume
 
 Skip it when:
 
-- Change 是 backend-only，没有 browser-visible behavior -> 用项目 test runner
-- 你只想快速确认 “does it still render” -> 用 `/ce-test-browser`
-- `agent-browser` 未安装 -> 先运行 `/ce-setup`
-- 本地 dev server 无法启动 -> 换一种 approach
+- The change is backend-only → the project's test runner
+- You only want a quick render check → `/ce-test-browser`
+- You want to sit with the page and direct the edits → `/ce-polish`
+- The run needs `agent-browser` and it is missing → `/ce-setup`, then retry
+- The dev server cannot run locally
 
 ---
 
-## 单独使用
+## Chain Position
 
-- **Current branch**：`/ce-dogfood`
-- **Specific PR**：`/ce-dogfood 847`
-- **Specific branch**：`/ce-dogfood feature/new-dashboard`
-- **Custom port**：`/ce-dogfood --port 5000`
-
-Skill 会拒绝在 trunk 上运行（没有 diff 可 dogfood），并会提议在 isolated worktree 中运行，避免污染 main checkout。
+On-demand. Nothing in the core loop calls this. After a green (or explicitly blocked) report, ship with `/ce-commit-push-pr` if you want a PR. The skill may itself call `ce-worktree` (isolation), `ce-debug` (unclear failures), `ce-commit` (each fix), and `ce-compound` (a reusable lesson).
 
 ---
 
@@ -139,20 +146,48 @@ Skill 会拒绝在 trunk 上运行（没有 diff 可 dogfood），并会提议�
 
 | Argument | Effect |
 |----------|--------|
-| _(empty)_ | Dogfood current branch |
-| `<PR number>` | Checkout 并 dogfood 该 PR |
-| `<branch name>` | Checkout 并 dogfood 该 branch |
-| `--port <number>` | Override port detection |
+| _(empty)_ | Dogfood the current branch in place. Stops if that branch is the trunk |
+| `<PR number>` | Dogfood that PR in a worktree so this checkout stays put. Never refused for a `main`-named head, because a PR always has a base to diff against |
+| `<branch name>` | Dogfood that branch, in a worktree if you are not already on it |
+| `--port <number>` | Skip port detection |
 
-Required：已安装 `agent-browser` CLI（缺失时运行 `/ce-setup`）；skill 能启动的 local dev server。
+Required: a browser the run can drive (the host's built-in browser, or `agent-browser` on PATH, not `npx agent-browser`), and a local dev server the skill can start or reuse. It reuses a server already listening on the chosen port only when that server runs from the checkout under test; otherwise it starts its own, on a free port if needed, from `bin/dev`, `rails server`, or `npm run dev` without asking. Port order matches the other browser skills: `--port`, a port already in active project instructions, `package.json`, `.env*`, then `3000`.
+
+Report path relocates with `docs_root` (see [configuration](./configuration.md)).
+
+---
+
+## FAQ
+
+**Why refuse the trunk?**
+There is no branch diff to dogfood. A PR still has a base, so `/ce-dogfood 847` is fine even when the head is `main`.
+
+**Does it always create a worktree?**
+No. Current-branch runs stay here. A PR or a different named branch gets a worktree without asking.
+
+**What if `agent-browser` is missing?**
+If the run needs it, it stops and tells you to run `/ce-setup`, then retry the same `/ce-dogfood` arguments.
+
+**Will it rewrite product behavior?**
+Not on its own. Large, ambiguous, or product-changing issues are escalated. Small obvious bugs get a test and a commit.
+
+**What do the Blocked states mean?**
+`Blocked (needs human verify)` is a real outside-service leg the branch changed that no local stand-in could cover. `Blocked (human decision)` is too big to auto-fix. Neither stops the run: it keeps going and lists them for you at the end.
+
+**When does it stop to ask me?**
+Only when it cannot continue without something only you have (such as secrets the app needs to start) or when the next step would touch your own work (such as checking out over uncommitted changes).
+
+**Can a pack be my persona source?**
+Yes. A pack rule whose body describes who the user is and what they notice or refuse is walked as a persona, cited from the pack; product-doc personas join it when present. See [Personas as packs](./packs.md#personas-as-packs).
 
 ---
 
 ## See Also
 
-- [`ce-test-browser`](./ce-test-browser.md) — 较轻的 test-and-report sibling
-- [`ce-worktree`](./ce-worktree.md) — Phase 0 提供的 isolation
-- [`ce-debug`](./ce-debug.md) — 非明显 failures 的 root-cause analysis
-- [`ce-commit`](./ce-commit.md) — 每个 fix 的 well-scoped commit message
-- [`ce-compound`](./ce-compound.md) — 捕获本 pass 浮现出的 reusable lessons
-- [`ce-setup`](./ce-setup.md) — 报告 `agent-browser` 是否可用，缺失时打印 install command
+- [`ce-test-browser`](./ce-test-browser.md): lighter test-and-report sibling
+- [`ce-polish`](./ce-polish.md): you drive UX on a working feature
+- [`ce-worktree`](./ce-worktree.md): isolation for a PR or other branch
+- [`ce-debug`](./ce-debug.md): used when a failure's cause is not obvious
+- [`ce-commit`](./ce-commit.md): each autonomous fix
+- [`ce-compound`](./ce-compound.md): reusable lessons from the pass
+- [`ce-setup`](./ce-setup.md): install `agent-browser` when it is missing

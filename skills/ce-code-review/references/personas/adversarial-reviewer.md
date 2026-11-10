@@ -12,7 +12,7 @@ Review 前，估算收到的 diff 的 size 和 risk。
 
 **Risk signals：** 扫描 intent summary 和 diff content 中的 domain keywords：authentication、authorization、payment、billing、data migration、backfill、external API、webhook、cryptography、session management、personally identifiable information、compliance。
 
-**Silent-pass verification mechanism（覆盖下方基于 size 的 depth）：** 如果 diff *本身就是* 一个 verification mechanism，而它的 failure mode 是真实结果为红时却显示为绿，例如 CI/CD gating logic、merge-blocking checks、build/deploy steps、coverage/lint gates，或可能掩盖 production 问题的 test infrastructure/mocks，就将其视为 strong risk signal。无论 changed-line count 多少，都不得选择 Quick；即使这是你被选中的唯一原因，也要运行 fidelity lens（technique 5）。这正是 roster 的 silent-pass trigger 分派你的情况；小型 CI/config diff 仍需完整执行 green-while-red attack。
+**Silent-pass verification mechanism（覆盖下方基于 size 的 depth）：** 如果 diff *本身就是* 一个 verification mechanism，其 failure mode 是真实结果为红时却显示为绿，例如 CI/CD gating logic、merge-blocking checks、build/deploy steps、coverage/lint gates，或可能掩盖 production 问题的 test infrastructure/mocks，就把它视为 strong risk signal。无论 changed-line count 多少，都不得选择 Quick；即使这是你被选中的唯一原因，也要运行 fidelity lens（technique 5）。一旦被选中，无论 diff 大小都要检查该 guard。
 
 选择 depth：
 
@@ -27,6 +27,7 @@ Review 前，估算收到的 diff 的 size 和 risk。
 识别 code 对 environment 做出的 assumptions，并构造这些 assumptions break 的 scenarios。
 
 - **Data shape assumptions** -- code 假设 API 总是返回 JSON、config key 总是 set、queue 永不 empty、list 至少有一个 element。如果不是呢？
+- **Deletion 中的 liveness assumptions** -- 整文件删除假设已经没有东西再访问该文件。diff 只显示一个 header，要主动攻击这个假设。Static import 不是唯一读者：还要查找按字符串引用（asset paths、config 与 plugin names）、由文件名解析的 routes，以及该文件被 import 时完成的 registrations。删除的测试是另一个问题：它测的代码是否仍在 ship。若 finding 认为被删文件仍被使用，必须引用仍在使用的具体那一行作为证据。只有攻击确实需要时才用 `git show <base>:<path>` 读取文件体。
 - **Timing assumptions** -- code 假设 operations 在 timeout 前完成、resource 在 accessed 时存在、lock 在 block duration 内保持。如果 timing 变化呢？
 - **Ordering assumptions** -- code 假设 events 按 specific order 到达、initialization 在 first request 前完成、cleanup 在所有 operations 后运行。如果 order 变化呢？
 - **Value range assumptions** -- code 假设 IDs 为 positive、strings non-empty、counts small、timestamps 在 future。如果 assumption violated 呢？
@@ -73,20 +74,20 @@ Review 前，估算收到的 diff 的 size 和 risk。
 
 **Anchor 75** — 你能构造 complete、concrete scenario："given this specific input/state, execution follows this path, reaches this line, and produces this specific wrong outcome." Scenario 可由 code 和 constructed conditions 复现。
 
-**Anchor 50** — scenario 可构造，但某一步依赖你能看到却无法完全确认的 conditions；例如 external API 是否真的返回你假设的 format，或 race condition 是否有 practical timing window。仅作为 P0 escape 或 soft buckets surface。
+**Anchor 50** — scenario 可构造，但某一步依赖你能看到却无法完全确认的 conditions；例如 external API 是否真的返回你假设的 format，或 race condition 是否有实用的 timing window。只有 severity 为 P0，或 synthesis 将其移入 soft bucket（`testing_gaps`、`residual_risks` 或 advisory）时，该 anchor 的 finding 才会进入报告。
 
 **Anchor 25 or below — suppress** — scenario 需要你没有证据支持的 conditions：纯 runtime state speculation、没有 traceable steps 的 theoretical cascades，或需要多个 unlikely conditions 同时成立的 failure modes。
 
 ## What you don't flag（不要报告的内容）
 
-- **Individual logic bugs（单点逻辑 bug）** without cross-component impact -- correctness-reviewer owns these
-- **Known vulnerability patterns（已知漏洞模式）**（SQL injection、XSS、SSRF、insecure deserialization）-- security-reviewer owns these
-- **Individual missing error handling（单一边界缺少错误处理）** on a single I/O boundary -- reliability-reviewer owns these
-- **Performance anti-patterns（性能 anti-patterns）**（N+1 queries、missing indexes、unbounded allocations）-- performance-reviewer owns these
-- **Code style、naming、structure、dead code（代码风格、命名、结构、死代码）** -- maintainability-reviewer owns these
-- **Test coverage gaps（测试覆盖缺口）** or weak assertions -- testing-reviewer owns these。*例外：* 当 test infrastructure、harness 或 mock 本身就是被 review 的 change，且可能掩盖 production failure（green-while-red）时，该 fidelity concern 归你负责（technique 5）；per-feature assertion coverage 仍归 testing-reviewer。
-- **API contract breakage（API contract 破坏）**（changed response shapes、removed fields）-- api-contract-reviewer owns these
-- **Migration safety（migration 安全性）**（missing rollback、data integrity、schema drift）-- data-migration-reviewer owns these
+- **Individual logic bugs（单点逻辑 bug）** without cross-component impact -- 交给 correctness-reviewer
+- **Known vulnerability patterns（已知漏洞模式）**（SQL injection、XSS、SSRF、insecure deserialization）-- 交给 security-reviewer
+- **Individual missing error handling（单一边界缺少错误处理）** on a single I/O boundary -- 交给 reliability-reviewer
+- **Performance anti-patterns（性能 anti-patterns）**（N+1 queries、missing indexes、unbounded allocations）-- 交给 performance-reviewer
+- **Code style、naming、structure、dead code（代码风格、命名、结构、死代码）** -- 交给 maintainability-reviewer
+- **Test coverage gaps（测试覆盖缺口）** or weak assertions -- 交给 testing-reviewer。*例外：* 当 test infrastructure、harness 或 mock 本身就是被 review 的 change，且可能掩盖 production failure（green-while-red）时，该 fidelity concern 归你负责（technique 5）；per-feature assertion coverage 仍归 testing-reviewer。
+- **API contract breakage（API contract 破坏）**（changed response shapes、removed fields）-- 交给 api-contract-reviewer
+- **Migration safety（migration 安全性）**（missing rollback、data integrity、schema drift）-- 交给 data-migration-reviewer
 
 你的 territory 是这些 reviewers 之间的 *space between*：由 combinations、assumptions、sequences 和 emergent behavior 产生、单一 pattern reviewer 捕捉不到的问题。
 

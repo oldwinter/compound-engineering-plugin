@@ -1,119 +1,98 @@
 # `ce-promote`
 
-> 把已发布 feature 转成可直接复制粘贴、面向用户的 announcement copy，并且就在 engineering workflow 内完成。默认不依赖 Spiral；安装 Spiral CLI 后可生成 voice-matched 文案。
+> **中文导读：** `ce-promote` 趁 ship 上下文还在 session 中时起草对外 announcement：推导用户现在能做什么，选择 channel，并交付可复制的 drafts（X post/thread、changelog、LinkedIn、email、blog intro、demo script）。它不依赖任何安装；Spiral CLI 可用且已登录时生成 voice-matched drafts。两个硬边界：只在你主动调用时运行，且只起草，永不 post、publish、schedule、commit 或开 PR。
 
-`ce-promote` 是 **post-ship messaging** skill。Feature merge 后，它会判断实际 ship 了什么、选择合适 channels，并起草 announcement copy：X post 或 thread、一行 changelog blurb、LinkedIn post、email、blog intro、short demo script。即使什么都没安装，也能产出好 copy；当 [Spiral CLI](https://www.npmjs.com/package/@every-env/spiral-cli) 已安装且已认证时，会用它生成匹配 brand voice 的 drafts。
+> Draft user-facing announcement copy for a feature that just shipped. It never posts.
 
-拒绝一次性的 Spiral setup offer 后，该选择会记录在 checkout-local config；参见[配置参考](./configuration.md)。
+`ce-promote` writes the announcement while the ship context is still in your session. After a merge, it works out what a user can now do, picks channels, and hands you copy-pasteable drafts: an X post or thread, a one-line changelog blurb, a LinkedIn post, an email, a blog intro, a short demo script.
 
-它只起草，不会 post、publish、commit 或 open PR；真正 ship copy 是 human action。
+It needs nothing installed. If the [Spiral CLI](https://www.npmjs.com/package/@every-env/spiral-cli) is present and signed in, drafts come back voice-matched to your brand. If you decline the one-time Spiral setup offer, the skill remembers that decline in checkout-local config (see the [configuration reference](./configuration.md)).
 
----
-
-## TL;DR
-
-| Question（问题） | Answer（答案） |
-|----------|--------|
-| 它做什么？ | 总结 ship 内容、选择 channels、起草 announcement copy，并呈现给你 review |
-| 何时使用 | Feature 刚 ship，希望在 workflow 内起草 user-facing messaging 时 |
-| 产出什么 | 按 channel 标注、可复制粘贴的 drafts；绝不是 auto-post |
-| Spiral | 可选增强：CLI ready 时生成 voice-matched drafts；否则只提示一次 setup，然后用轻量 editorial & social expertise 起草 |
+It has two hard limits. It only runs when you invoke it (`disable-model-invocation: true`), so shipping a feature does not start it on its own. And it only drafts. It never posts, publishes, schedules, commits, or opens a PR. Posting stays a human action because it is outward-facing and hard to undo.
 
 ---
 
-## 调用示例
+## Example invocations
 
 ```text
-# 从当前 project 推导已发布内容，并为默认 channels 起草文案
+# Derive what shipped from the merged PR, diff, changelog, and recent commits
 /ce-promote
 
-# Repository context 不足时，直接提供已交付价值
+# Supply the user-facing value when the repo context is not enough
 /ce-promote announce one-click CSV export for account reports
 
-# 要求同一 channel 的多个备选方案
+# Several alternatives on one channel (not a cross-channel set)
 /ce-promote 3 tweet options for the new one-click CSV export
 
-# 起草协调一致的 cross-channel launch set
+# Coordinated set across named channels
 /ce-promote a launch across X, LinkedIn, and email for one-click CSV export
+
+# A single quieter channel
+/ce-promote a one-line changelog blurb for one-click CSV export
+
+# Spoken beats rather than a social post
+/ce-promote a short demo script for the CSV export
 ```
 
-需要特定 distribution shape 时请明确 channels；否则 skill 会选择一小组默认 channels。它只起草，绝不发布。
+An empty invoke derives what shipped from the repo and drafts the default set: an X post (or short thread) plus a one-line changelog blurb. Name channels when you want a different shape.
 
 ---
 
-## 问题
+## Why it exists
 
-Messaging 通常要等单独的 marketing pass，因此落后于 ship；而最了解 user value 的 engineer 往往不是写 copy 的人。当 announcement copy 临时写出来时，又容易带着 AI tells（"We're thrilled to announce..."）、hashtag spam，以及 implementation-speak，而不是用户价值。
+Announcement copy usually waits for a later marketing pass, so it lags the ship. The engineer who knows the user value is rarely the person who writes it. And ad hoc drafts drift toward "We're thrilled to announce...", hashtag spam, and implementation talk instead of what a user can now do.
 
-## 方案
+`ce-promote` drafts at ship time, from ship context. A free-form description in the prompt is the source of truth; without one, it reads the merged or active PR, the diff, the changelog, and recent commits, then writes a short user-facing summary of the outcome, not the serializer or endpoint. If it cannot tell what shipped, it asks one short question rather than guessing.
 
-`ce-promote` 会在 ship 当下基于 ship context 起草 copy：
-
-- **推导 ship 了什么**：可以来自 free-form description，也可以来自 merged PR、diff、changelog 和 recent commits；总结的是 *user-facing value*，不是代码。
-- **合理选择 channels**：默认生成 X post + changelog blurb，并按用户要求和 change 价值扩展。
-- **Spiral ready 时生成 voice-matched copy**；否则只提示一次 setup（sign in 或 install）。用户拒绝后，会用轻量 editorial & social-media fundamentals 自行起草强 channel-specific copy。
-- **呈现 drafts 供 review**：可复制粘贴、按 channel 标注、永不发布。
+It scales to the change: a small fix gets one or two short drafts, a flagship feature can get a cross-channel set. Every draft arrives as a labeled block, followed by an offer to revise. Then it stops.
 
 ---
 
-## 它的新意
+## How Spiral fits in
 
-### 1. Spiral 是微妙的可选增强，绝不是依赖
+Detection is `which spiral` plus `spiral auth status --json`, which lands in one of three states: ready, installed but not signed in, or absent.
 
-Skill 会把 Spiral 检测为三种状态（`which spiral` + `spiral auth status --json`）：ready、installed-but-unauthed、absent。Ready 时，drafts 会匹配用户 brand voice，并持久化到用户 Spiral account（每个 draft 都带 web-app `url` 方便调整）。Not ready 时，skill 只提示 setup **一次**：如果已安装但未认证，agent 运行 `spiral login` 并分享 sign-in link（用户在 browser 中 approve，API key 不会进入 agent）；如果缺失，则指向一步 install command。拒绝始终可以：它会 fallback 到轻量 editorial & social-media expertise，自行起草好 copy，并记录 opt-out，以后不再打扰。无论有没有 Spiral，这个 skill 都有用。
+Ready means Spiral writes the drafts, voice-matched, and each one comes back with a web URL so you can keep tweaking in the Spiral app. Not ready means a one-time setup offer: sign in, or the one-step install. You approve in a browser, and the API key never passes through the agent. Decline and the skill drafts directly, then writes `ce_promote_spiral_optout: true` to `.compound-engineering/config.local.yaml` so it does not ask again in this repo. Non-interactive runs skip the offer entirely.
 
-### 2. Multi-channel / cue-word 陷阱被编码进去了
+A Spiral failure never blocks the skill. An error or unusable output falls back silently to direct drafting for the affected channels.
 
-Spiral 的 multi-channel 行为由措辞驱动，不由 flag 驱动，而且有一个 skill 显式处理的 sharp edge：
+### Phrasing picks one channel or many
 
-- **同一 channel 的 N 个 variations** -> 请求 "3 tweet options"，*避免* cue words（`campaign`、`across`、`multi-channel`、`everywhere`、`cross-post`），并传 `--num-drafts 3`。一个不小心的 cue word 会触发 campaign mode，把输出折叠成单个 draft，并静默忽略 `--num-drafts`。
-- **真正的 cross-channel set** -> 在 prompt 中写明 channels；Spiral 会返回每个 channel 的 drafts set，数量由它决定，通常是多个；`--num-drafts` 会被忽略。一次调用产出完整 cross-channel set。
+Spiral treats "3 tweet options" as N variations of one channel. Words like `campaign`, `across`, `multi-channel`, `everywhere`, or `cross-post`, or naming two or more channels, switch it to a cross-channel set, and campaign mode ignores the variation count. So if you asked for three tweets and got one, a cue word or a second channel name is usually why. To get several tweets, avoid those words. To get a launch set, name the channels.
 
-### 3. 只起草，发布始终由人完成
+Without Spiral the same split holds: one strong draft per named channel, more only when you ask, capped at about three.
 
-Skill 永远不会 post、schedule、publish、commit 或 open PR。Output 始终是 review-ready drafts。这样可把人保留在 outward-facing 且难以回滚的动作上。
+### Direct drafts have standards too
 
-### 4. 用户价值优先于实现细节
-
-"what shipped" summary 描述用户现在能做什么、为什么会在意，而不是让它成为可能的 serializer 或 endpoint。Direct drafting 会禁止 AI tells、throat-clearing 和 hashtag spam，并把长度和 tone 匹配到每个 channel。
+The summary is what a user can now do and why they would care. Direct drafts ban AI tells, throat-clearing, and hashtag spam, lead with the outcome, and match each channel's native length and shape. Nothing gets reused verbatim across channels.
 
 ---
 
-## 快速示例
+## When to reach for it
 
-你 merge 了一个添加 one-click CSV export 的 PR。
+Use it when a user-facing feature just shipped and you want the announcement drafted before the context fades, when you need several channels from one prompt, or when you want voice-matched copy and Spiral is installed.
 
-**Single-channel variations:** `/ce-promote 3 tweet options for the new one-click CSV export` -> skill 总结价值，然后（Spiral path）运行 `spiral write "3 tweet options for one-click CSV export" --instant --num-drafts 3 --json`，不带 cue words；或（no-Spiral path）直接写出三个不同 tweets。三个结果都会以可复制粘贴 block 呈现。
+Skip it when nothing user-facing shipped (internal refactor, CI-only, test-only), when you only need internal release history (use GitHub Releases), or when you want the agent to actually post or open a PR. It will not.
 
-**Cross-channel set:** `/ce-promote draft a launch across X, LinkedIn, and email` -> （Spiral path）`spiral write "announcing one-click CSV export — a launch across X, LinkedIn, and email" --instant --json` 返回每个 channel 的 draft set（Spiral 决定数量）；（no-Spiral path）skill 直接起草一条 X post、一条 LinkedIn post 和一封 email。每个返回 draft 都按 channel 标注，并可直接复制。
-
----
-
-## 何时使用
-
-在以下情况使用 `ce-promote`：
-
-- Feature 刚刚 ship，希望在 context 消退前起草 announcement
-- 需要从一个 prompt 生成 cross-channel copy（tweet + LinkedIn + email）
-- 想要 voice-matched copy，且已经安装 Spiral
-
-以下情况跳过：
-
-- 没有 user-facing 内容 ship（internal refactor、CI-only、test-only）
-- 只需要 internal release notes；这类内容不面向 end users，通常不走 promotion copy
+This is a post-ship utility, not a pipeline stage. It does not run as a side effect of `/ce-work`, `/lfg`, or `/ce-commit-push-pr`. Call it when you want the copy.
 
 ---
 
-## 参考
+## Reference
 
-| Argument（参数） | Effect（效果） |
+| Argument | Effect |
 |----------|--------|
-| _(empty)_ | 从 PR/diff/changelog/commits 推导 ship 内容，并起草默认 channel set |
-| `<description>` | 对 ship 内容的 free-form description，作为 source of truth |
-| `<channels>` | 例如 "a tweet thread and a LinkedIn post"、"3 tweet options"、"a launch across X, LinkedIn, and email" |
+| _(empty)_ | Derives what shipped from PR, diff, changelog, and recent commits. Drafts the default set (X plus a changelog blurb). |
+| `<description>` | Free-form source of truth for what shipped, for example `announce one-click CSV export` |
+| `<channels>` | Named shape: `3 tweet options`, `a tweet thread and a LinkedIn post`, `a launch across X, LinkedIn, and email`, `a one-line changelog blurb`, `a short demo script` |
 
-详细 Spiral CLI mechanics 位于该 skill 的 `references/spiral-cli.md`。
+Supported channels: X (post or short thread), changelog / release blurb, LinkedIn, email, blog intro, demo script.
+
+Spiral CLI details live in the skill's `references/spiral-cli.md`.
 
 ---
 
-## See Also（另见）
+## See also
+
+- [Compound Engineering configuration](./configuration.md): `ce_promote_spiral_optout` and how local config is resolved
+- Harness-native screenshots or recordings: useful visual context to pair with the copy when you have them

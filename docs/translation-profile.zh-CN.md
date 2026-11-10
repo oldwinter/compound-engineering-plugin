@@ -44,9 +44,9 @@
 
 README 顶部提供“安装中文版”区块，必须说明这是社区中文 fork，并使用 `oldwinter/compound-engineering-plugin` 作为 marketplace source。上游 `EveryInc/compound-engineering-plugin` 命令可保留作英文版说明，但不能标注为中文版安装入口。
 
-当前同步基线：上游 commit `5f5bc6b96518c69decdec955b353f49631f921da`。
+当前同步基线：上游 commit `dd9b7921c9c80498eba84994ff1b8e1e81dbc1db`。
 
-本批同步合并 `upstream/main` 从 `66ccf579f8c1ef2ccfc642c317ba53151eeb1ebb` 到 `5f5bc6b96518c69decdec955b353f49631f921da` 的 47 个 commit。保留上游 runtime behavior、host manifests、新的 `docs/guides` 布局、optimize ladder/objective schema、criteria-file review routes、native-format plan handoff、plugin upgrade 文档和新的 host metadata；runtime 入口继续使用已有中文本地化层，长篇 executable spec 与历史 solution 在冲突处保留权威上游英文，并补充中文导读。
+本批同步合并 `upstream/main` 从 `fe02f790` 到 `dd9b7921c9c80498eba84994ff1b8e1e81dbc1db` 的 302 个 commit（约 1,700 个文件）。保留上游 runtime behavior 与 restructured `docs/guides`、`ce-compound` 合并 `ce-compound-refresh` 后的新结构、open-vocabulary corpus-first 规则、`retire_when`/`framework_version` 约定、cross-model 结构化失败证据脚本、host manifests 升级与新 host metadata；runtime 入口继续使用已有中文本地化层，长篇 executable spec 与历史 solution 在冲突处保留权威上游英文，并补充中文导读。
 
 ## 同步后检查
 
@@ -62,3 +62,4 @@ README 顶部提供“安装中文版”区块，必须说明这是社区中文 
 - 上游同时支持 Claude Code、Codex、Cursor、Cline、Kimi、Grok、Devin、Pi 等 host；翻译不得改变各 host 的 manifest、权限映射或安装语义。
 - `skills/` 是 runtime source of truth；`docs/skills/` 是面向读者的镜像说明，两者涉及同一新增能力时应保持语义一致。
 - 长篇历史 plan、solution 和 spec 默认保留上游原文；只有实际运行入口、当前安装说明或用户直接依赖的文档需要增量翻译。
+- Codex 只注入每个 SKILL.md 的前 8000 字节（CRLF 校正后），`tests/codex-skill-prompt-budget.test.ts` 守住该上限。上游正文逼近上限时不得为插入中文导读越过门禁：`ce-compound`、`ce-product-pulse` 只保留单行 fork 标记，`ce-doc-review`、`ce-optimize` 余量分别仅 38 与 30 字节，SKILL.md 保持上游原文，中文说明留在各自 `references/`。

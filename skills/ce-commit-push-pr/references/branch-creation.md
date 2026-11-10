@@ -32,18 +32,10 @@ git log origin/<base>..HEAD --oneline
 ### 3. 创建 feature branch
 
 ```bash
-git checkout -b <branch-name> "$BASE_REF"
+git checkout --no-overwrite-ignore -b <branch-name> "$BASE_REF"
 ```
 
-如果 checkout 因 uncommitted changes 会被覆盖而失败，stash 后重试：
-
-```bash
-git stash push -u -m "ce-commit-push-pr: pre-branch <branch-name>"
-git checkout -b <branch-name> "$BASE_REF"
-git stash pop
-```
-
-如果 `git stash pop` 报告 conflicts，向用户展示 conflict output 和 stash ref；不要 auto-resolve。
+如果 checkout 因 uncommitted 或 ignored files 会被覆盖而失败，应当 stop and ask the user 处理发生冲突的路径。`mode:pipeline` 下直接报告 blocker，不要询问。不要 stash，也不要移除冲突路径。
 
 ## Fetch failure fallback（fetch 失败 fallback）
 

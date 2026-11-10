@@ -1,12 +1,12 @@
-# Resolution Templates（解决方案模板）
+# Resolution Templates
 
-选择与 problem_type track 匹配的 template（见 `references/schema.yaml`）。
+Choose the template matching the problem_type track (see `references/schema.yaml`).
 
 ---
 
-## Bug Track Template（bug track 模板）
+## Bug Track Template
 
-用于：`build_error`、`test_failure`、`runtime_error`、`performance_issue`、`database_issue`、`security_issue`、`ui_bug`、`integration_issue`、`logic_error`
+Use for: `build_error`, `test_failure`, `runtime_error`, `performance_issue`, `database_issue`, `security_issue`, `ui_bug`, `integration_issue`, `logic_error`
 
 <!-- YAML safety: array items (symptoms, applies_when, tags, related_components) starting with ` [ * & ! | > % @ ? or containing ": " must be wrapped in double quotes. See references/yaml-schema.md > "YAML Safety Rules". -->
 
@@ -23,6 +23,7 @@ symptoms:
 root_cause: [corpus value, else schema suggested default]
 resolution_type: [schema enum]
 severity: [schema enum]
+retire_when: [optional; the outside change that would retire this doc and how to check for it, else omit this line]
 tags: [keyword-one, keyword-two]
 ---
 
@@ -52,9 +53,9 @@ tags: [keyword-one, keyword-two]
 
 ---
 
-## Knowledge Track Template（knowledge track 模板）
+## Knowledge Track Template
 
-用于：`best_practice`、`documentation_gap`、`workflow_issue`、`developer_experience`
+Use for: `best_practice`, `documentation_gap`, `workflow_issue`, `developer_experience`, `architecture_pattern`, `design_pattern`, `tooling_decision`, `convention`
 
 <!-- YAML safety: array items (symptoms, applies_when, tags, related_components) starting with ` [ * & ! | > % @ ? or containing ": " must be wrapped in double quotes. See references/yaml-schema.md > "YAML Safety Rules". -->
 
@@ -69,6 +70,7 @@ component: [corpus value, else schema suggested default]
 severity: [schema enum]
 applies_when:
   - [Condition where this applies]
+retire_when: [optional; the outside change that would retire this doc and how to check for it, else omit this line]
 tags: [keyword-one, keyword-two]
 ---
 

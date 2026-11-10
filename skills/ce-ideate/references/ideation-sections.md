@@ -22,9 +22,8 @@ Ideation artifact 是一个已排序、已批判的 candidate set，包含 candi
 - **focus** — 提供 focus hint 时记录；open-ended 时省略。
 - **mode** — `repo-grounded`、`elsewhere-software` 或 `elsewhere-non-software`。
 
-Markdown 将 metadata 渲染为文件顶部的 YAML frontmatter。HTML 将它渲染为 visible header text
-（遵循 html-rendering hard invariant：每个 value 只有一个 visible source of truth，
-没有 hidden machine-readable copy）。
+Markdown 将 metadata 渲染为文件顶部的 YAML frontmatter。HTML 则按 `references/html-rendering.md`
+的规定把它渲染为 visible text；每个 value 只有一个可见副本，不保留 hidden machine-readable copy。
 
 **no status field（没有 status field）：doc 上没有，per idea 也没有。** Ideation doc 是 point-in-time
 discovery artifact，不是 tracked work item：它没有 `active → completed` lifecycle，

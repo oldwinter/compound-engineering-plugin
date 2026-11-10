@@ -4,14 +4,16 @@
 
 将本文件作为以下内容的 quick reference：
 - required fields（必填字段）
-- enum values（枚举值）
+- enum values 与 open-vocabulary defaults（枚举值与开放词汇默认值）
 - validation expectations（验证预期）
 - category mapping（类别映射）
 - track classification（track 分类：bug vs knowledge）
 
 ## Corpus-First Vocabulary（以现有 corpus 为先的词汇）
 
-`component` and `root_cause` are open vocabulary, and the category directories are a default layout, not a fixed one. Before classifying, sample existing docs under `<root>/solutions/` and reuse the corpus's established values and directory taxonomy. Use the schema defaults only when no existing doc covers the area or cause; do not coin a near-synonym.
+`component` 与 `root_cause` 是 open vocabulary，category directories 也只是 default layout，并非固定结构。已有 learnings 的 repos 通常有自己的、自洽的 values 和 directory names，它们的检索（agent instructions、greps、tooling）也以这些为准。按本文件的 defaults 而不是 repo 自身词汇写出的 doc，就是 repo 找不到的 doc，这会让写它的意义落空。
+
+所以分类前：当 `<root>/solutions/` 已有 docs 时，先采样该 area 现有 docs 的 frontmatter（`component`、`root_cause`、`problem_type`、`tags`）与 directory names。`component` 使用 corpus 现有 docs 为该 area 使用的 value（本次变更所属的 component/directory 分组）。`root_cause` 按 cause 本身而非 area 匹配：使用现有 docs 为同一个 underlying cause 使用的 value，无论这些 docs 位于 corpus 何处 —— 某个 area 的典型 root_cause 不会迁移到已验证 cause 不同的 doc 上。对这两个 field，当 corpus 对同一 area（component）或同一 cause（root_cause）存在多种拼写时，使用最多 docs 采用的拼写（并列时取日期最新的 doc）；只有当没有任何现有 doc 覆盖该 area（component）或命名该 cause（root_cause）时，才使用 schema 的 suggested default。复用 corpus values 的原拼写，不要自造已有 value 的近义词。Directory 选择是独立条件：把 doc 放进覆盖该 area 的既有 directory；只有当没有既有 directory 覆盖时才使用下方 Category Mapping。`problem_type`、`severity` 和 `resolution_type` 仍是 closed enums（`problem_type` 决定 track 选择）。
 
 ## Tracks（Track 分类）
 
@@ -50,22 +52,23 @@ Required（必填）：
 
 - **related_components**：涉及的其他 components
 - **tags**：Search keywords，lowercase 且 hyphen-separated
+- **retire_when**：会让本 learning 退役的仓库外变化，以及 refresh 如何在不改动仓库的情况下检查它。只有当该 guidance 仅在某个仓库外条件成立时才有效时设置：尚未修复的上游 bug、tool 或 platform 版本、dependency 的行为。否则省略。需要改动仓库才能完成的验证（如移除 workaround 后重跑 CI）应写进正文，作为移除前的步骤。该字段是一个字符串；值中含 ` #` 或 `: ` 时整体加引号。
 
 ## Optional Fields（bug track only，仅 bug track）
 
-- **framework_version**：`X.Y.Z` 格式的 framework version
+- **framework_version**：观察到该 bug 的 framework 或 runtime 名称与版本，例如 `rails 7.1.2` 或 `node 22.4.0`
 
 ## Backward Compatibility（向后兼容）
 
 Track system 之前创建的 docs 可能在 knowledge-type problem_types 上带有 `symptoms`/`root_cause`/`resolution_type`。这些是 valid legacy docs：
 
 - Knowledge-track doc 上存在 bug-track fields 是 harmless 的。除非该 doc 因其他原因正在重写，否则 refresh 时不要 strip 它们。
-- 旧 doc 可能仍使用早期 closed list 或 `rails_version`；它们保持有效。新 doc 必须遵循上面的 open vocabulary 规则。
+- 在 `component`/`root_cause` 成为 open vocabulary 之前写下的 docs，可能带有早期 closed list 的 values，或仍使用早期的 `rails_version` field（现为 `framework_version`）。它们保持有效，持续使用这些 values 的 corpus 也应继续沿用。
 - 创建 **new** docs 时，遵循上方 track rules。
 
 ## Category Mapping（类别映射）
 
-Default layout for a repo with no existing learnings. When `<root>/solutions/` already has an established directory taxonomy, place the doc in the existing directory that covers this area rather than creating a new directory from this table that nothing else uses.
+Default layout for a repo with no existing learnings. When `<root>/solutions/` already has an established directory taxonomy, place the doc in the existing directory that covers this area（即上文的 corpus-first 规则），rather than creating a new directory from this table that nothing else uses.
 
 - `build_error` -> `<root>/solutions/build-errors/`
 - `test_failure` -> `<root>/solutions/test-failures/`
@@ -92,10 +95,12 @@ Default layout for a repo with no existing learnings. When `<root>/solutions/` a
 3. Bug-track docs 上必须存在 bug-track required fields（`symptoms`、`root_cause`、`resolution_type`）。
 4. Knowledge-track docs 除 shared fields 外没有额外 required fields。
 5. Existing knowledge-track docs 上的 bug-track fields 是 harmless 的（见 Backward Compatibility）。
-6. Enum fields 必须精确匹配 allowed values。
-7. Array fields 必须遵守 min/max item counts。
-8. `date` 必须匹配 `YYYY-MM-DD`。
-9. `framework_version` 如存在，必须匹配 `X.Y.Z`，且只适用于 bug-track docs。
+6. Enum fields（`problem_type`、`severity`、`resolution_type`）必须精确匹配 allowed values。
+7. Open-vocabulary fields（`component`、`root_cause`）遵循上文 Corpus-First Vocabulary 规则。
+8. Array fields 必须遵守 min/max item counts。
+9. `date` 必须匹配 `YYYY-MM-DD`。
+10. `framework_version` 如存在，只适用于 bug-track docs。
+11. `retire_when` 在两个 track 上都是 optional；存在时为单个字符串，缺失时 doc 仍然有效。
 
 ## YAML Safety Rules（YAML 安全规则）
 

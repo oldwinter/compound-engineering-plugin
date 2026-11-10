@@ -1,100 +1,195 @@
 # `ce-retune`
 
-用测量优先的方法，为新模型重新调校 skill 语料库。
+> **中文导读：** `ce-retune` 是测量优先的语料库调优 skill：模型升级后 workflow 变慢、卡住、半途停止或 token 暴涨时，先挖运行归档、用两个相同 build 求 noise floor，再做对抗式审计，最后按预先登记的 bar 分批裁剪。硬性前提是能 A/B 两份语料库 build 的 benchmark harness；没有就停止并说明该建什么，绝不把静态审计伪装成 retune。它只能由用户手动调用（`disable-model-invocation: true`）。
 
-语料库在模型升级后退化，首先是测量问题，其次才是写作问题。只阅读文本并重写看似有问题的部分，会得到一份貌似合理的修复清单，却无法判断其中任何一项是否真正有效。
+> Retune a skill corpus for a new model, measurement-first.
+
+`ce-retune` is an on-demand **corpus** skill. Use it when a model upgrade made an agent workflow worse. The pipeline stalls, stops mid-run, or burns far more tokens than before, and someone wants to rewrite skill prose to fix it.
+
+It is not a general skill editor. Reading the corpus and rewriting what looks wrong produces a plausible fix list and no way to tell whether any item mattered. This skill mines the run archive, measures a noise floor on two identical builds, audits with an adversary that defends the existing prose, then cuts in measured passes until a bar you registered in advance clears.
+
+Hard requirement: a benchmark harness that can A/B two builds of the corpus. Without one, the skill stops and names what to build. It will not pretend a static audit is a retune.
+
+The skill is user-invoked only. It spends many paid runs, so an agent may not route into it on its own.
+
+---
 
 ## TL;DR
 
-| 问题 | 答案 |
-|------|------|
-| 它做什么？ | 从现有运行归档中挖掘基线，对两个完全相同的构建建立 noise floor，让 defender 为现有文本辩护并开展对抗式语料库审计，然后分批裁剪，直到通过预先登记的门槛 |
-| 何时使用？ | 模型升级后 agent 工作流表现变差：停滞、中途结束、token 消耗显著增加，或有人提议通过重写 skill 文本修复行为 |
-| 它产出什么？ | 重新调校后的语料库、每个 pass 一个 commit，以及基线表、noise floor 和支撑门槛结论的逐次运行记录 |
-| 下一步是什么？ | 用 `/ce-compound` 记录发现的机制；用 `/ce-commit-push-pr` 发布各个 pass |
-| 硬性要求 | 一个能对语料库两个构建进行 A/B 测试的 benchmark harness。缺少它时，本 skill 会拒绝执行 |
+| Question | Answer |
+|----------|--------|
+| What does it do? | Mines an existing run archive, measures a noise floor on two identical builds, audits the corpus with a defender, then cuts in measured passes until a pre-registered bar clears |
+| When to use it | A model upgrade made a skill corpus worse, or a rewrite is proposed and you need to know whether it actually helps |
+| What it produces | A retuned corpus, one commit per pass, plus the measurement record: baseline table, noise floor, and the run-by-run log behind the bar |
+| What's next | `/ce-compound` for the mechanism you found; `/ce-commit-push-pr` to ship the passes |
+| Hard requirement | A harness that can point a run at a specific checkout of the corpus. The skill refuses without one |
 
-## 调用示例
+---
 
-```bash
-# 从症状开始
+## Example invocations
+
+The first argument is a symptom or a target model. The corpus defaults to `./skills`. `bar:<n>` is consecutive clean runs, registered before any cut.
+
+```text
+# Start from what broke. Corpus defaults to ./skills
 /ce-retune the pipeline stops partway through on the new model
 
-# 预先指定目标和门槛
+# Token blow-up on the same pipeline, same task
+/ce-retune the pipeline uses several times more tokens on the new model
+
+# Name the model and the bar up front
 /ce-retune target-model bar:8
 
-# 指向 ./skills 以外的语料库
+# Point at a corpus that is not ./skills
 /ce-retune ./agents bar:12
+
+# Audit only. Cheaper, and honest that it cannot say whether a cut helped
+/ce-retune audit the skills corpus, do not run the measurement loop
 ```
 
-## 问题
+If any of the three measurement pieces is missing (archive or a harness that produces one, a build selector, a repeatable end-to-end task), the skill stops and tells you what to build.
 
-模型升级可能让原本可用的语料库退化。直觉做法是阅读各个 skill 并重写看似错误的部分，但它会因为一个具体原因失效：语料库足够大，没有人能可靠地仅凭阅读推断所有文本的行为，包括这些文本的作者。
+---
 
-更棘手的是，故障通常具有随机性。相同输入可能产生分布很宽的结果，因此单次运行说明不了问题，小样本也说明不了问题；从少量运行得出的“修改前后”对比，与什么都不做几乎无法区分。由此形成的修复清单看似严谨，实际并非如此。
+## How it works
 
-## 解决方案
+The failure this skill targets is stochastic. Identical inputs produce a wide spread of outcomes, so one run tells you nothing and a before-and-after drawn from a handful of runs is indistinguishable from doing nothing. The fix is to measure in a fixed order, where each step buys the right to take the next.
 
-按固定顺序先测量，每一步都为进入下一步提供依据。
+1. **Gate on measurability.** No archive, no build selector, no repeatable task: stop and say what to build.
+2. **Mine the archive.** Historical runs are a free baseline, usually larger than any experiment you can afford this week.
+3. **Find the noise floor.** Run the harness against two identical builds, same commit on both sides. Whatever difference appears is the floor every later claim must clear, and it sets the sample size. Register the bar in writing before any change exists. A bar chosen after seeing results is not a bar.
+4. **Audit adversarially.** One agent per skill proposes cuts. A second defends the existing prose from the project's learnings, tests, and git history. A defended keep leaves the list.
+5. **Cut in surgical passes.** One problem per agent, disjoint file ownership, reconcile after every edit.
+6. **Measure, and let the failure choose the next fix.** Where a run failed matters more than whether it did. Loop until the bar clears.
 
-1. **先过可测量性门槛。** 没有归档、build selector 或可重复任务，就停止并明确要补建什么。只做审计是合理但不同的请求。
-2. **挖掘归档。** 历史运行是免费的基线，样本通常比本周能承担的任何实验都大。
-3. **确定 noise floor。** 使用同一 commit 的两个完全相同构建。观察到的差异就是所有后续结论必须超过的下限，也用于决定样本量。在修改发生前登记门槛。
-4. **进行对抗式审计。** 每个单元由一个 agent 提议裁剪，再由另一个 agent 使用项目自身的 learnings、测试和 Git 历史为现有文本辩护。得到充分辩护的保留项从列表中移除。
-5. **分批精准裁剪。** 每个 agent 只处理一个问题，文件所有权互不重叠，每次编辑后都 reconcile。
-6. **让失败决定下一次修复。** 运行失败在哪里，比是否失败更重要。循环执行，直到通过门槛。
+Done is a cleared bar, or a report of the claim the run could not support. A green test suite is not done. It proves nothing broke, not that behavior improved. And word count is not the result: leanness and performance share a corpus and are separate programs.
 
-## 它的独特之处
+---
 
-### 1. 把损坏的运行当作一等结果
+## What Makes It Novel
 
-空 transcript 和错误退出如果算作模型失败，会悄悄放大每个效果。在本 skill 的来源项目中，归档里有 20% 是损坏运行；排除它们后，最初的核心结论被证伪。本 skill 把 `broken` 作为独立分类，不计入成功率的分子和分母，并检查它是否均匀分布在各组。分布明显偏斜，说明 harness 故障伪装成了模型效果。
+### Broken runs are their own bucket
 
-### 2. 始终分开两项指标
+Empty transcripts and error exits look like model failures and silently inflate every effect. In the engagement this skill came from, 20% of an archive was broken runs, and excluding them falsified the first headline finding. `broken` is excluded from both numerator and denominator. If broken runs pile up on one arm, that is a harness fault, not a model effect.
 
-“遵循了流程”和“完成了任务”分别跟踪，因为一次运行可能完成任务，却完全跳过工作流。合并为一个指标时，这会被解读为成功；分开后，它会显现为独立缺陷。本 skill 正是通过这一点发现了裁剪本身引入的回归。
+### Two metrics, never collapsed
 
-### 3. 先测 noise floor，再提出结论
+"Followed the process" and "did the job" stay separate. A run can finish the task while skipping the workflow. Folded into one number, that reads as success. Kept apart, it is a distinct defect, which is how the skill caught a regression the cutting itself introduced.
 
-在认定任何改进之前，先比较两个完全相同的构建。多数 retune 工作都会跳过这一步，因此它们的结论经不起检验。这也提供了低成本的单臂测试：已知基线成功率后，连续 N 次 clean run 在该基线下具有精确概率，因此无需 control arm，也能让 streak 通过统计门槛。
+### The noise floor comes before the claim
 
-### 4. 由反方为文本辩护
+Two identical builds are compared before anything is credited. That is the step most retuning skips, and skipping it is why those results do not survive scrutiny. A pre-registered streak on one fixed candidate can also clear an operational bar. Its `p^N` probability assumes a known fixed baseline rate, independent runs, and one planned attempt. Estimated baselines and candidate selection require additional statistical treatment; without it, report the observed confirmation rather than an exact-significance claim.
 
-每个裁剪提议都要面对一个 defender；它会用项目记录的 learnings、测试和 Git blame 查找该行存在的原因。“较弱模型可能需要它”不是保留理由，只有可引用的来源才是。这让审计不同于拆除，也常能保住初始判断中被视作无用的文本。
+### An adversary defends the prose
 
-### 5. 预期自己的前提会出错
+Every proposed cut faces an agent whose job is to find why that line exists. "A weaker model might need it" is not grounds for keeping. Only a citable source is. A cut with no provenance after a real search is a confident cut. A defended keep is not relitigated.
 
-综合结果必须报告与初始前提相矛盾的证据：defender 在哪里获胜，哪个单元比词数暗示的更精炼，以及语料库在哪里已经记录了反对自身繁复流程的论证，只是此前无人检索。只确认已有观点，学不到任何东西。
+Proposal and defense need separate contexts. If the host cannot run them as separate agents, the audit stops rather than arguing both sides in one conversation and calling that an audit.
 
-### 6. 审计测量工具无法触达的部分
+### Not every stop is the enemy
 
-如果 probe 在结构上无法进入某个阶段，就永远不会在那里失败，因此 green streak 只能证明它实际覆盖的路径。本 skill 要求列出未进入的阶段并直接阅读相关文件，其发现与运行结果具有同等权重。
+Some workflows exist to stop and ask; that is the product. Every stop gets sorted by who is actually on the other side before anyone touches it. And a removed string that a test pins is a finding to report, never a test to weaken.
 
-## 工作流位置
+### It expects to be wrong
 
-上游输入：模型升级，或显示退化的运行归档。
+The write-up has to report what contradicts the premise: where defenders won, which unit was leaner than its word count implied, and where the corpus already argued against its own ceremony. Hypotheses that died are recorded on purpose, so the next attempt does not rerun a dead end.
 
-下游：用 `/ce-compound` 记录机制和已被证伪的假设；用 `/ce-commit-push-pr` 发布各个 pass。
+### It audits what the instrument cannot reach
 
-相邻能力：`/ce-optimize` 根据 spec 运行通用指标优化循环，并不了解语料库、halt class 或 noise floor。待优化对象不是 skill 语料库时使用它。
+A probe that never enters a phase can never fail in it. A green streak certifies only what it exercised. Unentered phases are listed and those files are read directly. Findings there weigh the same as findings from the runs.
 
-## 不应使用的情况
+---
 
-- **无法测量。** 本 skill 会拒绝执行，不会退化为静态审计后仍宣称完成了 retune。
-- **你要的是语料库审计，而非 retune。** 直接请求审计；成本更低，也会诚实说明它能得出什么结论。
-- **目标是减少字数。** 精炼度与性能是两个不同计划，只是碰巧作用于同一语料库。本 skill 优化并报告完成表现，字数不是结果。
+## Quick Example
 
-## 说明
+A pipeline that used to finish now stops partway on the new model. You invoke `/ce-retune the pipeline stops partway through on the new model`.
 
-以下参考文件按需加载：
+The skill checks for an archive, a build selector, and a repeatable task. All three are present, so it mines the archive first. Broken runs are split out. "Followed the process" and "did the job" stay separate columns. The table shows which phase runs die in.
 
-| 文件 | 内容 |
-|------|------|
-| `references/baseline-mining.md` | 要抽取的字段、结果分类，以及会误导严谨分析者的混杂因素 |
-| `references/noise-floor.md` | A/A protocol、交错运行、适用于小样本的统计方法和门槛登记 |
-| `references/corpus-audit.md` | 分派方式、finding schema、值得查找的类别，以及不受模型层级影响的 protocol |
-| `references/cut-passes.md` | 精准裁剪循环、隔离规则、共享资产陷阱和过度裁剪故障模式 |
-| `references/halt-taxonomy.md` | 可检索的回归类别与修改前后示例，以及必须保留的 stop |
-| `references/workflow-shapes.md` | 每个阶段适合的编排方式，以及选错方式时会发生什么 |
+It then runs the same commit against itself. The spread on identical builds becomes the floor. You register `bar:8` consecutive clean runs before any file is edited.
 
-本 skill 只能由用户调用（`disable-model-invocation: true`）。它会消耗大量付费运行，并在缺少 harness 时拒绝执行；若允许模型自动路由，低成本请求可能意外升级成昂贵的测量计划。
+The audit proposes cuts. The defender keeps several lines with citations from tests and git history. The remaining cuts go out as one-problem, one-agent passes. After each pass the harness runs. A failure that moved to a later phase names the next target. A failure at the same site means the last cut missed.
+
+After selecting and freezing the candidate, eight fresh clean runs clear the pre-registered operational bar. Each pass is its own commit. The measurement artifacts retain all attempts, not just the final streak; clearing the bar alone is not a search-wide significance claim. `/ce-compound` gets the mechanism and the hypotheses that died.
+
+---
+
+## When to Reach For It
+
+Use `ce-retune` when:
+
+- A model upgrade made a skill corpus stall, halt, skip the workflow, or burn far more tokens
+- Someone wants to rewrite skill prose to fix that behavior, and you need a measured answer
+- You have (or will build) a harness that can point a run at a specific checkout of the corpus
+
+Skip it when:
+
+- There is no way to measure. The skill refuses rather than degrading into a static audit presented as retuning
+- You want a corpus audit, not a retune. Ask for the audit directly. It is cheaper and honest about what it can conclude
+- The goal is word reduction. This skill reports completion, not leanness
+- The thing being optimized is not a skill corpus → `/ce-optimize`
+- You already know the one-line fix in one file and do not need a measurement program. Edit it
+
+---
+
+## Use as Part of the Workflow
+
+Upstream: a model upgrade, or a run archive that already shows degradation.
+
+Downstream: `/ce-compound` records the mechanism and the hypotheses that died. `/ce-commit-push-pr` ships the per-pass commits.
+
+Adjacent: `/ce-optimize` is a generic metric-driven loop. It knows nothing about corpora, halt classes, or noise floors.
+
+---
+
+## Use Standalone
+
+Most runs start from a symptom in chat. The default corpus is `./skills`; name another tree when that is not the one that degraded. The model will never suggest this skill on its own. You have to invoke it.
+
+---
+
+## Reference
+
+| Argument | Effect |
+|----------|--------|
+| `<symptom>` | Starts from the failure (stall, mid-run halt, token blow-up) |
+| `<target model>` | Names the model the bar will be measured on |
+| `<path>` | Corpus root. Default is `./skills` |
+| `bar:<n>` | Pre-register a streak of N consecutive clean runs |
+| Audit-only wording | Runs the cheaper audit. It cannot say whether a cut helped |
+
+The three pieces the gate checks:
+
+1. A run archive, or a harness that produces one (tool-call trace, terminal marker, token counts, final message)
+2. A build selector (`--plugin-dir`-style override, configurable skills path, or env var) so two checkouts are comparable
+3. A repeatable task the corpus actually executes end to end
+
+---
+
+## FAQ
+
+**Why not just read the skills and edit them?**
+Because you cannot tell whether the edit mattered. The corpus is large, the failure is noisy, and a small before-and-after sits inside the envelope of doing nothing.
+
+**What if I have no harness?**
+The skill stops and names the missing piece. Build the harness (archive, build selector, repeatable task), then invoke again. Do not ask it to "just audit and apply."
+
+**Is an audit-only pass allowed?**
+Yes, if you ask for it as an audit. That pass can say what looks cuttable. It cannot say whether cutting helped.
+
+**What does `bar:8` mean?**
+An operational bar of eight consecutive clean runs on one fixed candidate. The bar is written down before any change exists. It does not by itself establish effect size or significance after candidate selection; the measurement protocol determines which statistical claims the evidence supports.
+
+**Is a green test suite enough?**
+No. Tests prove the suite still passes. They do not prove the new model finishes the workflow.
+
+**Will another skill start this for me?**
+No. `disable-model-invocation` is on. The run is expensive and refuses without a harness, so routing it automatically would turn a cheap request into a paid measurement program.
+
+---
+
+## See Also
+
+- [`ce-optimize`](./ce-optimize.md): generic scored search over code or config. Use that when the thing being optimized is not a skill corpus
+- [`ce-compound`](./ce-compound.md): record the mechanism and the hypotheses that died
+- [`ce-commit-push-pr`](./ce-commit-push-pr.md): ship the per-pass commits

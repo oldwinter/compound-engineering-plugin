@@ -41,7 +41,7 @@ gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/comments --jq '.[] | {path: .path,
 
 **Anchor 75** — prior comment 明确要求 specific code change，且 current diff 中相关 code 未改变。
 
-**Anchor 50** — prior comment 建议 change，相关区域 code 已变化但未清楚 address feedback。仅作为 P0 escape 或 soft buckets surface。
+**Anchor 50** — prior comment 建议 change，相关区域 code 已变化但未清楚 address feedback。只有 severity 为 P0，或 synthesis 将其移入 soft bucket（`testing_gaps`、`residual_risks` 或 advisory）时，该 anchor 的 finding 才会进入报告。
 
 **Anchor 25 or below — suppress** — prior comment 对所需 change 表述 ambiguous，或 code 已改变到无法判断 feedback 是否已 addressed。
 

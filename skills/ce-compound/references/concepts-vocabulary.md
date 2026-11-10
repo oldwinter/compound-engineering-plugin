@@ -52,7 +52,7 @@
 
 ## The coherence neighborhood（连贯性邻域）
 
-entry 的 neighborhood 是它所在 cluster 的 siblings，加上它 cross-reference 或引用它的 terms。它限定 capture-time pass：只处理已经掌握的 evidence，从不 audit 整个文件；任何需要本次 run 未进行的调查才能判断的内容，标记给 `ce-compound-refresh`。
+entry 的 neighborhood 是它所在 cluster 的 siblings，加上它 cross-reference 或引用它的 terms。它限定 capture-time pass：只处理已经掌握的 evidence，从不 audit 整个文件；任何需要本次 run 未进行的调查才能判断的内容，标记给一次 refresh（`ce-compound refresh`）。
 
 ## Per entry（单个条目）
 
@@ -96,3 +96,19 @@ A physical seating unit with fixed capacity. Tables are shared resources — the
 ### Seating
 The act of placing a Party at a Table once the Party arrives. A Reservation has at most one Seating; a Table accumulates many Seatings across its lifetime.
 ```
+
+## Vocabulary capture during a refresh（refresh 期间的词汇捕获）
+
+Per-doc actions 执行完后，把 investigation 期间标记的 domain terms 与 `CONCEPTS.md` 对账。
+
+1. **Aggregate**：汇总 scope 内 learnings 的 qualifying terms；同一个 term 以不同精度的 shades 出现时，把这些 shades 合并为一个 entry。
+2. **若 `CONCEPTS.md` 已存在：** 补充缺失的 terms，在 corpus 暴露新精度时 refine entries，然后按上方 **What earns a slot — and what keeps one** 对本次 run 的 scope 触及的每个 entry 对账：补齐 central-but-missing 的 core nouns，再把每个不达标的 entry 导向该条件指定的结果 —— 折叠进能承载它的 surviving entry；读者仍会遇到该 term 时 retire 到 `## Retired`；读者不会再遇到时删除。unscoped refresh 读整个 store，所以它的 reconcile 覆盖整个文件 —— 这正是累积式 glossary 需要的 pass；scoped refresh 只停在自己的 area，其余保持不动。Retention 读取的是 Seed goal 所用的同一个 **declared domain model**，因此 presence 与 absence 都对照同一个来源判断。
+3. **若它不存在**且至少有一个 term 合格：bootstrap 它 —— 按 Seed goal 播种 scope 内 area 的 core domain nouns，与已浮现的 terms 并列；创建时对 borderline terms 保守地把关。文件以 `# Concepts` heading 下的这段 preamble 开头：
+
+   > Shared domain vocabulary for this project — entities, named processes, and status concepts with project-specific meaning. Seeded with core domain vocabulary, then accretes as ce-compound captures and refreshes learnings; direct edits are fine. Glossary only, not a spec or catch-all.
+
+   1-4 个 terms → 用 flat headings；更多 → 按 reference 中的 domain relationship 聚类。
+4. **Scrub violations**：按本 reference 的 criteria（implementation specifics、会 drift 的 config values、status/owner/date metadata、duplicates、未定义的 project-specific siblings）清理 step 2 对账过的同一批 entries —— unscoped run 清理整个文件，因为 refresh 是 audit；scoped run 只清理该 area 的 entries。
+5. 不要超出本次 run 的 scope，也不要事后往 learnings 里注入 `(see CONCEPTS.md)` 指针。
+
+报告本次 run 对 `CONCEPTS.md` 做了什么。只有当文件与 run 开始时逐字节相同，才可以报 "scanned, no qualifying terms"；任何改动都要报告其计数，无论由哪个 step 造成。可见记录是"reference 被查阅"的 audit signal，也是防止 glossary 被静默修改而不上报的关键。所有 mode 下都静默应用 vocabulary edits —— 不向用户提问。

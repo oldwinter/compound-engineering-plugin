@@ -1,72 +1,187 @@
-# `/ce-sweep` - Recurring Feedback Sweep
+# `ce-sweep`
 
-| | |
-|---|---|
-| **Purpose** | Sweep configured feedback sources 中的新 items，跟踪每个 item 到 verified resolution，并产出 `/lfg`-ready plan |
-| **Inputs** | `feedback_sources` config（首次运行时 setup）；可选 `setup`/`reconfigure` 和 `mode:non-interactive` tokens（deprecated alias `mode:headless`） |
-| **Outputs** | Rolling requirements-only unified plan（`docs/plans/feedback-sweep-plan.md`）、durable state file、source-side acknowledgments、run summary |
-| **Invocation** | 手动（`/ce-sweep`）或定时（`/ce-sweep mode:non-interactive`）；绝不 model-invoked |
-| **Position** | Around the loop，从 customer feedback 供给 `/lfg` 和 `ce-plan` |
+> **中文导读：** `ce-sweep` 位于主循环之外：扫描已配置的反馈来源，把每条新反馈跟踪到已验证的 merge，并维护一份持续更新的 `/lfg` 可用 plan。首次运行是交互式 setup interview；之后可手动或以 `mode:non-interactive` 定时运行。输出为 `docs/plans/feedback-sweep-plan.md`。
 
-## 调用示例
+> Sweep configured feedback sources for new items, track each one to a verified merge, and keep one rolling `/lfg`-ready plan.
+
+`ce-sweep` sits around the loop, not inside it. The `/ce-ideate` → `/ce-brainstorm` → `/ce-plan` → `/ce-work` loop invents or refines work; this skill ingests what customers already sent and turns it into a requirements-only plan.
+
+You invoke it yourself (it is not model-invoked). The first run is an interactive setup interview. Later runs can be manual or scheduled with `mode:non-interactive`. The output is `docs/plans/feedback-sweep-plan.md`, which `/lfg` can execute. It is not a time-windowed metrics report (`ce-product-pulse`) and not a one-off recording analysis (`ce-riffrec-feedback-analysis`).
 
 ```text
-# 首次运行：配置 sources、approvals、state location 和 scheduling
+customer Slack / GitHub / email
+        |
+        v
+/ce-sweep  -->  docs/plans/feedback-sweep-plan.md  -->  /lfg
+        |
+        +-- source-side ack / close-out
+        +-- verified merge, not a thread claim
+```
+
+---
+
+## TL;DR
+
+| Question | Answer |
+|----------|--------|
+| What does it do? | Fetches new items since each source's cursor, acknowledges them, analyzes attached recordings, closes an item only after a verified merge to the default branch, and reconciles one rolling plan |
+| When to use it | An alpha or beta channel (Slack, GitHub Issues; email is experimental) that outruns ad-hoc triage |
+| What it produces | `docs/plans/feedback-sweep-plan.md` (requirements-only), a durable state file, configured source-side acks, a run summary with an `/lfg` handoff |
+| What's next | `/lfg docs/plans/feedback-sweep-plan.md` for the open items, or stay in the plan and answer outstanding questions |
+
+---
+
+## Example invocations
+
+Empty follows config. First run is setup, then a sweep. Later empty is a sweep only. `setup` / `reconfigure` re-enter the interview and then sweep.
+
+```text
+# No feedback_sources yet: interactive setup (sources, approvals, state location, ack cap), then the first sweep
 /ce-sweep
 
-# 后续运行：fetch、acknowledge、analyze、verify 并 reconcile plan
+# Configured: fetch, acknowledge, analyze recordings, verify merges, reconcile the plan
 /ce-sweep
 
-# Scheduled 或 unattended run：把 ambiguous decisions 延后到 plan
+# Re-enter setup to add or edit sources, then sweep with the new config
+/ce-sweep reconfigure
+/ce-sweep setup
+
+# Scheduled or unattended: never prompts. Ambiguous product calls go into the plan. Refuses if setup has not run.
 /ce-sweep mode:non-interactive
 
-# 重新进入 setup，增加或编辑 feedback sources
-/ce-sweep reconfigure
-
-# 通过 autonomous pipeline 交付已经 reconcile 的 open items
+# After a sweep, ship the reconciled open items through the autonomous pipeline
 /lfg docs/plans/feedback-sweep-plan.md
 ```
 
-## 问题
+A scheduled job should pass `mode:non-interactive` so the run defers instead of blocking. First-run setup cannot run unattended.
 
-Feedback triage 往往变成每个 repo 自己的 ritual：扫描上次之后的 Slack channel，react 表示已看到，下载并观看 screen recordings，判断某件事是否已经修复，再维护一份私有 open list。每个 project 都手工重建这套流程，state 活在某个人脑中或一次性文件里，而 “fixed” claims 常常没有证据就被相信。
+---
 
-## 方案
+## The problem
 
-`ce-sweep` 把 sweep 做成 repeatable skill。Sources 在共享 `feedback_sources` config 中声明一次。每次运行会 fetch 每个 source cursor 之后的新 items，在 source 侧 acknowledge（Slack emoji reaction、GitHub Issues label），并行 subagents 分析 attached recordings，在关闭任何 item 前验证 claimed fixes 是否真的 merge 到 main branch，然后 reconcile 一个 `/lfg` 可直接执行的 rolling plan。
+Feedback triage becomes a private ritual. Someone scans Slack since last time, reacts so the customer knows it was seen, downloads recordings, guesses whether something already shipped, and keeps the list in their head. Every project rebuilds this, and "fixed" claims get trusted without a merge to back them.
 
-[配置参考](./configuration.md)列出了 first-run setup 写入的 feedback-source 与 sweep coordination keys。
+## How it works
 
-每个 item 的 lifecycle 都存在 durable YAML state file 中，schema versioned，因此 runs 可以干净恢复，peer agents 可以共享 state，崩溃的 run 不会对 customer message double-acknowledge。
+Sources are declared once in `feedback_sources`. Each run fetches items newer than that source's cursor, acknowledges them at the source (emoji on Slack, label on GitHub Issues; email is tracked in state only), analyzes attached recordings, and closes an item only when a claimed fix has merged to the default branch. Open actionable items land in one rolling plan that `/lfg` can run. The [configuration reference](./configuration.md) lists the keys first-run setup writes.
 
-## 新颖之处
+Item lifecycle lives in a durable YAML state file, so runs resume cleanly and a crash does not double-acknowledge a customer's message.
 
-1. **Connectors are persona files over a code-pinned core.** 每种 source type 是一个 markdown persona，描述该 source 如何映射到 lifecycle；correctness-critical steps（cursor advance、no-double-ack guard、merge-evidence check）固定在 deterministic bundled script 中。新增 source type 只需要一个新 persona 和一个 config entry。
-2. **Per-item durability ordering.** Source acknowledge -> 确认可读 -> 写 state -> 最后推进 cursor。任意点崩溃都能恢复，且不会重复 customer-visible actions。
-3. **Fix verification trusts only merge evidence.** Thread claims 永不关闭 item；只有 verified merge 到 default branch 才能关闭，并记录 merge SHA。
-4. **The plan is a view, not a log.** 一个稳定路径上的 rolling plan 每次 run reconcile：新 items append，verified-fixed items drain，human-owned notes region 保持 untouched。如果 `/lfg` 已经就地 enrich plan，sweep 会 archive 它并开始 fresh view，而不是 clobber execution state。
-5. **Non-interactive-safe by contract.** `mode:non-interactive` 永不 prompt：ambiguous product calls deferred 到 plan 的 outstanding questions；当 cursor 看起来错误导致 ack volume 过大时，circuit-breaker 会 defer，而不是 mass-react。
+The skill never replies to customers. Its only source-side writes are the ack and close-out actions you approved at setup.
 
-## 何时使用
+### Durability before the cursor moves
 
-- 你运营 alpha/beta channel（Slack、GitHub Issues），customer feedback 积累速度超过 ad-hoc triage。
-- 你希望 feedback 快速被 acknowledge，但只有 fix 真正 landed 后才 close out。
-- 你希望从 “customer said something” 到 “executable plan exists” 有一条 standing、schedulable pipeline。
+For each new item the order is fixed: acknowledge at the source, confirm the ack is visible, write state, then advance the cursor. A crash in the middle recovers without a second customer-visible action. The bundled state engine is the only writer of that file, and if another sweep holds the lease, this run stops rather than interleaving writes.
 
-不适合单个 recording 的一次性分析（用 `/ce-riffrec-feedback-analysis`），也不适合 time-windowed metrics reporting（用 `/ce-product-pulse`）。
+### Merge evidence, not thread claims
+
+A message that says "this is fixed" does not close the item. Close-out needs a verified merge to the default branch, recorded with the merge SHA. Unverified claims stay open while the item is open at the source. An item deleted at the source is marked gone and drains from the plan. An issue closed at the source with no verified fix is marked `source_closed` and drains the same way.
+
+Entering or reopening `source_closed` clears prior fix evidence. Fix verification uses the checkout’s full host/owner/repository identity. PR numbers from another host or repository cannot supply merge evidence, even when their numbers and repository names match.
+
+### One rolling plan, not a log
+
+Every run reconciles `docs/plans/feedback-sweep-plan.md`. New items append, closed items drain, and a human-owned notes region is left untouched. If the file at that path is no longer a `ce-sweep` requirements-only plan (for example after `/lfg` has enriched it), the sweep archives it to a dated sibling and writes a fresh view rather than overwriting someone else's execution state.
+
+Customer quotes in the plan are marked untrusted data. Sensitive sources withhold body and quote from both state and the plan.
+
+Plan requirement IDs are retained in state when items drain, so reopened items keep their original IDs.
+
+### Safe to schedule
+
+`mode:non-interactive` never prompts. Product calls become Outstanding Questions on the plan. If new unacked items on one source exceed the ack cap (default 25), the run defers that batch instead of mass-reacting on a bad cursor. A harness with no blocking-question tool behaves the same way even without the token.
+
+---
+
+## Quick example
+
+You have a Slack alpha channel and a GitHub issues inbox. You run `/ce-sweep`. No `feedback_sources` key exists, so setup starts.
+
+You add sources one at a time: type, target (Slack channel ID, or `owner/repo`), ack and close-out actions, standing approval for those writes, and whether content is sensitive. Then you pick where state lives (committed under `docs/feedback-sweep/`, or machine-local under `/tmp`), set the ack cap, and optionally import a legacy tracker so already-seen items are not acked again. Setup offers a schedule, then the first sweep runs.
+
+A later `/ce-sweep` fetches items newer than each cursor, applies the approved ack, analyzes any recordings in parallel, looks up tracked GitHub issues by id, checks `fix_pending` items and completed closes against `gh`, and rewrites the machine-owned region of the plan. Interactive mode may ask one product question per category. The summary lists new items, recordings, closes with evidence, `source_closed` items, anything stuck or deferred, and the `/lfg` line for `docs/plans/feedback-sweep-plan.md`.
+
+---
+
+## When to reach for it
+
+Reach for `ce-sweep` when:
+
+- Customer feedback in Slack or GitHub Issues accumulates faster than ad-hoc triage
+- You want items acknowledged quickly and closed only when the fix has actually landed
+- You want a schedulable path from "someone reported this" to an executable plan
+
+Skip `ce-sweep` when:
+
+- You are analyzing one recording → `/ce-riffrec-feedback-analysis`
+- You want a time-windowed usage and error report → `/ce-product-pulse`
+- You are still deciding what to build from a blank slate → `/ce-ideate` or `/ce-brainstorm`
+
+---
+
+## Use as part of the workflow
+
+`ce-sweep` feeds the loop. It does not walk it.
+
+```text
+/ce-sweep  -->  docs/plans/feedback-sweep-plan.md  -->  /lfg
+                         |
+                         +--> stay in the plan and answer Outstanding Questions
+```
+
+The plan is requirements-only with `product_contract_source: ce-sweep`. `/lfg` is the intended next skill, but you can also open the plan and work the items by hand.
+
+`ce-strategy` and `ce-product-pulse` are separate anchors. Pulse reports numbers over a window. Sweep tracks individual feedback items.
+
+State location is a setup choice. Committed state is the right default when more than one agent or machine shares the branch. Machine-local state under `/tmp` stays off the repo and is invisible to other checkouts.
+
+---
+
+## Reference
+
+| Argument | Effect |
+|----------|--------|
+| _(empty)_ | `feedback_sources` unset: interactive setup, then sweep. Otherwise: sweep. |
+| `setup` / `reconfigure` | Re-run the interview regardless of config state, then sweep. Combined with `mode:non-interactive` this stops (`first run requires interactive setup`). |
+| `mode:non-interactive` | No prompts. Deferred decisions go on the plan. Unconfigured repos stop. Deprecated alias: `mode:headless`. |
+
+Source types: `slack`, `github-issues`, `email` (experimental, read-only, no source-side ack). Slack acks default to the `eyes` reaction and close out with `white_check_mark`. GitHub acks default to the `feedback:ack` label and close out with `feedback:resolved`.
+
+Config keys (the interview writes `config.local.yaml`): `feedback_sources`, `sweep_state_path`, `sweep_ack_cap`, `sweep_shared_branch`. `sweep_lease_ttl_minutes` is written at its default of 60 and is not asked. See the [configuration reference](./configuration.md).
+
+Default paths (`docs/` is the artifact root unless `docs_root` is set):
+
+- Plan: `docs/plans/feedback-sweep-plan.md`
+- Committed state fallback: `docs/feedback-sweep/state.yml`
+
+On Codex, the handoff is `$lfg` with the same plan path.
+
+---
 
 ## FAQ
 
-**State 放在哪里？** Setup 时选择：commit 到 repo（多 agents 或多 machines 共享 branches 时推荐），或 machine-local under `/tmp`。Schema 记录在 skill 的 `references/state-schema.md` 中，是 peer agents 可读写的 versioned contract。
+**Where does state live?**
+Your choice at setup: committed to the repo (recommended when several agents or machines share branches) or machine-local under `/tmp`. The schema is a versioned contract in the skill's `references/state-schema.md`.
 
-**它能回复 customers 吗？** 不能，这是刻意设计。它唯一的 source-side writes 是 setup 时 standing-approved 的 acknowledgment 和 close-out actions。
+**Can it reply to customers?**
+No. The only source-side writes are the configured acknowledgment and close-out actions, standing-approved at setup. A `no` on approval keeps that source read-only; its items land as deferred for you to handle.
 
-**Feedback content 里的 prompt injection 怎么办？** 所有 source content，包括 messages、issue bodies、transcripts、recording content，都被视为 data，不是 instructions；emitted plan 会结构化标记 customer text 为 untrusted，让 downstream consumers 继承同样 posture。
+**What about prompt injection from feedback content?**
+Bodies, titles, quotes, media filenames, and text read back from state are treated as data, never as instructions. The emitted plan marks customer text as untrusted so `/lfg` inherits the same posture.
 
-**Cora 的 `alpha-feedback-pulse` 怎么办？** `ce-sweep` 将其 generalize。Setup 会导入 legacy state file（cursors 和 item statuses），因此 migration 不会 re-ingest，也不会 duplicate acknowledgments。
+**What happened to Cora's `alpha-feedback-pulse`?**
+`ce-sweep` generalizes it. Setup can import that legacy state file (cursors and item statuses) so migration does not re-ingest or double-acknowledge.
 
-## See Also
+**What if two sweeps run at once?**
+A single-writer lease stops the second run. If state is committed on a shared docs branch (`sweep_shared_branch: true`), the lease is also push-gated so two machines cannot ack the same item.
 
-- [`/ce-product-pulse`](./ce-product-pulse.md) — time-windowed metrics reports；结构上的 sibling
-- [`/ce-riffrec-feedback-analysis`](./ce-riffrec-feedback-analysis.md) — ce-sweep 内置的 recording analyzer
-- [`/lfg`](./lfg.md) — end-to-end 执行 emitted plan
+**Does a non-interactive run acknowledge everything?**
+Not past the ack cap, and not on a source you left unapproved. Over-cap batches and product calls are deferred into the plan.
+
+---
+
+## See also
+
+- [`ce-product-pulse`](./ce-product-pulse.md): time-windowed metrics reports, not item-level triage
+- [`ce-riffrec-feedback-analysis`](./ce-riffrec-feedback-analysis.md): the recording analyzer this sweep can run per attachment
+- [`lfg`](./lfg.md): executes the emitted plan end to end

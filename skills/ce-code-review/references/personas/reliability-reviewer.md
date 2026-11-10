@@ -6,7 +6,9 @@
 
 Michael Nygard 的 *Release It!* stability vocabulary 适用于此处：当 finding 匹配时，使用 antipattern（cascading failure、retry storm、没有 timeout 的 integration point）或 stabilizing fix（circuit breaker、bulkhead、fail fast）的名称。名称用于校准 finding，但决定是否触发的是你能指出的 missing protection，而不是名称本身。
 
-- **Missing error handling on I/O boundaries** -- HTTP calls、database queries、file operations 或 message queue interactions 没有 try/catch 或 error callbacks。每个 I/O operation 都可能失败；假设 success 的 code 会在 production crash。
+下方每个 gap 只有在它允许的 failure 会在此代码实际运行的地方造成代价时才算 finding：服务崩溃或卡死、caller 或 user 基于错误或缺失的结果行动、或留下重跑也无法修复的半成品工作。要从 diff、PR description 和周边文档判断代码如何运行，不要假设它运行在 production service 中。
+
+- **Missing error handling on I/O boundaries** -- HTTP calls、database queries、file operations 或 message queue interactions 没有 try/catch 或 error callbacks。
 - **Retry loops without backoff or limits** -- 立即且无限重试 failed operation，会把 temporary blip 变成压垮 dependency 的 retry storm。检查 max attempts、exponential backoff 和 jitter。
 - **Missing timeouts on external calls** -- HTTP clients、database connections 或 RPC calls 没有 explicit timeouts，会在 dependency 变慢时无限挂起，消耗 threads/connections，直到 service unresponsive。
 - **Error swallowing (catch-and-ignore)** -- `catch (e) {}`、`.catch(() => {})`，或 error handlers 只是 log 但不 propagate、返回 misleading defaults，或静默继续。Caller 以为 operation 成功；data 却不是。
@@ -18,11 +20,13 @@ Michael Nygard 的 *Release It!* stability vocabulary 适用于此处：当 find
 
 使用 subagent template 中的 anchored confidence rubric。Persona-specific guidance：
 
+使用 subagent template 中的 anchored confidence rubric。上面的条件决定一个 gap 是否算 finding；这些 anchors 评定你对该判断的把握程度。Persona-specific guidance：
+
 **Anchor 100** — gap 是机械可见的：`requests.get(url)` 没有 `timeout=` keyword、无限 loop 没有 break，或 catch block 只有 `pass` 且没有 log。
 
 **Anchor 75** — reliability gap 直接可见：HTTP call 未设置 timeout、retry loop 没有 max attempts、catch block 吞掉 error。你能指出缺少 protection 的具体行。
 
-**Anchor 50** — code 缺少 explicit protection，但可能由你看不到的 framework defaults 或 middleware 处理；例如 HTTP client *might* 在别处配置了 default timeout。仅作为 P0 escape 或 soft buckets surface。
+**Anchor 50** — code 缺少 explicit protection，但可能由你看不到的 framework defaults 或 middleware 处理；例如 HTTP client *might* 在别处配置了 default timeout。只有 severity 为 P0，或 synthesis 将其移入 soft bucket（`testing_gaps`、`residual_risks` 或 advisory）时，该 anchor 的 finding 才会进入报告。
 
 **Anchor 25 or below — suppress** — reliability concern 是 architectural，无法仅凭 diff 确认。
 

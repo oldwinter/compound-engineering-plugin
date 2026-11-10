@@ -1,260 +1,470 @@
 # `ce-compound`
 
-> 记录一个刚解决的问题，让下次遇到时只花几分钟，而不是几小时。Knowledge compounds。
+> **中文导读：** `ce-compound` 负责把已解决问题的经验沉淀成“能阻止重复的最便宜形式”：优先测试或 lint 规则，其次 `CODING_STANDARDS.md` 规则，最后才是 `docs/solutions/` 中的 learning。只有在经验非显而易见、可长期复用且足够重要时才记录；它不会修改产品代码。Interactive Full 可在征得同意后小幅编辑 `AGENTS.md`/`CLAUDE.md` 以提升可发现性。下方英文为权威说明。
 
-`ce-compound` 是 **knowledge-capture** skill。解决一个 non-trivial problem 后，此 skill 会在 `docs/solutions/` 写入 structured doc，覆盖 symptoms、root cause、what didn't work、working solution 和 prevention strategies。未来运行 `ce-plan`、`ce-ideate`、`ce-debug` 和 `ce-work` 时会查阅该目录，把它作为 institutional memory；同一个 investigation 就不必重复发生。
+> Hold the lesson of a solved problem in the cheapest form that stops the repeat, and keep the lessons already captured accurate.
 
-Compound-engineering ideation chain 是 `/ce-ideate -> /ce-brainstorm -> /ce-plan -> /ce-work`。`ce-compound` 是 **closing loop**：在 debugging 或 build session 末尾捕获文档，并把它反馈到上游，作为未来 runs 的 grounding。第一次解决 "N+1 query in brief generation" 可能要 30 分钟 research；第二次找到 doc，fix 只要 2 分钟。
+`ce-compound` is the knowledge-capture skill. After a verified solution produces durable, non-obvious project knowledge, it holds that lesson in the cheapest form that works: a test or lint rule, a rule in `CODING_STANDARDS.md`, or a learning. A learning is a structured doc in `docs/solutions/` covering symptoms, root cause, what did not work, the working solution, and prevention. `ce-plan` and `ce-ideate` read that folder as institutional memory, so the same investigation does not happen twice.
+
+It closes the loop on the `/ce-ideate` -> `/ce-brainstorm` -> `/ce-plan` -> `/ce-work` chain. The first time you solve "N+1 query in brief generation" costs 30 minutes of research. The second time, someone finds the doc and the fix takes 2 minutes.
+
+It is optional. A completed or non-trivial fix is not enough: skip it when the final code and tests already communicate the whole lesson.
 
 ---
+
+Captures land in `docs/solutions/`, where `ce-plan`'s research and `ce-code-review`'s learnings pass rediscover them. Declared [Compound Packs](./packs.md#growing-packs-from-learnings) participate in capture too: an insight a pack rule already prescribes is recognized rather than re-captured, and interactive runs can route a prescriptive, cross-repo capture directly into a writable pack — or scaffold a new one — with the learning rewritten as a rule.
 
 ## TL;DR
 
-| Question（问题） | Answer（答案） |
+| Question | Answer |
 |----------|--------|
-| 它做什么？ | 把 solved problem 记录到 `docs/solutions/[category]/[filename].md`，包含 structured frontmatter、bug-track 或 knowledge-track sections 和 cross-references |
-| 何时使用 | 解决 non-trivial problem 后；用户说 "that worked"、"it's fixed"、"problem solved" 时 |
-| 产出什么 | `docs/solutions/` 中的一篇 doc，外加可选的 `CONCEPTS.md` vocabulary capture；interactive Full 获得 consent 后也可能小幅编辑 `AGENTS.md`/`CLAUDE.md` 以提升 discoverability |
-| 下一步 | 如果新 learning 暗示旧 doc 可能 stale，可选运行 `/ce-compound-refresh` |
+| What does it do? | Chooses the cheapest form that stops a solved problem from repeating, then writes it: a test or lint rule, a coding standard, or a learning at `docs/solutions/[category]/[filename].md` |
+| When to use it | After a verified solution produces durable reasoning that the final implementation does not readily reveal and that would be costly or risky to lose |
+| What it produces | At most one added test, added or tightened lint rule, or standard, and at most one doc in `docs/solutions/`, plus optional `CONCEPTS.md` vocabulary capture. It never changes product code. Interactive Full may also edit `AGENTS.md`/`CLAUDE.md` for discoverability after consent. |
+| What's next | No menu. Optional `/ce-compound refresh` if the new learning suggests an older doc may be stale. |
 
 ---
 
-## 调用示例
+## What is worth compounding
+
+Use `ce-compound` only when all three conditions hold:
+
+1. **Non-obvious:** the important reasoning is not readily recoverable from the final code, tests, types, comments, or existing documentation.
+2. **Durable:** it explains an invariant, constraint, root cause, rejected approach, or decision that should remain useful beyond the exact diff.
+3. **Material:** forgetting it would plausibly cause recurrence, meaningful risk, or substantial rediscovery.
+
+Apply this counterfactual: if the learning document disappeared, would a future engineer reading the final implementation still be likely to repeat the mistake or redo substantial investigation? If not, do not compound.
+
+The skill then picks the cheapest form that would stop the repeat, in the order below, and writes it without asking. The commit or pull request that carries the write is its review.
+
+1. **One owner and one way.** The mistake was possible because two ways to do the thing exist. This changes product code, so the skill reports it for the code's owner.
+2. **A test or lint rule** whose failure tells the reader what to fix. A lint rule can be new, or an existing one that is enabled, widened in scope, or raised in severity. If the rule flags existing code and the repo already keeps a baseline, the skill adds entries for only those violations, so the rule still fails on new code. The skill keeps it only after seeing it pass on the current tree and fail on the defect in a throwaway copy. A check is reported instead when it needs product code changed, such as a log field or metric, or when it needs a new tool, plugin, dependency, or rule-writing or baseline setup.
+3. **A rule in `CODING_STANDARDS.md`**, under the same bar [`ce-setup`](./ce-setup.md) applies, when no check can hold the lesson. The skill never creates that file. A repo without one has made a valid choice, so the learning states the rule and never asks you to set anything up. An attended run says once that the lesson could be a standard. [`/ce-setup standards`](./ce-setup.md) drafts rules from those learnings if you adopt standards later.
+4. **A learning**, only for reasoning the other forms cannot carry, such as measured facts or rejected alternatives.
+
+A stronger form that was reported rather than written appears as `Recommended form` in the report, and the learning holds the whole lesson so it survives a lost report.
+
+Other knowledge has its own home:
+
+| Knowledge | Best home |
+|-----------|-----------|
+| Machine-enforceable behavior | Test, lint rule, type, or assertion |
+| Local non-obvious rationale | Code comment |
+| Change-specific history | Commit or PR description |
+| Shared domain language | `CONCEPTS.md` |
+| Durable reasoning that crosses implementation boundaries | `docs/solutions/` through `ce-compound` |
+
+An existing learning that became materially inaccurate or incomplete is worth updating because leaving it would mislead. Let the overlap check update that canonical doc instead of creating a duplicate. Use a refresh for a broader maintenance pass over stale or overlapping learnings.
+
+---
+
+## Example invocations
+
+An empty invoke evaluates the most recent verified fix from this conversation and captures it when it qualifies. A context hint focuses the run when the session holds several solved problems. `mode:non-interactive` is for automations and standing instructions: no blocking questions, Full by default. `depth:` is valid only with non-interactive intent.
 
 ```text
-# 捕获当前 conversation 中已经验证的 solution
+# Capture the verified solution from the current conversation
 /ce-compound
 
-# Session 包含多个已解决问题时，指定捕获重点
+# Focus capture when the session contains several solved problems
 /ce-compound the email digest race condition we fixed
 
-# 由 automation 或 standing instructions 调用时，以无人值守方式捕获
+# Unattended Full capture (default depth when mode:non-interactive is set)
 /ce-compound mode:non-interactive the verified caching fix
+
+# Unattended single-pass capture: no subagents, no overlap research
+/ce-compound mode:non-interactive depth:lightweight the verified caching fix
+
+# Unattended Full capture, including the automatic session-history probe
+/ce-compound mode:non-interactive depth:full the verified caching fix
 ```
 
-只有后续 decision 应由 caller 负责时才使用 non-interactive mode；普通 interactive capture 仍可在修改 project guidance 前提问。
+One learning per run. If the session produced several distinct qualifying learnings, invoke the skill once per learning. A standalone "bootstrap CONCEPTS.md" request is a refresh. Use non-interactive mode only when the caller should own any follow-up decisions. Ordinary interactive capture can still ask before changing project guidance.
 
 ---
 
-## 问题
+## The problem
 
-多数 teams 会把同一个问题解决两次，有时甚至是同一个人，因为第一次 solution 只存在于 conversation、chat history 或 teammate 的脑中。常见 failure shapes：
+Most teams solve the same problem twice, sometimes with the same person, because the first solution lives in chat history or a teammate's head. The usual ways it goes wrong:
 
-- **Solution lives in chat**：Slack thread、Linear comment、agent transcript；一周后就找不到
-- **Documented but undiscoverable**：写进没人搜的 wiki，或 `docs/solutions/` 存在但 agents 不知道要查
-- **Rewritten when re-encountered**：同一问题被写成略有不同的新 doc，随后两篇 docs 开始 drift
-- **No anti-patterns captured**：调查中最昂贵的部分是 *didn't work*，也是最先消失的部分
-- **Captured at session-end clutter, not session-end clarity**：doc 写得太晚，context 已经褪色
+- The solution lives in a Slack thread, a Linear comment, or an agent transcript. Gone in a week.
+- It gets documented but nobody finds it. A wiki nobody searches, or a `docs/solutions/` folder agents do not know to check.
+- A slightly different doc gets created for the same problem, and now there are two that drift apart.
+- The anti-patterns disappear first. What did not work was the most expensive part of the investigation, and it never gets written down.
+- Capture waits until the end of the session, when the context has already faded.
 
-## 方案
-
-`ce-compound` 在 context 最新鲜的时刻运行 structured capture flow：
-
-- 两种 modes：**Full**（parallel subagents 负责 cross-referencing 和 duplicate detection）与 **Lightweight**（single-pass，更快、更省 tokens）
-- Bug track 和 knowledge track 生成匹配 doc 类型的不同 section structures
-- Overlap check 决定更新 existing doc，还是创建 duplicate
-- Discoverability check 确保项目的 `AGENTS.md`/`CLAUDE.md` 暴露 `docs/solutions/`，让未来 agents 找得到（interactive Full 编辑前征求 consent；non-interactive 和 lightweight 只 report 或 tip）
-- Specialized post-review 可选增强 doc：performance、security、data-integrity 和 read-only simplification checks 会 review drafted learning，但不 mutate product code
+`ce-compound` runs the capture at the moment context is freshest. It has two modes: Full runs parallel subagents for cross-referencing and duplicate detection; Lightweight is single-pass. An overlap check decides whether to update an existing doc rather than create a duplicate. A discoverability check makes sure the project's instruction file points future agents at `docs/solutions/`. Bug-track and knowledge-track docs get different section structures. Specialized post-review (performance, security, data integrity, read-only simplification) can look over the drafted learning without touching product code.
 
 ---
 
-## 它的新意
+## How it works
 
-### 1. 两种 modes：Full vs Lightweight，由 agent 自动选择
+### Two modes, agent-selected
 
-**Full mode** 并行运行三个 research subagents（Context Analyzer / Solution Extractor / Related Docs Finder），并自动执行 session-history probe，跨 Claude Code、Codex、Cursor 搜索 prior sessions 中的相关 context。它会 cross-reference existing docs、detect duplicates，并运行 specialized reviews。
+Full mode classifies the learning and drafts its body in the main session, which holds the conversation, while a Related Docs Finder subagent searches existing docs, plus an automatic session-history probe across Claude Code, Codex, Cursor, Pi, and oh-my-pi (omp). It cross-references existing docs, detects duplicates, and runs specialized reviews.
 
-**Lightweight mode** 以 single pass 写出同一种 solution-doc artifact，不使用 subagents 或 cross-referencing。它开销更低，但也会跳过 overlap detection、session-history research 和 semantic grounding validation。
+Lightweight mode writes the same doc type in a single pass. No subagents, no overlap detection, no session-history research, no semantic grounding validation.
 
-**Skill 会自行选择 mode，不会提问。** Full 是默认模式，因为与产生这条 learning 的工作相比，它增加的 token 成本很小；只有在 context 确实紧张（session 接近上限），或 fix 非常简单、cross-referencing 没有收益时，才会选择 Lightweight。这些条件 agent 能观察到，用户却看不到，因此提问只会让用户猜测。Skill 会在 output 第一行说明运行了哪个 mode 及原因；如果选择不符合你的偏好，重新运行的成本很低。
+The skill picks the mode itself and does not ask. Full is the default. Lightweight only fires when the session is near its context limit. That is a condition the agent can observe and you cannot. The first line of its output says which mode ran and why. If it guessed wrong, re-run it.
 
-Automations 也可以无提示地选择同一 tradeoff：`mode:non-interactive depth:lightweight` 运行 single-pass workflow；`mode:non-interactive depth:full` 运行包含 automatic session-history probe 的完整 workflow。Bare `mode:non-interactive`（以及 deprecated alias `mode:headless`）仍默认使用 Full。Depth 只适用于 non-interactive；没有 non-interactive intent 的 depth flag、unknown value 或 conflicting depth flags 都会显式失败，不会静默猜测。
+Automations select the same tradeoff without a prompt. `mode:non-interactive depth:lightweight` runs the single-pass workflow; `mode:non-interactive depth:full` runs the complete workflow including the session-history probe. Bare `mode:non-interactive` (and the deprecated alias `mode:headless`) is Full by default. Depth is non-interactive-only. A depth flag without non-interactive intent, an unknown value, or conflicting depth flags fails explicitly.
 
-### 2. Bug track vs knowledge track：不同形状使用不同结构
+### Bug track vs knowledge track
 
-Skill 根据 `problem_type` 把 work 分类到两个 tracks 之一：
+The skill classifies the work from `problem_type`:
 
-- **Bug track**：Symptoms、What Didn't Work、Solution、Why This Works、Prevention。用于 build errors、test failures、runtime errors、performance issues、integration issues 等。
-- **Knowledge track**：Context、Guidance、Why This Matters、When to Apply、Examples。用于 architecture patterns、design patterns、tooling decisions、conventions、workflow practices。
+- Bug track: Symptoms, What Didn't Work, Solution, Why This Works, Prevention. Used for build errors, test failures, runtime errors, performance issues, integration issues.
+- Knowledge track: Context, Guidance, Why This Matters, When to Apply, Examples. Used for architecture patterns, design patterns, tooling decisions, conventions, workflow practices.
 
-Track 决定 section order 和 frontmatter fields。把 bug-track fields 强加给 knowledge-track learning（或反过来）会生成结构上不适合内容的 docs。
+The track determines section order and frontmatter fields.
 
-### 3. Overlap detection：更新 existing docs，而不是制造 duplicates
+`problem_type`, `severity`, and `resolution_type` are closed enums. `component` and `root_cause` are open vocabulary, and the category directories are a default layout, not a mandate. When `docs/solutions/` already holds learnings, the classifier samples their frontmatter and directory names and reuses what the corpus already uses for the area. It falls back to the schema's suggested values only for an empty corpus or an uncovered area. Repos with their own documentation vocabulary keep it, so their existing retrieval still finds the new doc.
 
-Related Docs Finder 会按五个 dimensions 评估与 existing `docs/solutions/` content 的 overlap：problem statement、root cause、solution approach、referenced files、prevention rules。
+Some guidance holds only while something outside the repo holds: an open upstream bug, a tool or platform version, a dependency's behavior. Such a learning also records `retire_when`, which names the change that would retire it and how to check for it without changing the repo, so a refresh can tell when it stops applying. Most learnings have no such condition and omit the field.
 
-- **High overlap**（4-5 个 dimensions 匹配）-> **更新 existing doc**，加入更新鲜 context。Existing path 保持不变；添加 `last_updated` field。描述同一问题的两篇 docs 必然 drift。
-- **Moderate overlap**（2-3 个 dimensions 匹配）-> 创建 new doc，并标记需要 consolidation review（可能触发 `ce-compound-refresh`）。
-- **Low or none** -> 正常创建 new doc。
+### Overlap, discoverability, and grounding
 
-### 4. Discoverability check：knowledge 能被找到才会 compound
+The Related Docs Finder scores overlap with existing `docs/solutions/` content across five dimensions: problem statement, root cause, solution approach, referenced files, prevention rules.
 
-每次运行都会检查 project instruction file（`AGENTS.md` 或 `CLAUDE.md`）是否会引导未来 agent 发现 `docs/solutions/`。如果不会，interactive Full 会提出暴露 knowledge store 的最小补充，征得 consent 后应用。Non-interactive 只报告 `Instruction-file edit: gap noted, not applied`，绝不编辑；skill-to-skill handoff 不能越过上游 approval gate 修改 repo operating contract。Lightweight 只给 tip。这个检查每次都跑，因为 knowledge store 只有在 findable 时才有 compound value。
+- High overlap (4-5 dimensions match): update the existing doc. The path stays the same; a `last_updated` field is added.
+- Moderate overlap (2-3 dimensions): create the new doc, flag for consolidation review (a possible refresh trigger).
+- Low or none: create the new doc normally.
 
-Proposed addition 会匹配 existing file 的 tone 和 density：能塞进 existing directory listing 时就是单行；只有没有合适位置时才新增小 headed section。
+Every run also checks whether the project's instruction file (`AGENTS.md` or `CLAUDE.md`) would lead a future agent to discover `docs/solutions/`. If not, interactive Full proposes the smallest addition that surfaces the knowledge store, asks for consent, and applies it. Non-interactive reports `Instruction-file edit: gap noted, not applied` without editing. Lightweight tips only.
 
-### 5. Grounding validation：claims 在 compound 前对照 tree 验证
+Before the doc compounds, the skill checks its claims against the tree. A deterministic script checks cited repo paths, commit SHAs, relative links, and dangling scaffold (flags are adjudicated, not auto-failed). Then a read-only validator subagent (Full mode, including non-interactive Full) verifies code-behavior claims by quoting the defining source line, and merge-state claims against remote truth. Lightweight keeps the deterministic check and skips the validator subagent.
 
-Solution doc 的价值取决于其 claims 是否真实，而基于 conversation evidence 起草容易引入三种失败形态：从 session-level summary 而不是 source 写出 code-behavior claims；宣称 "fixed in X"，但 current checkout 看不到该 merge；以及 drafting scaffold（"Learning 3"）泄漏进最终 doc。
+### Session history, refresh, and the capture checkpoint
 
-Phase 2.45 用两层机制关闭这些缺口。Deterministic script（`scripts/validate-doc-claims.py`）检查 cited repo paths、commit SHAs（按 HEAD 与 upstream default branch 的 reachability 分类，从而区分 stale checkout 和 fabricated citation）、relative links 以及 dangling scaffold。其 flags 需要 adjudication，不会自动判定失败，因为 doc 可能合理地引用一个恰好被它记录的 fix 删除的 path。然后，read-only validator subagent（Full mode，包括 non-interactive Full）通过引用 defining source line 验证 code-behavior claims，通过 remote truth（`gh` 为 primary，local git 为 fallback）验证 merge-state claims，并检查 countable assertions 的 internal completeness。Lightweight 保留 deterministic check，但跳过 validator subagent。起草阶段同样适用这种 discipline：Solution Extractor 必须先读 defining line 再声明 behavior，并优先引用 PR numbers，而不是对 rebase 敏感的 SHAs。
+Full mode always runs a cheap two-stage session-history probe. A discovery-and-metadata pass runs in parallel with the research subagents. It lists Claude sessions from `~/.claude/projects/` (or `CLAUDE_CONFIG_DIR/projects` when that env var is set) and keeps the ones whose recorded `cwd` is the repo root, a parent of it, or a path inside it, so sessions started from a parent directory count. Codex sessions come from `~/.codex/sessions/` (or `CODEX_HOME/sessions` when set) plus `~/.agents/sessions/`. It escalates to extraction and synthesis only when a candidate session clears a relevance bar: current-branch match or at least two topic-keyword hits. On a hit, findings fold into "What Didn't Work" (bug track) or "Context" (knowledge track). Lightweight skips all of this.
 
-### 6. 选择性 refresh trigger
+After capturing the new learning, `ce-compound` checks whether the learning suggests a specific older doc may now be stale. Only then does it recommend or run a refresh, with a narrow scope hint. It does not run refresh by default.
 
-捕获 new learning 后，`ce-compound` 会检查是否应以 narrow scope hint 调用 `/ce-compound-refresh`。它不会默认运行 refresh；只在 new learning 暗示某篇具体 older doc 可能 stale（contradicted、superseded，或所在 domain 刚 refactored）时触发。
-
-### 7. Specialized post-review（专门后置 review）
-
-根据 problem type，可选 skill-local prompt assets review 文档：performance issues 使用 `performance-oracle`，security 使用 `security-sentinel`，database 使用 `data-integrity-guardian`。Code-heavy docs 也可以对 drafted examples 和 explanatory claims 做 read-only simplification review；这不会 invoke `ce-simplify-code`，也不会 mutate product code。
-
-### 8. Session history integration（自动 probe，不向用户提问）
-
-当某个看似无关的 earlier session 实际包含相关问题解决经验时，搜索 prior sessions 才真正有价值；但 agent 和用户都无法事先知道是否存在，因此它不适合做成 yes/no prompt。Full mode 改用低成本的两阶段 probe：始终运行 discovery + metadata pass（与 research subagents 并行，几乎不增加 wall-clock），只有 candidate session 达到 relevance bar 时才升级到成本较高的 extraction + synthesis。通过条件是 current-branch match，或至少命中 2 个 topic keywords。命中后，findings 会折入 bug track 的 "What Didn't Work" 或 knowledge track 的 "Context"；未命中时记录 "no relevant prior sessions" 并继续。这个 gate 让 always-on probe 足够便宜，non-interactive 也会运行它；该 probe 不提问，因此保持 non-interactive contract。只有 lightweight mode 完全跳过它。
-
-### 9. Auto-invoke triggers（自动调用触发条件）
-
-"that worked"、"it's fixed"、"working now"、"problem solved" 等短语会 auto-invoke 此 skill，让 capture 发生在 context 最新鲜时。用户也可以用 `/ce-compound [context]` 立即捕获。
+Phrases like "that worked", "it's fixed", "working now", and "problem solved" identify the completion checkpoint. They do not establish that a learning qualifies. Automatic capture still applies the non-obvious, durable, and material gate above. `/ce-compound [context]` requests immediate evaluation without waiting for a completion phrase; it does not lower the bar.
 
 ---
 
-## 快速示例
+## Quick example
 
-你刚花 45 分钟 debug brief-generation flow 中的 N+1 query。你确认 fix 有效，然后说 "that worked, ship it."
+You've just spent 45 minutes debugging an N+1 query in the brief-generation flow. The root cause spans query assembly and a surprising ORM default that neither the final call site nor its regression test explains. You confirm the fix works and say "that worked, ship it."
 
-`ce-compound` auto-invokes（或你显式调用）。因为剩余 context 充足，它会静默选择 Full mode，并在 output 顶部注明 "Ran Full mode."，不会弹出 prompt。
+The completion phrase marks the checkpoint. The agent applies the counterfactual, determines that a future engineer could plausibly repeat the investigation from the final implementation alone, and auto-invokes `ce-compound`. With plenty of context left, it picks Full mode and notes "Ran Full mode." at the top of its output. No prompt.
 
-三个 subagents 并行分派：Context Analyzer 读取 conversation history，分类为 `performance_issue`（bug track），提出 filename 和 category。Solution Extractor 用 before/after code 组织 fix。Related Docs Finder grep `docs/solutions/` 中的相关 issues，报告与一篇不同 N+1 case 的旧 doc 有 moderate overlap。与此同时，session-history probe 扫描 recent sessions；没有 candidate 达到 relevance bar，因此它记录 "no relevant prior sessions"，不会支付 synthesis 成本。
+The Related Docs Finder dispatches in the background. While it searches, the agent classifies the work as `performance_issue` (bug track), picks the filename and category, and drafts the fix with before/after code and the dead ends from the session. The finder reports moderate overlap with an older doc on a different N+1 case. Alongside them, the session-history probe scans recent sessions; none clear the relevance bar, so it records "no relevant prior sessions."
 
-Orchestrator 组装 doc，通过 YAML safety script 验证 frontmatter，并写入 `docs/solutions/performance-issues/n-plus-one-brief-generation.md`。接着运行 grounding validation：mechanical script 确认每个 cited path 和 SHA 都能 resolve，validator subagent 引用定义 ORM default batching behavior 的 source line，以验证 doc 中的对应 claim。Discoverability check 发现 `AGENTS.md` 未提到 `docs/solutions/`，提出给 existing directory listing 添加一行，并在你确认后应用。
+The orchestrator assembles the doc, validates frontmatter, and writes `docs/solutions/performance-issues/n-plus-one-brief-generation.md`. Grounding validation runs next: the mechanical script confirms every cited path and SHA resolves, and the validator subagent quotes the source line behind the doc's claim about the ORM's default batching behavior. The discoverability check finds `AGENTS.md` does not mention `docs/solutions/`, proposes a one-line addition, and applies it after you confirm.
 
-Phase 3 分派 local `performance-oracle` prompt，并因为 doc 包含 code examples，对 drafted examples 和 approach 做 read-only simplification check。Phase 2.5 提示 refresh recommendation：旧 N+1 doc 可能值得 consolidation review。Skill 建议用 `/ce-compound-refresh n-plus-one` 作为 narrow scope hint，然后结束。
-
----
-
-## 何时使用
-
-在以下情况使用 `ce-compound`：
-
-- 刚解决 non-trivial problem，context 仍新鲜
-- 用户说 "that worked"、"it's fixed"、"working now"、"problem solved"
-- 到了自然暂停点，想在 context 消退前捕获 learning
-- 问题花了有意义的 investigation（不是 typo 或 one-line fix）
-
-以下情况跳过 `ce-compound`：
-
-- Problem 仍 in-progress，或 solution 未验证
-- Fix 是 trivial typo 或 obvious error，没有 generalizable insight
-- Work 纯 mechanical（formatting、dependency bumps）
+Phase 3 dispatches the local `performance-oracle` prompt and, because the doc includes code examples, runs a read-only simplification check on them. The overlap finding surfaces as a refresh recommendation: the older N+1 doc may benefit from consolidation review, so the skill suggests `/ce-compound refresh n-plus-one` and ends. There is no "What's next?" menu.
 
 ---
 
-## 作为 Workflow 的一部分使用
+## When to reach for it
 
-`ce-compound` 是多个 workflows 的 closing loop：
+Reach for `ce-compound` when a solved and verified problem produced reasoning that is:
 
-- **`/ce-debug` Phase 4**：successful fix 和 PR 后，如果 bug 可泛化（3+ recurrence、对 shared dependency 的 wrong assumption），可选提供 `ce-compound`
-- **`/ce-work` Phase 4**：shipping 后，如果 work 产生 reusable pattern、convention 或 tooling decision，则提示 `ce-compound`
-- **Stand-alone**：任何 non-trivial problem-solving session 后直接调用
+- not readily recoverable from the final implementation or existing docs
+- useful beyond the exact diff
+- costly or risky to lose
 
-Output 会反馈给 upstream skills：
+Skip it when:
 
-- `/ce-plan` 在 Phase 1 research 中通过 `learnings-researcher` 读取 `docs/solutions/`
-- `/ce-ideate` 在 comprehensive grounding step 中读取它
-- `/ce-debug` 在拉取 issue tracker reference 时读取它作为 prior context
-
-当 new learning 暗示 older doc 可能 stale 时，`ce-compound` 会推荐带 narrow scope hint 的 `/ce-compound-refresh`。
-
----
-
-## 单独使用
-
-此 skill 自成完整 cycle：
-
-- **Just-finished problem**：`/ce-compound`（或从 "that worked" auto-invoked）
-- **With context hint（带 context hint）**：`/ce-compound "the email digest race condition we fixed"`
-- **Long session 中用 Lightweight**：context 紧张时，skill 会自行选择 lightweight mode，并在 output 中说明
-- **低开销 unattended capture**：`/ce-compound mode:non-interactive depth:lightweight "the verified fix"`
-- **完整 unattended capture**：`/ce-compound mode:non-interactive depth:full "the verified fix"`（等同于 plain `mode:non-interactive`）
-
-Auto-invoke triggers 会在对话中触发；如果你刚确认某件事 works，不需要记住 slash command。
+- The problem is in-progress or the solution is unverified
+- The final code, tests, types, comments, or existing docs already communicate the reasoning
+- The proposed doc would mainly narrate the diff or preserve change-specific history
+- You want a repo-wide concept map rather than a learning from one solved problem → `/ce-compound refresh`
 
 ---
 
-## 让 capture 自动发生
+## Use as part of the workflow
 
-Auto-invoke trigger phrases（"that worked"、"it's fixed"）只有在你刚好说出它们时才会触发。如果你总忘记 capture，可以在 agent instruction file 中添加 standing instruction，让 agent 在 fix 验证完成、把 session 交还给你之前主动提出 capture。
+`ce-compound` closes out multiple workflows when the work clears the durable-learning gate:
 
-可以放进 repo 的 `AGENTS.md`/`CLAUDE.md`；若希望适用于每个 repo，则放进 global instruction file（`~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`）。按希望的 checkpoint 强度选择：
+- After a successful debug when the root cause or prevention depends on reasoning the regression test cannot express
+- After shipping when the work yielded a durable cross-boundary invariant, convention, or tooling decision
+- Stand-alone after an investigation whose important reasoning would otherwise be lost
 
-**先询问**：agent 在 capture 前提问，让你有机会说“这次不用”：
-
-> 当一个已经解决并验证的问题产生 non-trivial、reusable learning 时，在工作单元完成的 completion checkpoint 只提议一次调用 `ce-compound` skill，让 learning 能随产生它的 PR 一起交付。最迟必须在 learning 仍可提交到该 PR 时完成，无论 PR 尚未创建、仍是 draft，还是已经打开并处于 review 中；应在 checkpoint 主动提议，而不是拖到最后期限。仅在把 captured learnings 视为 tracked、committed knowledge 的 repository 中执行。
-
-**自动运行**：不提问，因为自动化的目的就是不被打断：
-
-> 当一个已经解决并验证的问题产生 non-trivial、reusable learning 时，自动调用 `ce-compound` skill，并传入 `mode:non-interactive` argument。在工作单元完成的 completion checkpoint 触发，让 learning 随产生它的 PR 一起交付，而不是后来成为孤立文档。最迟必须在 learning 仍可提交到该 PR 时完成，无论 PR 尚未创建、仍是 draft，还是已经打开并处于 review 中；应在 checkpoint capture，而不是拖到最后期限。仅在把 captured learnings 视为 tracked、committed knowledge 的 repository 中执行。
-
-如果 standing workflow 明确接受较少 research 和 validation，以换取 single-pass、no-subagent closure，可改用 `mode:non-interactive depth:lightweight`。
-
-Auto-run 会不经询问写入 `docs/solutions/`（也可能触及 `CONCEPTS.md`），这正是选择自动化的含义，与 branch 上其他会在 commit 前 review 的 edits 没有本质差异。Non-interactive 永不编辑 `AGENTS.md`/`CLAUDE.md`；discoverability 缺失时会报告 `gap noted, not applied`，让后续 interactive run 在获得 consent 后应用。传入 `mode:non-interactive` 是显式且无歧义的形式；skill 也会接受明确的 “run headless / without prompts” 请求，但 token 可以消除疑问。没有 non-interactive signal 时，run 保持 interactive，并可能为一次性 discoverability consent 暂停。
-
-这些措辞中的其余部分也有明确作用：
-
-- 使用 **"invoke the `ce-compound` skill"**，而不是 "run `/ce-compound`"：instruction files 会被 Codex、Gemini、Cursor、Claude Code 等不同 agents 读取，slash-command form 并非都能由 agent 稳定调用；应引用 capability，而不是 keystroke。
-- 使用 **"at the completion checkpoint"**，并把 deadline 定义为 commit-reachability，而不是某个 PR event：PR 可能很早就创建，所以把期限绑定到 PR 创建会在工作完成前就过期；learning 是否仍能提交到产生它的 PR 才适用于所有情况。
-- 使用 **"non-trivial, reusable learning"**：门槛是 reuse，而不是投入；一次昂贵但无法 generalize 的 incident 不符合条件。
-- 使用 **"treats captured learnings as tracked, committed knowledge"**，而不是命名某个目录：真正的问题是 repo 是否欢迎 generated learning docs；你参与的 fork 或开源项目常常不接受。固定路径也会过时，因为 `docs_root` 可以移动 knowledge store。
+The output feeds back upstream: `/ce-plan` reads `docs/solutions/` during Phase 1 research, and `/ce-ideate` reads it as grounding. When the new learning suggests an older doc may now be stale, `ce-compound` recommends `/ce-compound refresh` with a narrow scope hint.
 
 ---
 
-## 输出产物
+## Make capture automatic
+
+Completion phrases such as "that worked" and "it's fixed" mark a useful checkpoint, but they are not sufficient triggers. Add a standing instruction when you want the agent to evaluate the durable-learning gate at that checkpoint without waiting for you to ask.
+
+Put it in the repo's `AGENTS.md`/`CLAUDE.md`, or in your harness's global instruction file (for example `~/.claude/CLAUDE.md`, `~/.agents/AGENTS.md`, or `~/.codex/AGENTS.md`) to make it apply in every repo. Pick the variant that matches how much of a checkpoint you want. `ce-setup` offers to add either variant to the repo file for you, verbatim.
+
+Offer first (the agent asks before capturing):
+
+> After a solved, verified problem, offer once to invoke the `ce-compound` skill at the completion checkpoint only when the work produced durable project reasoning that is not readily recoverable from the final code, tests, types, comments, or existing documentation, and losing it would plausibly cause recurrence, material risk, or substantial rediscovery. Apply this counterfactual: if the learning document disappeared, would a future engineer reading the final implementation still be likely to repeat the mistake or redo substantial investigation? If not, do not offer. Completion, effort, and diff size alone are not enough. Offer at the checkpoint so a qualifying learning can ship in the PR that produced it, and only where the repository treats captured learnings as tracked, committed knowledge.
+
+Run it automatically (no prompt):
+
+> After a solved, verified problem, automatically invoke the `ce-compound` skill with `mode:non-interactive` at the completion checkpoint only when the work produced durable project reasoning that is not readily recoverable from the final code, tests, types, comments, or existing documentation, and losing it would plausibly cause recurrence, material risk, or substantial rediscovery. Apply this counterfactual: if the learning document disappeared, would a future engineer reading the final implementation still be likely to repeat the mistake or redo substantial investigation? If not, do not invoke it. Completion, effort, and diff size alone are not enough. Capture at the checkpoint so a qualifying learning can ship in the PR that produced it, and only where the repository treats captured learnings as tracked, committed knowledge.
+
+Use `mode:non-interactive depth:lightweight` instead when the standing workflow accepts reduced research and validation in exchange for a single-pass, no-subagent closure.
+
+Auto-run writes to `docs/solutions/` (and may touch `CONCEPTS.md`) without asking. Non-interactive never edits `AGENTS.md`/`CLAUDE.md`. If discoverability is missing it reports `gap noted, not applied` so a later interactive run can apply it with consent. Passing `mode:non-interactive` as an argument is the explicit form; the skill also honors a clear "run headless / without prompts" request, but the token removes all doubt. Without a non-interactive signal the run stays interactive and can stop for the one-time discoverability-consent prompt.
+
+A few phrases in those standing lines are load-bearing:
+
+- "invoke the `ce-compound` skill", not "run `/ce-compound`": instruction files are read by whatever agent you are using, and the slash-command form is not reliably agent-callable across all of them.
+- "at the completion checkpoint", with the deadline as commit-reachability rather than a PR event: a PR can open early, so any deadline pegged to PR creation is already past by the time the work finishes. Whether the learning can still be committed to the producing PR holds in every case.
+- "not readily recoverable" and the counterfactual: the bar is preserving reasoning that the primary artifacts do not already carry, not the effort or size of the fix.
+- "treats captured learnings as tracked, committed knowledge", not a named folder: the question is whether the repo welcomes generated docs. Forks and OSS projects you contribute to often do not, and a named path goes stale since `docs_root` can move the store.
+
+---
+
+## Output artifact
 
 ```text
 docs/solutions/[category]/[filename].md
 ```
 
-这是 default root；如果 `config.yaml` 设置了 `docs_root`，store 会跟随它，因此在移动了 CE artifacts 的项目中，路径是 `<docs_root>/solutions/...`。Categories 会 auto-detect。Bug-track examples：`build-errors/`、`test-failures/`、`runtime-errors/`、`performance-issues/`、`database-issues/`、`security-issues/`、`ui-bugs/`、`integration-issues/`、`logic-errors/`。Knowledge-track examples：`architecture-patterns/`、`design-patterns/`、`tooling-decisions/`、`conventions/`、`workflow-issues/`、`developer-experience/`、`documentation-gaps/`、`best-practices/`。
+That is the default root; the store follows `docs_root` if it is set in `config.yaml`, so on a project that relocates CE artifacts the path is `<docs_root>/solutions/...`. Categories are auto-detected. Bug-track examples: `build-errors/`, `test-failures/`, `runtime-errors/`, `performance-issues/`, `database-issues/`, `security-issues/`, `ui-bugs/`, `integration-issues/`, `logic-errors/`. Knowledge-track examples: `architecture-patterns/`, `design-patterns/`, `tooling-decisions/`, `conventions/`, `workflow-issues/`, `developer-experience/`, `documentation-gaps/`, `best-practices/`.
 
-Doc 带 YAML frontmatter（`module`、`tags`、`problem_type` 等）以便 search。Validation 通过 `scripts/validate-frontmatter.py` 运行，用于捕获 silent corruption（malformed `---` delimiters、scalar values 中未 quote 的 `:`）；`scripts/validate-doc-claims.py` 则对照 tree 检查 body 中的 cited paths、SHAs、links 和 drafting scaffold。
+The doc carries YAML frontmatter (`module`, `tags`, `problem_type`, and so on) for searchability. `scripts/validate-frontmatter.py` catches silent corruption, and `scripts/validate-doc-claims.py` checks the body's cited paths, SHAs, links, and drafting scaffold against the tree.
 
-在 interactive Full mode 中，如果 discoverability check 发现 knowledge store 未暴露，并且你 consent，skill 也可能对 `AGENTS.md`/`CLAUDE.md` 做小编辑。Non-interactive 和 lightweight 永不应用该编辑。
+In interactive Full mode, the skill may also make a small edit to `AGENTS.md`/`CLAUDE.md` if the discoverability check finds the knowledge store is not surfaced and you consent. Non-interactive and lightweight never apply that edit.
 
 ---
 
-## 参考
+## Reference
 
-| Argument（参数） | Effect（效果） |
+| Argument | Effect |
 |----------|--------|
-| _(empty)_ | 使用 conversation context 记录最近 fix |
-| `<brief context>` | 例如 "the email digest race condition we fixed"；聚焦 capture |
+| _(empty)_ | Evaluate the most recent verified fix using conversation context and document it when it qualifies |
+| `<brief context>` | Focuses the capture (for example, "the email digest race condition we fixed") |
+| `mode:non-interactive` | Unattended run: no blocking questions. Defaults to Full. Deprecated alias: `mode:headless`. |
+| `depth:lightweight` | Non-interactive only. Single-pass workflow: no subagents, no overlap research, no session-history probe. |
+| `depth:full` | Non-interactive only. Complete workflow, including the automatic session-history probe. |
 
-Auto-invoke triggers：conversation 中出现 "that worked"、"it's fixed"、"working now"、"problem solved" 等短语。
+Auto-invoke checkpoint phrases include "that worked", "it's fixed", "working now", and "problem solved". They trigger the eligibility judgment, not automatic documentation by themselves.
 
----
-
-## 常见问题
-
-**为什么有两种 modes，而且不让我选择？**
-Full mode 适用于大多数情况：parallel subagents 能捕获 duplicates、找到 related docs 并运行 specialized reviews。Lightweight mode 用于 simple fixes 或 context 紧张的 sessions，此时深度 cross-referencing 不值得 token 成本。Skill 会自行选择，而不是弹出 prompt，因为决定因素是剩余 context budget，这项信息 agent 能看到、用户看不到；提问只会让用户猜测。它会在 output 中报告选择，如果判断不符合你的偏好，重新运行的成本很低。
-
-**Bug track 和 knowledge track 有什么区别？**
-Bug track 捕获 incident-level fixes："X broke, here's why and how we fixed it." Knowledge track 捕获 durable guidance："this is how we do X here, and why." 两者 audience 和 structure 不同：bug track 有 Symptoms / What Didn't Work / Solution；knowledge track 有 Context / Guidance / When to Apply。
-
-**为什么 auto-update docs，而不是总是创建新的？**
-描述同一问题的两篇 docs 必然 drift。新 context 更新鲜、更可信，所以 skill 会把它折入 existing doc。结果是一篇随时间改进的 canonical doc，而不是一堆部分重叠、之后还要 consolidation 的 docs。
-
-**它适用于非软件场景吗？**
-Knowledge track 可以泛化（conventions、decisions、workflow practices），但 skill 假设存在 code repo、`docs/solutions/` directory 和 YAML-frontmatter conventions。它主要是 software-team tool。
-
-**如果我不想改 AGENTS.md 的 discoverability 怎么办？**
-Interactive Full mode 会在应用编辑前征求 consent。你可以拒绝；doc 仍会写入。Non-interactive 和 lightweight 永不编辑 instruction file，只会 report 或 tip 该 gap。如果 AGENTS.md 已经提到 `docs/solutions/`，这个 prompt 不会触发。
+A standalone request to create or bootstrap `CONCEPTS.md` is a refresh. Vocabulary capture here is a side effect of documenting a real learning, scoped to that learning's area.
 
 ---
 
-## 另见
+## FAQ
 
-- [`ce-compound-refresh`](./ce-compound-refresh.md) - 随 codebase 演进维护 `docs/solutions/`
-- [`ce-debug`](./ce-debug.md) - fix 验证后常见的 upstream caller
-- [`ce-work`](./ce-work.md) - shipping 后常见的 upstream caller
-- [`ce-plan`](./ce-plan.md) - planning 时读取 `docs/solutions/` 作为 institutional memory
-- [`ce-ideate`](./ce-ideate.md) - grounding 时读取 `docs/solutions/`
+**Why two modes, and why doesn't it ask me which one?**
+Full mode is for most qualifying learnings: the parallel subagents catch duplicates, find related docs, and run specialized reviews. Lightweight exists for sessions running tight on context. The skill picks between them itself because the deciding factor, how much context budget is left, is something the agent can see and you cannot. It reports the choice in its output. Re-run it if it guessed wrong.
+
+**What's the difference between bug track and knowledge track?**
+Bug track captures incident-level fixes: "X broke, here's why and how we fixed it." Knowledge track captures durable guidance: "this is how we do X here, and why." Bug track has Symptoms / What Didn't Work / Solution. Knowledge track has Context / Guidance / When to Apply.
+
+**Why update existing docs instead of always creating new ones?**
+Two docs describing the same problem drift apart. The newer context is fresher, so the skill folds it into the existing doc. One canonical doc that improves over time.
+
+**Can I capture several learnings in one run?**
+No. Grounding, overlap detection, and cross-referencing assume a single solved problem. Run the skill once per learning, sequentially.
+
+**Does it work in non-software contexts?**
+Knowledge track generalizes (conventions, decisions, workflow practices), but the skill assumes a code repo, a `docs/solutions/` directory, and YAML-frontmatter conventions. It is primarily a software-team tool.
+
+**What if I don't want the discoverability edit to AGENTS.md?**
+Decline the consent prompt and the doc still gets written. Non-interactive and lightweight never edit the instruction file; they report or tip the gap instead. The prompt will not fire if your AGENTS.md already mentions `docs/solutions/`.
+
+**Is there a "What's next?" menu?**
+No. The skill ends after the summary. Cross-doc maintenance is deferred to a refresh via the refresh recommendation line.
+
+---
+
+## Refresh
+
+The second job maintains the store: it reviews existing learnings against the current codebase, then updates, consolidates, replaces, or deletes the ones that drifted, and keeps `CODING_STANDARDS.md` in step with the repo's checks.
+
+Run it with `/ce-compound refresh [scope]` or by asking in plain words, such as "clean up the learnings". A schedule or another skill uses `/ce-compound mode:refresh mode:non-interactive [scope]`. A bare `/ce-compound`, and any unattended run without `mode:refresh`, is a capture.
+
+### Example invocations
+
+A scope hint is a category directory, filename slug, module, or keyword. Prefer one: an unscoped run has to triage the whole store first.
+
+```text
+# Review learnings for one module or topic
+/ce-compound refresh authentication
+
+# One known file (filename slug)
+/ce-compound refresh release-please-version-drift-recovery
+
+# One category directory
+/ce-compound refresh performance-issues
+
+# Pattern-doc topic
+/ce-compound refresh critical-patterns
+
+# No hint: triage the whole store, then start at the highest-impact cluster.
+# Interactive asks before going deep.
+/ce-compound refresh
+
+# Apply unambiguous maintenance without questions. Ambiguous docs are marked
+# stale. On the default branch this opens a PR.
+/ce-compound mode:refresh mode:non-interactive authentication
+
+# Build a repo-wide CONCEPTS.md glossary. Interactive asks whether you meant
+# a refresh instead.
+/ce-compound refresh create a CONCEPTS.md
+
+# Fix drift only: skip the worth check and leave accurate content alone.
+/ce-compound refresh fix drift only
+```
+
+With no hint, a refresh clusters the store and recommends a starting area. Interactive confirms that area; non-interactive processes every cluster in impact order. A hint that matches nothing asks you to clarify (interactive) or reports the miss and exits (non-interactive). An empty store tells you to run `ce-compound` first.
+
+
+### The Problem
+
+`docs/solutions/` drifts in predictable ways:
+
+- A learning still names `app/models/auth_token.rb` after the file became `session_token.rb`
+- The recommended fix is now an anti-pattern
+- Two learnings describe the same problem from different months and have started to disagree
+- A workaround learning whose upstream bug was fixed, with nothing saying the workaround can go
+- A pattern doc whose supporting learnings no longer back the rule
+- Code that disappeared quarters ago, with the learning still sitting there
+- `_archived/` folders that pollute search and nobody reads
+
+Future agents (and humans) then take advice that no longer applies. The store makes the next encounter harder, not easier.
+
+### The Solution
+
+A structured review with five outcomes per doc:
+
+- **Keep**: accurate and useful. No edit, no review breadcrumb.
+- **Update**: the solution is still right; references drifted. Fix in place, including relocating a doc whose directory and frontmatter category clearly disagree.
+- **Consolidate**: two docs overlap. Merge unique content into the canonical one and delete the other. The inverse, **Split**, breaks one multi-problem doc into focused successors when the fragments have independent retrieval value.
+- **Replace**: the old guidance is now misleading. Write a successor, then delete the old file.
+- **Delete**: the code and the problem domain are gone, and inbound citations are absent or decorative. Git history is the archive; there is no `_archived/` destination.
+
+A refresh investigates each doc against the tree, then looks at the set (overlap, supersession, contradictions), then classifies and executes. Interactive mode asks only on genuine judgment calls. Non-interactive applies the safe subset and marks the rest stale.
+
+
+### What Makes It Novel
+
+#### Five outcomes, not "is this still right?"
+
+Each doc gets a specific action and an evidence bar. Age alone is not staleness, and typos are not a reason to edit. When a doc's claims about current mechanics disagree with the code, the doc changes. Guidance with independent support is different: if the implementation stops satisfying it, a refresh preserves the guidance and reports the conflict as a potential product regression. It never edits or adjudicates product code.
+
+A learning can declare a `retire_when` condition: the outside change, such as an upstream bug fix, that would retire it. A refresh checks a declared condition and treats a met one as contradicting evidence, not age. When repo code still carries the workaround the learning explains, the learning stays and the report recommends removing that code. A condition a refresh cannot check, for example because the tracker is unreachable, is noted in the report and does not change the learning on its own.
+
+#### Two modes
+
+**Interactive** (default) applies Keep, Update, and obvious Consolidate directly. It asks before a Replace, a Split, a Delete that fails the auto-delete gate, or a Consolidate whose canonical doc is not obvious.
+
+**Non-interactive** never pauses. It applies Keep, Update, Consolidate, gated auto-Delete, and Replace when the evidence is enough. Ambiguous cases get `status: stale`, `stale_reason`, and `stale_date` in frontmatter. Relocations auto-apply only under a four-condition gate; Splits are always recommend-only. The report separates Applied (writes that succeeded) from Recommended (writes that failed, plus everything that never runs unattended).
+
+#### Set-level problems
+
+After the per-doc pass, a refresh looks for overlap, a newer doc that subsumes an older one, and contradictions between docs. Contradictions outrank individual drift. For a knowledge-track learning, it also compares any guidance file the learning names (a skill's `SKILL.md`, a runbook, a root instruction file) for a conflicting order or rule on the same procedure. Only guidance the learning names, never a search, and a wrong guidance file is reported, not edited. Category-shape notes (a directory that mixes unrelated themes, a near-empty category) are report-only. It never renames categories or invents new ones.
+
+#### Delete is conservative
+
+Auto-delete requires all three: the implementation that lived in this repo is gone (or a successor already states the same guidance); the problem domain is gone; inbound markdown citations are absent or decorative. A doc that never pointed at in-repo code never auto-deletes. A citation another doc depends on is a Replace or Keep signal, not a cleanup task.
+
+Every refresh also applies the counterfactual `ce-compound` uses before writing: is this reasoning recoverable from a named in-repo artifact, such as a test or a coding standard? A claim that is gets cut, and a doc with nothing left gets deleted. Each cut quotes the artifact that states the claim, and the commit or PR carries those quotes. Measured facts and rejected alternatives stay unless the artifact states them too. Ask for drift fixes only to skip this.
+
+#### Keeping lessons in the right form
+
+A refresh also reads the coding standards that govern its scope. It removes a rule once a check covers its whole class, narrows the rule when coverage is partial, and turns a doc that is really a rule into a standard when no check could hold it. When a check could hold it, a refresh recommends the check, because it writes no checks and never changes product code. Pruning from review history stays with [`/ce-setup standards`](./ce-setup.md).
+
+If the current approach cannot be documented from a file scan, the doc is marked stale rather than guessed into a replacement. The recommendation is `/ce-compound` the next time you work in that area.
+
+#### Vocabulary and findability
+
+After the doc actions, a refresh reconciles domain terms with `CONCEPTS.md` at the repo root (creating it when enough terms qualify). That pass is silent in both modes.
+
+Every run also checks whether the project's instruction files would lead an agent to `docs/solutions/`. Interactive mode proposes the smallest addition and asks before editing; non-interactive only recommends it. The same check runs for `CONCEPTS.md` when that file exists.
+
+
+### Quick Example
+
+You just merged a rename in the auth models. You run `/ce-compound refresh auth`.
+
+A refresh finds five learnings and two pattern docs that match via directory, frontmatter, filename, or content.
+
+Investigation: three still name files that moved (`auth_token.rb` → `session_token.rb`). One is fully superseded by a newer doc. One is still accurate. One pattern doc generalizes a rule the rename broke. Set analysis then shows two learnings covering the same auth-error problem; the newer one is broader.
+
+Classification: three Updates (rename the references), one Consolidate (merge the older error doc into the newer and delete the older), one Keep, one Replace (the pattern doc gets a successor, then the old file is deleted).
+
+Interactive mode confirms the consolidation if the canonical choice is not obvious; other actions apply directly. On a feature branch, the recommended close is a separate commit of only the refresh files. The printed report lists every doc, the outcome, the evidence, and what was done.
+
+
+### When to Reach For It
+
+Reach for a refresh when:
+
+- A refactor or rename just landed and learnings in that area likely drifted
+- `ce-compound` flagged a specific older doc as superseded
+- Two docs in `docs/solutions/` look like the same problem
+- You want a periodic hygiene pass (for example quarterly), preferably scoped
+- You want a repo-wide `CONCEPTS.md` seeded from the declared domain model
+
+Skip it when:
+
+- You have not seen any drift. Broad sweeps without evidence produce churn.
+- The docs are recent and that area of the codebase has not moved
+- You are mid debug or mid build. Capture first with `/ce-compound`; refresh later.
+- Work you just finished made one learning wrong and you know which one. `/ce-compound` updates it through its overlap check, and recommends a refresh when older docs look affected too.
+
+
+### Use as Part of the Workflow
+
+A refresh is the maintenance counterpart to a capture. It is not on the ideate → brainstorm → plan → work path.
+
+- **From a capture**: a narrow scope hint when a new learning suggests an older doc is stale
+- **Manual, scoped**: `/ce-compound refresh auth`, `/ce-compound refresh performance-issues`
+- **Pre-release**: a pass so documented learnings match what is shipping
+
+Captures add docs. A refresh keeps the set lean. Without refreshes, captures eventually clutter the store.
+
+
+### Reference
+
+| Argument | Effect |
+|----------|--------|
+| _(empty)_ | Broad sweep with triage. Interactive: confirm the starting cluster. Non-interactive: process everything, no narrowing question. |
+| `<directory>` | Category folder, e.g. `performance-issues` |
+| `<filename slug>` | One file, e.g. `release-please-version-drift-recovery` |
+| `<module/keyword>` | Narrow by frontmatter or content, e.g. `auth`, `payments` |
+| `mode:refresh mode:non-interactive` | Add to any of the above for a schedule or another skill. The plain word `refresh` does not start an unattended sweep, because capture takes free-text context. No prompts. Unambiguous actions apply; the rest are stale-marked or recommended. Deprecated alias: `mode:headless`. |
+| `create a CONCEPTS.md` / `build the concept map` | Interactive: ask whether to bootstrap the glossary or run a refresh. Non-interactive: run a refresh and note that a standalone bootstrap was not run. |
+
+Default review root: `docs/solutions/` (follows `docs_root` if set). `README.md` files and anything under `_archived/` are not review candidates. Catalog README rows still update when a listed doc is removed or renamed. If `_archived/` exists, the report flags it for cleanup.
+
+On the default branch, non-interactive commits on a named branch and attempts a PR. Interactive asks: branch + PR, commit here, or don't commit.
+
+
+### FAQ
+
+**What's the difference between Update and Replace?**
+Update fixes drift and keeps the recommended solution (renamed file, moved class, broken link, unambiguous misfile). Replace rewrites the guidance because the recommended approach changed. If you would rewrite the solution section, that is Replace.
+
+**What happens when code and guidance disagree?**
+Claims about current mechanics follow the code. Guidance with independent support follows its governing evidence; if the implementation no longer satisfies it, a refresh preserves the guidance and reports a potential product regression without touching product code.
+
+**When should I use non-interactive mode?**
+Periodic or large-scope runs where stopping on every question is impractical. Ambiguous cases are marked stale, so the report is something a human can review.
+
+**What if it wants to delete a doc I want to keep?**
+Interactive mode shows the evidence first. Decline and the file stays. Non-interactive auto-delete is conservative: a substantive citation downgrades to stale-marking.
+
+**Why delete instead of archive?**
+Archive folders accumulate and pollute search. `git log --diff-filter=D -- docs/solutions/` recovers anything you need.
+
+**Does it reorganize `docs/solutions/`?**
+Only the safe subset. Unambiguous misfilings can move with inbound-link rewrites. One multi-problem doc can be split (always recommend-only when unattended). Catalog README rows update when a listed doc is removed or renamed. Renaming categories or inventing new ones is never automated.
+
+**Does it treat pattern docs differently?**
+Same five outcomes, different evidence. Keep means the supporting learnings still back the rule. Replace means the generalization is now wrong, and the successor is built from the refreshed learnings, not invented fresh.
+
+**What does a CONCEPTS.md run do?**
+It seeds the project's core domain nouns into a repo-root glossary. A normal refresh also accretes terms from the docs in scope and will create `CONCEPTS.md` if enough terms qualify. The explicit bootstrap is the only repo-wide seed.
+
+---
+
+## See also
+
+- [`ce-compound-refresh`](./ce-compound-refresh.md): the old name for a refresh, still working for now
+- [`ce-debug`](./ce-debug.md): a common moment to capture, after a fix is verified
+- [`ce-work`](./ce-work.md): a common moment to capture, after shipping
+- [`ce-plan`](./ce-plan.md): reads `docs/solutions/` as institutional memory during planning
+- [`ce-ideate`](./ce-ideate.md): reads `docs/solutions/` as part of grounding

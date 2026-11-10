@@ -8,7 +8,9 @@
 - **Do not** use this rule for `docs_root` — that key is `config.yaml` only.
 <!-- ce-config-layers:end -->
 
-Spiral（`@every-env/spiral-cli`）会用用户的 brand voice 起草文案。`ce-promote` 将其作为**可选增强**使用；每次调用都必须被包裹起来，确保 CLI 缺失、未认证或报错时绝不阻塞 skill。
+Spiral（`@every-env/spiral-cli`）会用用户的 brand voice 起草文案，`ce-promote` 将其作为**可选增强**使用。
+
+先解析 repo root（绝不用 CWD），再按上文的 ordinary-key 规则读取 `ce_promote_spiral_optout`。若最终生效的**未被注释**的顶层值恰为 `true`，就**跳过 Path 0**，直接走 Path B（不使用 Spiral CLI，直接起草 post）。**忽略被注释的行**：`ce-setup` 的模板自带 `# ce_promote_spiral_optout: true` 示例，注释行是文档而非 opt-out（朴素的子串匹配会错误地让所有采用默认模板的项目跳过 setup offer）。否则照常提供 setup。
 
 ## Detection — three states（检测：三种状态）
 

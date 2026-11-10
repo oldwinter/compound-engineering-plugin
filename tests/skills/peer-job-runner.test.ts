@@ -8,6 +8,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   statSync,
   utimesSync,
   writeFileSync,
@@ -295,6 +296,66 @@ describe("peer-job-runner lifecycle", () => {
       ["timeout", "died-without-result"],
     ).toContain(waitState(root, FAST, b.id, 10).stdout.trim())
   }, 25000)
+
+  test("deadline wait: labels each job and names the next step; reap takes several ids", () => {
+    const root = makeRoot()
+    const quick = startJob(root, FAST, [writeStub(`exit 0\n`)], { extra: ["--label", "codex"] })
+    const slow = startJob(root, FAST, [writeStub(`sleep 60\nexit 0\n`)], { extra: ["--label", "grok"] })
+    trackJob(quick.dir)
+    trackJob(slow.dir)
+
+    const waiting = runner(root, FAST, [
+      "wait", "--max-secs", "1", "--deadline-secs", "600", quick.id, slow.id,
+    ])
+    const lines = waiting.stdout.trim().split("\n")
+    expect(lines[0]).toMatch(new RegExp(`^codex\\t${quick.id}\\tdone\\t\\d+s$`))
+    expect(lines[1]).toMatch(new RegExp(`^grok\\t${slow.id}\\trunning\\t\\d+s$`))
+    expect(lines[2]).toMatch(/^waiting: 1 of 2 still running; \d+s left before the deadline$/)
+
+    const passed = runner(root, FAST, [
+      "wait", "--max-secs", "30", "--deadline-secs", "4", quick.id, slow.id,
+    ])
+    expect(passed.ms).toBeLessThan(8000)
+    expect(passed.stdout.trim().split("\n").at(-1)).toBe(
+      `deadline passed: reap ${slow.id}, then wait once more; a job still running after that counts as timed out`,
+    )
+
+    expect(runner(root, FAST, ["reap", quick.id, slow.id]).code).toBe(0)
+    const settled = runner(root, FAST, [
+      "wait", "--json", "--max-secs", "10", "--deadline-secs", "600", quick.id, slow.id,
+    ])
+    const doc = JSON.parse(settled.stdout)
+    expect(doc.all_settled).toBe(true)
+    expect(doc.deadline_passed).toBe(false)
+    expect(doc.jobs.map((j: { label: string }) => j.label)).toEqual(["codex", "grok"])
+    expect(doc.jobs[1].reason).toMatch(/reaped (on|by) request/)
+
+    runner(root, FAST, ["start", "--skill", "ce-doc-review", "--run-id", "run1", "--", "/nonexistent/worker-xyz"])
+    const neverStarted = readdirSync(path.join(root, "ce-doc-review", "run1", "jobs"))
+      .map((id) => path.join(root, "ce-doc-review", "run1", "jobs", id))
+      .find((dir) => !existsSync(path.join(dir, "pid")))!
+    const unsettled = runner(root, FAST, [
+      "wait", "--max-secs", "1", "--deadline-secs", "600", neverStarted,
+    ]).stdout.trim().split("\n")
+    expect(unsettled[0]).toMatch(/\tnever-started\t\S+\t\S/)
+    expect(unsettled.at(-1)).toBe("all settled")
+  }, 25000)
+
+  test("deadline wait: grace extends the window; non-finite or malformed seconds are usage errors", () => {
+    const root = makeRoot()
+    const slow = startJob(root, FAST, [writeStub(`sleep 60\nexit 0\n`)])
+    trackJob(slow.dir)
+    const graced = runner(root, FAST, [
+      "wait", "--max-secs", "0", "--deadline-secs", "0", "--deadline-grace-secs", "600", slow.id,
+    ])
+    expect(graced.stdout.trim().split("\n").at(-1)).toMatch(/^waiting: 1 of 1 still running; \d+s left before the deadline$/)
+    for (const bad of ["inf", "nan", "-1", "x[$(touch pwn)]"]) {
+      const res = runner(root, FAST, ["wait", "--max-secs", "0", "--deadline-secs", bad, slow.id])
+      expect(res.code).toBe(2)
+      expect(res.stderr).toContain("--deadline-secs")
+    }
+    expect(runner(root, FAST, ["reap", slow.id]).code).toBe(0)
+  }, 20000)
 
   test("idle reap: silent worker classified timeout, whole tree gone", () => {
     const root = makeRoot()
@@ -669,7 +730,73 @@ describe("peer-job-runner lifecycle", () => {
     ])
     expect(missing.code).toBe(3)
     expect(missing.stdout).toBe("")
+    // An absent artifact is an outcome, not a read error: report it as one
+    // rather than dumping errno at the caller (#1607).
+    expect(missing.stderr).toContain("no artifact at")
+    expect(missing.stderr).not.toContain("No such file or directory")
   }, 10000)
+
+  test("result --path with a job id names the job's state instead of a bare errno", () => {
+    const root = makeRoot()
+    const missing = path.join(mkTempRoot("peer-path-"), "adversarial-codex.json")
+
+    // A peer that skips (no different-provider CLI installed) exits 0 without
+    // writing the artifact and is legitimately `done` -- the dominant fold-in
+    // case behind #1607's ~90 phantom file errors.
+    const skipped = startJob(root, FAST, [writeStub("exit 0\n")])
+    trackJob(skipped.dir)
+    expect(
+      runner(root, FAST, ["wait", "--max-secs", "10", skipped.id]).stdout.trim(),
+    ).toBe("done")
+
+    const doneNoArtifact = runner(root, FAST, ["result", skipped.id, "--path", missing])
+    expect(doneNoArtifact.code).toBe(3)
+    expect(doneNoArtifact.stdout).toBe("")
+    expect(doneNoArtifact.stderr).toContain("no artifact at")
+    expect(doneNoArtifact.stderr).toContain(`job ${skipped.id}: done`)
+    // The terminal record's reason is what turns a state word into a diagnosis.
+    expect(doneNoArtifact.stderr).toContain("(worker exited 0)")
+    expect(doneNoArtifact.stderr).not.toContain("No such file or directory")
+
+    // The other actionable state: still running is never reported as exit 3.
+    const running = startJob(root, FAST, [writeStub("sleep 30\n")])
+    trackJob(running.dir)
+    const stillRunning = runner(root, FAST, ["result", running.id, "--path", missing])
+    expect(stillRunning.code).toBe(2)
+    expect(stillRunning.stdout).toBe("")
+    expect(stillRunning.stderr).toContain("still running")
+
+    expect(runner(root, FAST, ["reap", running.id]).code).toBe(0)
+    runner(root, FAST, ["wait", "--max-secs", "10", running.id])
+  }, 20000)
+
+  test("absent --path keeps each failure's own exit code rather than the routine 3", () => {
+    const root = makeRoot()
+    const missing = path.join(mkTempRoot("peer-path-"), "adversarial-codex.json")
+
+    // A job id that does not resolve is a lookup failure, not a peer that
+    // produced nothing -- collapsing it into 3 hides it as a routine skip.
+    const unknown = runner(root, FAST, ["result", "nope-0000", "--path", missing])
+    expect(unknown.code).toBe(1)
+    expect(unknown.stderr).toContain("no artifact at")
+    expect(unknown.stderr).toContain("job not found")
+
+    // A path that exists but is refused -- a planted symlink is what O_NOFOLLOW
+    // guards against -- is a trust failure, not "the peer produced nothing".
+    const linkDir = mkTempRoot("peer-link-")
+    writeFileSync(path.join(linkDir, "real.json"), "{}")
+    symlinkSync(path.join(linkDir, "real.json"), path.join(linkDir, "link.json"))
+    const refused = runner(root, FAST, [
+      "result", "--path", path.join(linkDir, "link.json"),
+    ])
+    expect(refused.code).toBe(4)
+    expect(refused.stdout).toBe("")
+    expect(refused.stderr).toContain("refused to read")
+
+    // The ownership-failure branch (exit 4) needs a real fstat-uid mismatch, so
+    // it lives in the python fixture -- mode bits would not fail the owner check
+    // and are inert as root and on Windows.
+  }, 20000)
 
   test("result with neither a job nor --path is a usage error (exit 2)", () => {
     const root = makeRoot()

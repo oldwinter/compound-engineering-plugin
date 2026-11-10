@@ -33,7 +33,11 @@ Script 负责报告 flags；你负责决定如何处理每一个。只有三种 
 
 ## Step 2：Semantic validator subagent（Full 和 non-interactive；lightweight 跳过）
 
-Dispatch **一个 generic read-only subagent**，覆盖 written solution doc，以及本次 run 新增或编辑的任何 `CONCEPTS.md` entries。Phase 2.4 entries 同样是 claims；从 session-level summary 写出 glossary entry，正是错误 semantics 进入 vocabulary 的方式。当 platform 提供对应能力时，使用与其他 reviewer subagents 相同的 mid-tier model class。使用下方模板构建 prompt；这是 canonical executable prompt contract，保留英文原文：
+Dispatch **一个 generic read-only subagent**，覆盖 written solution doc，以及本次 run 新增或编辑的任何 `CONCEPTS.md` entries。Phase 2.4 entries 同样是 claims；从 session-level summary 写出 glossary entry，正是错误 semantics 进入 vocabulary 的方式。当 platform 提供对应能力时，使用与其他 reviewer subagents 相同的 mid-tier model class。
+
+If the user's or project's active instructions or the live prompt name a model for this subagent, use that model instead of the default tier above. They can name it by the subagent's tier, by its prompt-asset name, or for the subagents being dispatched. Without such an instruction, a model configured for this subagent's role takes precedence over the default tier.
+
+使用下方模板构建 prompt；这是 canonical executable prompt contract，保留英文原文：
 
 ```
 You are a grounding validator for documentation about to enter a permanent

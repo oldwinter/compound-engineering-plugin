@@ -1,12 +1,14 @@
 # `ce-ideate`
 
-> 发现值得探索的强方向和合格方向，让其他噪声自然落下。
+> **中文导读：** `ce-ideate` 是可选的方向发现步骤：先做 grounding（仓库、既有 learnings、网络 prior art，可选 Slack 或 issue tracker），再用六个思考框架生成候选，只保留通过对抗式裁剪的想法。每个存活的想法都给出可核查的依据，被拒绝的想法附理由。它适用于本仓库软件、仓库外产品，乃至与软件无关的主题。
 
-`ce-ideate` 是上游 **discovery** skill。当你还没有具体 idea 时使用它；此时问题不是 "let me refine the one I already have"，而是 "which directions even matter here?"。它会先做功课：parallel grounding agents 从你的 codebase、past learnings、**open web 上的 external prior art**，以及可选的 Slack 和 issue tracker 中提取素材；然后从六种不同 conceptual frames 生成 candidates；要求每个 idea 都有 tagged **basis**；最后只展示通过 adversarial critique 的 survivors，并明确说明哪些内容被 rejected 以及原因。
+> When you don't have an idea yet, get a ranked set of grounded directions you can pick from, discuss, or discard.
 
-它同样适用于 software topics、product topics 和完全 non-software topics：naming、narrative、personal decisions、weekend trips、business strategy。相同的 generate-critique-survive engine；相同的 basis requirement；相同的 anti-slop discipline。
+`ce-ideate` is the optional discovery step. Use it when the question is "which directions are worth exploring?" rather than "help me refine this one I already have." It grounds first (the repo, past learnings, prior art on the web, and optionally Slack or your issue tracker), generates candidates from six thinking frames, and keeps only the ones that survive an adversarial cut. Every survivor cites a basis you can check. Rejected ideas come with reasons.
 
-这是 compound-engineering ideation chain 的第一步：
+It works on software in this repo, on a product outside the repo, and on topics with no software at all: names, narrative, personal decisions, business strategy. The generate-then-critique engine and the basis rule stay the same.
+
+This is the first step in the compound-engineering ideation chain. Skip it when you already know what to explore:
 
 ```text
 /ce-ideate         /ce-brainstorm      /ce-plan             /ce-work
@@ -15,143 +17,149 @@
                                         this?"
 ```
 
-这条 chain 可跨 domains 工作，每一步都支持 universal mode。`ce-ideate` 是上游 "find the strong candidates" step，但它本身也是一个完整 cycle。
+Acting on a survivor goes to `ce-brainstorm`. In a repo, don't skip from ideation to `ce-plan`. Outside a software build, the saved idea set can be the end of the run.
+
+If the options are already on the table and you need a verdict, use `ce-pov` instead.
 
 ---
 
 ## TL;DR
 
-| 问题 | 回答 |
+| Question | Answer |
 |----------|--------|
-| 它做什么？ | 基于真实材料 grounding，把 topic 分解为 orthogonal axes，跨六种 conceptual frames 生成 candidates，adversarially critique，展示 5-7 个 survivors，每个都带 tagged basis |
-| 何时使用 | Greenfield exploration、big-picture thinking、codebase audits、surprise-me runs、naming、decisions、business strategy；任何想要 qualified candidate set 而不是 refined idea 的 domain |
-| 产出什么 | Ranked ideation artifact；默认写成单个 self-contained HTML file（面向 human readers，丰富且可在 browser 打开）。传入 `output:md` 可写成 markdown。存在 `docs/ideation/` 时自动写入那里，否则写到已 announce 的 `/tmp/compound-engineering-<effective-uid>/` 临时路径 |
-| 下一步 | 对选中的 survivor 运行 `/ce-brainstorm`，先 iterate 某个 idea，或保留已保存文件后结束 |
+| What does it do? | Grounds in real material, splits the topic into axes, generates candidates across six frames, critiques them all, and presents 5-7 survivors, each with a cited basis |
+| When to use it | You don't have a specific idea yet: greenfield, a codebase audit, issue-tracker mining, surprise-me, naming, a decision, a strategy question |
+| What it produces | A ranked ideation file, HTML by default. `output:md` writes markdown. Lands in `docs/ideation/` when that tree exists, otherwise a temp path under `/tmp/compound-engineering-<effective-uid>/` |
+| What's next | `ce-brainstorm` on one survivor, stay here and discuss or refine the set, or keep the file and stop |
 
 ---
 
-## 调用示例
+## Example invocations
 
 ```text
-# 生成以证据为基础的 product 或 codebase opportunities
+# Generate grounded product or codebase opportunities
 /ce-ideate what should we improve in this repository?
 
-# 聚焦某个特定 product surface
+# Focus ideation on a specific product surface
 /ce-ideate onboarding improvements for new team administrators
 
-# 从 open GitHub issues 的模式中寻找 solution opportunities
+# Find solution opportunities across patterns in open GitHub issues
 /ce-ideate what product opportunities do you see across our open GitHub issues?
 
-# 根据可访问 Linear project 中的 open work 展开 ideation
+# Ideate from the open work in an accessible Linear project
 /ce-ideate find solution opportunities across https://linear.app/acme/project/customer-onboarding-1234
 
-# 不指定主题，要求非显而易见的方向
+# Ask for non-obvious directions without naming a subject
 /ce-ideate surprise me
 
-# 把同一引擎用于非软件 ideation
+# Use the same engine for non-software ideation
 /ce-ideate names for a neighborhood coffee shop
 
-# 要求 Markdown，而不是默认的自包含 HTML artifact
+# Ask for Markdown instead of the default self-contained HTML artifact
 /ce-ideate developer experience improvements, and write the artifact in Markdown
 
-# 可重复 automation 中的等价简写
+# Equivalent shorthand when a repeatable automation needs it
 /ce-ideate developer experience improvements output:md
 ```
 
-候选项已经明确、需要判断时使用 `ce-pov`；需要确定某个候选项的 scope 时使用 `ce-brainstorm`。
+---
+
+## Why not just ask the model for ideas?
+
+Because one "give me ideas" prompt returns plausible bullets with no grounding in the actual subject. They come from the model's most-trained directions, ranked by nothing, with no record of what was considered and cut. `ce-ideate` separates grounding, generation, critique, and selection, and gets its quality from explicit rejection with reasons.
+
+- Grounding agents go first: codebase scan (in a repo), past learnings, web prior art, optional Slack and issue intelligence
+- The topic splits into 3-5 axes from that grounding: what to cover, separate from how to think
+- Six frames generate in parallel, each spreading ideas across those axes
+- Every idea carries a tagged basis: `direct:`, `external:`, or `reasoned:`
+- Ideas without a basis are dropped
+- Survivors are scored and shown with downsides and confidence
+- A rejection summary shows what was cut and why
 
 ---
 
-## 问题
+## How it works
 
-问 AI "what's worth exploring here?" 通常会得到：
+### Grounding before any idea is generated
 
-- 没有 grounding 于真实 subject 的 plausible-sounding bullets
-- 只有前三个 obvious frames，没有任何 surprise
-- Flat list，看不出哪些 directions 强、哪些只是 filler
-- 没有记录 considered and rejected 的内容
-- 无法 audit basis：每个 claim 听起来都 confident，却没有 evidence
+Every run starts with parallel grounding: the codebase (in repo mode), `docs/solutions/`, web prior art, and optional Slack or issue intelligence. In a repo, each ideation agent then reads the code its ideas rest on and cites the exact `path:line` it read, so ideas point at real code. The web pass is what stops the run from remixing only what's already in the repo or in your head.
 
-## 方案
+You can also point the prompt at your own research (a survey export, an analytics dump, a social-listening report). A cheap agent distills it into a citable dossier. It adds sources web research can't reach; it doesn't replace the web pass.
 
-`ce-ideate` 把 **grounding**、**generation**、**critique** 和 **selection** 分成离散 phases；quality mechanism 是 **explicit rejection with reasons**，不是乐观 ranking。
+### Every idea cites its evidence
 
-- Grounding agents 先做功课：codebase scan、past learnings、external prior art，以及可选 Slack 和 issue intelligence
-- Topic 被分解为 3-5 个来自 grounding 的 orthogonal axes：sub-agents 必须覆盖的是 *subject 的哪些方面*，而不是 *如何思考它*
-- 六个 parallel ideation sub-agents 从不同 conceptual frames 工作，并让 ideas 分布在 axes 上
-- 每个 idea 都必须带 tagged **basis**：direct evidence、named external prior art，或写清楚的 first-principles argument
-- 没有 basis 的 ideas 会被 rejected；它要防止的 failure mode 是 "AI slop"
-- Survivors 用一致 rubric 打分，并展示 downsides 和 confidence
-- Rejection summary 展示哪些内容被 considered and cut
+Each survivor carries one tagged basis:
 
----
+- `direct:` quoted evidence
+- `external:` named prior art
+- `reasoned:` a written-out first-principles argument, not a gesture
 
-## 独特之处
+Plausible speculation with no basis is rejected. Grounding without a basis is well-informed speculation; a basis without grounding is clever-sounding rationalization. The skill requires both.
 
-### 1. Comprehensive grounding before any idea is generated（先 grounding，再生成 idea）
+### Six frames, then a cut
 
-每次 run 都从 parallel grounding agents 开始，提供 ideas 将被 qualification 的 substance：codebase scan（repo mode）、来自 `docs/solutions/` 的 past institutional learnings、通过 web research 获得的 external prior art，以及工具可用时的 Slack 和 issue intelligence。在 repo mode 中，cheap **evidence scouts** 会继续加深 grounding：每个 topic axis 一个 scout，返回逐字 quotes 和 `file:line` pointers 的 dossier，让 ideation agents 引用真实 code，而不是 paraphrased summary。**External prior art 很关键**：没有它，agent 只是在 remix 你的 codebase 或脑中已有内容。有了它，ideas 可以引用 "this is how X solved this"：具体、可验证、有名称的 precedent。你也可以把自己的 research 交给 run：在 prompt 中指向 research artifact（social-listening report、survey export、analytics dump），cheap agent 会把它 distill 成可引用的 evidence dossier；这是用 web research 抵达不了的 source classes 丰富 grounding，而不是替代 web research。
+The frames are pain and friction; inversion, removal, or automation; assumption-breaking; leverage and compounding; cross-domain analogy; and constraint-flipping. Separate frames, especially analogy and constraint-flipping, produce a wider set than one prompt would.
 
-### 2. Basis requirement：每个 idea 都引用 evidence
+Default software and product runs use five agents to cover all six frames. `go deep` puts the whole fleet on the conversation's top-tier model, doubles verification, and adds a second critic. A tactical ask (`quick wins`, `polish`, `cleanup`) keeps every frame and shrinks volume: fewer ideas per frame, fewer verification reads, at most 3 axes. Issue-tracker runs replace the six frames with the tracker's highest-leverage themes (up to four) when the scan returns usable themes.
 
-每个 surviving candidate 都带 tagged basis：`direct:`（quoted evidence）、`external:`（named prior art）或 `reasoned:`（写出来的 first-principles argument，而不是手势）。听起来 plausible 但没有 basis 的 speculation 会被 rejected。**Comprehensive grounding + basis requirement 是双重 anti-slop mechanism。** 只要其中一个都更弱：有 grounding 但无 basis 会变成 informed speculation；有 basis 但无 grounding 会变成 clever-sounding rationalization。
+Critique runs in two layers. A verifier that never saw generation tries to refute each candidate: do the quotes exist, is the prior art real, does the argument hold? Then the orchestrator makes the final cut. Every rejection gets a one-line reason.
 
-### 3. Six-frame divergent generation（六框架发散生成）
+### Axes so six frames don't all land on the same slice
 
-Parallel sub-agents 覆盖六个 generative frames：pain & friction、inversion/removal/automation、assumption-breaking、leverage & compounding、cross-domain analogy、constraint-flipping。Single-prompt ideation 会塌缩到 agent 最常训练的方向；不同 frames 强迫真正的 breadth，尤其是 cross-domain analogy 和 constraint-flipping，能浮现单个 prompt 不会得到的 ideas。这个 fleet 是 **cost-tiered**：evidence-driven frames 运行在 mid-tier model 上（dossiers 承担 heavy lifting），而 ceiling frames（强模型推理本身就是产物）继承 conversation 的模型。说 `go deep` 会把整个 fleet 提升到 top tier。
+Frames decide how to think; axes decide what part of the topic to think on. Before dispatch, the orchestrator derives 3-5 orthogonal axes from grounding. For social sharing those might be send, discovery, arrival, compounding, and actor types. Each frame spreads ideas across them, and if an axis ends up with zero ideas, one bounded recovery dispatch fills it. Atomic topics (a name, a tagline) and surprise-me runs skip this.
 
-### 4. Topic-surface decomposition：axis coverage 作为 dispatch invariant（dispatch 不变量）
+### Three modes, plus surprise-me and the issue tracker
 
-Frames 决定 *如何思考* topic；**axes** 决定 *思考 topic 的哪一部分*。Frame dispatch 之前，orchestrator 会把 topic 分解为 3-5 个来自 grounding 的 orthogonal axes（例如 "social sharing" 可分为 send、discovery、arrival、compounding、actor types）。然后要求每个 frame 的 ideas 分布在 axes 上，generation 之后的 axis-coverage check 会捕捉 blind spots；如果某个 axis 没有 ideas，就用 bounded recovery dispatch 填补。它防止的 failure mode 是：六个 lenses 都收敛到 topic 最显眼的 interpretation，而漏掉其余 surface。Atomic topics（name、tagline）和 surprise-me runs 会干净地跳过 decomposition。
+The same engine runs on things in this codebase, a software product outside this repo, or a topic with no software at all.
 
-### 5. Adversarial filtering with stated rejection reasons（带理由的对抗式筛选）
+Non-software mode uses a facilitator in the topic's own language. Same six frames, same basis rule, same critique. Depth is Quick (3-5 survivors, one inline round), Standard (5-7, still inline), or Full (5-7, frames dispatched as agents). `ce-brainstorm` on a non-software survivor develops that idea further (a name into a brand brief, a plot into an outline); it is not the first step of a build chain.
 
-Critique 分两层运行。**fresh-context verifier**（一个从未看过 generation 的 agent）会尝试 refute 每个 candidate：引用的 quotes 是否真实存在、named prior art 是否真实、argument 是否站得住？然后 orchestrator 用一致 rubric 仲裁 final cut：groundedness、basis strength、expected value、novelty、pragmatism、leverage、implementation burden、overlap。每个 rejection 都带 one-line reason。Survivors 与 rejection summary 一起展示，让你看到哪些内容被 considered and cut。
+`/ce-ideate surprise me` skips naming a subject. Each frame picks its own from the grounding, and combinations across those subjects are expected.
 
-### 6. 三种 modes：software、software-product 和完全 non-software
-
-同一个 generate-critique-survive mechanism 可以运行在很不同的 topic domains 上：codebase 中的东西、repo 外的软件产品（pages、apps、flows），或完全没有 software surface 的 topics（naming、narrative、personal decisions、business strategy）。在 non-software mode 中，domain-agnostic facilitator 接管：仍然是六个 frames、basis requirement 和 critique，但使用 domain-native language。
-
-### 7. Surprise-me mode：无需 subject
-
-`/ce-ideate "surprise me"` 会完全跳过 subject step。Sub-agents 从 grounding material 中发现自己的 subjects。不同 frames 找到不同 subjects 是 feature，不是 bug；跨 discovered subjects 的 cross-cutting combinations 往往产生最强 ideas。
-
-### 8. Issue-tracker intent（issue tracker 意图）
-
-“what users are reporting”或“biggest issue patterns”这类 phrase 会触发 issue-intelligence agent，从可访问的 tracker（GitHub、Linear 或 Jira）拉取真实 issues，并把按 leverage 排序的 clustered themes 输入 ideation frames。对于 large tracker，它会根据 tracker 自身结构限定 scope；只有 tracker 真正分裂时才最多询问一个问题。它会披露分析过和未分析的内容，不会暗示自己读完了一切。
+Phrases like "what users are reporting" or "biggest issue patterns" start an issue-intelligence pass against GitHub, Linear, or Jira, whichever is reachable. Large trackers are scoped by the tracker's own structure. The skill asks at most one question, and only when the tracker is genuinely split. It says what it did and did not analyze.
 
 ---
 
-## 快速示例
+## Quick example
 
-你在 code repo 中调用 `ce-ideate "DX improvements"`。Agent 宣布它会 dispatch 约 13 个 agents（多数在 cheap tiers），并提供 skip phrases 来控制成本。
+You invoke `ce-ideate "DX improvements"` from inside a repo. The agent names the grounding and ideation agents it will dispatch and lists the skip phrases (`no external research`, `no slack`).
 
-Grounding agents 并行返回：codebase summary、relevant past learnings、developer-experience patterns 的 external prior art。Orchestrator 将 topic 分解为 4-5 个来自 grounding 的 axes（例如 "DX improvements" 可分为 feedback loops、environment friction、tooling ergonomics、knowledge accessibility、automation surface），然后 cheap evidence scouts 为每个 axis 收集 quote-and-pointer dossier。覆盖六个 frames 的五个 ideation sub-agents 基于这些 evidence 生成 candidates，每个 idea 都标注 target axis，并在提交前 against actual files verification。Orchestrator 将 40+ candidates 合并成一个 list，synthesize cross-cutting combinations，运行 axis-coverage check（任何 empty axis 都触发一次 bounded recovery dispatch），再运行 two-layer critique pass：fresh-context verifier 尝试 refute 每个 candidate，然后 orchestrator 做 final cut。大约 13 个 ideas 会因过于 vague、缺乏 justification、被 refuted 或重复而被 cut。
+Grounding returns a codebase summary, relevant learnings, and prior art on developer-experience patterns. The orchestrator splits the topic into axes (feedback loops, environment friction, tooling, knowledge access, automation), and five agents covering six frames generate candidates across those axes, reading the code they cite. The orchestrator merges the list, synthesizes combinations, checks axis coverage, and runs the two-layer critique.
 
-完整 deliverable（全部七张 cards，包含 basis、rationale、downsides、confidence、complexity，以及 rejection summary）会自动写成 self-contained HTML file 并在 browser 中打开；session 本身只展示 concise ranked summary 和路径，让你阅读 rich version，而不是一墙 terminal text。
+A default run generates on the order of 36-48 raw ideas and keeps 5-7. The session summary looks like `Wrote 7 ranked ideas (36 raw, 13 cut) across 5 axes`.
 
----
+The full cards (basis, rationale, downsides, confidence, complexity) plus the rejection summary land in a self-contained HTML file that opens in the browser. The session shows a one-line count, a ranked one-liner per survivor, and the path. Then a menu of up to four options:
 
-## 何时使用
+1. Open in browser, or publish a copy to the publisher you named or the host's artifact tool (omitted on a markdown run with neither)
+2. Brainstorm one idea with `ce-brainstorm`
+3. Discuss or refine the ideas first
+4. Done: keep the file and stop
 
-在以下情况使用 `ce-ideate`：
-
-- 你还没有 specific idea；想要 strong、qualified candidates，而不是 refine 一个已有 idea
-- Thinking 是 greenfield 或 big-picture
-- 想探索一个 focus area，但还不 commit 到某个 direction
-- 想要 surprising direction（`surprise me`）
-- 想从 issue tracker 中挖掘 patterns
-- Topic 完全 non-software
-
-以下情况跳过 `ce-ideate`：
-
-- 已经有 specific feature 或 decision -> `/ce-brainstorm`
-- Requirements 已 ready，需要 execution guardrails -> `/ce-plan`
-- 正在 debug known bug -> `/ce-debug`
+Say `discard` if you don't want a file kept this run. Discard does not delete a resumed existing doc.
 
 ---
 
-## 作为 Chained Workflow 的一部分使用
+## When to reach for it
+
+Reach for `ce-ideate` when:
+
+- You don't have a specific idea yet and want a qualified candidate set
+- The thinking is greenfield or big-picture
+- You want a focus area explored without committing to a direction
+- You want a surprising direction (`surprise me`)
+- You want to mine the issue tracker for patterns
+- The topic is not software at all
+
+Skip `ce-ideate` when:
+
+- You already have a specific feature or decision in mind → `/ce-brainstorm`
+- The options are already on the table and you need a verdict → `/ce-pov`
+- Requirements are ready and you need execution guardrails → `/ce-plan`
+- You're debugging a known bug → `/ce-debug`
+
+---
+
+## Use as part of the chained workflow
 
 ```text
 /ce-ideate            "What's worth exploring?"
@@ -164,78 +172,81 @@ Grounding agents 并行返回：codebase summary、relevant past learnings、dev
    v
 /ce-plan              "What's needed to accomplish this?"
    |
-   |   structured plan (U-IDs, files, test scenarios — guardrails, not code)
+   |   structured plan (U-IDs, files, test scenarios: guardrails, not code)
    v
 /ce-work              "Build it."
 ```
 
-每个 artifact 都是下一步的 structured input：survivor 的 basis 作为 brainstorm 的 evidence base 继续传递；brainstorm 的 decisions 流入 plan 的 requirements 和 scope；plan 的 U-IDs 和 test scenarios 成为 `ce-work` 执行的 guardrails。当你在 next-steps menu 选择 "Brainstorm one idea" 时，`ce-brainstorm` 会用该 idea 作为 substance seed（basis、rationale 和 tradeoffs）加载；ideation file 此时已经保存。
+Each artifact feeds the next. The survivor's basis seeds the brainstorm's evidence; the brainstorm's decisions become the plan's requirements and scope; the plan's U-IDs and test scenarios are what `ce-work` executes against. When you pick "Brainstorm one idea," `ce-brainstorm` loads with that idea's basis, rationale, and tradeoffs. The ideation file is already saved.
 
-Chain 也能运行在 non-software domains：weekend-trip directions 的 ideation 会进入定义 trip 的 brainstorm，再进入把 bookings、packing 和 itinerary 结构化为 guardrails 的 plan。
+In a repo, acting on an idea always goes to `ce-brainstorm`, not `ce-plan`. `ce-plan` wants a brainstorm-grounded Product Contract.
 
----
-
-## 单独使用
-
-`ce-ideate` 本身就是完整 ideation cycle：它会产出一个已保存、可打开、可分享、可继续 brainstorm、也可 discard 的 ranked reasoned idea set。
-
-**Software（软件）：**
-
-- **Codebase audits（codebase 审计）**：`/ce-ideate "what to improve in this repo"`（可搭配 `STRATEGY.md` 做 strategy-aligned weighting）
-- **Issue triage（issue 分流）**：`/ce-ideate "biggest issue themes in the last quarter"`
-- **Pricing or positioning ideation（定价或定位 ideation）**：`/ce-ideate "pricing page A/B test ideas"`
-- **Surprise-me runs on any subject（任意主题 surprise-me 运行）**：在任意 repo 内运行 `/ce-ideate "surprise me"`
-
-**Non-software（非软件）：**
-
-- **Naming（命名）**：coffee shops、baby names、products、brands
-- **Personal decisions（个人决策）**：career options、sabbatical destinations
-- **Plot or narrative ideation（情节或叙事 ideation）**：short story directions、character beats
-- **Business strategy（商业策略）**：go-to-market、positioning against a competitor
-- **Travel and events（旅行与活动）**：trip themes、wedding-venue concepts
-
-Deliverable 会自动写入，不需要额外请求。如果某次 run 纯属探索而你不想保留，说 "discard" 即可删除该文件。
+The chain works outside software too: weekend-trip directions feed a brainstorm that defines the trip, which can feed a plan that structures bookings, packing, and itinerary. In that mode brainstorming is optional deeper development, not a required next rung.
 
 ---
 
-## 参考
+## Use standalone
 
-| Argument（参数） | Effect（效果） |
+`ce-ideate` is a complete ideation cycle on its own: a ranked, reasoned idea set saved as a file you can open, share, brainstorm from, or discard.
+
+**Software:**
+
+- Codebase audits: `/ce-ideate "what to improve in this repo"` (pair with `STRATEGY.md` for strategy-aligned weighting)
+- Issue triage: `/ce-ideate "biggest issue themes in the last quarter"`
+- Pricing or positioning: `/ce-ideate "pricing page A/B test ideas"`
+- Surprise-me runs: `/ce-ideate "surprise me"` from inside any repo
+
+**Non-software:**
+
+- Naming: coffee shops, baby names, products, brands
+- Personal decisions: career options, sabbatical destinations
+- Plot or narrative ideation: short story directions, character beats
+- Business strategy: go-to-market, positioning against a competitor
+- Travel and events: trip themes, wedding-venue concepts
+
+The file is written every run. Say `discard` to delete a file created this run. If a related ideation file from the last 30 days exists, the skill offers to resume it instead of starting a duplicate.
+
+---
+
+## Reference
+
+| Argument | Effect |
 |----------|--------|
-| _(empty)_ | Open-ended；询问 subject 或路由到 surprise-me |
-| `<concept>` | 例如 `DX improvements`、`auth quality` |
-| `<path>` | 聚焦某个 directory 或 file |
-| `<constraint>` | 例如 `low-complexity quick wins`、`polish-only` |
+| _(empty)_ | Open-ended; asks for a subject or routes to surprise-me |
+| `<concept>` | e.g., `DX improvements`, `auth quality` |
+| `<path>` | a directory or file to focus on |
+| `<constraint>` | e.g., `low-complexity quick wins`, `polish-only` |
 | `surprise me` | Surprise-me mode |
-| `go deep` | Maximum depth：每个 ideation agent 都运行在 top-tier model 上，verification budgets 翻倍，并在 filtering pass 中加入第二个 critic |
-| `top issue themes in <area>` | 触发 issue-tracker intent |
-| `output:md` | 将 artifact 写成 markdown，而不是默认 self-contained HTML（`output:html` 会显式强制 HTML）。也可通过 `.compound-engineering/config.local.yaml` 中的 `ideate_output` 做 per-project 设置；参见[配置参考](./configuration.md) |
+| `go deep` | Maximum depth: every ideation agent on the top-tier model, doubled verification, a second critic |
+| `top issue themes in <area>` | Triggers issue-tracker intent |
+| `top 3` / `100 ideas` / `raise the bar` | Volume override: survivor count, raw total, or a higher bar |
+| `output:md` | Write the artifact as markdown instead of the default self-contained HTML (`output:html` forces HTML). Also settable per-project via `ideate_output` in CE config (`config.local.yaml` then `config.yaml`); see the [configuration reference](./configuration.md). A headless or pipeline run resolves the format the same way; nothing forces markdown. |
 
-Prompt 任意位置支持 skip phrases：`no external research`、`no slack`。
-
----
-
-## 常见问题
-
-**为什么是六个 frames？为什么不只用一个 "give me ideas" prompt？**
-Single-prompt ideation 会塌缩到 agent 最常训练的方向。不同 frames 强迫真正的 breadth；尤其是 cross-domain analogy 和 constraint-flipping，会浮现单个 prompt 得不到的 ideas。
-
-**为什么需要 basis requirement？这不就是 AI hand-waving 吗？**
-没有 basis，plausible-sounding ideas 会未经筛选地通过。Basis requirement 意味着每个 survivor 都引用真实 evidence、真实 prior art，或写清楚的 argument。你可以 audit 它。
-
-**它真的适用于 non-software topics 吗？**
-是。相同的 generate-critique-survive engine 会用 domain-native language 处理 naming、narrative、personal decisions 和 business strategy。Codebase grounding 会替换为 user-context synthesis 和 external research。
-
-**如果我想在进入 brainstorm 前 tweak 或讨论这些 ideas 呢？**
-选择 "Discuss or refine the ideas first"：留在 `ce-ideate` 中跨整组 ideas 继续工作，可以调整或追问某个 idea、比较多个 ideas，或把它们组合/合并。调整和合并会更新已保存文件；纯 Q&A 和比较不会。文件会自动写入；如果你不想保留，说 "discard" 即可。
-
-**如果我的 prompt ambiguous 呢？**
-当 prompt 只指向某种 quality（`improvements`、`quick wins`）而不是 specific thing 时，subject-identification gate 会问一个 scope question。"Surprise me" 会作为真实 option 提供，而不是 fallback。
+Skip phrases supported anywhere in the prompt: `no external research`, `no slack`.
 
 ---
 
-## 另见
+## FAQ
 
-- [`ce-brainstorm`](./ce-brainstorm.md) - 选中 survivor 后，将 chosen direction brainstorm 成 requirements doc
-- [`ce-plan`](./ce-plan.md) - requirements 清晰后，规划 implementation
-- [`ce-strategy`](./ce-strategy.md) - 将 ideation 锚定到 documented product strategy
+**Why a basis requirement?**
+Without one, plausible-sounding ideas pass through unfiltered. Every survivor cites real evidence, real prior art, or a written-out argument, so you can audit it.
+
+**Can I go straight to `ce-plan` from a survivor?**
+Not from inside a repo. Acting on an idea loads `ce-brainstorm` with a substance seed; `ce-plan` wants a brainstorm-grounded Product Contract. Outside a software build, the saved idea set can be the end of the run, and brainstorming there is optional deeper development of one idea.
+
+**What if I want to talk through the ideas before committing to a brainstorm?**
+Pick "Discuss or refine the ideas first." Stay in `ce-ideate` and work across the set: adjust or interrogate one idea, compare several, or combine them. Adjustments and merges update the saved file; pure Q&A and comparison do not. The file is written automatically, so if you didn't want a new one kept, say `discard`.
+
+**What if my prompt is ambiguous?**
+A subject-identification gate asks one scope question when the prompt names only a quality (`improvements`, `quick wins`) rather than a specific thing. "Surprise me" is a real option, not a fallback.
+
+---
+
+## See also
+
+- [`ce-brainstorm`](./ce-brainstorm.md): once you've picked a survivor, brainstorm the chosen direction into a requirements-only unified plan
+- [`ce-pov`](./ce-pov.md): when the options are already known and you need a verdict, not a new candidate set
+- [`ce-plan`](./ce-plan.md): once requirements are clear, plan the implementation
+- [`ce-strategy`](./ce-strategy.md): anchor ideation to a documented product strategy
+- [`ce-doc-review`](./ce-doc-review.md): review a saved markdown or HTML planning artifact for clarity and completeness
+- [`ce-proof`](./ce-proof.md): publish the artifact to Proof for a shareable link when you name Proof (markdown output only; Proof can't ingest HTML)

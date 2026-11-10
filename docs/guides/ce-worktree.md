@@ -1,144 +1,135 @@
 # `ce-worktree`
 
-> 确保工作在 isolated git worktree 中进行，同时不扰动当前 checkout：先检测 existing isolation，优先交给 harness native worktree tool，最后才 fallback 到 plain git。
+> **中文导读：** `ce-worktree` 负责隔离：把工作放进独立 git worktree，而不打扰当前 checkout。多数 harness 在 session 启动时已创建 worktree，因此先检查是否已隔离；优先使用 harness 自带的 worktree 工具，只有都不适用时才退回 `git worktree add`。不要在 worktree 中再嵌套 worktree，也不要创建 harness 看不见的 worktree。
 
-`ce-worktree` 是 **isolation guardrail** skill。它的价值是 judgment，不是 mechanics：多数 coding harness 现在会在 session start 时默认创建 worktree，所以常见情况是你*已经*被隔离。这个 skill 编码了必要纪律：识别这种状态，优先 defer 给 harness 自己的 worktree tooling，仅在最后才用 plain git 创建 worktree，从而避免 nested worktrees 或创建 harness 无法管理的 state。
+> Put the work in an isolated git worktree without disturbing the current checkout.
 
-它是 pure prose + inline git，**没有 bundled script**，所以能在所有 targets（Claude Code、Codex、Gemini、OpenCode、Pi、Kiro）上原样工作。
+`ce-worktree` is the **isolation** skill, a git-workflow tool rather than a core-loop step. Most coding harnesses already create a worktree at session start, so the common case is that you are already isolated. The skill checks that first, then prefers the harness's own worktree tool, and only falls back to plain `git worktree add` when neither applies. Nesting a worktree inside another one, or creating one the harness cannot see, is worse than working where you already are.
+
+There is no bundled script. The agent runs inline git from the project directory, so the same instructions work on Claude Code, Codex, Gemini, OpenCode, and Pi.
 
 ---
 
 ## TL;DR
 
-| Question（问题） | Answer（答案） |
+| Question | Answer |
 |----------|--------|
-| 它做什么？ | 确保 isolation 存在。先检测 existing worktree，优先使用 harness native worktree tool，最后 fallback 到 `.worktrees/<branch>` 下的 `git worktree add` |
-| 何时使用？ | 开始一项应该和当前 checkout 隔离的工作；或 `ce-work` / `ce-code-review` 提供 worktree option 时 |
-| 产出什么？ | 要么报告 "you are already isolated, work in place"，要么创建新的 isolated worktree |
-| 何时跳过？ | 单个 task 放在当前 checkout 的 branch 中就足够 |
+| What does it do? | Makes sure isolation exists. Detects an existing worktree, prefers the harness tool, else `git worktree add` under `.worktrees/<branch>` |
+| When to use it | Starting work that should stay off the current checkout, or when `ce-work` / `ce-code-review` offers a worktree |
+| What it produces | Either "already isolated, work here" or a new isolated worktree, with path and branch reported |
+| Skip when | Single-task work that fits on a branch in the current checkout |
 
 ---
 
-## 调用示例
+## Example invocations
+
+Empty or a work description means **new work**. `isolate` plus a ref means **attach**. If this checkout is already a linked worktree, every form works in place rather than nesting.
 
 ```text
-# 在 isolation 中开始新工作；会先检测现有 isolation
+# New work. Detect isolation first. If none, create .worktrees/<named-branch> from trunk.
 /ce-worktree for the account-notifications feature
 
-# 隔离现有 branch，而不是创建新 branch
+# Already isolated (common in Orca or Cursor): report path and branch, stay here
+/ce-worktree
+
+# Attach a worktree to an existing branch
 /ce-worktree isolate feature/account-notifications
 
-# 隔离 pull request，且不扰动当前 checkout
+# Attach a worktree to a PR head on a local pr-1234 branch (so later commits can push back)
 /ce-worktree isolate PR 1234
+
+# Attach a worktree at an existing commit
+/ce-worktree isolate abcdef1
 ```
 
-如果当前 checkout 已经是 isolated worktree，所有调用形式都会原地工作，不再嵌套另一个 worktree。
+Git allows a branch in only one worktree at a time. If the named ref is already checked out somewhere, the skill reports that path and stops instead of forcing a second worktree. Work there, or ask for a detached worktree at the same commit if you truly need a separate tree.
 
 ---
 
-## 问题
+## The Problem
 
-要求 agent "make a worktree" 越来越常常是*错误默认值*，因为 agent 通常已经在 worktree 里：
+"Make a worktree" is often the wrong default, because the agent is usually already in one:
 
-- **Worktree-from-worktree**：从 linked worktree 内创建 worktree 时，新 worktree 会相对 *main* clone resolve，落在用户并不正在工作的另一个 directory tree 里。
-- **Phantom state**：偷偷执行的 `git worktree add` 对拥有 worktree lifecycle 的 harness（Orca、Cursor 等）不可见；它无法 list、navigate 或 cleanup。
-- **Committed worktree contents**：如果 `.worktrees/` 没有 gitignore，worktree 会污染 `git status`，并有被 commit 的风险。
-- **Cryptic branch names**：`worktree-jolly-beaming-raven` 这类 auto-generated names 会掩盖 worktree 的真实用途。
+- Creating a worktree from inside a linked worktree resolves the new one against the main clone, in a directory tree you are not using
+- A behind-the-back `git worktree add` is invisible to the harness (Orca, Cursor, and similar). It cannot list, open, or clean up that tree
+- If `.worktrees/` is not gitignored, the extra tree shows up in `git status` and can be committed
+- Auto-generated names like `worktree-jolly-beaming-raven` hide what the tree is for
 
-## 方案
+## The Solution
 
-`ce-worktree` 把 isolation 作为 ordered decision 运行，而不是 creation script：
+Isolation is an ordered decision, not a create script.
 
-1. **Detect existing isolation**（比较 `--git-dir` 和 `--git-common-dir`，并带 submodule guard）。如果已经 isolated，就报告并原地工作。
-2. **Prefer the harness's native worktree tool**（例如 `EnterWorktree` tool、`/worktree` command、`--worktree` flag），让 worktree 保持被 harness 管理。
-3. **Inline git fallback** 只在前两者都不适用时运行：先确认 `.worktrees` 已 gitignored，再用 meaningful branch name 创建 `.worktrees/<branch>`。
+**1. Detect existing isolation.** The skill compares the resolved absolute git dir against the resolved absolute common git dir. A raw string compare is not enough. From a subdirectory, one side can come back absolute and the other relative, which looks like "already isolated" when it is not. When the two differ, `git rev-parse --show-superproject-working-tree` splits the cases: non-empty means submodule (treat as a normal checkout), empty means linked worktree. Already isolated means report path and branch and work in place. In attach mode, check the named ref out here rather than nesting.
 
----
+**2. Prefer the harness tool.** If the harness has a worktree primitive (`EnterWorktree`, `/worktree`, `--worktree`, or similar), the skill uses it and stops, so the harness still owns the tree.
 
-## 新颖之处
+**3. Git fallback.** Only when neither applies. From the repo root, the skill runs `git check-ignore -q .worktrees/` (trailing slash required), adds the `.gitignore` line if needed, fetches the base (non-fatal if there is no `origin` or the branch is local-only), and creates the tree with a meaningful branch name.
 
-### 1. Detection before creation
+The two modes share the fallback. **New work** creates `feat/...` or `fix/...` from origin's default branch. **Attach** checks out the named branch, tag, commit, or PR. A PR is fetched to a local `pr-<n>` branch, then that branch is added as the worktree. A detached `FETCH_HEAD` is not used, because later fix commits would not update the PR. When you need fork-safe push tracking, the fallback is a detached add followed by `gh pr checkout`.
 
-最重要的行为：创建任何东西之前，先判断当前 directory 是否已经是 linked worktree。`git rev-parse --git-dir` 和 `--git-common-dir` 在 linked worktrees 与 submodules 中都会不同，因此还要用 `git rev-parse --show-superproject-working-tree` submodule guard 消歧。已经 isolated 时，skill 会原地工作，而不是 nesting。
-
-### 2. Native-tool deference
-
-如果 harness 提供 worktree primitive，skill 会使用它，而不是 shell out 到 git。这样避免创建 harness 看不到、也无法 cleanup 的 phantom worktrees，也就是 "don't fight the harness" rule。
-
-### 3. Portable by construction
-
-没有 bundled script，也不依赖 `${CLAUDE_SKILL_DIR}`，只有 agent 从 project directory 运行的 inline git。这就是该 skill 在每个 target 上 resolve 一致、也不需要 `ce_platforms` gate 的原因。
-
-### 4. Gitignore safety before creation
-
-运行 git fallback 时，skill 会先验证 `.worktrees` 已被 gitignored（`git check-ignore`），再创建 worktree，确保其 contents 不会被 commit。
-
-### 5. Naming guidance for upstream callers
-
-当 `ce-work` 或 `ce-code-review` 调用该 skill 时，它们会传入从工作内容 derive 的 meaningful branch name（`feat/crowd-sniff`、`fix/email-validation`），绝不会使用 opaque auto-generated name。
+If `git worktree add` fails on sandbox or permissions, the skill does **not** continue in the current checkout. You chose isolation for a reason. It reports the failure and asks whether to work here anyway or stop.
 
 ---
 
-## 快速示例
+## Quick Example
 
-你位于 Orca-managed worktree 中（harness 在 session start 时已创建），并要求 `ce-work` isolate the work。Skill 运行 Step 0：`--git-dir` 和 `--git-common-dir` 不同，submodule guard 返回 empty -> **you are already isolated**。它报告 worktree path 和 current branch，然后原地继续；不会创建第二个 worktree，也不会产生 phantom state。
+You are in an Orca-managed worktree created at session start. `ce-work` offers isolation. `/ce-worktree` sees that the absolute git dir and the common dir differ, and the submodule guard is empty. You are already isolated. It reports the path and branch and continues in place.
 
-在没有 native worktree tool 的 plain terminal checkout 中，同样的 invocation 会进入 Step 2：确认 `.worktrees` 已 gitignored，fetch base branch，运行 `git worktree add -b feat/login .worktrees/feat/login origin/main`，然后 `cd` 进去。
-
----
-
-## 何时使用
-
-在以下情况使用 `ce-worktree`：
-
-- 你要开始一项应当和当前 checkout 隔离的工作
-- 某个 skill（`ce-work`、`ce-code-review`）提供 worktree 作为 option
-
-以下情况跳过：
-
-- Work 是 single-task，放在当前 checkout 的 branch 中即可
-- 你已经 isolated，且不需要第二个 parallel workspace（skill 会替你检测）
+In a plain terminal checkout with no native tool, the same "new work" prompt confirms `.worktrees/` is ignored, fetches the base, runs `git worktree add -b feat/login .worktrees/feat/login origin/main`, and `cd`s in.
 
 ---
 
-## 作为 Workflow 的一部分使用
+## When to Reach For It
 
-`ce-worktree` 会被 chain skills 作为 isolation step 调用：
+Use `ce-worktree` when:
 
-- **`/ce-work`**：开始工作时，用户可选择 worktree isolation，而不是在当前 checkout 中 branch
-- **`/ce-code-review`**：并发 review PR，且不扰动 in-progress work
+- The work should stay off the current checkout
+- `ce-work` or `ce-code-review` offered a worktree
 
-Upstream callers 会传 meaningful branch names；skill 期望 `feat/...`、`fix/...`、`refactor/...` 形状，而不是 auto-generated random names。
+Skip it when:
+
+- The work fits on a branch in the current checkout
+- You are already isolated and do not need a second, parallel workspace (the skill detects this)
+
+Why a skill at all, when the agent already knows `git worktree add`? The skill is the order: detect first, defer to the harness, do not nest or create phantom state. `ce-work` and `ce-code-review` share that order by calling this skill.
 
 ---
 
-## Other worktree operations（其他 worktree 操作）
+## Chain Position
 
-List、remove 和 switch 直接使用 `git`；该 skill 不提供 wrapper：
+On-demand isolation. Callers pass a meaningful branch name (`feat/...`, `fix/...`, `refactor/...`), not a random label.
+
+```text
+/ce-work         ->  /ce-worktree   (optional isolation before implementation)
+/ce-code-review  ->  /ce-worktree   (review a PR without touching in-progress work)
+```
+
+---
+
+## Reference
+
+| Argument | Effect |
+|----------|--------|
+| _(empty)_ | Detect isolation. If none, new-work fallback needs a name from context. |
+| `<work description>` | New work: create a named branch worktree from trunk |
+| `isolate <branch\|tag\|commit>` | Attach a worktree to that ref |
+| `isolate PR <n>` | Attach a worktree to that PR head on local `pr-<n>` |
+
+List, remove, and switch are plain git. The skill does not wrap them:
 
 ```bash
-git worktree list                          # list worktrees
-git worktree remove .worktrees/<branch>    # remove a worktree
-cd .worktrees/<branch>                     # switch to a worktree
-cd "$(git rev-parse --show-toplevel)"      # return to the current checkout root
+git worktree list
+git worktree remove .worktrees/<branch>
+cd .worktrees/<branch>
+cd "$(git rev-parse --show-toplevel)"
 ```
 
----
-
-## FAQ
-
-**为什么用 skill，而不是直接 `git worktree add`？**
-价值不在 `git worktree add` 命令本身，agent 已经知道它。价值在 *judgment*：检测你很可能已经 isolated，defer 给 harness worktree tooling，并避免 nesting 或创建 phantom state。这套纪律由 `ce-work` 和 `ce-code-review` 共享，所以放在一个 named skill 中，而不是到处复制并 drift。
-
-**我已经在 worktree 里了，它还会再建一个吗？**
-不会。Step 0 会检测 existing isolation 并原地工作。Worktree-from-worktree 正是该 skill 要防止的 failure mode。
-
-**如何清理 worktree？**
-运行 `cd "$(git rev-parse --show-toplevel)"` 离开它，然后运行 `git worktree remove .worktrees/<branch>`。当 remote tracking branch 已消失时，用 `git branch --merged` 和 `git fetch --prune` 辅助清理 stale branches。
+To clean up when you are done, leave with `cd "$(git rev-parse --show-toplevel)"`, then `git worktree remove .worktrees/<branch>`. If the remote tracking branch is gone, `git fetch --prune` and `git branch -d <branch>` after you confirm it is merged.
 
 ---
 
-## 另见（See Also）
+## See Also
 
-- [`/ce-work`](./ce-work.md) - 将此 skill 作为 isolation option 提供
-- [`/ce-code-review`](./ce-code-review.md) - 为 concurrent review 提供 worktree isolation
+- [`/ce-work`](./ce-work.md): offers this skill as its isolation option
+- [`/ce-code-review`](./ce-code-review.md): offers worktree isolation for concurrent review
+- [`/ce-commit`](./ce-commit.md): commit in the isolated tree without shipping

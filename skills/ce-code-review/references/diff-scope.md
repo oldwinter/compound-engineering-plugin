@@ -22,6 +22,12 @@ SKILL.md 中的 scope step 会处理 discovery，并传入 resolved diff。除�
 - 否则只依赖提供的 `<diff>` 中的 diff hunks。
 - 不要把 local workspace contents 当作 changed files finding 的证据。
 
+## 整文件删除
+
+被删除的文件在 diff 中只显示为 header：`deleted file mode` 加路径，旧文件体被省略。review context 中的 `<deleted-files>` block 会列出每个被删文件导出了什么、是否在 import 时执行过任何东西。只有 finding 需要时才读取文件体，使用 `git show <base>:<path>`，base 取该 block 指定的值。
+
+存活代码树是否仍在使用被删文件，属于 correctness 与 adversarial reviewer 的判断范围；由他们的 persona 说明要检查什么。该检查需要被 review 的 tree，读取文件体则需要 block 指定的 base。若两者之一无法读取（例如远程 scope 没有 head ref，或 block 没有 base），就在 `residual_risks` 中记录哪些被删文件未检查及原因；绝不要把它们的 liveness 报告为已检查。其他 reviewer 只 review 存活文件，包括删除后留下的残留：不再有读者的 imports、props、styles、flags 和 assets。被删文件的文件体不是待 review 的代码。
+
 ## Evidence Tools（适配工具）
 
 Recall 取决于如何查找相关代码。只读取 diff 并执行文本 `grep`，会漏掉通过 re-exports、aliases 和 barrel files 到达的 callers，也会误命中 strings、comments 或更长名称中的 identifiers。当 claim 依赖某个 symbol 的 callers、implementations，或某个 construct 是否在别处出现时，使用 harness 实际提供的最强 search，按以下顺序优先，并在某一 tier 不可用时向下回退：
